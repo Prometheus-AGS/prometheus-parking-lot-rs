@@ -1,0 +1,23 @@
+# Bun Configuration for E2B Template
+# This file optimizes Bun for building E2B templates
+
+[install]
+# Use exact versions for reproducible builds
+exact = true
+
+# Faster installs with binary lockfile
+lockfile = true
+
+# Production mode (skip devDependencies in runtime)
+production = false
+
+[run]
+# Enable bun runtime for scripts
+bun = true
+
+# Load .env automatically
+env = true
+
+[test]
+# Bun test configuration
+preload = []

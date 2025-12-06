@@ -1,0 +1,32 @@
+{
+  "name": "prometheus-rust-dev-template",
+  "version": "1.0.0",
+  "description": "E2B template for Prometheus Parking Lot development with Rust toolchain",
+  "type": "module",
+  "scripts": {
+    "build": "bun run build-template.ts",
+    "test": "bun run test-template.ts"
+  },
+  "keywords": [
+    "e2b",
+    "rust",
+    "prometheus",
+    "sandbox",
+    "template"
+  ],
+  "author": "Prometheus AI Team",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "e2b": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "bun": ">=1.0.0"
+  }
+}

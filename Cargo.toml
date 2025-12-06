@@ -1,0 +1,40 @@
+[package]
+name = "prometheus_parking_lot"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Prometheus AI Team"]
+description = "High-performance synchronization primitives for the Prometheus AI Platform"
+documentation = "https://docs.rs/prometheus_parking_lot"
+repository = "https://github.com/prometheus-ai/prometheus-parking-lot"
+license = "MIT OR Apache-2.0"
+keywords = ["synchronization", "mutex", "rwlock", "concurrent", "prometheus"]
+categories = ["concurrency", "no-std"]
+
+[features]
+default = ["std"]
+std = []
+nightly = []
+
+[dependencies]
+lock_api = "0.4"
+parking_lot_core = "0.9"
+parking_lot = "0.12"
+
+[dev-dependencies]
+criterion = "0.5"
+rand = "0.8"
+
+# Benchmarks will be added later
+# [[bench]]
+# name = "sync_benchmarks"
+# harness = false
+
+[lints.rust]
+unsafe_code = "deny"
+missing_docs = "deny"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"
+nursery = "warn"
