@@ -1,0 +1,20 @@
+{
+  "pools": {
+    "llm_inference": {
+      "max_units": 20,
+      "max_queue_depth": 1000,
+      "default_timeout_secs": 60,
+      "queue": "postgres",
+      "mailbox": "postgres",
+      "runtime": "native"
+    },
+    "tauri_local_llm": {
+      "max_units": 8,
+      "max_queue_depth": 200,
+      "default_timeout_secs": 45,
+      "queue": "file",
+      "mailbox": "file",
+      "runtime": "native"
+    }
+  }
+}

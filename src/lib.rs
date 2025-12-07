@@ -1,75 +1,46 @@
 //! # Prometheus Parking Lot
 //!
-//! High-performance synchronization primitives for the Prometheus AI Platform.
+//! A configurable, runtime-agnostic parking-lot scheduler for AI agent workloads.
 //!
-//! This library provides efficient, lightweight synchronization primitives built on top of
-//! the battle-tested `parking_lot` crate.
+//! This library provides a dedicated scheduling layer that manages resource-constrained
+//! workloads across different deployment environments. It implements a "parking lot" pattern
+//! where tasks are intelligently queued when system capacity is exhausted, then automatically
+//! woken when resources become available.
 //!
-//! ## Modules
+//! ## Core Problem Solved
 //!
-//! - [`mutex`] - Mutual exclusion primitive
-//! - [`rwlock`] - Reader-writer lock
-//! - [`condvar`] - Condition variable for thread coordination
-//! - [`once`] - One-time initialization primitives (`Once`, `OnceCell`)
+//! AI workloads have fundamentally different resource constraints than typical web services:
 //!
-//! ## Examples
+//! - **GPU VRAM Limits**: Running multiple LLM inference tasks can exceed available GPU memory
+//! - **Expensive Task Loss**: AI tasks are computationally expensive - losing work due to restarts is costly
+//! - **Multi-Environment Deployment**: Same logic needs to work in desktop apps, cloud, and web
+//! - **Disconnected Clients**: Long-running tasks may complete after clients disconnect
 //!
-//! ### Using Mutex
+//! ## Key Features
 //!
-//! ```
-//! use prometheus_parking_lot::Mutex;
+//! - **Resource-Aware Scheduling**: Tracks resource consumption in arbitrary units
+//! - **Parking Lot Algorithm**: Tasks queue when capacity exhausted, wake when available
+//! - **Persistent Queues**: Survive application restarts
+//! - **Mailbox System**: Store results for later retrieval when clients disconnect
+//! - **Multi-Environment**: Same code runs on desktop (Tauri), cloud, and web
 //!
-//! let mutex = Mutex::new(0);
-//! *mutex.lock() = 10;
-//! assert_eq!(*mutex.lock(), 10);
-//! ```
+//! ## Quick Example
 //!
-//! ### Using `RwLock`
+//! ```rust,no_run
+//! use prometheus_parking_lot::core::{
+//!     PoolLimits, ResourcePool, ScheduledTask, TaskExecutor, TaskMetadata,
+//! };
+//! use prometheus_parking_lot::infra::{queue::memory::InMemoryQueue, mailbox::memory::InMemoryMailbox};
+//! use prometheus_parking_lot::util::serde::{Priority, ResourceCost, ResourceKind};
+//! use prometheus_parking_lot::util::clock::now_ms;
+//! use std::time::Duration;
 //!
-//! ```
-//! use prometheus_parking_lot::RwLock;
-//!
-//! let lock = RwLock::new(5);
-//!
-//! // Multiple readers
-//! let r1 = lock.read();
-//! let r2 = lock.read();
-//! assert_eq!(*r1, 5);
-//! assert_eq!(*r2, 5);
-//! drop(r1);
-//! drop(r2);
-//!
-//! // One writer
-//! let mut w = lock.write();
-//! *w = 10;
+//! // See tests/parking_lot_algorithm_test.rs for complete working examples
 //! ```
 //!
-//! ### Using Condvar for Thread Coordination
-//!
-//! ```
-//! use prometheus_parking_lot::{Mutex, Condvar};
-//! use std::sync::Arc;
-//! use std::thread;
-//!
-//! let pair = Arc::new((Mutex::new(false), Condvar::new()));
-//! let pair2 = Arc::clone(&pair);
-//!
-//! // Spawn a thread that will signal when ready
-//! thread::spawn(move || {
-//!     let (lock, cvar) = &*pair2;
-//!     let mut ready = lock.lock();
-//!     *ready = true;
-//!     cvar.notify_one();
-//! });
-//!
-//! // Wait for the signal
-//! let (lock, cvar) = &*pair;
-//! let mut ready = lock.lock();
-//! while !*ready {
-//!     cvar.wait(&mut ready);
-//! }
-//! assert!(*ready);
-//! ```
+//! For complete examples, see:
+//! - `tests/parking_lot_algorithm_test.rs` - Full integration tests
+//! - `README.md` - Comprehensive documentation
 
 #![deny(warnings)]
 #![deny(missing_docs)]
@@ -78,13 +49,16 @@
 #![warn(clippy::pedantic)]
 #![warn(clippy::nursery)]
 
-pub mod condvar;
-pub mod mutex;
-pub mod once;
-pub mod rwlock;
+/// Core scheduling abstractions and capacity accounting.
+pub mod core;
+/// Configuration models for pools, backends, and timeouts.
+pub mod config;
+/// Builders to construct scheduler components from configuration.
+pub mod builders;
+/// Infrastructure adapters for queues, mailboxes, and storage backends.
+pub mod infra;
+/// Runtime adapters (native, web/worker, cloud) and API surface.
+pub mod runtime;
+/// Shared utilities.
+pub mod util;
 
-// Re-export main types for convenience
-pub use condvar::Condvar;
-pub use mutex::{Mutex, MutexGuard};
-pub use once::{Once, OnceCell};
-pub use rwlock::{RwLock, RwLockReadGuard, RwLockUpgradableReadGuard, RwLockWriteGuard};

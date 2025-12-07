@@ -1,0 +1,226 @@
+openapi: 3.0.3
+info:
+  title: Prometheus Parking-Lot Scheduler API
+  version: 0.1.0
+servers:
+  - url: https://api.example.com
+paths:
+  /pools/{poolId}/tasks:
+    post:
+      summary: Submit a task to a pool
+      parameters:
+        - in: path
+          name: poolId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskSubmission'
+      responses:
+        '202':
+          description: Task accepted (running or queued)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskAccepted'
+        '400':
+          description: Validation error or past deadline
+        '409':
+          description: Queue full or capacity zero
+  /pools/{poolId}/tasks/{taskId}:
+    get:
+      summary: Get task status
+      parameters:
+        - in: path
+          name: poolId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: taskId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Current task status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskStatus'
+        '404':
+          description: Task not found
+  /mailbox/{tenant}/{mailboxKey}:
+    get:
+      summary: Fetch mailbox messages
+      parameters:
+        - in: path
+          name: tenant
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: mailboxKey
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: since
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Messages for mailbox
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MailboxMessage'
+        '404':
+          description: Mailbox not found
+  /pools:
+    get:
+      summary: List pools and config snapshot
+      responses:
+        '200':
+          description: Pool list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pools:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PoolConfig'
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service healthy
+components:
+  schemas:
+    TaskSubmission:
+      type: object
+      required: [taskId, priority, resourceCost, payload, createdAt]
+      properties:
+        taskId:
+          type: string
+        priority:
+          type: string
+          enum: [low, normal, high, critical]
+        resourceCost:
+          type: object
+          properties:
+            kind:
+              type: string
+              enum: [cpu, gpuVram, io, mixed]
+            units:
+              type: integer
+              minimum: 0
+        deadline:
+          type: string
+          format: date-time
+        mailboxKey:
+          type: object
+          properties:
+            tenant:
+              type: string
+            userId:
+              type: string
+            sessionId:
+              type: string
+        payload:
+          type: object
+          description: Opaque task payload
+        createdAt:
+          type: string
+          format: date-time
+    TaskAccepted:
+      type: object
+      properties:
+        taskId:
+          type: string
+        status:
+          type: string
+          enum: [running, queued]
+        position:
+          type: integer
+          description: Queue position if queued
+    TaskStatus:
+      type: object
+      properties:
+        taskId:
+          type: string
+        status:
+          type: string
+          enum: [submitted, queued, running, completed, failed, expired, rejected, dropped]
+        reason:
+          type: string
+        mailboxKey:
+          $ref: '#/components/schemas/MailboxKey'
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+    MailboxKey:
+      type: object
+      properties:
+        tenant:
+          type: string
+        userId:
+          type: string
+        sessionId:
+          type: string
+    MailboxMessage:
+      type: object
+      properties:
+        taskId:
+          type: string
+        status:
+          type: string
+          enum: [completed, failed, expired, dropped]
+        payload:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+    PoolConfig:
+      type: object
+      properties:
+        poolId:
+          type: string
+        maxUnits:
+          type: integer
+        maxQueueDepth:
+          type: integer
+        defaultTimeoutSecs:
+          type: integer
+        queueBackend:
+          type: string
+          description: in-memory | file | postgres | pgmq-style
+        mailboxBackend:
+          type: string
+          description: in-memory | file | postgres
+        runtimeAdapter:
+          type: string
+          description: native | web-worker | cloud-worker

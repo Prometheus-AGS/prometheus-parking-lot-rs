@@ -1,8 +1,14 @@
 # Rust
 /target/
+debug/
+release/
 **/*.rs.bk
+*.rlib
+*.prof*
 *.pdb
 Cargo.lock
+*.log
+.env*
 
 # IDE
 .vscode/

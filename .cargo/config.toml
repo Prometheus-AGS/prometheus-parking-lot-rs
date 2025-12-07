@@ -1,0 +1,6 @@
+[alias]
+fmt = "fmt --all"
+clippy = "clippy --all-targets --all-features -- -D warnings"
+
+[build]
+target-dir = "target"
