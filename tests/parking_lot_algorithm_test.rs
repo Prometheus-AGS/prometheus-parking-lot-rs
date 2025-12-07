@@ -407,3 +407,109 @@ async fn test_deadline_rejection() {
 
     assert!(result.is_err());
 }
+
+#[tokio::test]
+async fn test_concurrent_submissions() {
+    // Test that concurrent task submissions work correctly with atomic capacity tracking
+    let limits = PoolLimits {
+        max_units: 100,
+        max_queue_depth: 1000,
+        default_timeout: Duration::from_secs(60),
+    };
+
+    let queue = InMemoryQueue::new(1000);
+    let mailbox = InMemoryMailbox::new();
+    let executor = TestExecutor::new();
+    let spawner = TestSpawner;
+
+    let pool = Arc::new(ResourcePool::new(limits, queue, mailbox, executor.clone(), spawner));
+
+    // Submit many tasks concurrently
+    let num_tasks = 50;
+    let mut handles = Vec::new();
+
+    for i in 0..num_tasks {
+        let pool = Arc::clone(&pool);
+        let handle = tokio::spawn(async move {
+            let meta = TaskMetadata {
+                id: i,
+                priority: Priority::Normal,
+                cost: ResourceCost {
+                    kind: ResourceKind::Cpu,
+                    units: 2, // Each task uses 2 units
+                },
+                created_at_ms: now_ms(),
+                deadline_ms: None,
+                mailbox: None,
+            };
+
+            let job = TestJob {
+                name: format!("concurrent_task_{}", i),
+                value: i as u32,
+            };
+
+            pool.submit(ScheduledTask { meta, payload: job }, now_ms()).await
+        });
+        handles.push(handle);
+    }
+
+    // Wait for all submissions to complete
+    for handle in handles {
+        let result = handle.await.unwrap();
+        assert!(result.is_ok());
+    }
+
+    // Wait for all tasks to execute
+    tokio::time::sleep(Duration::from_millis(1000)).await;
+
+    // Verify all tasks executed
+    let results = executor.get_results().await;
+    assert_eq!(results.len(), num_tasks as usize);
+}
+
+#[tokio::test]
+async fn test_shutdown() {
+    // Test that shutdown signals wake workers correctly
+    let limits = PoolLimits {
+        max_units: 10,
+        max_queue_depth: 100,
+        default_timeout: Duration::from_secs(60),
+    };
+
+    let queue = InMemoryQueue::new(100);
+    let mailbox = InMemoryMailbox::new();
+    let executor = TestExecutor::new();
+    let spawner = TestSpawner;
+
+    let pool = ResourcePool::new(limits, queue, mailbox, executor.clone(), spawner);
+
+    // Submit a task
+    let meta = TaskMetadata {
+        id: 1,
+        priority: Priority::Normal,
+        cost: ResourceCost {
+            kind: ResourceKind::Cpu,
+            units: 5,
+        },
+        created_at_ms: now_ms(),
+        deadline_ms: None,
+        mailbox: None,
+    };
+
+    let job = TestJob {
+        name: "shutdown_test".to_string(),
+        value: 42,
+    };
+
+    pool.submit(ScheduledTask { meta, payload: job }, now_ms()).await.unwrap();
+
+    // Wait for task to complete
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // Shutdown the pool
+    pool.shutdown();
+
+    // Verify shutdown doesn't panic and task executed
+    let results = executor.get_results().await;
+    assert_eq!(results.len(), 1);
+}
