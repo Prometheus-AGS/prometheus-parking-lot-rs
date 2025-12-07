@@ -6,11 +6,15 @@
 //! - Task execution and wake-up mechanism
 //! - Mailbox delivery
 //! - End-to-end scheduling scenarios
+//! - Parking lot primitives (Mutex, atomics, Condvar)
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use std::hint::black_box;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+
+use parking_lot::{Condvar, Mutex};
 
 use prometheus_parking_lot::core::{
     Mailbox, PoolLimits, ResourcePool, ScheduledTask, Spawn, TaskExecutor, TaskMetadata,
@@ -104,14 +108,146 @@ fn build_string_task(id: u64) -> ScheduledTask<String> {
                 units: 1,
             },
             deadline_ms: None,
-            created_at_ms: 0,
+            created_at_ms: id as u128, // Use id for ordering
         },
         payload: format!("payload-{}", id),
     }
 }
 
 // ============================================================================
-// Queue Benchmarks
+// Parking Lot Primitives Benchmarks
+// ============================================================================
+
+fn bench_parking_lot_mutex_uncontended(c: &mut Criterion) {
+    let mut group = c.benchmark_group("parking_lot_mutex_uncontended");
+    
+    group.bench_function("lock_unlock_cycle", |b| {
+        let mutex = Mutex::new(0u64);
+        b.iter(|| {
+            let mut guard = mutex.lock();
+            *guard += 1;
+            black_box(*guard);
+        });
+    });
+    
+    group.bench_function("lock_unlock_1000", |b| {
+        let mutex = Mutex::new(0u64);
+        b.iter(|| {
+            for _ in 0..1000 {
+                let mut guard = mutex.lock();
+                *guard += 1;
+                black_box(*guard);
+            }
+        });
+    });
+    
+    group.finish();
+}
+
+fn bench_parking_lot_mutex_vs_std(c: &mut Criterion) {
+    let mut group = c.benchmark_group("mutex_comparison");
+    
+    group.bench_function("parking_lot_mutex", |b| {
+        let mutex = parking_lot::Mutex::new(0u64);
+        b.iter(|| {
+            for _ in 0..100 {
+                let mut guard = mutex.lock();
+                *guard += 1;
+                black_box(*guard);
+            }
+        });
+    });
+    
+    group.bench_function("std_mutex", |b| {
+        let mutex = std::sync::Mutex::new(0u64);
+        b.iter(|| {
+            for _ in 0..100 {
+                let mut guard = mutex.lock().unwrap();
+                *guard += 1;
+                black_box(*guard);
+            }
+        });
+    });
+    
+    group.finish();
+}
+
+fn bench_atomic_operations(c: &mut Criterion) {
+    let mut group = c.benchmark_group("atomic_operations");
+    
+    group.bench_function("atomic_load", |b| {
+        let counter = AtomicU32::new(0);
+        b.iter(|| {
+            black_box(counter.load(Ordering::Acquire));
+        });
+    });
+    
+    group.bench_function("atomic_fetch_add", |b| {
+        let counter = AtomicU32::new(0);
+        b.iter(|| {
+            black_box(counter.fetch_add(1, Ordering::AcqRel));
+        });
+    });
+    
+    group.bench_function("atomic_cas_success", |b| {
+        let counter = AtomicU32::new(0);
+        b.iter(|| {
+            let current = counter.load(Ordering::Acquire);
+            let _ = counter.compare_exchange(
+                current,
+                current + 1,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            );
+        });
+    });
+    
+    group.bench_function("capacity_check_pattern", |b| {
+        let active_units = AtomicU32::new(50);
+        let max_units = 100u32;
+        let cost = 5u32;
+        
+        b.iter(|| {
+            // This is the pattern used in can_start_lockfree + try_reserve_capacity
+            let current = active_units.load(Ordering::Acquire);
+            if current + cost <= max_units {
+                let _ = active_units.compare_exchange_weak(
+                    current,
+                    current + cost,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
+                );
+            }
+            black_box(current);
+        });
+    });
+    
+    group.finish();
+}
+
+fn bench_condvar_notify(c: &mut Criterion) {
+    let mut group = c.benchmark_group("condvar_notify");
+    
+    group.bench_function("notify_one_no_waiters", |b| {
+        let condvar = Condvar::new();
+        b.iter(|| {
+            // This is the pattern used when releasing capacity
+            black_box(condvar.notify_one());
+        });
+    });
+    
+    group.bench_function("notify_all_no_waiters", |b| {
+        let condvar = Condvar::new();
+        b.iter(|| {
+            black_box(condvar.notify_all());
+        });
+    });
+    
+    group.finish();
+}
+
+// ============================================================================
+// Queue Benchmarks (Now O(log n) with BinaryHeap)
 // ============================================================================
 
 fn bench_queue_enqueue_dequeue(c: &mut Criterion) {
@@ -160,6 +296,34 @@ fn bench_queue_priority_sorting(c: &mut Criterion) {
                     count += 1;
                 }
                 black_box(count);
+            });
+        });
+    }
+    group.finish();
+}
+
+fn bench_queue_with_mutex(c: &mut Criterion) {
+    let mut group = c.benchmark_group("queue_with_mutex");
+    
+    for size in [100, 1_000, 5_000] {
+        group.throughput(Throughput::Elements(size));
+        group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
+            b.iter(|| {
+                let q = Arc::new(Mutex::new(InMemoryQueue::new(size as usize)));
+                
+                // Enqueue with mutex (simulates ResourcePool usage)
+                for i in 0..size {
+                    let mut guard = q.lock();
+                    guard.enqueue(build_string_task(i)).unwrap();
+                }
+                
+                // Dequeue with mutex
+                loop {
+                    let mut guard = q.lock();
+                    if guard.dequeue().unwrap().is_none() {
+                        break;
+                    }
+                }
             });
         });
     }
@@ -467,9 +631,18 @@ fn bench_end_to_end_scenario(c: &mut Criterion) {
 // ============================================================================
 
 criterion_group!(
+    primitives_benches,
+    bench_parking_lot_mutex_uncontended,
+    bench_parking_lot_mutex_vs_std,
+    bench_atomic_operations,
+    bench_condvar_notify
+);
+
+criterion_group!(
     queue_benches,
     bench_queue_enqueue_dequeue,
     bench_queue_priority_sorting,
+    bench_queue_with_mutex,
     bench_queue_prune_expired
 );
 
@@ -492,4 +665,4 @@ criterion_group!(
     bench_end_to_end_scenario
 );
 
-criterion_main!(queue_benches, mailbox_benches, pool_benches, scenario_benches);
+criterion_main!(primitives_benches, queue_benches, mailbox_benches, pool_benches, scenario_benches);

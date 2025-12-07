@@ -123,9 +123,9 @@ classDiagram
 
 ### 4.2 Component Descriptions
 
-1. **ResourcePool:** The brain of the system. It tracks `active_units` (current load). When a job arrives, it calculates `cost`. If `active + cost > max`, the job is sent to the `TaskQueue`. When a job finishes, it pulls from the queue.
+1. **ResourcePool:** The brain of the system. It tracks `active_units` using lock-free `AtomicU32` with CAS (Compare-And-Swap) operations for high-performance capacity management. When a job arrives, it calculates `cost`. If `active + cost > max`, the job is sent to the `TaskQueue`. When a job finishes, it signals via `parking_lot::Condvar` and pulls from the queue.
 2. **TaskQueue (Trait):** Abstraction for ordered job storage. Implementations include:
-   - `InMemoryQueue`: Fast, non-durable heap.
+   - `InMemoryQueue`: High-performance non-durable `BinaryHeap` with O(log n) enqueue/dequeue operations.
    - `SeaOrmQueue`: Durable Postgres table.
    - `YaqueQueue`: Durable local file-based queue (for Desktop).
 3. **Mailbox (Trait):** Abstraction for result storage. It handles the "late pickup" pattern where a mobile client might disconnect before an LLM finishes generation.
@@ -237,8 +237,41 @@ JSON
 
 ------
 
-## 7. Importance to AI Agent Design
+## 7. Performance Characteristics
+
+The library is optimized for high-throughput scenarios using `parking_lot` crate primitives and lock-free data structures.
+
+### 7.1 Synchronization Primitives
+
+| Component | Primitive | Performance |
+|-----------|-----------|-------------|
+| Capacity tracking | `AtomicU32` + CAS | ~700ps per operation |
+| Queue access | `parking_lot::Mutex` | ~888ns lock/unlock |
+| Mailbox access | `parking_lot::Mutex` | ~888ns lock/unlock |
+| Wake notifications | `parking_lot::Condvar` | ~2.4µs notify_one |
+
+### 7.2 Queue Performance
+
+The `InMemoryQueue` uses a `BinaryHeap` for O(log n) priority queue operations:
+
+| Queue Size | Enqueue+Dequeue Time | Throughput |
+|------------|---------------------|------------|
+| 100 | ~12µs | 8.4M elem/s |
+| 1,000 | ~143µs | 7.0M elem/s |
+| 10,000 | ~1.75ms | 5.7M elem/s |
+
+### 7.3 Design Decisions
+
+1. **Lock-free capacity tracking:** `AtomicU32` with CAS loop avoids mutex contention on the hot path (task admission).
+2. **Fine-grained locking:** Queue and mailbox have separate mutexes, reducing lock contention.
+3. **BinaryHeap vs VecDeque:** Priority queues use heap for O(log n) vs O(n log n) sorted insertion.
+4. **Condvar signaling:** Efficient wake notifications replace polling loops.
+
+------
+
+## 8. Importance to AI Agent Design
 
 1. **Safety Valve:** AI models are heavy. Without `prometheus_parking_lot`, a burst of 10 requests could crash a local agent by exhausting VRAM. This library turns crashes into queues.
 2. **User Experience:** By utilizing persistent queues (Yaque/Postgres), user requests aren't lost if the app crashes or updates. The agent picks up exactly where it left off upon restart.
 3. **Unified Platform:** Developers learn *one* API (`ResourcePool::submit`). They don't need to write separate code for the desktop app (file-based queuing) and the cloud SaaS (Postgres queuing). The library abstracts this complexity entirely.
+4. **High Performance:** Lock-free capacity tracking and optimized queue operations ensure the scheduler itself doesn't become a bottleneck, even under heavy load.

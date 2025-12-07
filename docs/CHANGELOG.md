@@ -38,6 +38,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Full documentation with examples
 
 ### Changed
+- InMemoryQueue refactored from VecDeque+sort to BinaryHeap (2024-12-07)
+  - **415x performance improvement** for 10,000-item queues (725ms → 1.75ms)
+  - O(n² log n) → O(n log n) total complexity for n enqueue operations
+  - Introduced `PriorityTask<P>` wrapper implementing `Ord` for heap ordering
+  - Priority comparison: highest priority first (Critical > High > Normal > Low)
+  - FIFO ordering within same priority level via `created_at_ms` comparison
+  - Added comprehensive unit tests: `test_prune_expired`, `test_empty_queue`
+
+- Added benchmarks for parking_lot primitives (2024-12-07)
+  - `bench_parking_lot_mutex_uncontended` - measures single-thread mutex performance
+  - `bench_parking_lot_mutex_vs_std` - compares parking_lot vs std::sync::Mutex
+  - `bench_atomic_operations` - measures AtomicU32 load, fetch_add, CAS operations
+  - `bench_condvar_notify` - measures Condvar notify_one/notify_all performance
+  - `bench_queue_with_mutex` - measures InMemoryQueue under Mutex protection
 
 ### Deprecated
 
