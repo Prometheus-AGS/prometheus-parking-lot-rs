@@ -4,6 +4,7 @@ pub mod error;
 pub mod resource_pool;
 pub mod audit;
 pub mod executor;
+pub mod worker_pool;
 
 pub use error::{AppResult, SchedulerError};
 pub use resource_pool::{
@@ -11,4 +12,5 @@ pub use resource_pool::{
     WakeState, sync_wake_worker_loop,
 };
 pub use audit::{AuditEvent, AuditSink, InMemoryAuditSink, PostgresAuditSink, build_audit_event};
-pub use executor::{TaskExecutor, TaskPayload};
+pub use executor::{TaskExecutor, TaskPayload, WorkerExecutor};
+pub use worker_pool::{PoolError, PoolStats, WorkerPool};

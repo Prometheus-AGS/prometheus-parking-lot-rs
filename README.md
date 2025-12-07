@@ -125,13 +125,64 @@ So if a client disconnects, the result can be stored and picked up later, and op
 
 ### ResourcePool
 
-The parking-lot scheduler itself.
+The parking-lot scheduler for async workloads.
 
 - Enforces a `max_units` capacity (e.g., GPU units, CPU slots, worker slots).
 - If there's room → execute immediately.
 - If not → enqueue into a `TaskQueue<P>`.
 - When tasks finish, it wakes queued tasks that fit within current capacity.
 - Uses a `Mailbox<T>` to deliver results and handle timeouts/expired work.
+
+### WorkerPool (NEW - for CPU/GPU-bound work)
+
+A dedicated worker thread pool for **heavy CPU/GPU-bound tasks** like LLM inference:
+
+```rust
+use prometheus_parking_lot::core::{WorkerPool, WorkerExecutor, TaskMetadata, PoolError};
+use prometheus_parking_lot::config::WorkerPoolConfig;
+use async_trait::async_trait;
+use std::time::Duration;
+
+// Your executor - result type does NOT need to be Serializable!
+// This allows returning channels for streaming responses.
+#[derive(Clone)]
+struct LlmExecutor { /* ... */ }
+
+#[async_trait]
+impl WorkerExecutor<InferenceJob, InferenceResult> for LlmExecutor {
+    async fn execute(&self, job: InferenceJob, meta: TaskMetadata) -> InferenceResult {
+        // This runs in a dedicated worker thread with its own tokio runtime,
+        // NOT blocking the main async runtime!
+        do_inference(job).await
+    }
+}
+
+// Create pool with dedicated OS threads (native) or async tasks (WASM)
+let pool = WorkerPool::new(
+    WorkerPoolConfig::new()
+        .with_worker_count(4)         // 4 worker threads
+        .with_max_units(1000)          // Resource capacity
+        .with_max_queue_depth(500),    // Queue limit
+    executor,
+)?;
+
+// Async API (works on native AND WASM - unified programming model)
+let key = pool.submit_async(job, meta).await?;
+let result = pool.retrieve_async(&key, Duration::from_secs(120)).await?;
+
+// Blocking API (native only, slightly faster for sync contexts)
+#[cfg(not(target_arch = "wasm32"))]
+{
+    let key = pool.submit(job, meta)?;
+    let result = pool.retrieve(&key, Duration::from_secs(120))?;
+}
+```
+
+**Key features:**
+- **No polling** - uses `parking_lot::Condvar` and oneshot channels for efficient signaling
+- **Lock-free fast paths** - atomic counters, brief critical sections
+- **Non-serializable results** - supports streaming channels, handles, etc.
+- **Cross-platform** - same API on native (OS threads) and WASM (async tasks)
 
 ---
 
@@ -307,6 +358,61 @@ async fn main() -> anyhow::Result<()> {
 
 ## Use cases
 
+### 0. LLM Inference (candle-vllm pattern)
+
+The `WorkerPool` is designed specifically for LLM inference workloads like **candle-vllm**:
+
+```rust
+use prometheus_parking_lot::core::{WorkerPool, WorkerExecutor, TaskMetadata};
+use prometheus_parking_lot::config::WorkerPoolConfig;
+
+// candle-vllm just needs to implement WorkerExecutor
+#[derive(Clone)]
+pub struct LlmExecutor {
+    pipeline: Arc<Pipeline>,
+    cache_engine: Arc<CacheEngine>,
+}
+
+#[async_trait]
+impl WorkerExecutor<InferenceJob, InferenceResult> for LlmExecutor {
+    async fn execute(&self, job: InferenceJob, _meta: TaskMetadata) -> InferenceResult {
+        // This runs in a DEDICATED WORKER THREAD, not blocking tokio!
+        if job.is_streaming {
+            let (tx, rx) = flume::unbounded();
+            // Streaming generation...
+            InferenceResult::Streaming { rx }  // Can return non-serializable channels!
+        } else {
+            InferenceResult::Completion { text: self.generate(&job) }
+        }
+    }
+}
+
+// At server startup - create ONE pool
+let pool = WorkerPool::new(
+    WorkerPoolConfig::new()
+        .with_worker_count(4)          // 4 inference workers
+        .with_max_queue_depth(1000),   // Queue up to 1000 requests
+    llm_executor,
+)?;
+
+// In your HTTP handler - NO thread management needed!
+async fn handle_completion(pool: &WorkerPool<...>, request: Request) -> Response {
+    let job = InferenceJob::from(request);
+    let meta = TaskMetadata::new(request.id, ResourceCost::gpu_vram(100));
+    
+    let key = pool.submit_async(job, meta).await?;
+    let result = pool.retrieve_async(&key, Duration::from_secs(120)).await?;
+    
+    Response::from(result)
+}
+```
+
+**Why this matters for candle-vllm:**
+- CPU/GPU inference runs in dedicated threads, not blocking the async HTTP server
+- Streaming results can include channels (no serialization requirement)
+- The library handles ALL thread management - clients write zero thread code
+- Same code works on native (OS threads) and WASM (web workers)
+
 ### 1. Local / Tauri / desktop agents
 
 - **Queue backend:** Yaque or InMemory for embedded queueing.
@@ -378,3 +484,6 @@ at your option.
 ---
 
 *This README describes a version 1 structure meant to be minimal but immediately useful, safe and explicit in its abstractions, and ready to be integrated into the Prometheus AI platform as the standard scheduling layer for agent workloads.*
+
+
+codex resume 019af581-86ce-7d23-b9c6-0f99353d36af

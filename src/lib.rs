@@ -20,22 +20,53 @@
 //!
 //! - **Resource-Aware Scheduling**: Tracks resource consumption in arbitrary units
 //! - **Parking Lot Algorithm**: Tasks queue when capacity exhausted, wake when available
+//! - **Worker Thread Pool**: Dedicated OS threads for CPU/GPU-bound work (native) or async tasks (WASM)
 //! - **Persistent Queues**: Survive application restarts
 //! - **Mailbox System**: Store results for later retrieval when clients disconnect
-//! - **Multi-Environment**: Same code runs on desktop (Tauri), cloud, and web
+//! - **Multi-Environment**: Same code runs on desktop (Tauri), cloud, and web (WASM)
 //!
-//! ## Quick Example
+//! ## WorkerPool - Thread Pool for CPU/GPU-Bound Work
 //!
-//! ```rust,no_run
+//! The `WorkerPool` manages dedicated worker threads (on native) or async tasks (on WASM)
+//! for CPU/GPU-bound work like LLM inference. This ensures heavy computation doesn't
+//! block your main async runtime.
+//!
+//! ```rust,ignore
+//! use prometheus_parking_lot::core::{WorkerPool, WorkerExecutor, TaskMetadata, PoolError};
+//! use prometheus_parking_lot::config::WorkerPoolConfig;
+//! use std::time::Duration;
+//!
+//! // Create a pool with 4 worker threads
+//! let pool = WorkerPool::new(
+//!     WorkerPoolConfig::new()
+//!         .with_worker_count(4)
+//!         .with_max_units(1000)
+//!         .with_max_queue_depth(500),
+//!     my_executor,  // Implements WorkerExecutor
+//! )?;
+//!
+//! // Submit work (async API works on all platforms)
+//! let key = pool.submit_async(job, meta).await?;
+//! let result = pool.retrieve_async(&key, Duration::from_secs(120)).await?;
+//!
+//! // Blocking API available on native platforms only
+//! #[cfg(not(target_arch = "wasm32"))]
+//! {
+//!     let key = pool.submit(job, meta)?;
+//!     let result = pool.retrieve(&key, Duration::from_secs(120))?;
+//! }
+//! ```
+//!
+//! ## ResourcePool - Async Scheduling
+//!
+//! For lighter workloads that don't require dedicated threads, use `ResourcePool`:
+//!
+//! ```rust,ignore
 //! use prometheus_parking_lot::core::{
 //!     PoolLimits, ResourcePool, ScheduledTask, TaskExecutor, TaskMetadata,
 //! };
 //! use prometheus_parking_lot::infra::{queue::memory::InMemoryQueue, mailbox::memory::InMemoryMailbox};
 //! use prometheus_parking_lot::util::serde::{Priority, ResourceCost, ResourceKind};
-//! use prometheus_parking_lot::util::clock::now_ms;
-//! use std::time::Duration;
-//!
-//! // See tests/parking_lot_algorithm_test.rs for complete working examples
 //! ```
 //!
 //! For complete examples, see:

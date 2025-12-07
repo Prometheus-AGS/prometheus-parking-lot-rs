@@ -60,3 +60,69 @@ where
     /// if a mailbox key is present in the task metadata.
     async fn execute(&self, payload: P, meta: TaskMetadata) -> T;
 }
+
+/// Executor trait for worker pools that does NOT require serialization on results.
+/// 
+/// This is the primary executor trait for `WorkerPool`. Unlike `TaskExecutor`,
+/// this trait allows result types that cannot be serialized, such as:
+/// - Streaming channels (`flume::Receiver`, `tokio::sync::mpsc::Receiver`)
+/// - Complex types with non-serializable fields
+/// - Types containing file handles or network connections
+/// 
+/// # Example
+/// 
+/// ```rust,ignore
+/// use async_trait::async_trait;
+/// use prometheus_parking_lot::core::{WorkerExecutor, TaskMetadata};
+/// 
+/// #[derive(Clone)]
+/// struct LlmExecutor;
+/// 
+/// struct InferenceJob {
+///     prompt: String,
+///     is_streaming: bool,
+/// }
+/// 
+/// enum InferenceResult {
+///     Completion { text: String },
+///     Streaming { rx: flume::Receiver<String> },  // Non-serializable!
+/// }
+/// 
+/// #[async_trait]
+/// impl WorkerExecutor<InferenceJob, InferenceResult> for LlmExecutor {
+///     async fn execute(&self, job: InferenceJob, _meta: TaskMetadata) -> InferenceResult {
+///         if job.is_streaming {
+///             let (tx, rx) = flume::unbounded();
+///             // Spawn streaming task...
+///             InferenceResult::Streaming { rx }
+///         } else {
+///             InferenceResult::Completion { text: "Hello".into() }
+///         }
+///     }
+/// }
+/// ```
+#[async_trait]
+pub trait WorkerExecutor<P, R>: Send + Sync + Clone + 'static
+where
+    P: Send + 'static,
+    R: Send + 'static,  // NO Serialize requirement - supports channels, etc.
+{
+    /// Execute a task payload and return the result.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `payload` - The task payload to execute
+    /// * `meta` - Task metadata including ID, priority, cost, etc.
+    /// 
+    /// # Returns
+    /// 
+    /// The result of task execution. This result does NOT need to be serializable,
+    /// allowing for streaming channels and other non-serializable types.
+    /// 
+    /// # Threading
+    /// 
+    /// On native platforms, this method is called from a dedicated worker thread
+    /// with its own single-threaded tokio runtime. This ensures CPU/GPU-bound
+    /// work does not block the main async runtime.
+    async fn execute(&self, payload: P, meta: TaskMetadata) -> R;
+}

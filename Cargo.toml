@@ -28,6 +28,12 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 dotenvy = "0.15.7"
 async-trait = "0.1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"], optional = true }
+num_cpus = "1.16"
+uuid = { version = "1", features = ["v4"] }
+
+# Native-only dependencies for worker thread pool
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+crossbeam-channel = "0.5"
 
 [dev-dependencies]
 criterion = { version = "0.8.0", features = ["async_tokio"] }
@@ -36,6 +42,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"
 reqwest = { version = "0.12", features = ["json", "stream"] }
 serde_json = "1"
 futures = "0.3"
+flume = "0.11"  # For testing non-serializable streaming results (candle-vllm pattern)
 
 [[bench]]
 name = "queue_bench"
