@@ -17,6 +17,32 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+// Test wrapper with explicit timeout enforcement
+// If the test doesn't complete in the specified time, we panic immediately
+// This ensures the test runner never hangs - if there's a hang, it's a test failure
+async fn with_timeout<F, T>(name: &str, timeout_secs: u64, f: F) -> T
+where
+    F: std::future::Future<Output = T>,
+{
+    eprintln!("[TEST_START] {} (timeout: {}s)", name, timeout_secs);
+    let start = Instant::now();
+    
+    // Run the test with timeout
+    let result = tokio::time::timeout(Duration::from_secs(timeout_secs), f).await;
+    
+    let elapsed = start.elapsed();
+    match result {
+        Ok(r) => {
+            eprintln!("[TEST_END] {} completed in {:?}", name, elapsed);
+            r
+        }
+        Err(_) => {
+            eprintln!("[TEST_TIMEOUT] {} exceeded {}s - FAILING TEST", name, timeout_secs);
+            panic!("Test {} timed out after {:?}", name, elapsed);
+        }
+    }
+}
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -222,6 +248,7 @@ impl WorkerExecutor<(), String> for SlowExecutor {
 /// Test basic task submission and retrieval with async API
 #[tokio::test]
 async fn test_basic_async_api() {
+    with_timeout("test_basic_async_api", 10, async {
     println!("\n=== test_basic_async_api ===");
 
     let config = WorkerPoolConfig::new()
@@ -256,12 +283,19 @@ async fn test_basic_async_api() {
     println!("Final stats: {:?}", stats);
     assert_eq!(stats.completed_tasks, 1);
 
+    eprintln!("[CLEANUP] test_basic_async_api shutting down pool");
+    pool.shutdown();
+    drop(pool);
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    eprintln!("[CLEANUP] test_basic_async_api shutdown complete");
     println!("=== test_basic_async_api PASSED ===\n");
+    }).await;
 }
 
 /// Test blocking API (native only)
 #[tokio::test]
 async fn test_blocking_api() {
+    with_timeout("test_blocking_api", 10, async {
     println!("\n=== test_blocking_api ===");
 
     let config = WorkerPoolConfig::new()
@@ -286,12 +320,19 @@ async fn test_blocking_api() {
     println!("Result: {}", result);
     assert_eq!(result, 30);
 
+    eprintln!("[CLEANUP] test_blocking_api shutting down pool");
+    pool.shutdown();
+    drop(pool);
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    eprintln!("[CLEANUP] test_blocking_api shutdown complete");
     println!("=== test_blocking_api PASSED ===\n");
+    }).await;
 }
 
 /// Test concurrent task submission and execution
 #[tokio::test]
 async fn test_concurrent_execution() {
+    with_timeout("test_concurrent_execution", 20, async {
     println!("\n=== test_concurrent_execution ===");
 
     let executor = CountingExecutor::new();
@@ -359,12 +400,19 @@ async fn test_concurrent_execution() {
     println!("Final stats: {:?}", stats);
     assert_eq!(stats.completed_tasks, num_tasks as u64);
 
+    eprintln!("[CLEANUP] test_concurrent_execution shutting down pool");
+    pool.shutdown();
+    drop(pool);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    eprintln!("[CLEANUP] test_concurrent_execution shutdown complete");
     println!("=== test_concurrent_execution PASSED ===\n");
+    }).await;
 }
 
 /// Test resource limits cause queueing
 #[tokio::test]
 async fn test_resource_limits_queueing() {
+    with_timeout("test_resource_limits_queueing", 15, async {
     println!("\n=== test_resource_limits_queueing ===");
 
     let executor = CountingExecutor::new();
@@ -408,12 +456,19 @@ async fn test_resource_limits_queueing() {
     println!("Final stats: {:?}", final_stats);
     assert_eq!(final_stats.completed_tasks, 10);
 
+    eprintln!("[CLEANUP] test_resource_limits_queueing shutting down pool");
+    pool.shutdown();
+    drop(pool);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    eprintln!("[CLEANUP] test_resource_limits_queueing shutdown complete");
     println!("=== test_resource_limits_queueing PASSED ===\n");
+    }).await;
 }
 
 /// Test non-serializable streaming results (THE KEY CANDLE-VLLM PATTERN)
 #[tokio::test]
 async fn test_streaming_non_serializable_results() {
+    with_timeout("test_streaming_non_serializable_results", 10, async {
     println!("\n=== test_streaming_non_serializable_results ===");
     println!("This tests the candle-vllm streaming pattern with flume channels");
 
@@ -458,12 +513,17 @@ async fn test_streaming_non_serializable_results() {
     assert!(tokens[0].contains("hello:token_0"));
     assert!(tokens[4].contains("hello:token_4"));
 
+    eprintln!("[CLEANUP] test_streaming_non_serializable_results shutting down pool");
+    pool.shutdown();
+    eprintln!("[CLEANUP] test_streaming_non_serializable_results shutdown complete");
     println!("=== test_streaming_non_serializable_results PASSED ===\n");
+    }).await;
 }
 
 /// Test timeout on slow tasks
 #[tokio::test]
 async fn test_timeout_handling() {
+    with_timeout("test_timeout_handling", 10, async {
     println!("\n=== test_timeout_handling ===");
 
     // Executor that takes 500ms
@@ -504,12 +564,23 @@ async fn test_timeout_handling() {
     // Verify timeout was respected (should be ~100ms, not 500ms)
     assert!(elapsed < Duration::from_millis(200), "Timeout took too long");
 
+    eprintln!("[CLEANUP] test_timeout_handling shutting down pool");
+    pool.shutdown();
+    eprintln!("[CLEANUP] test_timeout_handling shutdown complete");
+    
+    // Explicitly drop pool and wait for detached workers to exit
+    drop(pool);
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    eprintln!("[CLEANUP] test_timeout_handling workers detached, test exiting");
+    
     println!("=== test_timeout_handling PASSED ===\n");
+    }).await;
 }
 
 /// Test graceful shutdown
 #[tokio::test]
 async fn test_graceful_shutdown() {
+    with_timeout("test_graceful_shutdown", 10, async {
     println!("\n=== test_graceful_shutdown ===");
 
     let executor = CountingExecutor::new();
@@ -563,12 +634,15 @@ async fn test_graceful_shutdown() {
     // Verify all tasks completed
     assert_eq!(executor_clone.execution_count(), 3);
 
+    eprintln!("[CLEANUP] test_graceful_shutdown complete");
     println!("=== test_graceful_shutdown PASSED ===\n");
+    }).await;
 }
 
 /// Test submitting after shutdown fails gracefully
 #[tokio::test]
 async fn test_submit_after_shutdown() {
+    with_timeout("test_submit_after_shutdown", 10, async {
     println!("\n=== test_submit_after_shutdown ===");
 
     let config = WorkerPoolConfig::new()
@@ -595,12 +669,15 @@ async fn test_submit_after_shutdown() {
         }
     }
 
+    eprintln!("[CLEANUP] test_submit_after_shutdown complete");
     println!("=== test_submit_after_shutdown PASSED ===\n");
+    }).await;
 }
 
 /// Test CPU-bound work doesn't block the async runtime
 #[tokio::test]
 async fn test_cpu_work_isolation() {
+    with_timeout("test_cpu_work_isolation", 10, async {
     println!("\n=== test_cpu_work_isolation ===");
 
     let config = WorkerPoolConfig::new()
@@ -644,12 +721,18 @@ async fn test_cpu_work_isolation() {
     println!("CPU task result: {}", result);
     assert!(result.contains("Processed 'test_data'"));
 
+    eprintln!("[CLEANUP] test_cpu_work_isolation shutting down pool");
+    pool.shutdown();
+    eprintln!("[CLEANUP] test_cpu_work_isolation shutdown complete");
     println!("=== test_cpu_work_isolation PASSED ===\n");
+    }).await;
 }
 
 /// Test queue depth limit
 #[tokio::test]
 async fn test_queue_depth_limit() {
+    with_timeout("test_queue_depth_limit", 15, async {
+    eprintln!("[SETUP] Creating pool with queue_depth=3");
     println!("\n=== test_queue_depth_limit ===");
 
     let config = WorkerPoolConfig::new()
@@ -696,12 +779,17 @@ async fn test_queue_depth_limit() {
         let _ = pool.retrieve_async(&key, Duration::from_secs(5)).await;
     }
 
+    eprintln!("[CLEANUP] test_queue_depth_limit shutting down pool");
+    pool.shutdown();
+    eprintln!("[CLEANUP] test_queue_depth_limit shutdown complete");
     println!("=== test_queue_depth_limit PASSED ===\n");
+    }).await;
 }
 
 /// Test multiple result retrievals for same key
 #[tokio::test]
 async fn test_result_consumed_once() {
+    with_timeout("test_result_consumed_once", 10, async {
     println!("\n=== test_result_consumed_once ===");
 
     let config = WorkerPoolConfig::new()
@@ -741,5 +829,9 @@ async fn test_result_consumed_once() {
         }
     }
 
+    eprintln!("[CLEANUP] test_result_consumed_once shutting down pool");
+    pool.shutdown();
+    eprintln!("[CLEANUP] test_result_consumed_once shutdown complete");
     println!("=== test_result_consumed_once PASSED ===\n");
+    }).await;
 }

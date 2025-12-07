@@ -56,3 +56,8 @@ missing_docs = "deny"
 all = "warn"
 pedantic = "warn"
 nursery = "warn"
+
+# Coverage profile for cargo-tarpaulin and cargo-llvm-cov
+[profile.coverage]
+inherits = "test"
+debug = true
