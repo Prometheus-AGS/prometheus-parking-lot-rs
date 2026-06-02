@@ -5,6 +5,7 @@ pub mod resource_pool;
 pub mod audit;
 pub mod executor;
 pub mod hooks;
+pub mod cancellation;
 pub mod worker_pool;
 #[cfg(feature = "tokio-runtime")]
 pub mod shutdown;
@@ -15,6 +16,10 @@ pub use resource_pool::{
     WakeState, sync_wake_worker_loop,
 };
 pub use audit::{AuditEvent, AuditSink, InMemoryAuditSink, PostgresAuditSink, build_audit_event};
+pub use cancellation::{
+    CancelReason, CancellationChannel, CancellationConfig, CancellationSink, CancelledTask,
+    LoggingCancellationSink, RecordingCancellationSink, SinkOutcome,
+};
 pub use hooks::{
     AuditHookAdapter, CancelledReason, Hook, HookBus, LifecycleEvent, RecordingHook,
     RejectionReason, TracingHook,
