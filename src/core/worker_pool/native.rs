@@ -508,22 +508,27 @@ where
                 let _ = tx.send(result.is_ok());
             });
             
-            // Wait up to 2 seconds for this worker to exit
+            // Wait up to 2 seconds for this worker to exit.
             match rx.recv_timeout(Duration::from_secs(2)) {
                 Ok(true) => {
                     debug!(worker_id = idx, "Worker joined successfully");
+                    // Helper has already sent its result, so it is about to
+                    // finish — joining it returns immediately.
+                    let _ = join_thread.join();
                 }
                 Ok(false) => {
                     warn!(worker_id = idx, "Worker panicked");
+                    let _ = join_thread.join();
                 }
                 Err(_) => {
                     warn!(worker_id = idx, "Worker did not exit within timeout - detaching");
-                    // Detach the join thread - worker will eventually exit
+                    // The helper is still blocked on `worker.join()`; joining it
+                    // here would block until the wedged worker exits, defeating
+                    // the timeout. Detach instead so shutdown() always returns
+                    // within its per-worker bound. The OS reclaims the thread.
+                    drop(join_thread);
                 }
             }
-            
-            // Clean up join thread
-            let _ = join_thread.join();
         }
         
         info!(worker_count = worker_count, "Worker pool shut down complete");
@@ -745,6 +750,43 @@ mod tests {
         assert_eq!(executor.execution_count.load(Ordering::Relaxed), 10);
     }
     
+    /// Executor that blocks far longer than the shutdown join bound, to prove
+    /// `shutdown()` detaches a wedged worker instead of hanging on it (CR-02).
+    #[derive(Clone)]
+    struct WedgedExecutor;
+
+    #[async_trait]
+    impl WorkerExecutor<String, String> for WedgedExecutor {
+        async fn execute(&self, _payload: String, _meta: TaskMetadata) -> String {
+            // Much longer than shutdown's 2s-per-worker join bound.
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            "unreachable".to_string()
+        }
+    }
+
+    #[test]
+    fn test_shutdown_returns_within_bound_with_wedged_worker() {
+        let config = WorkerPoolConfig::new()
+            .with_worker_count(1)
+            .with_max_queue_depth(10);
+        let pool = WorkerPool::new(config, WedgedExecutor).unwrap();
+
+        // Occupy the single worker with a 30s task.
+        let _ = pool.submit("stuck".to_string(), make_meta(1)).unwrap();
+        // Give the worker a moment to pick up the task.
+        thread::sleep(Duration::from_millis(100));
+
+        let start = std::time::Instant::now();
+        pool.shutdown();
+        let elapsed = start.elapsed();
+
+        // Must return within the per-worker bound (2s) plus slack — NOT 30s.
+        assert!(
+            elapsed < Duration::from_secs(5),
+            "shutdown() blocked on a wedged worker: took {elapsed:?}"
+        );
+    }
+
     #[test]
     fn test_worker_pool_blocking_api() {
         let executor = TestExecutor {

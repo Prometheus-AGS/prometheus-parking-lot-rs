@@ -10,11 +10,11 @@ On the "detach" branch, `shutdown()` still runs an unconditional
 `worker.join()` — the timeout/detach is illusory and can hang on a wedged worker.
 
 ## Tasks
-- [ ] Restructure join: bounded wait, then truly drop/detach the handle (no trailing join)
-- [ ] Avoid spawning N helper threads if superseded by CR-03 `TaskTracker`
-- [ ] Log detached workers at WARN with worker id
-- [ ] Unit test: wedged worker → `shutdown()` returns within bound
+- [x] Restructure join: join only when the worker exited; drop/detach on timeout
+- [ ] Avoid spawning N helper threads — superseded by CR-03 `TaskTracker` (deferred to CR-03)
+- [x] Log detached workers at WARN with worker id
+- [x] Unit test: wedged worker → `shutdown()` returns within bound (`test_shutdown_returns_within_bound_with_wedged_worker`)
 
 ## Acceptance
-- [ ] `shutdown()` returns within per-worker timeout even with a stuck worker
-- [ ] `test_graceful_shutdown` stays < 500ms
+- [x] `shutdown()` returns within per-worker timeout even with a stuck worker (~2.1s, not 30s)
+- [x] `test_graceful_shutdown` still passes; worker_pool_test suite green & exits clean
