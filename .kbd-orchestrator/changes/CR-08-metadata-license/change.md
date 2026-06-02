@@ -9,17 +9,18 @@
 - `description = "High-performance synchronization primitives…"` ❌
 - `keywords = ["synchronization","mutex","rwlock","concurrent","prometheus"]` ❌
 - `categories = ["concurrency","no-std"]` ❌ (crate is **not** no-std; it uses tokio/threads)
-- License declares `MIT OR Apache-2.0` but **`LICENSE-APACHE` is missing**.
+- License: **MIT only** (per user decision 2026-06-02). Manifest previously declared
+  `MIT OR Apache-2.0`; corrected to `MIT` — no `LICENSE-APACHE` needed.
 
 ## Tasks
-- [ ] Rewrite `description` to describe the parking-lot **scheduler**
-- [ ] `keywords` → e.g. `scheduler`, `queue`, `gpu`, `ai`, `tokio` (max 5)
-- [ ] `categories` → `asynchronous`, `concurrency` (drop `no-std`)
-- [ ] Add `readme = "README.md"`, `homepage`, `documentation = "https://docs.rs/..."`
-- [ ] Add `LICENSE-APACHE` file (standard Apache-2.0 text)
-- [ ] Verify `repository` URL resolves; set `include`/`exclude` to trim package
-- [ ] `[package.metadata.docs.rs]` with `all-features = true`
+- [x] Rewrite `description` to describe the parking-lot **scheduler**
+- [x] `keywords` → `scheduler`, `queue`, `tokio`, `gpu`, `ai` (max 5)
+- [x] `categories` → `asynchronous`, `concurrency` (drop `no-std`)
+- [x] Add `readme = "README.md"`, `homepage`, `documentation`
+- [x] Set `license = "MIT"`; keep `LICENSE-MIT`; fix README license footer to MIT-only
+- [x] Set `exclude` to trim package (.kbd-orchestrator/, .firecrawl/, oversized docs)
+- [x] `[package.metadata.docs.rs]` with `all-features = true`
 
 ## Acceptance
-- [ ] `cargo publish --dry-run` metadata clean
-- [ ] Both license files present and referenced
+- [x] `cargo publish --dry-run` metadata clean (195 files; orchestrator/research excluded)
+- [x] License field (MIT) matches the shipped `LICENSE-MIT`; README footer MIT-only

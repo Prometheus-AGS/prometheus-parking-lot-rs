@@ -46,7 +46,7 @@ documentation = "https://docs.rs/prometheus_parking_lot"
 repository = "https://github.com/prometheus-ai/prometheus-parking-lot"
 homepage = "https://github.com/prometheus-ai/prometheus-parking-lot"
 readme = "README.md"
-license = "MIT OR Apache-2.0"     # both LICENSE-* files MUST exist (CR-08)
+license = "MIT"                   # MIT only; LICENSE-MIT must exist (CR-08)
 keywords = ["scheduler", "queue", "tokio", "gpu", "ai"]   # max 5
 categories = ["asynchronous", "concurrency"]              # NOT no-std
 exclude = [".firecrawl/", ".kbd-orchestrator/", "docs/DISCUSSION.md", "reports/"]
@@ -68,15 +68,15 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 ## 2. Pre-flight: license
 
-The manifest declares `MIT OR Apache-2.0`, so **both** files must ship:
+The crate is **MIT-only**. The `license` field and the shipped file must agree:
 
-- [ ] `LICENSE-MIT` ✅ (present)
-- [ ] `LICENSE-APACHE` ❗ **add it** (standard Apache-2.0 text) — currently missing (CR-08)
-- [ ] README footer states the dual license
+- [ ] `Cargo.toml` → `license = "MIT"`
+- [ ] `LICENSE-MIT` present
+- [ ] README footer states the MIT license
 
 ```bash
-# Sanity: both files exist
-ls LICENSE-MIT LICENSE-APACHE
+# Sanity: the license file exists and matches the manifest
+ls LICENSE-MIT
 ```
 
 ---

@@ -4,12 +4,25 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.91.1"
 authors = ["Prometheus AI Team"]
-description = "High-performance synchronization primitives for the Prometheus AI Platform"
+description = "Runtime-agnostic, resource-aware parking-lot scheduler for AI agent and inference workloads."
 documentation = "https://docs.rs/prometheus_parking_lot"
 repository = "https://github.com/prometheus-ai/prometheus-parking-lot"
-license = "MIT OR Apache-2.0"
-keywords = ["synchronization", "mutex", "rwlock", "concurrent", "prometheus"]
-categories = ["concurrency", "no-std"]
+homepage = "https://github.com/prometheus-ai/prometheus-parking-lot"
+readme = "README.md"
+license = "MIT"
+keywords = ["scheduler", "queue", "tokio", "gpu", "ai"]
+categories = ["asynchronous", "concurrency"]
+exclude = [
+    ".kbd-orchestrator/",
+    ".firecrawl/",
+    "reports/",
+    "docs/DISCUSSION.md",
+    "docs/Comprehensive Architectural Report Distributed Parking Management Systems and High-Performance Rust Audit Infrastructur.md",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = ["tokio-runtime"]

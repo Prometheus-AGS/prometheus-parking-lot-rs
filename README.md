@@ -474,16 +474,8 @@ For comprehensive documentation, see:
 
 ## License
 
-Licensed under either of:
-
-- MIT license ([LICENSE-MIT](LICENSE-MIT))
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
-
-at your option.
+Licensed under the MIT license ([LICENSE-MIT](LICENSE-MIT)).
 
 ---
 
 *This README describes a version 1 structure meant to be minimal but immediately useful, safe and explicit in its abstractions, and ready to be integrated into the Prometheus AI platform as the standard scheduling layer for agent workloads.*
-
-
-codex resume 019af581-86ce-7d23-b9c6-0f99353d36af
