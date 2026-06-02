@@ -1,7 +1,7 @@
 {
   "phase": "phase-certification-remediation",
   "title": "Resolve CERTIFICATION_REPORT.md blockers + make crate publishable",
-  "stage": "plan",
+  "stage": "complete",
   "stage_complete": true,
   "source": "CERTIFICATION_REPORT.md",
   "change_backend": "native-kbd",
