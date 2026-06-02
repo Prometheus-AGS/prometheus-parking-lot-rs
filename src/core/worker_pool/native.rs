@@ -34,6 +34,11 @@ enum ResultState {
     Pending,
     /// Result is ready.
     Ready,
+    /// The slot was removed/cancelled before a result arrived; any waiter must
+    /// wake and stop waiting. This prevents a waiter from parking forever if the
+    /// producing worker never stores a result (e.g. it was cancelled or the
+    /// caller timed out and removed the slot first).
+    Cancelled,
 }
 
 /// Result storage entry with Condvar-based notification.
@@ -147,14 +152,40 @@ impl<R> ResultStorage<R> {
     }
     
     /// Remove a result entry entirely.
+    ///
+    /// Any task still parked on this entry's `Condvar` is woken before we drop
+    /// our reference: we mark the entry `Cancelled` (unless a result already
+    /// arrived) and `notify_all`. Because a waiter holds its own `Arc` to the
+    /// entry, removing it from the map is not enough to wake it — without this
+    /// notify a waiter whose result never gets stored would block forever and
+    /// wedge the runtime on shutdown. See `retrieve_async`.
     fn remove(&self, key: &MailboxKey) -> Option<R> {
         let key_str = mailbox_key_to_string(key);
-        
-        let mut entries = self.entries.write();
-        if let Some(entry_pair) = entries.remove(&key_str) {
-            let (entry_mutex, _) = entry_pair.as_ref();
-            let mut entry = entry_mutex.lock();
-            entry.result.take()
+
+        // Drop the map entry under the write lock, then deal with the entry
+        // itself outside the map lock.
+        let entry_pair = {
+            let mut entries = self.entries.write();
+            entries.remove(&key_str)
+        };
+
+        if let Some(entry_pair) = entry_pair {
+            let (entry_mutex, condvar) = entry_pair.as_ref();
+            // Mutate state under the lock, then release it before notifying:
+            // the state change is published under the lock (no lost wakeup),
+            // and notifying after unlock avoids the woken waiter immediately
+            // re-blocking on a still-held mutex.
+            let taken = {
+                let mut entry = entry_mutex.lock();
+                let taken = entry.result.take();
+                if entry.state != ResultState::Ready {
+                    entry.state = ResultState::Cancelled;
+                }
+                taken
+            };
+            // Wake any waiter so it can observe the terminal state and exit.
+            condvar.notify_all();
+            taken
         } else {
             None
         }
@@ -388,16 +419,21 @@ where
             tokio::task::spawn_blocking(move || {
                 let (entry_mutex, condvar) = entry_pair.as_ref();
                 let mut entry = entry_mutex.lock();
-                
+
                 // Check if already ready (fast path, no wait needed)
                 if entry.state == ResultState::Ready {
                     return entry.result.take();
                 }
-                
-                // Wait on parking_lot Condvar (blocking, but in spawn_blocking thread)
-                // parking_lot's wait is more efficient than std::sync::Condvar
-                condvar.wait(&mut entry);
-                
+
+                // Wait on parking_lot Condvar (blocking, but in spawn_blocking thread).
+                // The wait is BOUNDED by `timeout`: even if the outer future is
+                // dropped on timeout and `store` never fires, this thread cannot
+                // park forever and leak (which would wedge runtime shutdown).
+                // It is also woken early by `remove`'s notify when the caller
+                // times out and reclaims the slot. parking_lot's wait is more
+                // efficient than std::sync::Condvar.
+                let _ = condvar.wait_for(&mut entry, timeout);
+
                 if entry.state == ResultState::Ready {
                     entry.result.take()
                 } else {

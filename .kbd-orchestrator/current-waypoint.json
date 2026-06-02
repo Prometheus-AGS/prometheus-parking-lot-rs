@@ -1,0 +1,23 @@
+{
+  "phase": "phase-certification-remediation",
+  "title": "Resolve CERTIFICATION_REPORT.md blockers + make crate publishable",
+  "stage": "plan",
+  "stage_complete": true,
+  "source": "CERTIFICATION_REPORT.md",
+  "change_backend": "native-kbd",
+  "changes": [
+    "CR-01", "CR-02", "CR-03", "CR-04", "CR-05", "CR-06",
+    "CR-07", "CR-08", "CR-09", "CR-10", "CR-11", "CR-12", "CR-13", "CR-14"
+  ],
+  "changes_done": ["CR-11"],
+  "critical_path": ["CR-01", "CR-02", "CR-04"],
+  "parallel_start": ["CR-01", "CR-08"],
+  "milestones": {
+    "M1-certify": ["CR-01", "CR-02", "CR-04"],
+    "M2-harden": ["CR-03", "CR-13", "CR-14", "CR-05", "CR-06", "CR-07"],
+    "M3-publish": ["CR-08", "CR-09", "CR-10", "CR-11", "CR-12"]
+  },
+  "decision_records": ["decision-cancellation-policy.md", "decision-cancellation-capture.md", "decision-idempotency.md"],
+  "idempotency_locked": true,
+  "next_action": "/kbd-execute phase-certification-remediation"
+}
