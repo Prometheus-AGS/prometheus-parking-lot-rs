@@ -41,7 +41,7 @@ use tokio_util::sync::CancellationToken;
 /// Policy controlling what happens to in-flight tasks during pool shutdown.
 ///
 /// Choose based on the workload: AI inference tasks are expensive but can hang,
-/// so the default [`DrainThenCancel`] is recommended for most inference pools.
+/// so the default `DrainThenCancel` policy is recommended for most inference pools.
 ///
 /// This enum is `#[non_exhaustive]`; new policies may be added in minor versions.
 #[derive(Debug, Clone)]
@@ -59,7 +59,7 @@ pub enum ShutdownPolicy {
     /// Wait for in-flight tasks up to `deadline`, then cancel any stragglers.
     ///
     /// This is the **default policy**. Cancelled stragglers are captured and
-    /// handed to the pool's `CancellationSink` for optional replay (CR-14).
+    /// handed to the pool's `CancellationSink` for optional replay.
     DrainThenCancel {
         /// Maximum time to wait before cancelling remaining tasks.
         deadline: Duration,
