@@ -93,3 +93,17 @@ pub mod runtime;
 /// Shared utilities.
 pub mod util;
 
+// ── Top-level convenience re-exports ─────────────────────────────────────────
+
+pub use core::error::{AppResult, SchedulerError};
+pub use core::{PoolError, PoolStats, TaskMetadata, WorkerPool};
+pub use core::cancellation::{
+    CancelReason, CancellationChannel, CancellationConfig, CancellationSink, CancelledTask,
+    LoggingCancellationSink, RecordingCancellationSink, SinkOutcome,
+};
+pub use core::hooks::{
+    CancelledReason, Hook, HookBus, LifecycleEvent, RecordingHook, RejectionReason, TracingHook,
+};
+#[cfg(feature = "tokio-runtime")]
+pub use core::shutdown::{ShutdownHandle, ShutdownPolicy, wait_for_signal};
+

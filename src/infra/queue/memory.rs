@@ -74,7 +74,7 @@ impl<P> InMemoryQueue<P> {
 impl<P> TaskQueue<P> for InMemoryQueue<P> {
     fn enqueue(&mut self, task: ScheduledTask<P>) -> Result<(), SchedulerError> {
         if self.len() >= self.max_depth() {
-            return Err(SchedulerError::QueueFull("max queue depth reached".into()));
+            return Err(SchedulerError::queue_full("in-memory", self.len(), self.max_depth));
         }
         // O(log n) insertion
         self.tasks.push(PriorityTask { task });
@@ -124,6 +124,7 @@ mod tests {
                 },
                 deadline_ms: None,
                 created_at_ms,
+                idempotency_key: None,
             },
             payload: format!("task-{}", id),
         }

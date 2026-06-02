@@ -24,7 +24,7 @@ where
     S: Clone,
 {
     cfg.validate()
-        .map_err(|e| SchedulerError::Backend(format!("config invalid: {e}")))?;
+        .map_err(|e| SchedulerError::invalid_config(format!("config validation: {e}")))?;
 
     let mut pools = HashMap::new();
     for (name, pool_cfg) in &cfg.pools {

@@ -44,6 +44,7 @@ use crate::util::serde::MailboxKey;
 
 /// Errors that can occur when using a `WorkerPool`.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum PoolError {
     /// The task queue is full; no more tasks can be accepted.
     QueueFull,

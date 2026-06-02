@@ -1,0 +1,35 @@
+[graph]
+# Analyze only the default feature set unless you add --all-features to the deny command.
+all-features = true
+
+[advisories]
+# Reject crates with known security advisories.
+version = 2
+ignore = []
+
+[licenses]
+# Allow MIT, Apache-2.0, and common permissive licenses used by our dependencies.
+version = 2
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+    "OpenSSL",
+    "CC0-1.0",
+    "Zlib",
+]
+
+[bans]
+# Disallow duplicate versions of the same crate (warn, not error, to avoid blocking first-time adds).
+multiple-versions = "warn"
+# Crates that must never appear in the dependency graph.
+deny = []
+
+[sources]
+# Only allow crates from crates.io.
+unknown-registry = "deny"
+unknown-git = "deny"

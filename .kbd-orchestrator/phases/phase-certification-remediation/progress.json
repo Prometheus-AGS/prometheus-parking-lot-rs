@@ -1,0 +1,39 @@
+{
+  "phase": "phase-certification-remediation",
+  "assessment_complete": true,
+  "plan_complete": true,
+  "execute_complete": true,
+  "reflect_complete": false,
+  "source": "CERTIFICATION_REPORT.md",
+  "change_backend": "native-kbd",
+  "blocker_reproduced": true,
+  "root_cause": "retrieve_async leaks a blocking-pool thread parked on an untimed condvar.wait(); entry removed before store() can notify -> wedges tokio runtime drop -> runner hang in test_timeout_handling",
+  "changes": ["CR-01","CR-02","CR-03","CR-04","CR-05","CR-06","CR-07","CR-08","CR-09","CR-10","CR-11","CR-12","CR-13","CR-14"],
+  "changes_total": 14,
+  "changes_done": ["CR-11","CR-01","CR-08","CR-02","CR-04","CR-05","CR-03","CR-13","CR-07","CR-06","CR-14","CR-09","CR-10","CR-12"],
+  "changes_completed": 14,
+  "execution_branch": "kbd/certification-remediation",
+  "milestone_status": {
+    "M1-certify": "CR-01 done, CR-02 done, CR-04 pending (needs cargo-llvm-cov install)",
+    "M2-harden": "not started (CR-03,05,06,07,13,14 — public API changes)",
+    "M3-publish": "CR-08 done; CR-09,10,12 pending; CR-11 done"
+  },
+  "certification_blocker_resolved": true,
+  "verification": "worker_pool_test exits clean (was infinite hang); full suite green EXITCODE=0; clippy --lib net-neutral at 111; cargo publish --dry-run clean",
+  "deliverables_this_phase": ["docs/PUBLISHING.md", "plan.md", ".kbd-orchestrator/changes/*"],
+  "research_sources": [".firecrawl/s1-shutdown.json", ".firecrawl/s2-backpressure.json", ".firecrawl/s3-hooks.json", ".firecrawl/s4-publish.json"],
+  "decisions": {
+    "shutdown": "tokio three-part model + CancellationToken + ctrl_c/SIGTERM",
+    "errors": "single #[non_exhaustive] thiserror enum, rich QueueFull context",
+    "mailbox": "at-least-once + TTL/eviction; notifier failure != data loss",
+    "hooks": "generalize AuditSink to multi-observer Hook lifecycle bus",
+    "R2_policy": "RESOLVED by user: NO always-drain (inference can hang). DrainThenCancel default; cancelled stragglers captured for replay via CR-14",
+    "R6_cancellation_capture": "ADOPT CancellationSink<P> trait + bounded decoupled handoff (per-call timeout delta + fallback) + at-least-once nack/DLQ replay = CR-14. Owned CancelledTask<P> context passed to caller off the teardown path. See decision-cancellation-capture.md",
+    "R7_idempotency": "LOCKED by user: D1 explicit idempotency_key on TaskMetadata; D2 at-least-once + idempotent executor (no exactly-once); D3 env-only auto-requeue, deadline/signal->DLQ; D4 max_attempts=3 + exp backoff configurable. Defaults D5 first-write-wins+consume-once, D6 partial-side-effects documented, D7 persist key+attempt. See decision-idempotency.md",
+    "R5_caller_pluggable_shutdown": "ADOPT bounded form (token injection + ShutdownPolicy enum + ShutdownHandle = CR-13); REJECT library-invoked async policy callback; per-task reactions via CR-07 hooks. See decision-cancellation-policy.md"
+  },
+  "open_questions": ["Install cargo-llvm-cov for CR-04 coverage? (cargo install, several min)", "Proceed with M2 public-API changes (CR-03/05/13/14 change TaskMetadata + shutdown API) incrementally?"],
+  "publish_blockers_resolved": ["CR-01 test hang (FIXED)", "CR-08 metadata/license (FIXED, MIT-only)"],
+  "license_decision": "MIT only (user, 2026-06-02) — no Apache-2.0",
+  "next_action": "CR-04 (install llvm-cov) then M2 CR-03; or checkpoint for user review"
+}

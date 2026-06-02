@@ -4,16 +4,31 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.91.1"
 authors = ["Prometheus AI Team"]
-description = "High-performance synchronization primitives for the Prometheus AI Platform"
+description = "Runtime-agnostic, resource-aware parking-lot scheduler for AI agent and inference workloads."
 documentation = "https://docs.rs/prometheus_parking_lot"
 repository = "https://github.com/prometheus-ai/prometheus-parking-lot"
-license = "MIT OR Apache-2.0"
-keywords = ["synchronization", "mutex", "rwlock", "concurrent", "prometheus"]
-categories = ["concurrency", "no-std"]
+homepage = "https://github.com/prometheus-ai/prometheus-parking-lot"
+readme = "README.md"
+license = "MIT"
+keywords = ["scheduler", "queue", "tokio", "gpu", "ai"]
+categories = ["asynchronous", "concurrency"]
+exclude = [
+    ".kbd-orchestrator/",
+    ".firecrawl/",
+    ".e2b-template/",
+    ".github/",
+    "reports/",
+    "docs/DISCUSSION.md",
+    "docs/Comprehensive Architectural Report Distributed Parking Management Systems and High-Performance Rust Audit Infrastructur.md",
+]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = ["tokio-runtime"]
-tokio-runtime = ["tokio"]
+tokio-runtime = ["tokio", "tokio-util"]
 
 [dependencies]
 lock_api = "0.4"
@@ -27,7 +42,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 dotenvy = "0.15.7"
 async-trait = "0.1"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"], optional = true }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal"], optional = true }
+tokio-util = { version = "0.7", features = ["rt"], optional = true }
 num_cpus = "1.16"
 uuid = { version = "1", features = ["v4"] }
 

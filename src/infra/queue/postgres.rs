@@ -40,14 +40,14 @@ CREATE INDEX IF NOT EXISTS idx_pl_queue_jobs_deadline ON pl_queue_jobs (deadline
 
 impl<P> TaskQueue<P> for PostgresQueue<P> {
     fn enqueue(&mut self, _task: ScheduledTask<P>) -> Result<(), SchedulerError> {
-        Err(SchedulerError::Backend(
-            "postgres queue not wired to database client".into(),
+        Err(SchedulerError::internal(
+            "postgres queue not wired to database client",
         ))
     }
 
     fn dequeue(&mut self) -> Result<Option<ScheduledTask<P>>, SchedulerError> {
-        Err(SchedulerError::Backend(
-            "postgres queue not wired to database client".into(),
+        Err(SchedulerError::internal(
+            "postgres queue not wired to database client",
         ))
     }
 

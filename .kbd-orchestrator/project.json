@@ -1,0 +1,20 @@
+{
+  "name": "prometheus_parking_lot",
+  "language": "rust",
+  "edition": "2021",
+  "rust_version": "1.91.1",
+  "kind": "library-crate",
+  "description": "Configurable, runtime-agnostic parking-lot scheduler for Prometheus AI agents and services.",
+  "canonical_specs": [
+    "CLAUDE.md",
+    "CERTIFICATION_REPORT.md"
+  ],
+  "openspec": false,
+  "source_roots": ["src"],
+  "test_roots": ["tests"],
+  "key_modules": [
+    "src/core/worker_pool/native.rs",
+    "src/core/resource_pool.rs",
+    "src/infra"
+  ]
+}

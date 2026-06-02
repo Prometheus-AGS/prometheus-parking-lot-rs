@@ -65,7 +65,9 @@ fn make_meta(task_id: u64, units: u32) -> TaskMetadata {
         },
         deadline_ms: None,
         created_at_ms: now_ms(),
-    }
+
+            idempotency_key: None,
+        }
 }
 
 fn make_gpu_meta(task_id: u64, units: u32) -> TaskMetadata {
@@ -79,7 +81,9 @@ fn make_gpu_meta(task_id: u64, units: u32) -> TaskMetadata {
         },
         deadline_ms: None,
         created_at_ms: now_ms(),
-    }
+
+            idempotency_key: None,
+        }
 }
 
 // ============================================================================

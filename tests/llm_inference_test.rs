@@ -132,6 +132,7 @@ async fn test_llm_inference_with_parking() {
                 },
                 deadline_ms: None,
                 created_at_ms: now_ms(),
+                idempotency_key: None,
             },
             payload: LLMTaskPayload {
                 prompt: prompts[i % prompts.len()].to_string(),

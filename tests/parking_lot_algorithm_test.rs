@@ -98,6 +98,7 @@ async fn test_immediate_execution() {
             units: 5,
         },
         created_at_ms: now_ms(),
+            idempotency_key: None,
         deadline_ms: None,
         mailbox: None,
     };
@@ -146,6 +147,7 @@ async fn test_capacity_enforcement_and_queueing() {
             units: 10,
         },
         created_at_ms: now_ms(),
+            idempotency_key: None,
         deadline_ms: None,
         mailbox: None,
     };
@@ -167,6 +169,7 @@ async fn test_capacity_enforcement_and_queueing() {
             units: 5,
         },
         created_at_ms: now_ms(),
+            idempotency_key: None,
         deadline_ms: None,
         mailbox: None,
     };
@@ -212,6 +215,7 @@ async fn test_wake_up_mechanism() {
             units: 10,
         },
         created_at_ms: now_ms(),
+            idempotency_key: None,
         deadline_ms: None,
         mailbox: None,
     };
@@ -231,6 +235,7 @@ async fn test_wake_up_mechanism() {
                 units: 3,
             },
             created_at_ms: now_ms(),
+            idempotency_key: None,
             deadline_ms: None,
             mailbox: None,
         };
@@ -287,6 +292,7 @@ async fn test_mailbox_delivery() {
             units: 5,
         },
         created_at_ms: now_ms(),
+            idempotency_key: None,
         deadline_ms: None,
         mailbox: Some(mailbox_key.clone()),
     };
@@ -332,6 +338,7 @@ async fn test_priority_ordering() {
             priority: Priority::Normal,
             cost: ResourceCost { kind: ResourceKind::Cpu, units: 10 },
             created_at_ms: now_ms(),
+            idempotency_key: None,
             deadline_ms: None,
             mailbox: None,
         },
@@ -353,6 +360,7 @@ async fn test_priority_ordering() {
                 priority,
                 cost: ResourceCost { kind: ResourceKind::Cpu, units: 3 },
                 created_at_ms: now_ms(),
+            idempotency_key: None,
                 deadline_ms: None,
                 mailbox: None,
             },
@@ -396,6 +404,7 @@ async fn test_deadline_rejection() {
             units: 5,
         },
         created_at_ms: now_ms(),
+            idempotency_key: None,
         deadline_ms: Some(past_time),
         mailbox: None,
     };
@@ -439,6 +448,7 @@ async fn test_concurrent_submissions() {
                     units: 2, // Each task uses 2 units
                 },
                 created_at_ms: now_ms(),
+            idempotency_key: None,
                 deadline_ms: None,
                 mailbox: None,
             };
@@ -492,6 +502,7 @@ async fn test_shutdown() {
             units: 5,
         },
         created_at_ms: now_ms(),
+            idempotency_key: None,
         deadline_ms: None,
         mailbox: None,
     };
