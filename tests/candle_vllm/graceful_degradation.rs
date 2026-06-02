@@ -19,7 +19,9 @@ fn make_meta(task_id: u64) -> TaskMetadata {
         cost: ResourceCost { kind: ResourceKind::Cpu, units: 10 },
         deadline_ms: None,
         created_at_ms: now_ms(),
-    }
+
+            idempotency_key: None,
+        }
 }
 
 #[derive(Clone)]

@@ -27,7 +27,7 @@ impl<P> YaqueQueue<P> {
     {
         let path = path.as_ref().to_path_buf();
         let stream = stream.into();
-        create_dir_all(&path).map_err(|e| SchedulerError::Backend(e.to_string()))?;
+        create_dir_all(&path).map_err(|e| SchedulerError::backend("yaque::new", e))?;
         let mut queue = Self {
             path,
             stream,
@@ -53,12 +53,12 @@ impl<P> YaqueQueue<P> {
         let file = OpenOptions::new()
             .read(true)
             .open(&file_path)
-            .map_err(|e| SchedulerError::Backend(e.to_string()))?;
+            .map_err(|e| SchedulerError::backend("yaque::load_from_disk::open", e))?;
         let reader = BufReader::new(file);
         for line in reader.lines() {
-            let line = line.map_err(|e| SchedulerError::Backend(e.to_string()))?;
+            let line = line.map_err(|e| SchedulerError::backend("yaque::load_from_disk::read", e))?;
             let task: ScheduledTask<P> =
-                serde_json::from_str(&line).map_err(|e| SchedulerError::Backend(e.to_string()))?;
+                serde_json::from_str(&line).map_err(|e| SchedulerError::backend("yaque::load_from_disk::deserialize", e))?;
             self.tasks.push_back(task);
         }
         Ok(())
@@ -73,10 +73,10 @@ impl<P> YaqueQueue<P> {
             .create(true)
             .append(true)
             .open(&file_path)
-            .map_err(|e| SchedulerError::Backend(e.to_string()))?;
+            .map_err(|e| SchedulerError::backend("yaque::append_to_disk::open", e))?;
         let line =
-            serde_json::to_string(task).map_err(|e| SchedulerError::Backend(e.to_string()))?;
-        writeln!(file, "{line}").map_err(|e| SchedulerError::Backend(e.to_string()))
+            serde_json::to_string(task).map_err(|e| SchedulerError::backend("yaque::append_to_disk::serialize", e))?;
+        writeln!(file, "{line}").map_err(|e| SchedulerError::backend("yaque::append_to_disk::write", e))
     }
 
     fn rewrite_disk(&self, tasks: &VecDeque<ScheduledTask<P>>) -> Result<(), SchedulerError>
@@ -89,11 +89,11 @@ impl<P> YaqueQueue<P> {
             .write(true)
             .truncate(true)
             .open(&file_path)
-            .map_err(|e| SchedulerError::Backend(e.to_string()))?;
+            .map_err(|e| SchedulerError::backend("yaque::rewrite_disk::open", e))?;
         for task in tasks {
             let line =
-                serde_json::to_string(task).map_err(|e| SchedulerError::Backend(e.to_string()))?;
-            writeln!(file, "{line}").map_err(|e| SchedulerError::Backend(e.to_string()))?;
+                serde_json::to_string(task).map_err(|e| SchedulerError::backend("yaque::rewrite_disk::serialize", e))?;
+            writeln!(file, "{line}").map_err(|e| SchedulerError::backend("yaque::rewrite_disk::write", e))?;
         }
         Ok(())
     }
@@ -105,7 +105,7 @@ where
 {
     fn enqueue(&mut self, task: ScheduledTask<P>) -> Result<(), SchedulerError> {
         if self.len() >= self.max_depth() {
-            return Err(SchedulerError::QueueFull("max queue depth reached".into()));
+            return Err(SchedulerError::queue_full("yaque", self.len(), self.max_depth));
         }
         self.tasks.push_back(task.clone());
         self.append_to_disk(&task)?;

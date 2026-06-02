@@ -44,8 +44,8 @@ impl<P> Mailbox<P> for PostgresMailbox<P> {
         _status: TaskStatus,
         _payload: Option<P>,
     ) -> Result<(), SchedulerError> {
-        Err(SchedulerError::Backend(
-            "postgres mailbox not wired to database client".into(),
+        Err(SchedulerError::internal(
+            "postgres mailbox not wired to database client",
         ))
     }
 }

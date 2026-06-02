@@ -37,7 +37,7 @@ impl<P> YaqueMailbox<P> {
     {
         let path = path.as_ref().to_path_buf();
         let stream = stream.into();
-        create_dir_all(&path).map_err(|e| SchedulerError::Backend(e.to_string()))?;
+        create_dir_all(&path).map_err(|e| SchedulerError::backend("yaque_mailbox", e))?;
         let mut mb = Self {
             path,
             stream,
@@ -62,12 +62,12 @@ impl<P> YaqueMailbox<P> {
         let file = OpenOptions::new()
             .read(true)
             .open(&file_path)
-            .map_err(|e| SchedulerError::Backend(e.to_string()))?;
+            .map_err(|e| SchedulerError::backend("yaque_mailbox", e))?;
         let reader = BufReader::new(file);
         for line in reader.lines() {
-            let line = line.map_err(|e| SchedulerError::Backend(e.to_string()))?;
+            let line = line.map_err(|e| SchedulerError::backend("yaque_mailbox", e))?;
             let (key, msg): (MailboxKey, MailboxMessage<P>) =
-                serde_json::from_str(&line).map_err(|e| SchedulerError::Backend(e.to_string()))?;
+                serde_json::from_str(&line).map_err(|e| SchedulerError::backend("yaque_mailbox", e))?;
             self.messages.entry(key).or_default().push(msg);
         }
         Ok(())
@@ -82,10 +82,10 @@ impl<P> YaqueMailbox<P> {
             .create(true)
             .append(true)
             .open(&file_path)
-            .map_err(|e| SchedulerError::Backend(e.to_string()))?;
+            .map_err(|e| SchedulerError::backend("yaque_mailbox", e))?;
         let line = serde_json::to_string(&(key, msg))
-            .map_err(|e| SchedulerError::Backend(e.to_string()))?;
-        writeln!(file, "{line}").map_err(|e| SchedulerError::Backend(e.to_string()))
+            .map_err(|e| SchedulerError::backend("yaque_mailbox", e))?;
+        writeln!(file, "{line}").map_err(|e| SchedulerError::backend("yaque_mailbox", e))
     }
 
     /// Fetch messages for a mailbox key, optionally since a timestamp.

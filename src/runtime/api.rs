@@ -74,6 +74,7 @@ where
         cost: req.resource_cost,
         deadline_ms: req.deadline_ms,
         created_at_ms: req.created_at_ms,
+        idempotency_key: None,
     };
     let task: ScheduledTask<P> = ScheduledTask {
         meta,

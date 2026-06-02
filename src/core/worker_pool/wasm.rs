@@ -426,6 +426,8 @@ mod tests {
             },
             deadline_ms: None,
             created_at_ms: 0,
+
+            idempotency_key: None,
         }
     }
     

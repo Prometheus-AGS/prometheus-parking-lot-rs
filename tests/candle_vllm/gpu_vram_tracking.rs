@@ -20,7 +20,9 @@ fn make_gpu_meta(task_id: u64, units: u32) -> TaskMetadata {
         cost: ResourceCost { kind: ResourceKind::GpuVram, units },
         deadline_ms: None,
         created_at_ms: now_ms(),
-    }
+
+            idempotency_key: None,
+        }
 }
 
 #[derive(Clone)]
