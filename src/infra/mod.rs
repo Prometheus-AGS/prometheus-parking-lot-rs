@@ -2,6 +2,10 @@
 
 pub mod mailbox;
 pub mod queue;
+
+#[cfg(feature = "postgres")]
+pub mod entities;
+
 pub use mailbox::InMemoryMailbox;
 pub use mailbox::YaqueMailbox;
 pub use queue::YaqueQueue;

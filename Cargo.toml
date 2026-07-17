@@ -29,6 +29,8 @@ rustdoc-args = ["--cfg", "docsrs"]
 [features]
 default = ["tokio-runtime"]
 tokio-runtime = ["tokio", "tokio-util"]
+postgres = ["sea-orm", "sqlx", "chrono"]
+pgmq-ext = ["postgres", "pgmq"]
 
 [dependencies]
 lock_api = "0.4"
@@ -47,6 +49,12 @@ tokio-util = { version = "0.7", features = ["rt"], optional = true }
 num_cpus = "1.16"
 uuid = { version = "1", features = ["v4"] }
 
+# Postgres backend dependencies
+sea-orm = { version = "1.1.2", features = ["runtime-tokio-rustls", "sqlx-postgres", "macros"], optional = true }
+sqlx = { version = "0.8.2", features = ["postgres", "runtime-tokio-rustls", "macros"], optional = true }
+chrono = { version = "0.4", optional = true }
+pgmq = { version = "0.34.0-alpha.5", optional = true }
+
 # Native-only dependencies for worker thread pool
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 crossbeam-channel = "0.5"
@@ -59,6 +67,9 @@ reqwest = { version = "0.12", features = ["json", "stream"] }
 serde_json = "1"
 futures = "0.3"
 flume = "0.11"  # For testing non-serializable streaming results (candle-vllm pattern)
+tempfile = "3.14"
+testcontainers = "0.23"
+testcontainers-modules = { version = "0.11", features = ["postgres"] }
 
 [[bench]]
 name = "queue_bench"

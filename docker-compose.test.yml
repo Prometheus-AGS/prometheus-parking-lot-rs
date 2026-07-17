@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: prometheus-parking-lot-test-db
+    environment:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+      POSTGRES_DB: testdb
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./migrations/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d testdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: 
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=pg_stat_statements"
+      - "-c"
+      - "max_connections=200"
+
+  # Service to install pgmq extension after postgres is ready
+  pgmq-setup:
+    image: postgres:17-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: testuser
+      PGPASSWORD: testpass
+      PGDATABASE: testdb
+    volumes:
+      - ./migrations:/migrations
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        # Wait a bit for postgres to be fully ready
+        sleep 2
+        # Install pgmq from source (as extension may not be in alpine package)
+        # For now we'll create the tables manually instead
+        echo "Postgres test database ready"
