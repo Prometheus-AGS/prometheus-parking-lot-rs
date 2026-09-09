@@ -131,7 +131,10 @@ pub trait Mailbox<T> {
     /// message is removed (consume-once semantics).
     ///
     /// The default implementation returns `None` (not supported by backend).
-    fn consume(&mut self, _key: &MailboxKey) -> Result<Option<(TaskStatus, Option<T>)>, SchedulerError> {
+    fn consume(
+        &mut self,
+        _key: &MailboxKey,
+    ) -> Result<Option<(TaskStatus, Option<T>)>, SchedulerError> {
         Ok(None)
     }
 
@@ -290,7 +293,9 @@ where
         if let Some(deadline) = task.meta.deadline_ms {
             if now_ms > deadline {
                 tracing::warn!("task {} expired before enqueue", task.meta.id);
-                return Err(SchedulerError::DeadlineExpired { task_id: task.meta.id });
+                return Err(SchedulerError::DeadlineExpired {
+                    task_id: task.meta.id,
+                });
             }
         }
 
@@ -338,6 +343,24 @@ where
         Ok(TaskStatus::Queued)
     }
 
+    /// Resolve the execution budget for one task.
+    ///
+    /// A per-task `deadline_ms` wins when it is still in the future; otherwise the
+    /// pool's `default_timeout` applies. Every task is bounded: there is no path
+    /// that returns an unbounded budget, which is what makes the pool's capacity
+    /// guarantee hold under a wedged executor.
+    fn effective_budget(limits: &PoolLimits, meta: &TaskMetadata) -> std::time::Duration {
+        let Some(deadline) = meta.deadline_ms else {
+            return limits.default_timeout;
+        };
+        let now = crate::util::clock::now_ms();
+        // An already-passed deadline yields a near-zero budget rather than
+        // saturating to the default, so an expired task fails fast.
+        let remaining = deadline.saturating_sub(now);
+        std::time::Duration::from_millis(u64::try_from(remaining).unwrap_or(u64::MAX))
+            .min(limits.default_timeout)
+    }
+
     /// Spawn a task execution asynchronously.
     async fn spawn_task(&self, task: ScheduledTask<P>) {
         let executor = self.executor.clone();
@@ -356,13 +379,36 @@ where
         let meta = task.meta.clone();
         let payload = task.payload;
 
+        // A per-task deadline overrides the pool default; otherwise every task
+        // is bounded by `limits.default_timeout`. Before this, `default_timeout`
+        // was configured, validated and plumbed to the pool but never read here,
+        // so `executor.execute` awaited forever and a wedged task held its
+        // capacity units for the life of the process.
+        let budget = Self::effective_budget(&limits, &meta);
+
         self.spawner.spawn(async move {
-            tracing::debug!("executing task {}", task_id);
+            tracing::debug!("executing task {} (budget {:?})", task_id, budget);
 
-            // Execute the task
-            let result = executor.execute(payload, meta).await;
+            // Execute the task under its budget. On elapse the executor future is
+            // dropped, which cancels it at its next await point; an executor that
+            // owns a `tokio::process::Child` built with `kill_on_drop(true)` gets
+            // the child reaped as part of that drop.
+            let outcome = tokio::time::timeout(budget, executor.execute(payload, meta)).await;
 
-            tracing::info!("task {} completed", task_id);
+            let result = match outcome {
+                Ok(value) => {
+                    tracing::info!("task {} completed", task_id);
+                    Some(value)
+                }
+                Err(_) => {
+                    tracing::warn!(
+                        "task {} exceeded its {:?} budget and was cancelled",
+                        task_id,
+                        budget
+                    );
+                    None
+                }
+            };
 
             // Handle task completion
             Self::on_task_finished_static(
@@ -401,9 +447,13 @@ where
         task_id: TaskId,
         task_cost: u32,
         mailbox_key: Option<MailboxKey>,
-        result: T,
+        result: Option<T>,
     ) -> std::pin::Pin<Box<dyn Future<Output = ()> + Send + 'static>> {
         Box::pin(async move {
+            // Captured before `result` is moved into the mailbox below; the audit
+            // trail must distinguish a completion from a budget kill.
+            let result_was_some = result.is_some();
+
             // Release capacity atomically (lock-free)
             active_units.fetch_sub(task_cost, Ordering::Release);
             tracing::debug!(
@@ -422,9 +472,12 @@ where
             // Deliver to mailbox if key present (separate mutex from queue)
             if let Some(ref key) = mailbox_key {
                 let mut mailbox_guard = mailbox.lock();
-                if let Err(e) =
-                    mailbox_guard.deliver(key, TaskStatus::Completed, Some(result))
-                {
+                let status = if result.is_some() {
+                    TaskStatus::Completed
+                } else {
+                    TaskStatus::Failed("execution exceeded its timeout budget".to_string())
+                };
+                if let Err(e) = mailbox_guard.deliver(key, status, result) {
                     tracing::error!("failed to deliver to mailbox: {}", e);
                 }
             }
@@ -436,12 +489,17 @@ where
                     .as_ref()
                     .map(|m| m.tenant.clone())
                     .unwrap_or_else(|| "unknown".into());
+                let action = if result_was_some {
+                    "complete"
+                } else {
+                    "timeout"
+                };
                 sink.record(crate::core::build_audit_event(
-                    format!("{}-complete-{}", task_id, crate::util::clock::now_ms()),
+                    format!("{}-{}-{}", task_id, action, crate::util::clock::now_ms()),
                     task_id.to_string(),
                     "pool",
                     tenant,
-                    "complete".to_string(),
+                    action.to_string(),
                     None,
                 ));
             }
@@ -582,10 +640,29 @@ where
                 let meta = task.meta.clone();
                 let payload = task.payload;
 
+                // The woken path is bounded exactly like the immediate path; a task
+                // that waited in the parking lot gets no licence to run forever.
+                let budget = Self::effective_budget(&limits_clone, &meta);
+
                 spawner.spawn(async move {
-                    tracing::debug!("executing woken task {}", task_id);
-                    let result = executor_clone.execute(payload, meta).await;
-                    tracing::info!("woken task {} completed", task_id);
+                    tracing::debug!("executing woken task {} (budget {:?})", task_id, budget);
+                    let result =
+                        match tokio::time::timeout(budget, executor_clone.execute(payload, meta))
+                            .await
+                        {
+                            Ok(value) => {
+                                tracing::info!("woken task {} completed", task_id);
+                                Some(value)
+                            }
+                            Err(_) => {
+                                tracing::warn!(
+                                    "woken task {} exceeded its {:?} budget and was cancelled",
+                                    task_id,
+                                    budget
+                                );
+                                None
+                            }
+                        };
 
                     Self::on_task_finished_static(
                         queue_clone,
