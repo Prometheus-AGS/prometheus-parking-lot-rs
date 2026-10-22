@@ -361,6 +361,10 @@ crate feature "iggy"
 
 ### 10.1 Document-by-document verdict
 
+> cr-16 (2026-10-22) moved the invalid and historical documents below to `docs/archive/`;
+> [`docs/archive/README.md`](archive/README.md) lists each with its reason. `specs/001-parking-system-build/`
+> stays in place because KBD state references it.
+
 | Document | Verdict | Notes |
 |---|---|---|
 | `WHAT_WHY.md` | ✅ **Valid** | An accurate statement of intent. Keep it as the north star. |
