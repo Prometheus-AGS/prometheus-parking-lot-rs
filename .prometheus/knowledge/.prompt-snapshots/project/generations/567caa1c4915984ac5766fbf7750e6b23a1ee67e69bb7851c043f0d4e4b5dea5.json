@@ -1,0 +1,515 @@
+{
+  "schemaVersion": 1,
+  "scope": "project",
+  "generation": "567caa1c4915984ac5766fbf7750e6b23a1ee67e69bb7851c043f0d4e4b5dea5",
+  "candidateCount": 23,
+  "byteCount": 43055,
+  "entries": [
+    {
+      "id": "karpathy-session-0de87a9f4477d32d",
+      "title": "Karpathy session 0de87a9f4477",
+      "content": "## Delta\n\nThe tooling changes are committed on a new branch, `chore/agent-tooling-openspec-kbd`, as three commits:\n\n| Commit | What's in it |\n|---|---|\n| `ddcd851` chore(openspec) | `openspec/` plus the generated skill and command files for the six tools |\n| `0592009` chore(kbd) | `.kbd-orchestrator/`: the updated KBD config and new `constraints.md`, the migrated state, and the converted progress ledger |\n| `e32b77b` chore(agents) | `AGENTS.md`, `CLAUDE.md` (stored in git as a symlink), the bootstrap hooks, rules and settings, the `.prometheus/` logs and archived originals, `versions.toml`, the two docs, and the skill installer script |\n\nThe branch starts from `main`, not the fix branch, so the two can be reviewed and merged independently. `fix/execution-timeout-enforcement` is unchanged at `e8b0217`. None of the three commits touch `src/`, `tests/`, `Cargo.toml` or `CHANGELOG.md`, so I didn't run the build or test gates for them.\n\n- **The diff is large:** 934 files and about 227,000 added lines. Almost all of it is the generated OpenSpec skills copied into each tool's folder.\n- **Still untracked on purpose:**\n  - `docs/update-plan-10-22-2026.md`: today's audit. It wasn't created in this session, so it's yours to decide on, and it's worth keeping.\n  - `.serena/`: Serena's local state.\n  - `.prometheus/recovery/`: a backup of `AGENTS.md` written by the bootstrap. Consider adding it to `.gitignore`.\n- **These files would ship to crates.io.** The new tooling folders (`.agents/`, `.claude/`, `.opencode/`, `openspec/` and so on) aren't in the `exclude` list in `Cargo.toml`, so `cargo publish` would include them. The audit recommends replacing that list with an `include` list of the files the crate needs, as part of the credentials cleanup.\n\nNothing is pushed. Do you want me to push both branches and open the two PRs?\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T10:58:40.288094Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- .prometheus/recovery/\n- .serena/\n- docs/update-plan-10-22-2026.md\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T10:58:43.614499Z",
+      "updated_at": "2026-10-22T10:58:43.614499Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-257f06741c4af6f7",
+      "title": "Karpathy session 257f06741c4a",
+      "content": "## Delta\n\nThe default-features test run is still compiling. I'll pick up the results when it finishes.\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T10:50:15.111280Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- .gitignore\n- .kbd-orchestrator/current-waypoint.json\n- .kbd-orchestrator/phases/phase-certification-remediation/progress.json\n- .kbd-orchestrator/project.json\n- AGENTS.md\n- CLAUDE.md\n- .agents/\n- .claude/agents/\n- .claude/commands/opsx/\n- .claude/hooks/\n- .claude/rules/\n- .claude/settings.json\n- .claude/skills/\n- .kbd-orchestrator/constraints.md\n- .kbd-orchestrator/position-reminder.txt\n- .kbd-orchestrator/position.json\n- .kimi-code/\n- .opencode/\n- .serena/\n- docs/agent-context.md\n- docs/skill-routing.md\n- docs/update-plan-10-22-2026.md\n- openspec/\n- scripts/install-agent-skills.sh\n- versions.toml\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T10:51:06.520260Z",
+      "updated_at": "2026-10-22T10:51:06.520260Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-270ed858ab7efe25",
+      "title": "Karpathy session 270ed858ab7e",
+      "content": "## Delta\n\nLocal `main` is now at `16be889`, the #4 merge, so the plan doc and knowledge sync are in. I deleted the three merged local branches; git confirmed each was fully merged first.\n\n**Remaining loose ends:**\n- **Merged branches still on GitHub:** `chore/agent-tooling-openspec-kbd`, `docs/next-phase-plan-and-knowledge`, `fix/execution-timeout-enforcement`, and the old `kbd/certification-remediation`. I left them because deleting branches on GitHub is visible to everyone; I can delete them if you want.\n- **New knowledge records:** the hooks have already written another session record and snapshot. They'll go in the next `chore(knowledge)` commit with the next phase's work, not a PR of their own.\n\n**Next step:** `/kbd-new-phase phase-correctness-and-durability`, using `docs/update-plan-10-22-2026.md` as its spec. Milestone 0 starts with CR-15, the leaked `.codex/auth.json` credentials on this public repo:\n\n1. **You:** revoke and rotate those tokens. This is the urgent part and only you can do it.\n2. **Me:**\n   - purge the file from git history;\n   - switch `Cargo.toml` to an `include` list of files that ship to crates.io;\n   - add a secret scan to CI.\n\nThe history purge means a force-push to `main`, so I'll confirm with you before running it.\n\nShall I start the phase?\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T11:08:14.882060Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- .prometheus/recovery/\n- .serena/\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T11:08:16.006978Z",
+      "updated_at": "2026-10-22T11:08:16.006978Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-2745a5b1d9e4af42",
+      "title": "Karpathy session 2745a5b1d9e4",
+      "content": "## Delta\n\nNothing was applied, so the builder is unchanged. Running the same patch from a script file.\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: unknown\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T12:22:50.019484Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- No changed paths detected.\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T12:41:47.300410Z",
+      "updated_at": "2026-10-22T12:41:47.300410Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-30f8a86ca36fbcd0",
+      "title": "Karpathy session 30f8a86ca36f",
+      "content": "## Delta\n\nOne ordering bug remains: `cr-15`'s history purge force-pushes `main`, so it can't run alongside `cr-41`'s branch. Making the baseline depend on containment, then validating every OpenSpec change.\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T11:32:47.672851Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- No changed paths detected.\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T12:16:53.320014Z",
+      "updated_at": "2026-10-22T12:16:53.320014Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-354481f1c53425b2",
+      "title": "Karpathy session 354481f1c534",
+      "content": "## Delta\n\nAll 12 skills are installed and work in every tool. Each one's `SKILL.md` opens from all four skill folders: `~/.agents/skills` (Codex, Zed and OpenCode), `~/.claude/skills`, `~/.kimi/skills` and `~/.minimax/skills`. Each also has a `.provenance` file recording its source commit and license.\n\nClaude Code has already picked them up; all 12 now appear in this session's skill list. Codex, OpenCode, Zed, Kimi and MiniMax usually load skills at startup, so restart any of those you have open.\n\nNothing is committed yet. That includes the restructured `AGENTS.md`/`CLAUDE.md`, `docs/agent-context.md`, `docs/skill-routing.md`, the installer script, the bootstrap files, and the earlier OpenSpec and KBD changes. Do you want it as one commit or split up (OpenSpec, KBD migration, agent context), and on `fix/execution-timeout-enforcement` or a new branch?\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T10:45:18.956764Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- .gitignore\n- .kbd-orchestrator/current-waypoint.json\n- .kbd-orchestrator/phases/phase-certification-remediation/progress.json\n- .kbd-orchestrator/project.json\n- AGENTS.md\n- CLAUDE.md\n- .agents/\n- .claude/agents/\n- .claude/commands/opsx/\n- .claude/hooks/\n- .claude/rules/\n- .claude/settings.json\n- .claude/skills/\n- .kbd-orchestrator/constraints.md\n- .kbd-orchestrator/position-reminder.txt\n- .kbd-orchestrator/position.json\n- .kimi-code/\n- .opencode/\n- .serena/\n- docs/agent-context.md\n- docs/skill-routing.md\n- docs/update-plan-10-22-2026.md\n- openspec/\n- scripts/install-agent-skills.sh\n- versions.toml\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T10:47:48.016577Z",
+      "updated_at": "2026-10-22T10:47:48.016577Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-5aea40bd0352d424",
+      "title": "Karpathy session 5aea40bd0352",
+      "content": "## Delta\n\nAll 12 skills are installed and work in every tool. Each one's `SKILL.md` opens from all four skill folders: `~/.agents/skills` (Codex, Zed and OpenCode), `~/.claude/skills`, `~/.kimi/skills` and `~/.minimax/skills`. Each also has a `.provenance` file recording its source commit and license.\n\nClaude Code has already picked them up; all 12 now appear in this session's skill list. Codex, OpenCode, Zed, Kimi and MiniMax usually load skills at startup, so restart any of those you have open.\n\nNothing is committed yet. That includes the restructured `AGENTS.md`/`CLAUDE.md`, `docs/agent-context.md`, `docs/skill-routing.md`, the installer script, the bootstrap files, and the earlier OpenSpec and KBD changes. Do you want it as one commit or split up (OpenSpec, KBD migration, agent context), and on `fix/execution-timeout-enforcement` or a new branch?\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T10:47:40.835565Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- .gitignore\n- .kbd-orchestrator/current-waypoint.json\n- .kbd-orchestrator/phases/phase-certification-remediation/progress.json\n- .kbd-orchestrator/project.json\n- AGENTS.md\n- CLAUDE.md\n- .agents/\n- .claude/agents/\n- .claude/commands/opsx/\n- .claude/hooks/\n- .claude/rules/\n- .claude/settings.json\n- .claude/skills/\n- .kbd-orchestrator/constraints.md\n- .kbd-orchestrator/position-reminder.txt\n- .kbd-orchestrator/position.json\n- .kimi-code/\n- .opencode/\n- .serena/\n- docs/agent-context.md\n- docs/skill-routing.md\n- docs/update-plan-10-22-2026.md\n- openspec/\n- scripts/install-agent-skills.sh\n- versions.toml\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T10:47:54.465434Z",
+      "updated_at": "2026-10-22T10:47:54.465434Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-5f8f446310fa2e45",
+      "title": "Karpathy session 5f8f446310fa",
+      "content": "## Delta\n\nA syntax error: unescaped backticks inside a template string. Escaping the two inline code spans.\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T12:17:11.387198Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- No changed paths detected.\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T12:42:40.580140Z",
+      "updated_at": "2026-10-22T12:42:40.580140Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-6003004b05ff2ec7",
+      "title": "Karpathy session 6003004b05ff",
+      "content": "## Delta\n\nAdopting the contract through the canonical writer. It stamps the digest and plan revision and records a KBD decision.\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T12:30:21.410216Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- No changed paths detected.\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T12:43:23.246838Z",
+      "updated_at": "2026-10-22T12:43:23.246838Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": null,
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-62e1466808b0f2d2",
+      "title": "Karpathy session 62e1466808b0",
+      "content": "## Delta\n\nBoth branches are pushed and both PRs are open against `main`:\n\n- **#2, the timeout fix:** https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/pull/2\n- **#3, the tooling changes:** https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/pull/3\n\n**#2** describes the fix and includes today's test results: the new timeout tests passed 5 of 5 runs, and the `worker_pool_test` flake failed 3 of 8. It also tells reviewers CI will fail, and that every cause except 4 new clippy style findings is already on `main`:\n- the full-feature build doesn't compile on Rust 1.91.1;\n- the clippy and fmt aliases call themselves, so those checks have never actually run;\n- the repo has a formatting backlog;\n- the build without default features is broken.\n\nIt also notes that the fix adds two ungated tokio calls in `src/core`; they need moving behind the tokio feature once that build is fixed.\n\n**#3** is split into its three commits, lists the checks that passed (bootstrap verifier, KBD validator, secret scan), and has follow-up checkboxes:\n- switch `Cargo.toml` from `exclude` to an `include` list so the tooling folders don't ship to crates.io;\n- decide whether to commit today's audit doc;\n- add `.prometheus/recovery/` to `.gitignore`.\n\nThe two PRs don't depend on each other and can merge in either order.\n\nSeparately, the audit reports that `.codex/auth.json` with agent credentials is committed on `main`, and this repo is public. Neither PR touches it. Revoke and rotate those tokens now, whatever happens with these PRs.\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T11:03:20.928864Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- .prometheus/recovery/\n- .serena/\n- docs/update-plan-10-22-2026.md\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T11:03:25.518522Z",
+      "updated_at": "2026-10-22T11:03:25.518522Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-6d84921daed3975c",
+      "title": "Karpathy session 6d84921daed3",
+      "content": "## Delta\n\nNow pointing the Claude path rule `.claude/rules/rust.md` at the routing doc. It currently hard-codes `rust-best-practices` as the general skill, which contradicts the table.\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T10:35:18.545122Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- No changed paths detected.\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T10:44:36.162122Z",
+      "updated_at": "2026-10-22T10:44:36.162122Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-87e7f6dcec435d75",
+      "title": "Karpathy session 87e7f6dcec43",
+      "content": "## Delta\n\nCompleted adversarial-review — PASS (0/7/2)\nCompleted kbd-assess — phase-correctness-and-durability (step 0 of 0)\n\nThe assessment is written. On current `main` (`90a6194`), none of the phase's six milestone goals is met. The seventh, delivery by the agent team, is partial: the team is installed but no role has run yet. The assess stage is recorded in KBD at revision 20, and the handoff for planning is written.\n\n**Two problems are worse than the audit described:**\n- **The Postgres backends don't work at all.** Every database call blocks inside the async runtime, which panics, so any Postgres-backed pool that has to queue a task crashes. The code comments say \"SKIP LOCKED\" but the query doesn't use it.\n- **Capacity limits are broken in both `WorkerPool` versions**, native and WASM. Neither has a timeout, because the #2 fix only covered `ResourcePool`.\n\n**Other verified gaps:**\n- the native worker silently drops a task it has already taken if shutdown happens at that moment;\n- executor panics are never caught;\n- the public `sync_wake_worker_loop` throws work away;\n- hooks are never emitted;\n- no notifier type exists, though two later CRs depend on one.\n\n**Builds:**\n- **Compiles but nothing else does:** the library and tests compile with default features. The bench and both examples don't, so the `ck` and `t` shortcuts from #5 can't pass yet.\n- **CI on `main`:** every job fails, for the reasons found earlier.\n- **Test suites:** `tests/unit` and `tests/integration` are never built, so the Postgres code has no running tests.\n\n**Review:** the adversarial review passed, with 7 warnings and 2 suggestions, all now applied to the assessment. It ran as a same-model-family subagent, not cross-model, for two reasons:\n- **No judge models configured:** no providers are set up for liter-llm.\n- **Packet builder blocked:** the Trail of Bits modern-python plugin's `python3` shim refuses to run the skill pack's packet builder. That conflict will hit every adversarial review until it's fixed.\n\n**Decisions needed from you before planning:**\n1. **Edit `constraints.md` for `.codex/`.** It currently says `.codex/` is tracked tooling that must not be deleted, which contradicts CR-15's purge. It also claims `.codex/` is excluded from the package, which is false.\n2. **Pull the pgmq decision forward.** The blocking constraints use `--all-features`, which can't build on Rust 1.91.1 while `pgmq` is present. The plan defers the pgmq decision to CR-30 in M2. I recommend dropping or pinning pgmq in a new M0 build-baseline change, alongside fixing all build targets, committing `Cargo.lock` and the format pass.\n3. **Risk acceptance.** May the breaking API changes in M1/M2 ship as 0.3.0? Is it acceptable for CI to stay red until M0 is done?\n\nAnswer those and I'll run `/kbd-plan`. The assessment, review findings and handoff are uncommitted on `main`'s working tree; I'll put them on a branch with the plan.\n\n**KBD status:** position `phase-correctness-and-durability › assess` (complete), revision 20, lifecycle Ready. Next: `/kbd-plan`. The `.codex/auth.json` tokens still need revoking.\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T11:31:47.978373Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- .kbd-orchestrator/current-waypoint.json\n- .kbd-orchestrator/phases/phase-correctness-and-durability/hooks-status.json\n- .kbd-orchestrator/phases/phase-correctness-and-durability/hooks.log.jsonl\n- .kbd-orchestrator/phases/phase-correctness-and-durability/progress.json\n- .kbd-orchestrator/position-reminder.txt\n- .kbd-orchestrator/position.json\n- .kbd-orchestrator/model-preflight.json\n- .kbd-orchestrator/phases/phase-correctness-and-durability/assessment.md\n- .kbd-orchestrator/phases/phase-correctness-and-durability/handoffs/\n- .kbd-orchestrator/phases/phase-correctness-and-durability/prior-context.md\n- .kbd-orchestrator/phases/phase-correctness-and-durability/review/\n- .kbd-orchestrator/phases/phase-correctness-and-durability/sycophancy/\n- .serena/\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T11:59:11.077765Z",
+      "updated_at": "2026-10-22T11:59:11.077765Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-8af247e9c71440b3",
+      "title": "Karpathy session 8af247e9c714",
+      "content": "## Delta\n\nBoth are checked in on a new branch, `docs/next-phase-plan-and-knowledge`, and PR #4 is open against `main`: https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/pull/4\n\nSorry for treating the knowledge files as a mistake. I've saved a note so I keep committing `.prometheus/knowledge/` from now on.\n\nThe branch starts from the updated `main`, which includes both merges. It has two commits:\n- **`bbd2b96`** adds `docs/update-plan-10-22-2026.md` as the plan for the next phase, `phase-correctness-and-durability`. The commit message notes that the audit was written before #2 merged, so it doesn't cover the timeout fix.\n- **`1c0d2f1`** syncs the session records, wiki index and log, and prompt snapshots the knowledge hooks wrote since #3.\n\nA secret scan of both found nothing, and local `main` is now up to date.\n\nThe knowledge hooks keep writing after every turn, so `.prometheus/knowledge/` will show new changes again before long. Those go in the next `chore(knowledge)` commit.\n\nStill left uncommitted: `.prometheus/recovery/` (local backups of `AGENTS.md`, not knowledge) and `.serena/`. Say if you want either one tracked or added to `.gitignore`.\n\nAfter #4 merges, the next step is `/kbd-new-phase phase-correctness-and-durability` from the plan. Its Milestone 0 starts with CR-15: revoking and purging the committed `.codex/auth.json` credentials, which are still exposed in this public repo.\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T11:06:53.025598Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- .prometheus/recovery/\n- .serena/\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T11:06:56.585006Z",
+      "updated_at": "2026-10-22T11:06:56.585006Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-a60203d8c4b04ed7",
+      "title": "Karpathy session a60203d8c4b0",
+      "content": "## Delta\n\nThe fix itself is complete, but the branch isn't ready to merge. It's one commit (`e8b0217`, from Sep 9) that has never been pushed, has no pull request, and no KBD phase or OpenSpec change tracks it. It would also fail CI as soon as it's pushed, almost entirely because of problems already on `main`.\n\n**The fix: done and working.** `ResourcePool` used to accept a timeout setting but never apply it, so a task that never returned held its capacity forever. The fix applies the timeout on both the immediate and the woken path, lets a per-task deadline shorten it, and reports a timed-out task as `Failed` to the mailbox and `timeout` to the audit log. On today's re-run its 4 new tests passed 5 out of 5 times. The commit message also says 3 of them fail against the old code; I didn't re-run that check.\n\n**Gates on this branch today:**\n\n| Gate | Result | Caused by this branch? |\n|---|---|---|\n| `cargo test --all-features` (CI's command) | Doesn't compile on Rust 1.91.1: optional `pgmq` pulls in sqlx 0.9, which needs 1.94, and `Cargo.lock` is gitignored | No |\n| `cargo test --lib --tests` (default features) | All suites pass except `worker_pool_test::test_timeout_handling`, which failed 3 of 8 runs | No; the commit already noted this flake on code it didn't touch |\n| clippy `-D warnings` | Fails across the crate. In `resource_pool.rs`, 43 findings on `main` and 47 here | 4 new style findings on the new timeout code |\n| `cargo fmt --check` | 355 diff hunks across the repo, none in the two files the fix touched | No |\n| Build without default features | Fails (tokio not available) | No, `main` already fails. The fix adds two more tokio calls in `src/core`, the part meant to work without tokio |\n\nThe clippy and fmt checks have never actually run before. `.cargo/config.toml` defines `fmt` and `clippy` aliases that call themselves, so `cargo clippy` errors out without linting, and the commit message already flagged this. I got around it by calling `cargo-clippy` and `cargo-fmt` directly.\n\n**Today's audit (`docs/update-plan-10-22-2026.md`)** reviews `main` at `7939b07`, so it doesn't know about this fix and doesn't list the timeout bug. It does list more serious `ResourcePool` defects this branch doesn't touch: a lost wakeup, silently dropped tasks, and executor panics that leak capacity. It also reports agent credentials committed in `.codex/auth.json` that `cargo publish` would ship. That one needs action regardless of what happens with this branch.\n\n**Recommendation:** keep this branch to the fix, and put today's tooling changes (OpenSpec, KBD migration, the AGENTS.md and skills work) on a separate `chore/` branch so the fix PR stays easy to review. CI won't pass on either branch until the alias recursion, the MSRV/lockfile problem and the formatting backlog are fixed. Those are the audit's Milestone 0 work, so either fix them first or treat this branch's CI failures as known and pre-existing in the PR description.\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T10:54:22.797721Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- No changed paths detected.\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T10:54:58.987713Z",
+      "updated_at": "2026-10-22T10:54:58.987713Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-b504f2099c702b9e",
+      "title": "Karpathy session b504f2099c70",
+      "content": "## Delta\n\nCompleted tasks 10–14 out of 15: install-project codex, kimi, opencode, minimax, deepseek\nStarting task 15 out of 15: install check plus context verification\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T11:16:26.653168Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- No changed paths detected.\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T11:22:58.797410Z",
+      "updated_at": "2026-10-22T11:22:58.797410Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-bcbacefef7fa8348",
+      "title": "Karpathy session bcbacefef7fa",
+      "content": "## Delta\n\nStarting with the research those decisions need: the current Rust stable release, flint-forge's custom Postgres 18 setup, and the know-me branding.\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T11:28:59.768870Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- .kbd-orchestrator/current-waypoint.json\n- .kbd-orchestrator/phases/phase-correctness-and-durability/hooks-status.json\n- .kbd-orchestrator/phases/phase-correctness-and-durability/hooks.log.jsonl\n- .kbd-orchestrator/phases/phase-correctness-and-durability/progress.json\n- .kbd-orchestrator/position-reminder.txt\n- .kbd-orchestrator/position.json\n- .kbd-orchestrator/model-preflight.json\n- .kbd-orchestrator/phases/phase-correctness-and-durability/assessment.md\n- .kbd-orchestrator/phases/phase-correctness-and-durability/handoffs/\n- .kbd-orchestrator/phases/phase-correctness-and-durability/prior-context.md\n- .kbd-orchestrator/phases/phase-correctness-and-durability/review/\n- .kbd-orchestrator/phases/phase-correctness-and-durability/sycophancy/\n- .serena/\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T12:03:23.336638Z",
+      "updated_at": "2026-10-22T12:03:23.336638Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-d080872c2ede7dc1",
+      "title": "Karpathy session d080872c2ede",
+      "content": "## Delta\n\nZed didn't open. That `setpgid ... Operation not permitted` error comes from the restricted shell that `!` commands run in here: it won't let the `zed` command start a separate process, so this isn't a Zed problem.\n\nEither of these should work:\n\n- Run `zed .` in your own terminal, outside Claude Code.\n- Or type `! open -a Zed .` here, which hands the folder to Zed through macOS instead.\n\nWhen Zed opens, its agent will find the OpenSpec skills in `.agents/skills/`, and you start a change with `/openspec-propose \"...\"`.\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T10:32:17.893376Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- .kbd-orchestrator/current-waypoint.json\n- .kbd-orchestrator/phases/phase-certification-remediation/progress.json\n- .kbd-orchestrator/project.json\n- .agents/\n- .claude/commands/opsx/\n- .claude/skills/\n- .kbd-orchestrator/constraints.md\n- .kbd-orchestrator/position-reminder.txt\n- .kbd-orchestrator/position.json\n- .kimi-code/\n- .opencode/\n- .serena/\n- docs/update-plan-10-22-2026.md\n- openspec/\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T10:38:11.439740Z",
+      "updated_at": "2026-10-22T10:38:11.439740Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-d6b3e11d11641ca4",
+      "title": "Karpathy session d6b3e11d1164",
+      "content": "## Delta\n\nZed didn't open. That `setpgid ... Operation not permitted` error comes from the restricted shell that `!` commands run in here: it won't let the `zed` command start a separate process, so this isn't a Zed problem.\n\nEither of these should work:\n\n- Run `zed .` in your own terminal, outside Claude Code.\n- Or type `! open -a Zed .` here, which hands the folder to Zed through macOS instead.\n\nWhen Zed opens, its agent will find the OpenSpec skills in `.agents/skills/`, and you start a change with `/openspec-propose \"...\"`.\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T10:27:43.903129Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- .kbd-orchestrator/current-waypoint.json\n- .kbd-orchestrator/phases/phase-certification-remediation/progress.json\n- .kbd-orchestrator/project.json\n- .agents/\n- .claude/commands/opsx/\n- .claude/skills/\n- .kbd-orchestrator/constraints.md\n- .kbd-orchestrator/position-reminder.txt\n- .kbd-orchestrator/position.json\n- .kimi-code/\n- .opencode/\n- .serena/\n- docs/update-plan-10-22-2026.md\n- openspec/\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T10:38:13.308689Z",
+      "updated_at": "2026-10-22T10:38:13.308689Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-dbe09a23a5acf784",
+      "title": "Karpathy session dbe09a23a5ac",
+      "content": "## Delta\n\nRound 2 of the plan review is running. It checks that each round-1 issue is actually fixed and looks for new problems the revision introduced. When it finishes, I'll apply its findings, then adopt the contract, register the changes and tasks with KBD, and open the PR.\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T11:46:17.665329Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- No changed paths detected.\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T12:32:20.396869Z",
+      "updated_at": "2026-10-22T12:32:20.396869Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-dc8402859be335b6",
+      "title": "Karpathy session dc8402859be3",
+      "content": "## Delta\n\nZed didn't open. That `setpgid ... Operation not permitted` error comes from the restricted shell that `!` commands run in here: it won't let the `zed` command start a separate process, so this isn't a Zed problem.\n\nEither of these should work:\n\n- Run `zed .` in your own terminal, outside Claude Code.\n- Or type `! open -a Zed .` here, which hands the folder to Zed through macOS instead.\n\nWhen Zed opens, its agent will find the OpenSpec skills in `.agents/skills/`, and you start a change with `/openspec-propose \"...\"`.\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T10:35:09.640971Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- .kbd-orchestrator/current-waypoint.json\n- .kbd-orchestrator/phases/phase-certification-remediation/progress.json\n- .kbd-orchestrator/project.json\n- .agents/\n- .claude/commands/opsx/\n- .claude/skills/\n- .kbd-orchestrator/constraints.md\n- .kbd-orchestrator/position-reminder.txt\n- .kbd-orchestrator/position.json\n- .kimi-code/\n- .opencode/\n- .serena/\n- docs/update-plan-10-22-2026.md\n- openspec/\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T10:38:13.860935Z",
+      "updated_at": "2026-10-22T10:38:13.860935Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-dd566af197614229",
+      "title": "Karpathy session dd566af19761",
+      "content": "## Delta\n\nRound 2 of the plan review is running. It checks that each round-1 issue is actually fixed and looks for new problems the revision introduced. When it finishes, I'll apply its findings, then adopt the contract, register the changes and tasks with KBD, and open the PR.\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T11:36:48.589965Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- No changed paths detected.\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T12:32:30.697263Z",
+      "updated_at": "2026-10-22T12:32:30.697263Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-f95bbed9dcd83dc8",
+      "title": "Karpathy session f95bbed9dcd8",
+      "content": "## Delta\n\nStarting kbd-plan — phase-correctness-and-durability (step 0 of 0)\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T11:28:08.633062Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- .codex/auth.json\n- .codex/config.toml\n- .codex/history.jsonl\n- .codex/sessions/2025/12/06/rollout-2025-12-06T15-11-37-019af581-86ce-7d23-b9c6-0f99353d36af.jsonl\n- .codex/version.json\n- .gitignore\n- .kbd-orchestrator/constraints.md\n- .kbd-orchestrator/current-waypoint.json\n- .kbd-orchestrator/phases/phase-correctness-and-durability/hooks-status.json\n- .kbd-orchestrator/phases/phase-correctness-and-durability/hooks.log.jsonl\n- .kbd-orchestrator/phases/phase-correctness-and-durability/progress.json\n- .kbd-orchestrator/position-reminder.txt\n- .kbd-orchestrator/position.json\n- .kbd-orchestrator/model-preflight.json\n- .kbd-orchestrator/phases/phase-correctness-and-durability/assessment.md\n- .kbd-orchestrator/phases/phase-correctness-and-durability/handoffs/\n- .kbd-orchestrator/phases/phase-correctness-and-durability/prior-context.md\n- .kbd-orchestrator/phases/phase-correctness-and-durability/review/\n- .kbd-orchestrator/phases/phase-correctness-and-durability/sycophancy/\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T12:06:16.362426Z",
+      "updated_at": "2026-10-22T12:06:16.362426Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    },
+    {
+      "id": "karpathy-session-ff5863c353660e10",
+      "title": "Karpathy session ff5863c35366",
+      "content": "## Delta\n\nRound 2 of the plan review is running. It checks that each round-1 issue is actually fixed and looks for new problems the revision introduced. When it finishes, I'll apply its findings, then adopt the contract, register the changes and tasks with KBD, and open the PR.\n\n## Root Cause\n\nNo explicit root-cause section was captured; preserve this as a session record, not an inferred diagnosis.\n\n## Corrective Actions\n\nReview and promote only reusable findings.\n\n## Session Metadata\n\n- Harness: claude-code\n- Session: d281c3f1-466c-41cb-b006-ce00f1aa43b6\n- Captured: 2026-10-22T11:39:21.067751Z\n- Project: /Volumes/T7/Projects/prometheus/prometheus-parking-lot\n\n## Changed Paths\n\n- No changed paths detected.\n",
+      "tags": [
+        "karpathy",
+        "session-learning"
+      ],
+      "links": [],
+      "sources": [
+        {
+          "resource": "session:d281c3f1-466c-41cb-b006-ce00f1aa43b6"
+        }
+      ],
+      "created_at": "2026-10-22T12:32:39.797160Z",
+      "updated_at": "2026-10-22T12:32:39.797160Z",
+      "revision": 0,
+      "entry_type": "SessionRecord",
+      "description": null,
+      "generated_by": "pk/1.11.0",
+      "extra": {}
+    }
+  ]
+}
