@@ -1,16 +1,49 @@
 //! Core scheduling abstractions and capacity accounting.
+//!
+//! Since the workspace split (ADR 0001) this module re-exports the
+//! runtime-free contracts from `prometheus-parking-lot-core` and, behind the
+//! default `tokio-runtime` feature, the pools and runtime pieces from
+//! `prometheus-parking-lot-runtime-tokio`, under the paths they had before.
 
-pub mod audit;
-pub mod cancellation;
-pub mod error;
-pub mod executor;
-pub mod hooks;
-pub mod resource_pool;
+/// Audit sink contract and implementations.
+pub mod audit {
+    pub use prometheus_parking_lot_core::hooks::audit::*;
+    #[cfg(feature = "postgres")]
+    pub use prometheus_parking_lot_pg::audit::PostgresAuditSink;
+}
+
+pub use prometheus_parking_lot_core::contracts::{error, executor};
+pub use prometheus_parking_lot_core::hooks;
 #[cfg(feature = "tokio-runtime")]
-pub mod shutdown;
-pub mod worker_pool;
+pub use prometheus_parking_lot_runtime_tokio::cancellation;
+#[cfg(feature = "tokio-runtime")]
+pub use prometheus_parking_lot_runtime_tokio::shutdown;
 
-pub use audit::{AuditEvent, AuditSink, InMemoryAuditSink, PostgresAuditSink, build_audit_event};
+/// Scheduling contracts (queue, mailbox, spawner, task types) and the async
+/// `ResourcePool`.
+pub mod resource_pool {
+    pub use prometheus_parking_lot_core::contracts::{
+        Mailbox, PoolLimits, ScheduledTask, Spawn, TaskMetadata, TaskQueue, TaskStatus,
+    };
+    #[cfg(feature = "tokio-runtime")]
+    pub use prometheus_parking_lot_runtime_tokio::resource_pool::{
+        ResourcePool, WakeState, sync_wake_worker_loop,
+    };
+}
+
+/// `WorkerPool`: dedicated worker threads (native) or async tasks (WASM).
+pub mod worker_pool {
+    pub use prometheus_parking_lot_core::contracts::{PoolError, PoolStats};
+    #[cfg(all(feature = "tokio-runtime", not(target_arch = "wasm32")))]
+    pub use prometheus_parking_lot_runtime_tokio::worker_pool::WorkerPool;
+    #[cfg(target_arch = "wasm32")]
+    pub use prometheus_parking_lot_wasm::WorkerPool;
+}
+
+#[cfg(feature = "postgres")]
+pub use audit::PostgresAuditSink;
+pub use audit::{AuditEvent, AuditSink, InMemoryAuditSink, build_audit_event};
+#[cfg(feature = "tokio-runtime")]
 pub use cancellation::{
     CancelReason, CancellationChannel, CancellationConfig, CancellationSink, CancelledTask,
     LoggingCancellationSink, RecordingCancellationSink, SinkOutcome,
@@ -22,9 +55,15 @@ pub use hooks::{
     RejectionReason, TracingHook, emit_cancelled, emit_completed, emit_rejected, emit_submitted,
 };
 pub use resource_pool::{
-    Mailbox, PoolLimits, ResourcePool, ScheduledTask, Spawn, TaskMetadata, TaskQueue, TaskStatus,
-    WakeState, sync_wake_worker_loop,
+    Mailbox, PoolLimits, ScheduledTask, Spawn, TaskMetadata, TaskQueue, TaskStatus,
 };
 #[cfg(feature = "tokio-runtime")]
+pub use resource_pool::{ResourcePool, WakeState, sync_wake_worker_loop};
+#[cfg(feature = "tokio-runtime")]
 pub use shutdown::{ShutdownHandle, ShutdownPolicy, wait_for_signal};
-pub use worker_pool::{PoolError, PoolStats, WorkerPool};
+#[cfg(any(
+    all(feature = "tokio-runtime", not(target_arch = "wasm32")),
+    target_arch = "wasm32"
+))]
+pub use worker_pool::WorkerPool;
+pub use worker_pool::{PoolError, PoolStats};

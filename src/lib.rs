@@ -70,7 +70,7 @@
 //! ```
 //!
 //! For complete examples, see:
-//! - `tests/parking_lot_algorithm_test.rs` - Full integration tests
+//! - `crates/parking-lot-runtime-tokio/tests/parking_lot_algorithm_test.rs` - Full integration tests
 //! - `README.md` - Comprehensive documentation
 
 #![deny(missing_docs)]
@@ -80,28 +80,82 @@
 #![warn(clippy::nursery)]
 
 /// Builders to construct scheduler components from configuration.
+#[cfg(feature = "tokio-runtime")]
 pub mod builders;
 /// Configuration models for pools, backends, and timeouts.
 pub mod config;
 /// Core scheduling abstractions and capacity accounting.
 pub mod core;
-/// Infrastructure adapters for queues, mailboxes, and storage backends.
-pub mod infra;
 /// Runtime adapters (native, web/worker, cloud) and API surface.
+#[cfg(feature = "tokio-runtime")]
 pub mod runtime;
 /// Shared utilities.
 pub mod util;
 
+/// Infrastructure adapters for queues, mailboxes, and storage backends.
+///
+/// The in-memory backends come from `prometheus-parking-lot-core`; the
+/// Postgres backends (feature `postgres`) from `prometheus-parking-lot-pg`; the
+/// embedded file-backed backends (feature `embedded`) from
+/// `prometheus-parking-lot-embedded`.
+pub mod infra {
+    /// Queue backends.
+    pub mod queue {
+        pub use prometheus_parking_lot_core::contracts::memory_queue as memory;
+        #[cfg(feature = "embedded")]
+        pub use prometheus_parking_lot_embedded::queue::yaque;
+        #[cfg(feature = "postgres")]
+        pub use prometheus_parking_lot_pg::queue as postgres;
+
+        pub use memory::InMemoryQueue;
+        #[cfg(feature = "postgres")]
+        pub use postgres::PostgresQueue;
+        #[cfg(feature = "embedded")]
+        pub use yaque::YaqueQueue;
+    }
+
+    /// Mailbox backends.
+    pub mod mailbox {
+        pub use prometheus_parking_lot_core::mailbox::memory;
+        #[cfg(feature = "embedded")]
+        pub use prometheus_parking_lot_embedded::mailbox::yaque;
+        #[cfg(feature = "postgres")]
+        pub use prometheus_parking_lot_pg::mailbox as postgres;
+
+        pub use memory::InMemoryMailbox;
+        #[cfg(feature = "postgres")]
+        pub use postgres::PostgresMailbox;
+        #[cfg(feature = "embedded")]
+        pub use yaque::YaqueMailbox;
+    }
+
+    #[cfg(feature = "postgres")]
+    pub use prometheus_parking_lot_pg::entities;
+
+    pub use mailbox::InMemoryMailbox;
+    #[cfg(feature = "embedded")]
+    pub use mailbox::YaqueMailbox;
+    pub use queue::InMemoryQueue;
+    #[cfg(feature = "embedded")]
+    pub use queue::YaqueQueue;
+}
+
 // ── Top-level convenience re-exports ─────────────────────────────────────────
 
-pub use core::cancellation::{
+#[cfg(any(
+    all(feature = "tokio-runtime", not(target_arch = "wasm32")),
+    target_arch = "wasm32"
+))]
+pub use crate::core::WorkerPool;
+#[cfg(feature = "tokio-runtime")]
+pub use crate::core::cancellation::{
     CancelReason, CancellationChannel, CancellationConfig, CancellationSink, CancelledTask,
     LoggingCancellationSink, RecordingCancellationSink, SinkOutcome,
 };
-pub use core::error::{AppResult, SchedulerError};
-pub use core::hooks::{
+pub use crate::core::error::{AppResult, SchedulerError};
+pub use crate::core::hooks::{
     CancelledReason, Hook, HookBus, LifecycleEvent, RecordingHook, RejectionReason, TracingHook,
 };
 #[cfg(feature = "tokio-runtime")]
-pub use core::shutdown::{ShutdownHandle, ShutdownPolicy, wait_for_signal};
-pub use core::{PoolError, PoolStats, TaskMetadata, WorkerPool};
+pub use crate::core::shutdown::{ShutdownHandle, ShutdownPolicy, wait_for_signal};
+pub use crate::core::{PoolError, PoolStats, TaskMetadata};
