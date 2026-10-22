@@ -1,41 +1,230 @@
 {
+  "schemaVersion": "2",
+  "generatedBy": "kbd-runtime",
+  "projectionContractVersion": 2,
+  "sourceRevision": 2,
+  "derivedRevision": 2,
+  "frontier": {
+    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 2
+  },
+  "conflictCount": 0,
   "phase": "phase-certification-remediation",
-  "assessment_complete": true,
-  "plan_complete": true,
-  "execute_complete": true,
-  "reflect_complete": true,
-  "merged_at": "2026-06-02",
-  "merged_pr": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/pull/1",
-  "source": "CERTIFICATION_REPORT.md",
-  "change_backend": "native-kbd",
-  "blocker_reproduced": true,
-  "root_cause": "retrieve_async leaks a blocking-pool thread parked on an untimed condvar.wait(); entry removed before store() can notify -> wedges tokio runtime drop -> runner hang in test_timeout_handling",
-  "changes": ["CR-01","CR-02","CR-03","CR-04","CR-05","CR-06","CR-07","CR-08","CR-09","CR-10","CR-11","CR-12","CR-13","CR-14"],
+  "phaseId": "phase-certification-remediation",
+  "parentPhase": null,
+  "last_updated": "2026-10-22T10:34:18.181429Z",
+  "last_updated_by": "kbd-runtime",
   "changes_total": 14,
-  "changes_done": ["CR-11","CR-01","CR-08","CR-02","CR-04","CR-05","CR-03","CR-13","CR-07","CR-06","CR-14","CR-09","CR-10","CR-12"],
   "changes_completed": 14,
-  "execution_branch": "kbd/certification-remediation",
-  "milestone_status": {
-    "M1-certify": "CR-01 done, CR-02 done, CR-04 pending (needs cargo-llvm-cov install)",
-    "M2-harden": "not started (CR-03,05,06,07,13,14 — public API changes)",
-    "M3-publish": "CR-08 done; CR-09,10,12 pending; CR-11 done"
+  "implementation_total": 14,
+  "implementation_completed": 14,
+  "completion": {
+    "primaryCounter": "implementation",
+    "implementation": {
+      "completed": 14,
+      "total": 14,
+      "status": "COMPLETE"
+    },
+    "evidence": {
+      "status": "NOT_TRACKED",
+      "summary": null,
+      "blockers": []
+    },
+    "certification": {
+      "status": "NOT_TRACKED",
+      "summary": null,
+      "blockers": []
+    },
+    "publication": {
+      "status": "NOT_TRACKED",
+      "summary": null,
+      "blockers": []
+    }
   },
-  "certification_blocker_resolved": true,
-  "verification": "worker_pool_test exits clean (was infinite hang); full suite green EXITCODE=0; clippy --lib net-neutral at 111; cargo publish --dry-run clean",
-  "deliverables_this_phase": ["docs/PUBLISHING.md", "plan.md", ".kbd-orchestrator/changes/*"],
-  "research_sources": [".firecrawl/s1-shutdown.json", ".firecrawl/s2-backpressure.json", ".firecrawl/s3-hooks.json", ".firecrawl/s4-publish.json"],
-  "decisions": {
-    "shutdown": "tokio three-part model + CancellationToken + ctrl_c/SIGTERM",
-    "errors": "single #[non_exhaustive] thiserror enum, rich QueueFull context",
-    "mailbox": "at-least-once + TTL/eviction; notifier failure != data loss",
-    "hooks": "generalize AuditSink to multi-observer Hook lifecycle bus",
-    "R2_policy": "RESOLVED by user: NO always-drain (inference can hang). DrainThenCancel default; cancelled stragglers captured for replay via CR-14",
-    "R6_cancellation_capture": "ADOPT CancellationSink<P> trait + bounded decoupled handoff (per-call timeout delta + fallback) + at-least-once nack/DLQ replay = CR-14. Owned CancelledTask<P> context passed to caller off the teardown path. See decision-cancellation-capture.md",
-    "R7_idempotency": "LOCKED by user: D1 explicit idempotency_key on TaskMetadata; D2 at-least-once + idempotent executor (no exactly-once); D3 env-only auto-requeue, deadline/signal->DLQ; D4 max_attempts=3 + exp backoff configurable. Defaults D5 first-write-wins+consume-once, D6 partial-side-effects documented, D7 persist key+attempt. See decision-idempotency.md",
-    "R5_caller_pluggable_shutdown": "ADOPT bounded form (token injection + ShutdownPolicy enum + ShutdownHandle = CR-13); REJECT library-invoked async policy callback; per-task reactions via CR-07 hooks. See decision-cancellation-policy.md"
+  "completionScopes": {
+    "completion": "phase",
+    "runCompletion": "run"
   },
-  "open_questions": ["Install cargo-llvm-cov for CR-04 coverage? (cargo install, several min)", "Proceed with M2 public-API changes (CR-03/05/13/14 change TaskMetadata + shutdown API) incrementally?"],
-  "publish_blockers_resolved": ["CR-01 test hang (FIXED)", "CR-08 metadata/license (FIXED, MIT-only)"],
-  "license_decision": "MIT only (user, 2026-06-02) — no Apache-2.0",
-  "next_action": "CR-04 (install llvm-cov) then M2 CR-03; or checkpoint for user review"
+  "runCompletion": {
+    "scope": "run",
+    "runId": "phase-certification-remediation-20261022T103344Z",
+    "primaryCounter": "implementation",
+    "implementation": {
+      "completed": 14,
+      "total": 14,
+      "status": "COMPLETE"
+    },
+    "evidence": {
+      "status": "PENDING",
+      "summary": null,
+      "blockers": []
+    },
+    "certification": {
+      "status": "PENDING",
+      "summary": null,
+      "blockers": []
+    },
+    "publication": {
+      "status": "PENDING",
+      "summary": null,
+      "blockers": []
+    }
+  },
+  "changes": [
+    {
+      "id": "CR-01",
+      "title": "CR-01",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 0,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "CR-02",
+      "title": "CR-02",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 0,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "CR-03",
+      "title": "CR-03",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 0,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "CR-04",
+      "title": "CR-04",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 0,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "CR-05",
+      "title": "CR-05",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 0,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "CR-06",
+      "title": "CR-06",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 0,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "CR-07",
+      "title": "CR-07",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 0,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "CR-08",
+      "title": "CR-08",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 0,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "CR-09",
+      "title": "CR-09",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 0,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "CR-10",
+      "title": "CR-10",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 0,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "CR-11",
+      "title": "CR-11",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 0,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "CR-12",
+      "title": "CR-12",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 0,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "CR-13",
+      "title": "CR-13",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 0,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "CR-14",
+      "title": "CR-14",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 0,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": null,
+      "blockers": []
+    }
+  ],
+  "children": {},
+  "migrationStatus": null
 }

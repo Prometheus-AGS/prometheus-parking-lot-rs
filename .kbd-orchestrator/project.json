@@ -1,20 +1,146 @@
 {
-  "name": "prometheus_parking_lot",
-  "language": "rust",
-  "edition": "2021",
-  "rust_version": "1.91.1",
-  "kind": "library-crate",
-  "description": "Configurable, runtime-agnostic parking-lot scheduler for Prometheus AI agents and services.",
+  "activePhase": "phase-certification-remediation",
+  "agents_config": {
+    "claude-code": {
+      "entry": ".claude/skills + /opsx:* commands",
+      "strengths": [
+        "planning",
+        "multi-file features",
+        "review"
+      ]
+    },
+    "codex": {
+      "entry": ".agents/skills ($openspec-*)",
+      "strengths": [
+        "parallel isolated tasks via git worktrees"
+      ]
+    },
+    "kimi-code": {
+      "entry": ".kimi-code/skills (/skill:openspec-*)",
+      "strengths": [
+        "focused implementation"
+      ]
+    },
+    "minimax-code": {
+      "entry": "~/.minimax/skills (global)",
+      "strengths": [
+        "focused implementation"
+      ]
+    },
+    "opencode": {
+      "entry": ".opencode/skills + /opsx-* commands",
+      "strengths": [
+        "quick targeted edits"
+      ]
+    },
+    "zed": {
+      "entry": ".agents/skills (shared with codex)",
+      "strengths": [
+        "in-editor edits"
+      ]
+    }
+  },
+  "build_health_command": "cargo check --all-targets --all-features",
   "canonical_specs": [
     "CLAUDE.md",
     "CERTIFICATION_REPORT.md"
   ],
-  "openspec": false,
-  "source_roots": ["src"],
-  "test_roots": ["tests"],
+  "constraint_file": ".kbd-orchestrator/constraints.md",
+  "description": "Configurable, runtime-agnostic parking-lot scheduler for Prometheus AI agents and services.",
+  "dev_command": null,
+  "doc_command": "RUSTDOCFLAGS=\"-D warnings\" cargo doc --no-deps --all-features",
+  "edition": "2021",
+  "fmt_command": "cargo fmt --all -- --check",
+  "focus_project_path": "/Volumes/T7/Projects/prometheus/prometheus-parking-lot",
   "key_modules": [
     "src/core/worker_pool/native.rs",
     "src/core/resource_pool.rs",
     "src/infra"
-  ]
+  ],
+  "kind": "library-crate",
+  "language": "rust",
+  "lint_command": "cargo clippy --all-targets --all-features -- -D warnings",
+  "maxChildDepth": 4,
+  "model_policy": {
+    "active_environment": "local",
+    "phases": {
+      "creator-execute": "tiered",
+      "creator-persist": "small",
+      "creator-plan": "frontier",
+      "creator-reflect": "frontier",
+      "creator-specify": "frontier",
+      "evolver-analyze": "frontier",
+      "evolver-assess": "frontier",
+      "evolver-execute-high": "frontier",
+      "evolver-execute-low": "small",
+      "evolver-execute-medium": "medium",
+      "evolver-plan": "frontier",
+      "evolver-reflect": "frontier",
+      "evolver-status": "small",
+      "kbd-assess": "frontier",
+      "kbd-plan": "frontier",
+      "kbd-reflect": "frontier",
+      "kbd-status": "small",
+      "opsx-apply-high": "frontier",
+      "opsx-apply-low": "small",
+      "opsx-apply-medium": "medium",
+      "opsx-archive": "small",
+      "opsx-new": "small",
+      "opsx-verify": "medium",
+      "refiner-evaluate": "medium",
+      "refiner-iterate": "small"
+    },
+    "registry": {
+      "frontier": {
+        "l4": "claude-sonnet-4-6",
+        "local": "claude-sonnet-4-6",
+        "t4": "claude-sonnet-4-6"
+      },
+      "medium": {
+        "l4": "Qwen3.5-35B-A3B-Q4",
+        "local": null,
+        "t4": "Qwen3.5-27B-Q4"
+      },
+      "small": {
+        "l4": "Qwen3.5-9B-Q8_0",
+        "local": "Qwen3.5-9B-Q8_0",
+        "t4": "Qwen3.5-9B-Q8_0"
+      }
+    }
+  },
+  "name": "prometheus_parking_lot",
+  "openspec": true,
+  "openspec_available": true,
+  "preferred_execution_agents": [],
+  "preferred_planning_agent": "antigravity",
+  "prerequisites": [
+    "docker (testcontainers Postgres integration tests)"
+  ],
+  "rust_version": "1.91.1",
+  "source_roots": [
+    "src"
+  ],
+  "spec_paths": [
+    "openspec/specs/**/*.md",
+    "specs/001-parking-system-build/*.md",
+    "docs/*.md"
+  ],
+  "test_command": "cargo test --all-features",
+  "test_roots": [
+    "tests"
+  ],
+  "updatedAt": "2026-10-22T10:30:00Z",
+  "ux_profile": "advanced",
+  "workspace": {
+    "folders": [
+      {
+        "path": "/Volumes/T7/Projects/prometheus/prometheus-parking-lot",
+        "purpose": "Active project — all KBD operations target this directory",
+        "role": "focus",
+        "write_access": true
+      }
+    ],
+    "workspace_file": null
+  },
+  "worktreeRoot": "${HOME}/.claude/worktrees"
 }
