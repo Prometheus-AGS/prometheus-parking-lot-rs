@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossbeam_channel::{Receiver, Sender, bounded};
 use parking_lot::{Condvar, Mutex, RwLock};
@@ -156,38 +156,21 @@ impl<R> ResultStorage<R> {
     /// Wait for a result with timeout (blocking).
     /// Uses Condvar for efficient waiting - NO POLLING.
     fn wait_for_result(&self, key: &MailboxKey, timeout: Duration) -> Result<R, SchedulerError> {
-        let key_str = mailbox_key_to_string(key);
+        // Fix the deadline before touching any lock so lock contention counts
+        // against the caller's budget rather than extending it.
+        let deadline = Instant::now() + timeout;
 
         // Get the entry pair (need to hold Arc while waiting)
         let entry_pair = {
             let entries = self.entries.read();
-            entries.get(&key_str).cloned()
+            entries.get(&mailbox_key_to_string(key)).cloned()
         };
 
         let Some(entry_pair) = entry_pair else {
             return Err(result_not_found(key));
         };
 
-        let (entry_mutex, condvar) = entry_pair.as_ref();
-        let mut entry = entry_mutex.lock();
-
-        // Fast path: result already ready
-        if entry.state == ResultState::Ready {
-            return entry.result.take().ok_or_else(|| result_not_found(key));
-        }
-
-        // Wait with timeout using Condvar (NO POLLING)
-        let wait_result = condvar.wait_for(&mut entry, timeout);
-
-        if wait_result.timed_out() {
-            return Err(wait_timed_out());
-        }
-
-        if entry.state == ResultState::Ready {
-            entry.result.take().ok_or_else(|| result_not_found(key))
-        } else {
-            Err(wait_timed_out())
-        }
+        wait_on_entry(&entry_pair, deadline)
     }
 
     /// Remove a result entry entirely.
@@ -233,6 +216,44 @@ impl<R> ResultStorage<R> {
         let key_str = mailbox_key_to_string(key);
         let entries = self.entries.read();
         entries.get(&key_str).cloned()
+    }
+}
+
+/// Block on one result slot until a result is stored or `deadline` passes.
+///
+/// This is the single place that maps a slot's terminal state to the
+/// caller-visible outcome, shared by `retrieve` and `retrieve_async`:
+///
+/// - `Ready` with a value → `Ok(result)`.
+/// - `Ready` but the value was already taken (a concurrent retriever consumed
+///   it) → `SchedulerError::ResultNotFound`.
+/// - still `Pending` at the deadline, or `Cancelled` (the slot was reclaimed
+///   before a result arrived) → `SchedulerError::Timeout`.
+///
+/// The slot value is the task's outcome (`Result<_, TaskError>`); callers map
+/// an executor error to `SchedulerError::Task`.
+///
+/// The wait loops on the slot state against an absolute deadline, so a spurious
+/// Condvar wakeup neither returns early nor restarts the full timeout. A result
+/// stored at the same instant the deadline fires is still delivered, because
+/// the state is re-read under the reacquired lock after the wait.
+fn wait_on_entry<R>(
+    entry_pair: &(Mutex<ResultEntry<R>>, Condvar),
+    deadline: Instant,
+) -> Result<R, SchedulerError> {
+    let (entry_mutex, condvar) = entry_pair;
+    let mut entry = entry_mutex.lock();
+    while entry.state == ResultState::Pending {
+        if condvar.wait_until(&mut entry, deadline).timed_out() {
+            break;
+        }
+    }
+    match entry.state {
+        ResultState::Ready => entry
+            .result
+            .take()
+            .ok_or(SchedulerError::ResultNotFound { key: None }),
+        ResultState::Pending | ResultState::Cancelled => Err(wait_timed_out()),
     }
 }
 
@@ -471,50 +492,31 @@ where
             .get_entry(key)
             .ok_or_else(|| result_not_found(key))?;
 
-        // Use tokio::task::spawn_blocking to wait on the parking_lot Condvar
-        // This moves the blocking wait to tokio's blocking thread pool
-        // parking_lot's Condvar is significantly faster than std's
-        let key_clone = key.clone();
-
-        let result = tokio::time::timeout(timeout, async move {
-            // Use spawn_blocking for the Condvar wait
-            tokio::task::spawn_blocking(move || {
-                let (entry_mutex, condvar) = entry_pair.as_ref();
-                let mut entry = entry_mutex.lock();
-
-                // Check if already ready (fast path, no wait needed)
-                if entry.state == ResultState::Ready {
-                    return entry.result.take();
-                }
-
-                // Wait on parking_lot Condvar (blocking, but in spawn_blocking thread).
-                // The wait is BOUNDED by `timeout`: even if the outer future is
-                // dropped on timeout and `store` never fires, this thread cannot
-                // park forever and leak (which would wedge runtime shutdown).
-                // It is also woken early by `remove`'s notify when the caller
-                // times out and reclaims the slot. parking_lot's wait is more
-                // efficient than std::sync::Condvar.
-                let _ = condvar.wait_for(&mut entry, timeout);
-
-                if entry.state == ResultState::Ready {
-                    entry.result.take()
-                } else {
-                    None
-                }
-            })
-            .await
-            .ok()
-            .flatten()
-        })
+        // One absolute deadline shared by both waits below. The blocking wait
+        // is bounded by it (so the `spawn_blocking` thread cannot park forever
+        // and wedge runtime shutdown if `store` never fires), and the outer
+        // tokio timeout covers the case where the blocking pool is saturated
+        // and the closure has not started yet. Whichever of the two fires
+        // first, an elapsed deadline is reported as `SchedulerError::Timeout`:
+        // `wait_on_entry` maps a still-pending slot to `Timeout`, never to
+        // `ResultNotFound`.
+        let deadline = Instant::now() + timeout;
+        let waited = tokio::time::timeout(
+            timeout,
+            tokio::task::spawn_blocking(move || wait_on_entry(&entry_pair, deadline)),
+        )
         .await;
 
-        // Clean up the entry
-        self.results.remove(&key_clone);
+        // Clean up the entry. This also wakes a still-parked blocking waiter
+        // (outer timeout fired first) via `remove`'s notify.
+        self.results.remove(key);
 
-        match result {
-            Ok(Some(outcome)) => outcome.map_err(SchedulerError::Task),
-            Ok(None) => Err(result_not_found(&key_clone)),
-            Err(_) => Err(wait_timed_out()),
+        match waited {
+            Ok(Ok(outcome)) => outcome?.map_err(SchedulerError::Task),
+            Ok(Err(join_error)) => Err(SchedulerError::internal(format!(
+                "result wait task failed: {join_error}"
+            ))),
+            Err(_elapsed) => Err(wait_timed_out()),
         }
     }
 

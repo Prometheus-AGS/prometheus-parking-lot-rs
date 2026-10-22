@@ -1,6 +1,7 @@
 # Build performance and disk use
 
-Owner: `platform-engineer`. Measured on 2026-10-22 (macOS, Rust 1.91.1, Samsung T7).
+Owner: `platform-engineer`. Measured on 2026-10-22 (macOS, Rust 1.91.1, Samsung T7); the workspace-loop
+numbers below are from 2026-10-22 on Rust 1.99.1 after the workspace split (cr-48).
 Update the numbers when they change; do not keep unmeasured claims here.
 
 ## What is already configured (user-level `~/.cargo/config.toml`)
@@ -21,6 +22,17 @@ Update the numbers when they change; do not keep unmeasured claims here.
 | sccache size | 9.0 GB |
 | sccache Rust hit rate (lifetime) | **2.68%** of 5,910 compile requests |
 
+Workspace loop, 2026-10-22, 1.99.1, fresh worktree build-dir (first run builds dependencies):
+
+| Command | Wall time |
+|---|---|
+| `cargo ck` (cold) | 1m15s |
+| `cargo lint` (after `ck`, same worktree) | 3.5s |
+| `cargo t` (cold, builds test profile) | 55s; the 64 tests themselves take ~2.2s |
+
+The rows measured before the workspace split (940 MB, 113 GB, 2.68%) are the 2026-10-22
+pre-split baseline and are kept for comparison; re-measure after CI caching lands.
+
 The low hit rate is the main finding. sccache never caches incremental crates (this
 crate in dev), `proc-macro`/`bin`/`cdylib` crates, or anything whose absolute paths
 differ — and each build-dir has a different path.
@@ -34,15 +46,32 @@ differ — and each build-dir has a different path.
 
    | Role | Loop commands (aliases in `.cargo/config.toml`) |
    |---|---|
-   | scheduler, events, tech-lead | `cargo ck`, `cargo lint`, `cargo t` (default features) |
-   | postgres | `cargo ck-pg`, `cargo lint-pg`, `cargo t-pg` (`--features postgres`) |
-   | platform | default set locally; `--all-features` and cross targets only in CI |
+   | scheduler, events, tech-lead | `cargo ck`, `cargo lint`, `cargo t` |
+   | postgres | `cargo ck-pg`, `cargo lint-pg`, `cargo t-pg` (adds `--features postgres`) |
+   | platform | the default aliases locally; `--all-features` and cross targets only in CI |
+
+   Every alias passes `--workspace --locked`: the repository root is both the facade
+   package and the workspace root, so a bare `cargo check` only covers the facade.
+   `postgres` is a feature of the facade package (`prometheus_parking_lot`), not of
+   `prometheus-parking-lot-pg`, which is always built under `--workspace`.
 
 2. **One Cargo process per worktree**, and at most **4 worktrees building at once**.
    `build.jobs = 10` applies per process, so 4 parallel builds already oversubscribe;
    set `CARGO_BUILD_JOBS=3` in an agent shell when 3+ agents build concurrently.
 3. **Never** `cargo clean`, `--release`, or cross-compile during implementation.
-4. Tests: `cargo nextest run` (installed) — faster and per-test process isolation.
+4. Tests: `cargo t` (nextest) — faster and per-test process isolation. nextest does not run
+   doctests; CI also runs `cargo test --workspace --doc --locked`.
+
+## CI (`.github/workflows/ci.yml`)
+
+- `Swatinem/rust-cache@v2` with a `shared-key` per job (`test-<toolchain>` per matrix leg) and
+  `save-if` only on `main`, so pull requests restore but never write the cache.
+- `--locked --workspace` on every cargo call; `CARGO_INCREMENTAL=0` (incremental artifacts
+  are useless in a clean runner and bloat the cache).
+- Jobs: fmt, clippy (pinned 1.99.1 only; 1.95 lacks the `unused_async_trait_impl` lint), test on
+  1.99.1 and MSRV 1.95 via nextest (build step separated so the 5-minute watchdog bounds test
+  execution only), docs with `-D warnings`, cargo-deny, coverage (cargo-llvm-cov).
+- No CI timings measured yet; record the first green main run and a cache-hit run here.
 
 ## Disk hygiene
 

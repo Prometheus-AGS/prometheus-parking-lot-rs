@@ -3,12 +3,14 @@
 # recursive alias, so the old entries made `cargo clippy` / `cargo fmt` error out
 # without running. Canonical per-role loops (docs/build-performance.md): keep one
 # feature set per worktree so artifacts are reused instead of rebuilt.
-ck = "check --all-targets"
-lint = "clippy --all-targets -- -D warnings"
-t = "nextest run"
-ck-pg = "check --all-targets --features postgres"
-lint-pg = "clippy --all-targets --features postgres -- -D warnings"
-t-pg = "nextest run --features postgres"
+# The repository root is both the facade package and the workspace root, so every
+# alias passes --workspace; `postgres` is a feature of the facade package.
+ck = "check --workspace --all-targets --locked"
+lint = "clippy --workspace --all-targets --locked -- -D warnings"
+t = "nextest run --workspace --locked"
+ck-pg = "check --workspace --all-targets --locked --features postgres"
+lint-pg = "clippy --workspace --all-targets --locked --features postgres -- -D warnings"
+t-pg = "nextest run --workspace --locked --features postgres"
 
 [build]
 target-dir = "target"

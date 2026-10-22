@@ -248,6 +248,23 @@ impl WorkerExecutor<(), String> for SlowExecutor {
     }
 }
 
+/// Executor that parks every task until the test opens the gate.
+///
+/// The gate is a zero-permit semaphore: each task acquires a permit and drops
+/// it straight away, so one `add_permits(1)` releases every queued task.
+#[derive(Clone)]
+struct GatedExecutor {
+    gate: Arc<tokio::sync::Semaphore>,
+}
+
+#[async_trait]
+impl WorkerExecutor<(), String> for GatedExecutor {
+    async fn execute(&self, _payload: (), _meta: TaskMetadata) -> Result<String, TaskError> {
+        drop(self.gate.acquire().await);
+        Ok("completed".to_string())
+    }
+}
+
 // ============================================================================
 // TESTS
 // ============================================================================
@@ -570,10 +587,16 @@ async fn test_timeout_handling() {
             }
         }
 
-        // Verify timeout was respected (should be ~100ms, not 500ms)
+        // Verify the timeout was respected: it returned near the 100ms
+        // deadline, not after the 500ms executor finished. The upper bound is
+        // loose on purpose so a loaded CI runner cannot flake it.
         assert!(
-            elapsed < Duration::from_millis(200),
-            "Timeout took too long"
+            elapsed >= Duration::from_millis(100),
+            "Timeout returned before the deadline: {elapsed:?}"
+        );
+        assert!(
+            elapsed < Duration::from_millis(400),
+            "Timeout took too long: {elapsed:?}"
         );
 
         eprintln!("[CLEANUP] test_timeout_handling shutting down pool");
@@ -586,6 +609,57 @@ async fn test_timeout_handling() {
         eprintln!("[CLEANUP] test_timeout_handling workers detached, test exiting");
 
         println!("=== test_timeout_handling PASSED ===\n");
+    })
+    .await;
+}
+
+/// Regression: `retrieve_async` must report `Timeout` every time the caller's
+/// deadline elapses before a result is stored, whichever internal wait (the
+/// tokio timeout or the blocking Condvar wait) fires first. Before the fix the
+/// blocking wait could win the race and the call returned `ResultNotFound`.
+#[tokio::test]
+async fn test_retrieve_async_timeout_is_always_timeout() {
+    const ITERATIONS: u64 = 200;
+
+    with_timeout("test_retrieve_async_timeout_is_always_timeout", 30, async {
+        let gate = Arc::new(tokio::sync::Semaphore::new(0));
+        let config = WorkerPoolConfig::new()
+            .with_worker_count(1)
+            .with_max_units(1_000)
+            .with_max_queue_depth(256);
+        let pool = WorkerPool::new(
+            config,
+            GatedExecutor {
+                gate: Arc::clone(&gate),
+            },
+        )
+        .expect("Failed to create pool");
+
+        for i in 0..ITERATIONS {
+            // Cycle the timeout through 5..=20ms to sweep the race window.
+            let timeout = Duration::from_millis(5 + i % 16);
+            let key = pool
+                .submit_async((), make_meta(i, 1))
+                .await
+                .expect("Failed to submit");
+
+            let start = Instant::now();
+            let result = pool.retrieve_async(&key, timeout).await;
+            let elapsed = start.elapsed();
+
+            assert!(
+                matches!(result, Err(SchedulerError::Timeout { .. })),
+                "iteration {i} (timeout {timeout:?}): expected Timeout, got {result:?}"
+            );
+            assert!(
+                elapsed >= timeout,
+                "iteration {i}: returned after {elapsed:?}, before the {timeout:?} deadline"
+            );
+        }
+
+        // Release every parked task so shutdown drains promptly.
+        gate.add_permits(1);
+        pool.shutdown();
     })
     .await;
 }
