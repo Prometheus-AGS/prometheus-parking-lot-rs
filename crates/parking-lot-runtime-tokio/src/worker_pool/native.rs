@@ -21,10 +21,18 @@
 //! - **Clean shutdown**: dropping the sender unblocks workers naturally;
 //!   parked tasks are failed with [`TaskError::Cancelled`] rather than dropped
 //!   silently.
+//! - **Panic containment** (cr-21): an executor panic fails its task with
+//!   [`TaskError::ExecutorPanicked`], returns its units through the
+//!   dispatcher and leaves the worker serving. A panic that gets past that
+//!   (see `crate::contain`) is caught per task on the worker: the task is
+//!   reported as panicked if it had no outcome yet, the units its permit
+//!   freed while unwinding are handed to parked work with `Dispatcher::poke`,
+//!   and the worker thread is replaced by a fresh one, so the pool keeps its
+//!   worker count.
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
@@ -42,6 +50,8 @@ use prometheus_parking_lot_core::{
     Clock, MailboxKey, PoolStats, SchedulerError, SystemClock, TaskError, TaskMetadata,
     WorkerExecutor,
 };
+
+use crate::contain::{Panicked, catch, contain};
 
 /// Pool name used in errors (pools are not named yet).
 const POOL_NAME: &str = "worker_pool";
@@ -295,6 +305,13 @@ struct Shared<P, R, E> {
     shutdown: AtomicBool,
     /// The executor; each worker runs a clone.
     executor: E,
+    /// Worker thread handles, joined by `shutdown`. A replacement worker's
+    /// handle is pushed here too.
+    workers: Mutex<Vec<JoinHandle<()>>>,
+    /// Worker threads serving the pool. A worker that dies is replaced and
+    /// its replacement takes its place, so a death does not change this; it
+    /// drops when a worker exits (shutdown) or cannot be replaced.
+    live_workers: AtomicUsize,
 }
 
 impl<P, R, E> Shared<P, R, E>
@@ -379,9 +396,50 @@ where
         }
     }
 
+    /// Run one admitted task on the calling worker behind the panic backstop.
+    ///
+    /// Returns `Err` when a panic escaped [`execute`](Self::execute)'s own
+    /// containment; the worker must then be replaced. Before returning, the
+    /// task is reported as panicked unless its completion had started, and
+    /// the units its permit freed while unwinding are handed to parked work.
+    fn execute_supervised(
+        &self,
+        runtime: &tokio::runtime::Runtime,
+        admitted: Admitted<P>,
+    ) -> Result<(), Panicked> {
+        let task_id = admitted.item.meta.id;
+        let mailbox_key = admitted.item.mailbox_key.clone();
+        let mut reported = false;
+        let ran = catch(|| self.execute(runtime, admitted, &mut reported));
+        if let Err(panicked) = &ran {
+            error!(
+                task_id,
+                %panicked,
+                "panic escaped the executor containment; replacing the worker"
+            );
+            if !reported {
+                self.finish(&mailbox_key, Err(TaskError::from(panicked.clone())));
+            }
+            let woken = self.dispatcher.poke(self.now_ms());
+            self.launch(woken);
+        }
+        ran
+    }
+
     /// Run one admitted task on the calling worker under its budget, then
     /// return its permit and hand on whatever that admits.
-    fn execute(&self, runtime: &tokio::runtime::Runtime, admitted: Admitted<P>) {
+    ///
+    /// The executor call, its future and the budget timer run inside one
+    /// [`contain`], so an executor panic — in the call, in a poll, or in the
+    /// drop of its future when the budget elapses — becomes
+    /// [`TaskError::ExecutorPanicked`] and the task finishes normally.
+    /// `reported` is set just before the completion starts.
+    fn execute(
+        &self,
+        runtime: &tokio::runtime::Runtime,
+        admitted: Admitted<P>,
+        reported: &mut bool,
+    ) {
         let Grant { item: task, permit } = admitted;
         let WorkerTask {
             payload,
@@ -400,25 +458,78 @@ where
             // On elapse the executor future is dropped, which cancels it at
             // its next await point. The timer is created inside `block_on`:
             // it needs the worker runtime's time driver in context.
-            runtime
-                .block_on(async {
-                    tokio::time::timeout(budget, self.executor.execute(payload, meta)).await
-                })
-                .unwrap_or_else(|_elapsed| {
+            let executor = &self.executor;
+            let contained = runtime.block_on(contain(async move {
+                tokio::time::timeout(budget, executor.execute(payload, meta)).await
+            }));
+            match contained {
+                Ok(Ok(outcome)) => outcome,
+                Ok(Err(_elapsed)) => {
                     warn!(
                         task_id,
                         ?budget,
                         "task exceeded its budget and was cancelled"
                     );
                     Err(TaskError::Timeout { budget })
-                })
+                }
+                Err(panicked) => {
+                    error!(task_id, %panicked, "executor panicked; task failed");
+                    Err(TaskError::from(panicked))
+                }
+            }
         };
 
         // Return the units before publishing the outcome, so a caller that
         // has retrieved the result already sees them released.
-        let woken = self.dispatcher.complete(permit, self.now_ms());
+        let now_ms = self.now_ms();
+        *reported = true;
+        let woken = self.dispatcher.complete(permit, now_ms);
         self.finish(&mailbox_key, outcome);
         self.launch(woken);
+    }
+
+    /// Replace a worker that died: spawn a new thread (with a new runtime)
+    /// on the same channel. The replacement takes the dead worker's place in
+    /// `live_workers`.
+    ///
+    /// The shutdown flag is read under the `workers` lock, which `shutdown`
+    /// also takes after setting the flag, so a replacement is either joined
+    /// by `shutdown` or never spawned. A worker that is not replaced drains
+    /// the admitted tasks still in the channel, failing each as cancelled,
+    /// in case it was the last worker.
+    fn respawn(
+        self: &Arc<Self>,
+        worker_id: usize,
+        ready_rx: &Receiver<Admitted<P>>,
+        stack_size: usize,
+    ) {
+        let mut workers = self.workers.lock();
+        // Acquire pairs with the Release in `shutdown()`; the lock orders it
+        // after the swap as well.
+        let replaced = if self.shutdown.load(Ordering::Acquire) {
+            false
+        } else {
+            match spawn_worker(worker_id, ready_rx.clone(), Arc::clone(self), stack_size) {
+                Ok(handle) => {
+                    workers.push(handle);
+                    info!(worker_id, "replaced a worker that panicked");
+                    true
+                }
+                Err(spawn_error) => {
+                    error!(worker_id, error = %spawn_error, "could not replace a dead worker");
+                    false
+                }
+            }
+        };
+        drop(workers);
+        if !replaced {
+            // Relaxed: a statistic.
+            self.live_workers.fetch_sub(1, Ordering::Relaxed);
+            for Grant { item: task, permit } in ready_rx.try_iter() {
+                drop(permit);
+                self.finish(&task.mailbox_key, Err(shutdown_cancelled()));
+            }
+        }
     }
 }
 
@@ -452,9 +563,6 @@ where
 {
     /// State shared with the workers.
     shared: Arc<Shared<P, R, E>>,
-
-    /// Worker thread handles.
-    workers: Mutex<Vec<JoinHandle<()>>>,
 
     /// Task ID counter (lock-free atomic).
     task_id_counter: AtomicU64,
@@ -496,6 +604,8 @@ where
             clock: RwLock::new(Arc::new(SystemClock::new())),
             shutdown: AtomicBool::new(false),
             executor,
+            workers: Mutex::new(Vec::new()),
+            live_workers: AtomicUsize::new(config.worker_count),
         });
 
         let workers = (0..config.worker_count)
@@ -511,6 +621,7 @@ where
             .map_err(|error| {
                 SchedulerError::internal(format!("failed to spawn worker thread: {error}"))
             })?;
+        *shared.workers.lock() = workers;
 
         info!(
             worker_count = config.worker_count,
@@ -521,7 +632,6 @@ where
 
         Ok(Self {
             shared,
-            workers: Mutex::new(workers),
             task_id_counter: AtomicU64::new(0),
         })
     }
@@ -703,12 +813,20 @@ where
     }
 
     /// Get current pool statistics.
+    ///
+    /// `worker_count` is the number of worker threads serving the pool: a
+    /// worker that dies from a panic is replaced, so it stays at the
+    /// configured count until shutdown. `failed_tasks` counts executor
+    /// errors and panics, timeouts, expired deadlines and shutdown
+    /// cancellations.
     #[must_use]
     pub fn stats(&self) -> PoolStats {
         let shared = &self.shared;
+        // Relaxed: a statistic.
+        let live_workers = shared.live_workers.load(Ordering::Relaxed);
         let mut stats = shared
             .counters
-            .snapshot(shared.config.worker_count, shared.config.max_units);
+            .snapshot(live_workers, shared.config.max_units);
         stats.used_units = shared.dispatcher.units_in_use();
         stats.active_tasks = u64::from(shared.dispatcher.running());
         stats.queued_tasks = u64::try_from(shared.dispatcher.parked()).unwrap_or(u64::MAX);
@@ -736,8 +854,10 @@ where
         drop(shared.ready_tx.lock().take());
         shared.cancel_parked();
 
-        // Join workers with timeout
-        let workers: Vec<_> = self.workers.lock().drain(..).collect();
+        // Join workers with timeout. A replacement for a worker that died is
+        // spawned only while the flag is clear and under this lock, so none
+        // can appear after this drain.
+        let workers: Vec<_> = shared.workers.lock().drain(..).collect();
         let worker_count = workers.len();
 
         for (idx, worker) in workers.into_iter().enumerate() {
@@ -832,6 +952,8 @@ where
                         error = %e,
                         "Failed to create worker runtime"
                     );
+                    // Relaxed: a statistic.
+                    shared.live_workers.fetch_sub(1, Ordering::Relaxed);
                     return;
                 }
             };
@@ -840,9 +962,17 @@ where
             // dropped (shutdown) and the channel is empty, recv returns Err
             // and the worker exits.
             while let Ok(admitted) = ready_rx.recv() {
-                shared.execute(&runtime, admitted);
+                if shared.execute_supervised(&runtime, admitted).is_err() {
+                    // This thread's runtime unwound mid-task; hand the
+                    // channel to a fresh worker and exit.
+                    drop(runtime);
+                    Shared::respawn(&shared, worker_id, &ready_rx, stack_size);
+                    return;
+                }
             }
 
+            // Relaxed: a statistic.
+            shared.live_workers.fetch_sub(1, Ordering::Relaxed);
             debug!(worker_id = worker_id, "Worker thread exiting");
         })
 }

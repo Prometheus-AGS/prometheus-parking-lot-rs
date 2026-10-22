@@ -23,13 +23,25 @@
 //! A running task owns its semaphore permit; completion returns the permit
 //! through the dispatcher, which starts whatever the freed units admit under
 //! the same lock (no lost wakeup; see the dispatcher's module docs).
+//!
+//! ## Panics
+//!
+//! An executor panic is contained (cr-21): the task fails with
+//! [`TaskError::ExecutorPanicked`], its units are returned through the
+//! dispatcher like any other outcome and the pool keeps serving. A panic that
+//! gets past that containment (see `crate::contain`) is caught by a backstop
+//! around the whole task: the permit, freed by unwinding, is followed by
+//! [`Dispatcher::poke`] so parked work it admits starts at once, and the task
+//! is reported as panicked unless its outcome was already recorded.
 
 use std::marker::PhantomData;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 use parking_lot::{Mutex, RwLock};
+
+use crate::contain::contain;
 
 use prometheus_parking_lot_core::dispatch::{Dispatched, Dispatcher, Grant, TaskQueueAdapter};
 use prometheus_parking_lot_core::semaphore::{Permit, UnitSemaphore};
@@ -71,6 +83,11 @@ struct Inner<P, T, Q, M, E, S> {
     audit: Mutex<Option<Box<dyn AuditSink>>>,
     clock: RwLock<Arc<dyn Clock>>,
     shutdown: AtomicBool,
+    /// Tasks that ran and returned a value.
+    completed: AtomicU64,
+    /// Tasks whose outcome was a failure: an executor error or panic, a
+    /// timeout, or a deadline that passed while parked.
+    failed: AtomicU64,
     /// `fn() -> _` keeps the pool `Send`/`Sync` independent of `P` and `T`,
     /// which it never stores.
     _types: PhantomData<fn() -> (P, T)>,
@@ -102,6 +119,8 @@ where
                 audit: Mutex::new(None),
                 clock: RwLock::new(Arc::new(SystemClock::new())),
                 shutdown: AtomicBool::new(false),
+                completed: AtomicU64::new(0),
+                failed: AtomicU64::new(0),
                 _types: PhantomData,
             }),
         }
@@ -135,6 +154,28 @@ where
     #[must_use]
     pub fn running_tasks(&self) -> u32 {
         self.inner.dispatcher.running()
+    }
+
+    /// Tasks that ran and returned a value.
+    ///
+    /// Counted before the outcome is delivered, so a caller that has read a
+    /// task's outcome from the mailbox sees it counted.
+    #[must_use]
+    pub fn completed_tasks(&self) -> u64 {
+        // Relaxed: a statistic. The increment is sequenced before the
+        // delivery's mailbox unlock, so a reader ordered after the delivery
+        // (through the mailbox's lock) observes it regardless.
+        self.inner.completed.load(Ordering::Relaxed)
+    }
+
+    /// Tasks whose outcome was a failure: an executor error or panic
+    /// ([`TaskError::ExecutorPanicked`]), a timeout, or a deadline that passed
+    /// while the task was parked. Counted before delivery, like
+    /// [`completed_tasks`](Self::completed_tasks).
+    #[must_use]
+    pub fn failed_tasks(&self) -> u64 {
+        // Relaxed: as in `completed_tasks`.
+        self.inner.failed.load(Ordering::Relaxed)
     }
 
     /// Stop accepting new submissions.
@@ -322,12 +363,58 @@ where
             tracing::debug!(task_id = task.meta.id, action, "starting task");
             self.record_audit(&task.meta, action);
             let inner = Arc::clone(self);
-            self.spawner.spawn(inner.run(task, permit));
+            self.spawner.spawn(inner.supervise(task, permit));
+        }
+    }
+
+    /// Run one task behind the panic backstop.
+    ///
+    /// [`run`](Self::run) contains executor panics itself. A panic that still
+    /// escapes it (a payload whose destructor panics, or a panicking `Clock`,
+    /// `Mailbox` or `AuditSink` in the completion path) is caught here: the
+    /// `run` future, and with it the task's permit, has been dropped by then,
+    /// so the freed units are handed to parked work with
+    /// [`Dispatcher::poke`]. A task whose outcome was not recorded yet is
+    /// reported as panicked; one whose completion had started is not reported
+    /// twice. If the panic struck after the completion took woken tasks off
+    /// the queue but before they were started, those tasks are lost with it;
+    /// that needs a panicking `Mailbox` or `AuditSink`.
+    async fn supervise(self: Arc<Self>, task: ScheduledTask<P>, permit: Permit) {
+        let task_id = task.meta.id;
+        let mailbox_key = task.meta.mailbox.clone();
+        // Set by `run` just before it starts the completion. Relaxed: it is
+        // written and read by this one task; tokio orders its polls.
+        let reported = AtomicBool::new(false);
+        let ran = contain(Arc::clone(&self).run(task, permit, &reported)).await;
+        if let Err(panicked) = ran {
+            tracing::error!(
+                task_id,
+                %panicked,
+                "panic escaped the executor containment"
+            );
+            if !reported.load(Ordering::Relaxed) {
+                self.failed.fetch_add(1, Ordering::Relaxed);
+                if let Some(key) = mailbox_key.as_ref() {
+                    let status = TaskStatus::Failed(TaskError::from(panicked));
+                    self.deliver(task_id, key, status, None);
+                }
+                let tenant = mailbox_key
+                    .as_ref()
+                    .map_or("unknown", |key| key.tenant.as_str());
+                self.record_event(task_id, tenant, "fail");
+            }
+            let woken = self.dispatcher.poke(self.now_ms());
+            self.launch(woken, None);
         }
     }
 
     /// Execute one task under its budget, then finish it.
-    async fn run(self: Arc<Self>, task: ScheduledTask<P>, permit: Permit) {
+    ///
+    /// The executor call, its future and the budget timer run inside one
+    /// [`contain`], so an executor panic — in the call, in a poll, or in the
+    /// drop of its future when the budget elapses — becomes
+    /// [`TaskError::ExecutorPanicked`] and the task finishes normally.
+    async fn run(self: Arc<Self>, task: ScheduledTask<P>, permit: Permit, reported: &AtomicBool) {
         let ScheduledTask { meta, payload } = task;
         let task_id = meta.id;
         let mailbox_key = meta.mailbox.clone();
@@ -337,10 +424,19 @@ where
         // On elapse the executor future is dropped, which cancels it at its
         // next await point; an executor owning a `tokio::process::Child` built
         // with `kill_on_drop(true)` has the child reaped by that drop.
-        let outcome = tokio::time::timeout(budget, self.executor.execute(payload, meta))
-            .await
-            .unwrap_or(Err(TaskError::Timeout { budget }));
+        let executor = &self.executor;
+        let contained =
+            contain(
+                async move { tokio::time::timeout(budget, executor.execute(payload, meta)).await },
+            )
+            .await;
+        let outcome = match contained {
+            Ok(Ok(outcome)) => outcome,
+            Ok(Err(_elapsed)) => Err(TaskError::Timeout { budget }),
+            Err(panicked) => Err(TaskError::from(panicked)),
+        };
 
+        reported.store(true, Ordering::Relaxed);
         self.finish(task_id, permit, mailbox_key.as_ref(), outcome);
     }
 
@@ -359,6 +455,13 @@ where
         outcome: Result<T, TaskError>,
     ) {
         let woken = self.dispatcher.complete(permit, self.now_ms());
+        let counter = if outcome.is_ok() {
+            &self.completed
+        } else {
+            &self.failed
+        };
+        // Relaxed: see `ResourcePool::completed_tasks`.
+        counter.fetch_add(1, Ordering::Relaxed);
         let action = match &outcome {
             Ok(_) => "complete",
             Err(TaskError::Timeout { budget }) => {
@@ -368,6 +471,10 @@ where
                     "task exceeded its budget and was cancelled"
                 );
                 "timeout"
+            }
+            Err(error @ TaskError::ExecutorPanicked { .. }) => {
+                tracing::error!(task_id, %error, "executor panicked; task failed");
+                "fail"
             }
             Err(error) => {
                 tracing::warn!(task_id, %error, "task failed");
@@ -390,6 +497,7 @@ where
 
     /// Record a queued task that reached the head after its deadline.
     fn expire(&self, meta: &TaskMetadata) {
+        self.failed.fetch_add(1, Ordering::Relaxed);
         tracing::warn!(
             task_id = meta.id,
             "queued task expired before it could start"
