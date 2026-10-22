@@ -6,26 +6,41 @@
 //!
 //! # Design Principles
 //!
-//! - **No polling**: Uses proper signaling (Condvar for blocking, oneshot for async)
-//! - **Lock-free fast path**: Result storage uses `RwLock` with brief critical sections
-//! - **Clean shutdown**: Dropping the sender unblocks workers naturally
+//! - **One dispatcher**: admission goes through the core
+//!   [`Dispatcher`](prometheus_parking_lot_core::dispatch::Dispatcher) shared
+//!   with `ResourcePool`. It enforces `max_units` (audit C1: the 0.2 pool
+//!   ignored it), serves parked tasks by priority then submission order, and
+//!   bounds admitted tasks by the worker count, so an admitted task always has
+//!   a worker and `max_queue_depth` bounds exactly the tasks waiting.
+//! - **Bounded execution**: every execution runs under a budget (the task's
+//!   deadline or the pool's default timeout, whichever is nearer); a task
+//!   still running at its budget is cancelled, its units are released and its
+//!   result is [`TaskError::Timeout`].
+//! - **No polling**: workers block on a channel of admitted tasks; results use
+//!   a Condvar.
+//! - **Clean shutdown**: dropping the sender unblocks workers naturally;
+//!   parked tasks are failed with [`TaskError::Cancelled`] rather than dropped
+//!   silently.
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
-use crossbeam_channel::{Receiver, Sender, bounded};
+use crossbeam_channel::{Receiver, Sender, unbounded};
 use parking_lot::{Condvar, Mutex, RwLock};
 use tracing::{debug, error, info, warn};
 
 use prometheus_parking_lot_core::config::WorkerPoolConfig;
 use prometheus_parking_lot_core::dispatch::{
-    PoolCounters, WorkerTask, generate_mailbox_key, mailbox_key_to_string,
+    Dispatched, Dispatcher, Grant, PoolCounters, WorkerTask, generate_mailbox_key,
+    mailbox_key_to_string,
 };
+use prometheus_parking_lot_core::semaphore::UnitSemaphore;
 use prometheus_parking_lot_core::{
-    MailboxKey, PoolStats, SchedulerError, TaskError, TaskMetadata, WorkerExecutor,
+    Clock, MailboxKey, PoolStats, SchedulerError, SystemClock, TaskError, TaskMetadata,
+    WorkerExecutor,
 };
 
 /// Pool name used in errors (pools are not named yet).
@@ -257,6 +272,163 @@ fn wait_on_entry<R>(
     }
 }
 
+/// An admitted task on its way to a worker.
+type Admitted<P> = Grant<WorkerTask<P>>;
+
+/// State shared by the pool handle and its worker threads.
+struct Shared<P, R, E> {
+    /// Pool configuration.
+    config: WorkerPoolConfig,
+    /// Admission, the parked queue and the semaphore.
+    dispatcher: Dispatcher<WorkerTask<P>>,
+    /// Result storage with Condvar-based notification.
+    results: ResultStorage<TaskOutcome<R>>,
+    /// Submitted/completed/failed counters (running and parked come from the
+    /// dispatcher).
+    counters: PoolCounters,
+    /// Admitted tasks to the workers. `None` once the pool shuts down; the
+    /// workers exit when it is gone and the channel is empty.
+    ready_tx: Mutex<Option<Sender<Admitted<P>>>>,
+    /// Time source for deadlines and budgets.
+    clock: RwLock<Arc<dyn Clock>>,
+    /// Shutdown flag.
+    shutdown: AtomicBool,
+    /// The executor; each worker runs a clone.
+    executor: E,
+}
+
+impl<P, R, E> Shared<P, R, E>
+where
+    P: Send + 'static,
+    R: Send + 'static,
+    E: WorkerExecutor<P, R>,
+{
+    fn now_ms(&self) -> u128 {
+        self.clock.read().now_ms()
+    }
+
+    /// Resolve the execution budget for one task: the task's deadline when it
+    /// is nearer than the pool's default timeout, otherwise the default. No
+    /// path is unbounded; an already-passed deadline gives a zero budget.
+    #[cfg(not(parking_lot_negative_control = "s-4"))]
+    fn budget(&self, meta: &TaskMetadata) -> Duration {
+        let default = self.config.default_timeout();
+        let Some(deadline) = meta.deadline_ms else {
+            return default;
+        };
+        let remaining = deadline.saturating_sub(self.now_ms());
+        Duration::from_millis(u64::try_from(remaining).unwrap_or(u64::MAX)).min(default)
+    }
+
+    /// Negative control S-4: the budget is not applied (effectively
+    /// unbounded), so the `budget_` wedged-executor tests must fail.
+    #[cfg(parking_lot_negative_control = "s-4")]
+    fn budget(&self, meta: &TaskMetadata) -> Duration {
+        let _ = (meta, &self.config);
+        Duration::from_secs(u64::from(u32::MAX))
+    }
+
+    /// Record a task's outcome in its result slot and count it.
+    fn finish(&self, key: &MailboxKey, outcome: TaskOutcome<R>) {
+        let counter = if outcome.is_ok() {
+            &self.counters.completed_tasks
+        } else {
+            &self.counters.failed_tasks
+        };
+        counter.fetch_add(1, Ordering::Relaxed);
+        self.results.store(key, outcome);
+    }
+
+    /// Hand every admitted task to the workers and fail every task found
+    /// expired at the head of the queue.
+    ///
+    /// A task admitted after shutdown took the sender cannot run: it is
+    /// failed with [`TaskError::Cancelled`] (its permit is released by drop;
+    /// the parked queue was already emptied by `shutdown`).
+    fn launch(&self, dispatched: Dispatched<WorkerTask<P>>) {
+        let Dispatched { started, expired } = dispatched;
+        for task in expired {
+            warn!(
+                task_id = task.meta.id,
+                "queued task expired before it could start"
+            );
+            self.finish(&task.mailbox_key, Err(TaskError::DeadlineExpired));
+        }
+        if started.is_empty() {
+            return;
+        }
+        // A clone sent after `shutdown` took the original still delivers: the
+        // worker then sees the shutdown flag and cancels the task.
+        let ready_tx = self.ready_tx.lock().clone();
+        for admitted in started {
+            let refused = match ready_tx.as_ref() {
+                Some(tx) => tx.send(admitted).err().map(|error| error.0),
+                None => Some(admitted),
+            };
+            if let Some(Grant { item: task, permit }) = refused {
+                drop(permit);
+                self.finish(&task.mailbox_key, Err(shutdown_cancelled()));
+            }
+        }
+    }
+
+    /// Fail every parked task (shutdown): nothing parked is dropped silently.
+    fn cancel_parked(&self) {
+        for task in self.dispatcher.take_parked() {
+            self.finish(&task.mailbox_key, Err(shutdown_cancelled()));
+        }
+    }
+
+    /// Run one admitted task on the calling worker under its budget, then
+    /// return its permit and hand on whatever that admits.
+    fn execute(&self, runtime: &tokio::runtime::Runtime, admitted: Admitted<P>) {
+        let Grant { item: task, permit } = admitted;
+        let WorkerTask {
+            payload,
+            meta,
+            mailbox_key,
+        } = task;
+        let task_id = meta.id;
+
+        let outcome = if self.shutdown.load(Ordering::Acquire) {
+            // Acquire pairs with the Release in `shutdown()`: the pool is
+            // shutting down, so the task is failed rather than started.
+            Err(shutdown_cancelled())
+        } else {
+            let budget = self.budget(&meta);
+            debug!(task_id, ?budget, "worker executing task");
+            // On elapse the executor future is dropped, which cancels it at
+            // its next await point. The timer is created inside `block_on`:
+            // it needs the worker runtime's time driver in context.
+            runtime
+                .block_on(async {
+                    tokio::time::timeout(budget, self.executor.execute(payload, meta)).await
+                })
+                .unwrap_or_else(|_elapsed| {
+                    warn!(
+                        task_id,
+                        ?budget,
+                        "task exceeded its budget and was cancelled"
+                    );
+                    Err(TaskError::Timeout { budget })
+                })
+        };
+
+        // Return the units before publishing the outcome, so a caller that
+        // has retrieved the result already sees them released.
+        let woken = self.dispatcher.complete(permit, self.now_ms());
+        self.finish(&mailbox_key, outcome);
+        self.launch(woken);
+    }
+}
+
+/// The error for a task that will not run because the pool shut down.
+fn shutdown_cancelled() -> TaskError {
+    TaskError::Cancelled {
+        reason: "worker pool shut down".into(),
+    }
+}
+
 /// Worker pool with dedicated OS threads for CPU/GPU-bound work.
 ///
 /// Each worker thread has its own single-threaded tokio runtime, ensuring
@@ -264,41 +436,28 @@ fn wait_on_entry<R>(
 ///
 /// # Design
 ///
+/// - **Capacity**: a task runs only while the units of all running tasks,
+///   including it, fit in `max_units`, and at most `worker_count` tasks run.
+///   Others wait in a priority queue (at most `max_queue_depth`), highest
+///   priority first, FIFO within a priority.
+/// - **Budgets**: each execution is bounded by the task's deadline or
+///   `default_timeout_ms`, whichever is nearer.
 /// - **No polling**: Workers block on channel recv; results use Condvar
 /// - **Clean shutdown**: Dropping sender naturally unblocks all workers
-/// - **Lock-free fast path**: Atomic counters, `RwLock` for read-heavy maps
 pub struct WorkerPool<P, R, E>
 where
     P: Send + 'static,
     R: Send + 'static,
     E: WorkerExecutor<P, R>,
 {
-    /// Pool configuration.
-    config: WorkerPoolConfig,
-
-    /// Task sender (to workers). Option allows clean shutdown by dropping.
-    task_tx: Mutex<Option<Sender<WorkerTask<P>>>>,
-
-    /// Result storage with Condvar-based notification.
-    results: Arc<ResultStorage<TaskOutcome<R>>>,
-
-    /// Pool statistics counters (lock-free atomics).
-    counters: Arc<PoolCounters>,
-
-    /// Active resource units (lock-free atomic).
-    active_units: Arc<AtomicU32>,
-
-    /// Shutdown flag (lock-free atomic).
-    shutdown: Arc<AtomicBool>,
+    /// State shared with the workers.
+    shared: Arc<Shared<P, R, E>>,
 
     /// Worker thread handles.
     workers: Mutex<Vec<JoinHandle<()>>>,
 
     /// Task ID counter (lock-free atomic).
     task_id_counter: AtomicU64,
-
-    /// Phantom data for executor type.
-    _executor: std::marker::PhantomData<E>,
 }
 
 impl<P, R, E> WorkerPool<P, R, E>
@@ -317,33 +476,41 @@ where
     /// Returns [`SchedulerError::InvalidConfig`] if the configuration is invalid.
     #[expect(
         clippy::needless_pass_by_value,
-        reason = "public constructor takes the config by value; changing it is an API change for the worker-pool rework (cr-19)"
+        reason = "public constructor takes the config by value; changing it is an API change"
     )]
     pub fn new(config: WorkerPoolConfig, executor: E) -> Result<Self, SchedulerError> {
         config.validate().map_err(SchedulerError::invalid_config)?;
+        let worker_permits = u32::try_from(config.worker_count).unwrap_or(u32::MAX);
 
-        let (task_tx, task_rx) = bounded::<WorkerTask<P>>(config.max_queue_depth);
-        let results = Arc::new(ResultStorage::new());
-        let counters = Arc::new(PoolCounters::default());
-        let active_units = Arc::new(AtomicU32::new(0));
-        let shutdown = Arc::new(AtomicBool::new(false));
+        let (ready_tx, ready_rx) = unbounded::<Admitted<P>>();
+        let shared = Arc::new(Shared {
+            dispatcher: Dispatcher::in_memory(
+                POOL_NAME,
+                UnitSemaphore::with_max_permits(config.max_units, worker_permits),
+                config.max_queue_depth,
+            ),
+            config: config.clone(),
+            results: ResultStorage::new(),
+            counters: PoolCounters::default(),
+            ready_tx: Mutex::new(Some(ready_tx)),
+            clock: RwLock::new(Arc::new(SystemClock::new())),
+            shutdown: AtomicBool::new(false),
+            executor,
+        });
 
-        // Spawn worker threads
-        let mut workers = Vec::with_capacity(config.worker_count);
-
-        for worker_id in 0..config.worker_count {
-            let worker = spawn_worker(
-                worker_id,
-                task_rx.clone(),
-                Arc::clone(&results),
-                Arc::clone(&counters),
-                Arc::clone(&active_units),
-                Arc::clone(&shutdown),
-                executor.clone(),
-                config.thread_stack_size,
-            );
-            workers.push(worker);
-        }
+        let workers = (0..config.worker_count)
+            .map(|worker_id| {
+                spawn_worker(
+                    worker_id,
+                    ready_rx.clone(),
+                    Arc::clone(&shared),
+                    config.thread_stack_size,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| {
+                SchedulerError::internal(format!("failed to spawn worker thread: {error}"))
+            })?;
 
         info!(
             worker_count = config.worker_count,
@@ -353,16 +520,21 @@ where
         );
 
         Ok(Self {
-            config,
-            task_tx: Mutex::new(Some(task_tx)),
-            results,
-            counters,
-            active_units,
-            shutdown,
+            shared,
             workers: Mutex::new(workers),
             task_id_counter: AtomicU64::new(0),
-            _executor: std::marker::PhantomData,
         })
+    }
+
+    /// Read time from `clock` instead of the system clock: deadline checks
+    /// at submission and at the head of the queue, and execution budgets.
+    ///
+    /// Pass a [`TestClock`](prometheus_parking_lot_core::TestClock) clone to
+    /// drive deadlines from a test.
+    #[must_use]
+    pub fn with_clock(self, clock: impl Clock + 'static) -> Self {
+        *self.shared.clock.write() = Arc::new(clock);
+        self
     }
 
     /// Submit a task asynchronously.
@@ -375,26 +547,24 @@ where
     ///
     /// # Errors
     ///
-    /// - [`SchedulerError::QueueFull`] if the task queue is full
-    /// - [`SchedulerError::PoolShutdown`] if the pool has been shut down
+    /// As [`submit`](Self::submit).
     #[expect(
         clippy::unused_async,
         clippy::unused_async_trait_impl,
-        reason = "public async API kept for callers; enqueue is non-blocking today and cr-19 may make it await backpressure (the trait-impl variant misfires on an inherent method)"
+        reason = "public async API kept for callers; admission is non-blocking (the trait-impl variant misfires on an inherent method)"
     )]
     pub async fn submit_async(
         &self,
         payload: P,
         meta: TaskMetadata,
     ) -> Result<MailboxKey, SchedulerError> {
-        // Use the sync submit internally - it's non-blocking for enqueue
         self.submit(payload, meta)
     }
 
-    /// Submit a task (blocking API).
+    /// Submit a task (non-blocking).
     ///
-    /// This method can be called from any context. The enqueue operation
-    /// itself is non-blocking; it only fails immediately if the queue is full.
+    /// The task starts at once when nothing is parked, its cost fits the free
+    /// units and a worker is free; otherwise it waits in the priority queue.
     ///
     /// # Returns
     ///
@@ -402,65 +572,60 @@ where
     ///
     /// # Errors
     ///
-    /// - [`SchedulerError::QueueFull`] if the task queue is full
     /// - [`SchedulerError::PoolShutdown`] if the pool has been shut down
-    #[expect(
-        clippy::significant_drop_tightening,
-        reason = "narrowing lock scopes changes concurrent behaviour; the worker-pool rework (cr-19/cr-29) owns it"
-    )]
+    /// - [`SchedulerError::DeadlineExpired`] if the task's deadline has already
+    ///   passed by the pool's clock
+    /// - [`SchedulerError::CapacityExceeded`] if the task costs more units than
+    ///   the pool has in total (it could never run)
+    /// - [`SchedulerError::QueueFull`] if the task must wait and
+    ///   `max_queue_depth` tasks are already waiting
     pub fn submit(&self, payload: P, meta: TaskMetadata) -> Result<MailboxKey, SchedulerError> {
-        if self.shutdown.load(Ordering::Acquire) {
+        let shared = &self.shared;
+        // Acquire pairs with the Release in `shutdown()`.
+        if shared.shutdown.load(Ordering::Acquire) {
             return Err(pool_shutdown());
         }
+        let now_ms = shared.now_ms();
+        if meta.deadline_ms.is_some_and(|deadline| now_ms > deadline) {
+            return Err(SchedulerError::DeadlineExpired { task_id: meta.id });
+        }
 
-        // Generate unique task ID and mailbox key
+        // Relaxed: the counter only needs unique values.
         let task_id = self.task_id_counter.fetch_add(1, Ordering::Relaxed);
         let mailbox_key = generate_mailbox_key(task_id);
+        shared.results.create_slot(&mailbox_key);
 
-        // Create result slot
-        self.results.create_slot(&mailbox_key);
-
-        // Create the worker task
         let task = WorkerTask {
             payload,
             meta,
             mailbox_key: mailbox_key.clone(),
         };
-
-        // Get sender (brief lock)
-        let task_tx_guard = self.task_tx.lock();
-        let Some(task_tx) = task_tx_guard.as_ref() else {
-            // Pool is shutting down
-            self.results.remove(&mailbox_key);
-            return Err(pool_shutdown());
+        let admission = match shared.dispatcher.submit(task, now_ms) {
+            Ok(admission) => admission,
+            Err(error) => {
+                shared.results.remove(&mailbox_key);
+                warn!(%error, "worker pool rejected task");
+                return Err(error);
+            }
         };
+        shared
+            .counters
+            .submitted_tasks
+            .fetch_add(1, Ordering::Relaxed);
+        debug!(
+            task_id,
+            started = admission.started,
+            "task submitted to worker pool"
+        );
+        shared.launch(admission.dispatched);
 
-        // Try to enqueue (non-blocking)
-        match task_tx.try_send(task) {
-            Ok(()) => {
-                self.counters
-                    .submitted_tasks
-                    .fetch_add(1, Ordering::Relaxed);
-                self.counters.queued_tasks.fetch_add(1, Ordering::Relaxed);
-                debug!(task_id = task_id, "Task submitted to worker pool");
-                Ok(mailbox_key)
-            }
-            Err(crossbeam_channel::TrySendError::Full(_)) => {
-                // Remove the result slot we created
-                self.results.remove(&mailbox_key);
-                warn!("Worker pool queue is full");
-                // The bounded channel is full, so the depth is its capacity.
-                Err(SchedulerError::queue_full(
-                    POOL_NAME,
-                    self.config.max_queue_depth,
-                    self.config.max_queue_depth,
-                ))
-            }
-            Err(crossbeam_channel::TrySendError::Disconnected(_)) => {
-                self.results.remove(&mailbox_key);
-                Err(pool_shutdown())
-            }
+        // A shutdown that raced this submission may have emptied the parked
+        // queue before this task was parked; fail anything parked since.
+        // Acquire pairs with the Release in `shutdown()`.
+        if shared.shutdown.load(Ordering::Acquire) {
+            shared.cancel_parked();
         }
+        Ok(mailbox_key)
     }
 
     /// Retrieve a result asynchronously with timeout.
@@ -471,7 +636,8 @@ where
     /// # Errors
     ///
     /// - [`SchedulerError::Task`] carrying the [`TaskError`] when the executor
-    ///   failed
+    ///   failed, ran past its budget ([`TaskError::Timeout`]), expired while
+    ///   queued or was cancelled at shutdown
     /// - [`SchedulerError::Timeout`] if the result is not available within the
     ///   timeout
     /// - [`SchedulerError::ResultNotFound`] if the mailbox key is invalid
@@ -480,15 +646,15 @@ where
         key: &MailboxKey,
         timeout: Duration,
     ) -> Result<R, SchedulerError> {
+        let results = &self.shared.results;
         // First, try immediate retrieval (fast path)
-        if let Some(outcome) = self.results.try_retrieve(key) {
-            self.results.remove(key);
+        if let Some(outcome) = results.try_retrieve(key) {
+            results.remove(key);
             return outcome.map_err(SchedulerError::Task);
         }
 
         // Get entry for waiting
-        let entry_pair = self
-            .results
+        let entry_pair = results
             .get_entry(key)
             .ok_or_else(|| result_not_found(key))?;
 
@@ -509,7 +675,7 @@ where
 
         // Clean up the entry. This also wakes a still-parked blocking waiter
         // (outer timeout fired first) via `remove`'s notify.
-        self.results.remove(key);
+        results.remove(key);
 
         match waited {
             Ok(Ok(outcome)) => outcome?.map_err(SchedulerError::Task),
@@ -527,57 +693,54 @@ where
     ///
     /// # Errors
     ///
-    /// - [`SchedulerError::Task`] carrying the [`TaskError`] when the executor
-    ///   failed
-    /// - [`SchedulerError::Timeout`] if the result is not available within the
-    ///   timeout
-    /// - [`SchedulerError::ResultNotFound`] if the mailbox key is invalid
+    /// As [`retrieve_async`](Self::retrieve_async).
     pub fn retrieve(&self, key: &MailboxKey, timeout: Duration) -> Result<R, SchedulerError> {
-        let outcome = self.results.wait_for_result(key, timeout);
+        let results = &self.shared.results;
+        let outcome = results.wait_for_result(key, timeout);
         // Clean up entry on any outcome
-        self.results.remove(key);
+        results.remove(key);
         outcome?.map_err(SchedulerError::Task)
     }
 
     /// Get current pool statistics.
     #[must_use]
     pub fn stats(&self) -> PoolStats {
-        let mut stats = self
+        let shared = &self.shared;
+        let mut stats = shared
             .counters
-            .snapshot(self.config.worker_count, self.config.max_units);
-        stats.used_units = self.active_units.load(Ordering::Relaxed);
+            .snapshot(shared.config.worker_count, shared.config.max_units);
+        stats.used_units = shared.dispatcher.units_in_use();
+        stats.active_tasks = u64::from(shared.dispatcher.running());
+        stats.queued_tasks = u64::try_from(shared.dispatcher.parked()).unwrap_or(u64::MAX);
         stats
     }
 
     /// Shut down the pool gracefully with timeout.
     ///
-    /// This drops the task sender to unblock idle workers, then attempts to join
-    /// all workers with a reasonable timeout (2 seconds per worker).
-    ///
-    /// Workers that don't exit within the timeout are detached to prevent hangs.
-    #[expect(
-        clippy::significant_drop_tightening,
-        reason = "narrowing lock scopes changes concurrent behaviour; the worker-pool rework (cr-19/cr-29) owns it"
-    )]
+    /// New submissions are refused, tasks still waiting in the queue are
+    /// failed with [`TaskError::Cancelled`], admitted tasks not yet started
+    /// are failed the same way, and running tasks finish (within their
+    /// budgets). Workers are then joined with a 2-second bound each; a worker
+    /// that does not exit in time is detached so shutdown never hangs.
     pub fn shutdown(&self) {
-        // Check if already shut down
-        if self.shutdown.swap(true, Ordering::AcqRel) {
+        let shared = &self.shared;
+        // AcqRel: Release publishes the flag to the Acquire loads in
+        // `submit`/`execute`; Acquire makes a second caller see the first.
+        if shared.shutdown.swap(true, Ordering::AcqRel) {
             return; // Already shut down
         }
 
         info!("Shutting down worker pool");
 
         // Drop the sender to unblock all workers waiting on recv()
-        {
-            let mut task_tx = self.task_tx.lock();
-            *task_tx = None;
-        }
+        drop(shared.ready_tx.lock().take());
+        shared.cancel_parked();
 
         // Join workers with timeout
-        let mut workers = self.workers.lock();
+        let workers: Vec<_> = self.workers.lock().drain(..).collect();
         let worker_count = workers.len();
 
-        for (idx, worker) in workers.drain(..).enumerate() {
+        for (idx, worker) in workers.into_iter().enumerate() {
             // Try to join with timeout using a helper thread
             let (tx, rx) = std::sync::mpsc::channel();
             let join_thread = thread::spawn(move || {
@@ -627,9 +790,10 @@ where
     fn drop(&mut self) {
         // Signal shutdown but DON'T join workers in Drop
         // This prevents test hangs when pools are dropped with tasks still running
-        if !self.shutdown.swap(true, Ordering::AcqRel) {
+        if !self.shared.shutdown.swap(true, Ordering::AcqRel) {
             // Drop the sender to unblock waiting workers
-            *self.task_tx.lock() = None;
+            drop(self.shared.ready_tx.lock().take());
+            self.shared.cancel_parked();
 
             // DON'T join workers here - let OS clean up threads
             // Explicit shutdown() is required for graceful cleanup
@@ -639,20 +803,12 @@ where
 }
 
 /// Spawn a worker thread.
-#[expect(
-    clippy::too_many_arguments,
-    reason = "private thread entry point; parameter grouping belongs to the worker-pool rework (cr-19/cr-29)"
-)]
 fn spawn_worker<P, R, E>(
     worker_id: usize,
-    task_rx: Receiver<WorkerTask<P>>,
-    results: Arc<ResultStorage<TaskOutcome<R>>>,
-    counters: Arc<PoolCounters>,
-    active_units: Arc<AtomicU32>,
-    shutdown: Arc<AtomicBool>,
-    executor: E,
+    ready_rx: Receiver<Admitted<P>>,
+    shared: Arc<Shared<P, R, E>>,
     stack_size: usize,
-) -> JoinHandle<()>
+) -> std::io::Result<JoinHandle<()>>
 where
     P: Send + 'static,
     R: Send + 'static,
@@ -665,11 +821,11 @@ where
             debug!(worker_id = worker_id, "Worker thread started");
 
             // Each worker has its own single-threaded tokio runtime
-            let rt = match tokio::runtime::Builder::new_current_thread()
+            let runtime = match tokio::runtime::Builder::new_current_thread()
                 .enable_all()
                 .build()
             {
-                Ok(rt) => rt,
+                Ok(runtime) => runtime,
                 Err(e) => {
                     error!(
                         worker_id = worker_id,
@@ -680,69 +836,15 @@ where
                 }
             };
 
-            // Worker loop - blocking recv, NO POLLING
-            // When sender is dropped, recv() returns Err and worker exits
-            loop {
-                // Block waiting for a task
-                // This is efficient - thread sleeps until work arrives
-                // When sender is dropped (shutdown), recv returns Err
-                let Ok(task) = task_rx.recv() else {
-                    // Channel closed (sender dropped) - clean exit
-                    debug!(worker_id = worker_id, "Worker channel closed, exiting");
-                    break;
-                };
-
-                // Check shutdown flag (in case of shutdown during task processing)
-                if shutdown.load(Ordering::Acquire) {
-                    debug!(
-                        worker_id = worker_id,
-                        "Worker shutdown during task, exiting"
-                    );
-                    break;
-                }
-
-                // Update counters (lock-free atomics)
-                counters.queued_tasks.fetch_sub(1, Ordering::Relaxed);
-                counters.active_tasks.fetch_add(1, Ordering::Relaxed);
-                let task_id = task.meta.id;
-                let task_cost = task.meta.cost.total_units();
-                active_units.fetch_add(task_cost, Ordering::Relaxed);
-                let mailbox_key = task.mailbox_key.clone();
-
-                debug!(
-                    worker_id = worker_id,
-                    task_id = task_id,
-                    cost = task_cost,
-                    "Worker executing task"
-                );
-
-                // Execute the task in this worker's runtime
-                let result = rt.block_on(async { executor.execute(task.payload, task.meta).await });
-
-                debug!(
-                    worker_id = worker_id,
-                    task_id = task_id,
-                    "Worker completed task"
-                );
-
-                let finished = if result.is_ok() {
-                    &counters.completed_tasks
-                } else {
-                    &counters.failed_tasks
-                };
-
-                // Store result and notify waiters (via Condvar)
-                results.store(&mailbox_key, result);
-
-                // Update counters (lock-free atomics)
-                counters.active_tasks.fetch_sub(1, Ordering::Relaxed);
-                active_units.fetch_sub(task_cost, Ordering::Relaxed);
-                finished.fetch_add(1, Ordering::Relaxed);
+            // Worker loop - blocking recv, NO POLLING. When the sender is
+            // dropped (shutdown) and the channel is empty, recv returns Err
+            // and the worker exits.
+            while let Ok(admitted) = ready_rx.recv() {
+                shared.execute(&runtime, admitted);
             }
 
             debug!(worker_id = worker_id, "Worker thread exiting");
         })
-        .expect("Failed to spawn worker thread")
 }
 
 #[cfg(test)]
