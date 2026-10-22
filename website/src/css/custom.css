@@ -469,6 +469,15 @@ table thead tr {
   color: var(--pl-text-secondary) !important;
 }
 
+/* Edge-label text is an HTML p/span inside a foreignObject; Mermaid's own
+   label colour is not theme-aware, so take it from the tokens (WCAG contrast
+   in dark mode). */
+.docusaurus-mermaid-container svg .edgeLabel p,
+.docusaurus-mermaid-container svg .edgeLabel span {
+  background-color: var(--pl-surface) !important;
+  color: var(--pl-text-secondary) !important;
+}
+
 /* ---------- Status pills and metadata ---------- */
 .pl-pill {
   display: inline-flex;
