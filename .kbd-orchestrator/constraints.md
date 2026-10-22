@@ -16,17 +16,17 @@ constraints:
   - id: build-passes
     severity: blocking
     description: 'Crate compiles for all targets and all features'
-    command: 'cargo check --all-targets --all-features'
+    command: 'cargo check --workspace --all-targets --all-features --locked'
 
   - id: clippy-clean
     severity: blocking
     description: 'Zero clippy warnings (all/pedantic/nursery enabled in Cargo.toml) — mirrors CI'
-    command: 'cargo clippy --all-targets --all-features -- -D warnings'
+    command: 'cargo clippy --workspace --all-targets --all-features --locked -- -D warnings'
 
   - id: tests-pass
     severity: blocking
     description: 'Full test suite passes with all features (Postgres tests need Docker via testcontainers)'
-    command: 'cargo test --all-features'
+    command: 'cargo test --workspace --all-features --locked'
 
   - id: fmt-clean
     severity: blocking
@@ -36,7 +36,7 @@ constraints:
   - id: docs-build
     severity: blocking
     description: 'Rustdoc builds with warnings denied (missing_docs = deny) — mirrors CI'
-    command: 'RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features'
+    command: 'RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --all-features --locked'
 
   - id: no-unsafe-code
     severity: blocking
@@ -46,7 +46,7 @@ constraints:
   - id: no-hardcoded-secrets
     severity: blocking
     description: 'No hardcoded API keys, tokens, passwords, or DB URLs with credentials in source'
-    check: "grep -rnE 'sk-[A-Za-z0-9]|postgres://[^:\"]+:[^@\"]+@|Bearer [A-Za-z0-9]{16,}' src/"
+    check: "grep -rnE 'sk-[A-Za-z0-9]|postgres://[^:\"]+:[^@\"]+@|Bearer [A-Za-z0-9]{16,}' src/ crates/"
 
   - id: no-tracked-tool-credentials
     severity: blocking
@@ -81,12 +81,12 @@ constraints:
   - id: no-unwrap-in-library-code
     severity: warning
     description: 'Prefer Result propagation over unwrap()/expect() outside tests'
-    check: "grep -rn '\\.unwrap()' src/ --include='*.rs'"
+    check: "grep -rn '\\.unwrap()' src/ crates/ --include='*.rs'"
 
   - id: no-stub-comments
     severity: warning
     description: 'No TODO/FIXME/STUB/HACK comments in committed code'
-    check: "grep -rn 'TODO\\|FIXME\\|STUB\\|HACK' src/"
+    check: "grep -rn 'TODO\\|FIXME\\|STUB\\|HACK' src/ crates/"
 
   - id: changelog-updated
     severity: warning

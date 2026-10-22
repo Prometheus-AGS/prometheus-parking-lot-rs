@@ -1,0 +1,82 @@
+name: Docs site
+
+on:
+  pull_request:
+    paths:
+      - "website/**"
+      - ".github/workflows/docs.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "website/**"
+      - ".github/workflows/docs.yml"
+
+permissions:
+  contents: read
+
+# Pages deploys must not overlap, and an in-flight deploy is never cancelled.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+# Every step after detection is a no-op until website/package.json exists (cr-45 lands
+# separately).
+# Pages itself is enabled by the operator (cr-45 task 1.6), not by this workflow.
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    outputs:
+      present: ${{ steps.detect.outputs.present }}
+    steps:
+      - uses: actions/checkout@v7
+      # hashFiles is only valid at step level, so the guard is a step output that
+      # every later step (and the deploy job) keys on.
+      - id: detect
+        name: Detect website/
+        run: |
+          if [ -f website/package.json ]; then echo "present=true" >> "$GITHUB_OUTPUT"; else echo "present=false" >> "$GITHUB_OUTPUT"; echo "website/package.json not present yet; skipping"; fi
+      - if: hashFiles('website/package.json') != ''
+        uses: actions/setup-node@v7
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - if: hashFiles('website/package.json') != ''
+        name: Install
+        working-directory: website
+        run: npm ci
+      - if: hashFiles('website/package.json') != '' && github.event_name == 'pull_request'
+        name: Build (pull request, no deploy)
+        working-directory: website
+        run: npm run build
+      - if: hashFiles('website/package.json') != '' && github.event_name == 'push'
+        name: Build (main, published URL)
+        working-directory: website
+        env:
+          SITE_URL: https://prometheus-ags.github.io
+          BASE_URL: /prometheus-parking-lot-rs/
+        run: npm run build
+      - if: hashFiles('website/package.json') != '' && github.event_name == 'push'
+        uses: actions/configure-pages@v6
+      - if: hashFiles('website/package.json') != '' && github.event_name == 'push'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: website/build
+
+  deploy:
+    name: Deploy to GitHub Pages
+    if: github.event_name == 'push' && needs.build.outputs.present == 'true'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
