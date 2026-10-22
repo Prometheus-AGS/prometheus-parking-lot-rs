@@ -24,3 +24,8 @@ Thumbs.db
 # Coverage reports
 /coverage/
 /reports/
+
+# prometheus-context-bootstrap
+.prometheus/.writer.lock
+.prometheus/.review-pending
+.claude/settings.json.bak.*

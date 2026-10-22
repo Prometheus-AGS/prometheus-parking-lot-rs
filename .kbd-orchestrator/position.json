@@ -1,0 +1,167 @@
+{
+  "schemaVersion": "1",
+  "generatedBy": "kbd-runtime",
+  "projectionContractVersion": 2,
+  "sourceRevision": 14,
+  "derivedRevision": 14,
+  "frontier": {
+    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 14
+  },
+  "conflictCount": 0,
+  "updatedAt": "2026-10-22T10:34:51.206424Z",
+  "cursor": [
+    "phase-certification-remediation",
+    "complete"
+  ],
+  "root": {
+    "type": "phase",
+    "id": "f6c384db-6ee1-4f1b-9bab-0e1602ec2615",
+    "status": "ready",
+    "progress": {
+      "done": 14,
+      "total": 14
+    },
+    "children": [
+      {
+        "type": "phase",
+        "id": "phase-certification-remediation",
+        "canonicalId": "phase-certification-remediation",
+        "status": "COMPLETE",
+        "progress": {
+          "done": 14,
+          "total": 14
+        },
+        "children": [
+          {
+            "type": "change",
+            "id": "CR-01",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 0,
+              "total": 0
+            }
+          },
+          {
+            "type": "change",
+            "id": "CR-02",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 0,
+              "total": 0
+            }
+          },
+          {
+            "type": "change",
+            "id": "CR-03",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 0,
+              "total": 0
+            }
+          },
+          {
+            "type": "change",
+            "id": "CR-04",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 0,
+              "total": 0
+            }
+          },
+          {
+            "type": "change",
+            "id": "CR-05",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 0,
+              "total": 0
+            }
+          },
+          {
+            "type": "change",
+            "id": "CR-06",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 0,
+              "total": 0
+            }
+          },
+          {
+            "type": "change",
+            "id": "CR-07",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 0,
+              "total": 0
+            }
+          },
+          {
+            "type": "change",
+            "id": "CR-08",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 0,
+              "total": 0
+            }
+          },
+          {
+            "type": "change",
+            "id": "CR-09",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 0,
+              "total": 0
+            }
+          },
+          {
+            "type": "change",
+            "id": "CR-10",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 0,
+              "total": 0
+            }
+          },
+          {
+            "type": "change",
+            "id": "CR-11",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 0,
+              "total": 0
+            }
+          },
+          {
+            "type": "change",
+            "id": "CR-12",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 0,
+              "total": 0
+            }
+          },
+          {
+            "type": "change",
+            "id": "CR-13",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 0,
+              "total": 0
+            }
+          },
+          {
+            "type": "change",
+            "id": "CR-14",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 0,
+              "total": 0
+            }
+          }
+        ],
+        "annotations": []
+      }
+    ],
+    "annotations": []
+  }
+}
