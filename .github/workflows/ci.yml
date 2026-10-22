@@ -22,7 +22,8 @@ env:
 
 # Every cargo invocation is --locked (Cargo.lock is committed) and --workspace
 # (the repository root is both the facade package and the workspace root).
-# Postgres/Docker suites are not registered yet (cr-35), so no service container here.
+# The Postgres suites (crates/parking-lot-pg/tests) are registered and compiled here,
+# but need Docker and are #[ignore]d; the Docker job arrives with cr-36.
 
 jobs:
   fmt:
@@ -79,10 +80,23 @@ jobs:
         run: cargo +${{ matrix.toolchain }} nextest run --workspace --all-features --locked --no-run
       - name: Run tests (suite-level watchdog, 5 minutes)
         timeout-minutes: 5
-        run: cargo +${{ matrix.toolchain }} nextest run --workspace --all-features --locked --no-fail-fast
+        # --no-tests=fail: a run that finds no tests is a failure, not a pass.
+        run: cargo +${{ matrix.toolchain }} nextest run --workspace --all-features --locked --no-fail-fast --no-tests=fail
       - name: Run doctests (nextest does not run them)
         timeout-minutes: 5
         run: cargo +${{ matrix.toolchain }} test --workspace --all-features --locked --doc
+
+  orphan-tests:
+    # cr-35: every .rs file under a tests/ directory must be compiled by a Cargo
+    # target. Static check (cargo metadata + `mod` resolution); no build needed.
+    name: Orphan tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.PINNED_TOOLCHAIN }}
+      - run: python3 .github/scripts/check-orphan-tests.py
 
   docs:
     name: Docs
