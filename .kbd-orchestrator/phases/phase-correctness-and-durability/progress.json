@@ -2,26 +2,26 @@
   "schemaVersion": "2",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 18,
-  "derivedRevision": 18,
+  "sourceRevision": 190,
+  "derivedRevision": 190,
   "frontier": {
-    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 18
+    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 190
   },
   "conflictCount": 0,
   "phase": "phase-correctness-and-durability",
   "phaseId": "phase-correctness-and-durability",
   "parentPhase": null,
-  "last_updated": "2026-10-22T11:31:17.306399Z",
+  "last_updated": "2026-10-22T12:45:45.677282Z",
   "last_updated_by": "kbd-runtime",
-  "changes_total": 0,
+  "changes_total": 37,
   "changes_completed": 0,
-  "implementation_total": 0,
+  "implementation_total": 37,
   "implementation_completed": 0,
   "completion": {
     "primaryCounter": "implementation",
     "implementation": {
       "completed": 0,
-      "total": 0,
+      "total": 37,
       "status": "PENDING"
     },
     "evidence": {
@@ -50,8 +50,8 @@
     "primaryCounter": "implementation",
     "implementation": {
       "completed": 14,
-      "total": 14,
-      "status": "COMPLETE"
+      "total": 51,
+      "status": "IN_PROGRESS"
     },
     "evidence": {
       "status": "PENDING",
@@ -69,7 +69,415 @@
       "blockers": []
     }
   },
-  "changes": [],
+  "changes": [
+    {
+      "id": "cr-15-containment",
+      "title": "Contain leaked agent credentials and ship only allowlisted files",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 4,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Operator rotates OPENAI_API_KEY and Codex OAuth tokens exposed in .codex/auth.json and records confirmation (no secret values) in execution.md",
+      "blockers": []
+    },
+    {
+      "id": "cr-41-toolchain-baseline",
+      "title": "Rust 1.99.1 / MSRV 1.95 / edition 2024 build baseline where every target compiles",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 5,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Pin rust-toolchain.toml to 1.99.1, set rust-version = \"1.95\" and edition = \"2024\", run cargo fix --edition, and commit Cargo.lock (remove it from .gitignore)",
+      "blockers": []
+    },
+    {
+      "id": "cr-17-kbd-correction",
+      "title": "Correct the certification phase record through superseding KBD decisions",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Verify by reading code which certification-phase changes are unwired (CR-03, CR-07, CR-13, CR-14 at minimum)",
+      "blockers": []
+    },
+    {
+      "id": "cr-48-workspace-split",
+      "title": "Split into a Cargo workspace with a wasm-safe core and per-backend crates",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 4,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Write docs/adr/0001-workspace-split.md (crate map, dependency rules, feature mapping, MSRV per crate)",
+      "blockers": []
+    },
+    {
+      "id": "cr-42-ci-rebuild",
+      "title": "Green, cached, locked CI on stable and MSRV",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 4,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Rewrite .github/workflows/ci.yml: rust-cache, --locked, nextest, toolchain matrix 1.99.1 + 1.95",
+      "blockers": []
+    },
+    {
+      "id": "cr-45-docs-site",
+      "title": "Branded Docusaurus documentation site (know-me brand, Flat 2.0)",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 4,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Scaffold website/ with build-branded-docusaurus; pin versions; map know-me dark/light tokens, typography and logo",
+      "blockers": []
+    },
+    {
+      "id": "cr-18-core-contracts",
+      "title": "Core contracts: Arc<Inner>, Clock, Result executors, error taxonomy",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 4,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Arc<Inner> refactor of ResourcePool; delete sync_wake_worker_loop; Clock trait + TestClock",
+      "blockers": []
+    },
+    {
+      "id": "cr-51-supply-chain-gates",
+      "title": "CI gates: secrets, purged paths, pre-purge history and package allowlists",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Add CI jobs (fetch-depth 0): gitleaks full history, path-history emptiness assertion, pre-purge root-set ancestry rejection, per-crate cargo package --list allowlist check",
+      "blockers": []
+    },
+    {
+      "id": "cr-43-postgres18-image",
+      "title": "Project Postgres 18 image (flint-forge pattern) with pgmq for tests and local dev",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 4,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Write docker/postgres18/Dockerfile (+ pg17 variant) modelled on flint-forge images/postgres18: PGDG base, pgmq from pinned tag, tuned conf, init scripts; no Flint-specific extensions",
+      "blockers": []
+    },
+    {
+      "id": "cr-25-backend-contracts",
+      "title": "Async lease/ack queue, async mailbox and Notifier contracts with a conformance suite",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 4,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Define async TaskQueue (lease/ack/nack/extend), async Mailbox (deliver/consume-once/TTL) and Notifier traits",
+      "blockers": []
+    },
+    {
+      "id": "cr-19-dispatcher-semaphore",
+      "title": "Unit-weighted semaphore and priority dispatcher shared by every pool",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 4,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Implement the dispatcher + unit-weighted semaphore; atomic depth-check/enqueue; peek-then-pop",
+      "blockers": []
+    },
+    {
+      "id": "cr-46-docs-theory",
+      "title": "Concepts: theory and history of parking lots, admission, mailboxes and worker pools",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Research and outline concept chapters with primary sources (deep-research skill)",
+      "blockers": []
+    },
+    {
+      "id": "cr-35-test-targets",
+      "title": "Unit and integration suites become real test targets on the current testcontainers API",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 4,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Register unit/integration suites as test targets in their crates",
+      "blockers": []
+    },
+    {
+      "id": "cr-16-docs-truth",
+      "title": "Archive invalid docs and make README examples compile",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Archive invalid docs (PLAN-/SPEC-/TASKS-*, primitives docs, stale reports) to docs/archive/ with an index of reasons",
+      "blockers": []
+    },
+    {
+      "id": "cr-21-panic-containment",
+      "title": "Executor panics never leak capacity or kill the pool",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "catch_unwind + RAII permits on every execution path; worker respawn; counters",
+      "blockers": []
+    },
+    {
+      "id": "cr-28-embedded-redb-queue",
+      "title": "Crash-safe embedded queue (redb) replacing the JSONL Yaque queue",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 4,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "One-day spike: redb vs rustqueue; record the decision in docs/adr",
+      "blockers": []
+    },
+    {
+      "id": "cr-22-result-slots",
+      "title": "Async result slots with TTL that use no blocking threads",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Replace condvar slots with oneshot/Notify slots; blocking API via blocking_recv; TTL sweeper",
+      "blockers": []
+    },
+    {
+      "id": "cr-26-pg-lease-queue",
+      "title": "Postgres lease queue on raw sqlx with SKIP LOCKED, NOTIFY and a reaper",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 4,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Lease/ack/nack/extend SQL and migrations; LISTEN/NOTIFY wake-up; reaper; backoff",
+      "blockers": []
+    },
+    {
+      "id": "cr-38-wasm-target",
+      "title": "WASM pool on spawn_local with a CI check job",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Port the wasm pool onto the dispatcher in parking-lot-wasm (spawn_local + JS timers, capacity admission, budgets); getrandom config; document panic=abort limit",
+      "blockers": []
+    },
+    {
+      "id": "cr-27-pg-mailbox",
+      "title": "Postgres mailbox: consume-once, TTL eviction, first-write-wins idempotency",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Mailbox SQL (DELETE ... RETURNING, TTL, ON CONFLICT) and migration",
+      "blockers": []
+    },
+    {
+      "id": "cr-37-config-schema",
+      "title": "Config schema carrying backend parameters and a real build_pools_from_scheduler_config",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Config types + validation + builder",
+      "blockers": []
+    },
+    {
+      "id": "cr-30-pgmq-sql-backend",
+      "title": "pgmq backend through SQL (one queue per priority), no client crate",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "SQL implementation over pgmq functions with visibility-timeout leases and per-priority queues; add the pgmq config section and example test (tech-lead config handoff)",
+      "blockers": []
+    },
+    {
+      "id": "cr-34-mailbox-composition",
+      "title": "Composable mailbox: storage plus optional notifier",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "StorageMailbox<S, N> behaviour in crates/parking-lot-core/src/mailbox/ with off-path bounded notification",
+      "blockers": []
+    },
+    {
+      "id": "cr-44-mobile-desktop-bindings",
+      "title": "Mobile (UniFFI) bindings and desktop (Tauri) integration",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "UniFFI crate over the embedded backend; generated bindings",
+      "blockers": []
+    },
+    {
+      "id": "cr-49-durable-dispatch",
+      "title": "Pools persist accepted work through the durable queue (persist, lease, ack after delivery, extend)",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 4,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Dispatcher sources from TaskQueue::lease when durable; persist-before-accept on submit; ack after mailbox write; lease heartbeat",
+      "blockers": []
+    },
+    {
+      "id": "cr-36-pg-matrix",
+      "title": "Postgres 17 + 18 CI matrix, autovacuum tuning and PG18 runbook",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "CI matrix job (handoff to platform-engineer) and per-table autovacuum migration",
+      "blockers": []
+    },
+    {
+      "id": "cr-29-shutdown-cancellation",
+      "title": "Wire shutdown policy and cancellation capture into both pools",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 4,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Wire ShutdownPolicy + cancellation channel into ResourcePool and WorkerPool; fix received-task drop",
+      "blockers": []
+    },
+    {
+      "id": "cr-31-hook-emission",
+      "title": "Emit lifecycle events at every transition",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Emit events from the dispatcher and pools; builder registration (tech-lead handoff); hooks.rs API adjustments via events-engineer handoff",
+      "blockers": []
+    },
+    {
+      "id": "cr-20-skip-ahead",
+      "title": "Skip-ahead bin-packing with a starvation guard",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Skip-ahead policy with starvation guard (config field via tech-lead handoff); emit lifecycle events for skipped/promoted dispatch",
+      "blockers": []
+    },
+    {
+      "id": "cr-32-iggy-events",
+      "title": "Iggy hook and notifier (events only, not storage or work queue)",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "IggyHook + IggyNotifier with bounded publisher and UUIDv5 IDs; iggy config section + example test (tech-lead config handoff)",
+      "blockers": []
+    },
+    {
+      "id": "cr-23-multi-resource",
+      "title": "Multi-resource cost vectors (e.g. VRAM + worker slots)",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Vector-aware semaphore/dispatcher admission; multi-dimension limits via tech-lead config handoff; lifecycle events per dimension",
+      "blockers": []
+    },
+    {
+      "id": "cr-33-stream-replay",
+      "title": "(Stretch) Streaming-token replay for reconnecting clients",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "IggyStreamSink and resume API",
+      "blockers": []
+    },
+    {
+      "id": "cr-39-dependency-hygiene",
+      "title": "Dependency prune and semver checks",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Prune dependencies (handoff Cargo.toml edits to tech-lead)",
+      "blockers": []
+    },
+    {
+      "id": "cr-40-benchmarks",
+      "title": "CI-reproducible benchmarks and published numbers",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Criterion suites (throughput, latency, utilization)",
+      "blockers": []
+    },
+    {
+      "id": "cr-47-docs-guides",
+      "title": "Guides and scenarios with compiled examples and agentic value",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 4,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Write scenario guides backed by examples/ sources; every JSON/TOML config shown is added to the config example test (tech-lead reviews API usage)",
+      "blockers": []
+    },
+    {
+      "id": "cr-53-wasm-parity",
+      "title": "WASM pool parity with later dispatcher changes",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 3,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Adapt the WASM pool to vector admission, skip-ahead and lifecycle events",
+      "blockers": []
+    },
+    {
+      "id": "cr-52-release",
+      "title": "Version, publish and tag 0.3.0 (crates.io trusted publishing, signed tag, GitHub release, docs deploy)",
+      "status": "PENDING",
+      "implementation_status": "PENDING",
+      "tasks_total": 6,
+      "tasks_done": 0,
+      "last_task_completed": null,
+      "next_task_pending": "Versioning ADR (SemVer, workspace version 0.3.0, inter-crate pins, MSRV policy); release-plz.toml and cliff.toml",
+      "blockers": []
+    }
+  ],
   "children": {},
   "migrationStatus": null
 }

@@ -1,0 +1,18 @@
+{
+  "stage": "plan",
+  "completedAt": "2026-10-22T12:45:45Z",
+  "outputs": [
+    "plan.md"
+  ],
+  "nextStage": "execute",
+  "summaryForNext": "37 changes / 130 tasks in 16 dependency rounds (M0 containment+baseline+workspace split, M1 core, M2 durable backends+durable dispatch, M3 events, M4 platform/docs, M5 release 0.3.0). First: cr-15-containment (operator rotates keys; driver purges history in a mirror clone after this plan merges). Task model assignments in plan.md (Claude Code subagents: opus for lead/scheduler/PM/reviewer, sonnet for postgres/events/platform); cross-family review route unresolved. Plan review: 2 rounds BLOCK, all findings applied, cap reached — see Unresolved review findings. Contract adopted sha256 bb9c2939…04b17.",
+  "skipped": false,
+  "skipReason": null,
+  "identity": {
+    "projectId": "f6c384db-6ee1-4f1b-9bab-0e1602ec2615",
+    "runId": "phase-certification-remediation-20261022T103344Z",
+    "phaseId": "phase-correctness-and-durability",
+    "planRevision": 1,
+    "contractDigest": "bb9c2939a6b56c58200dd816e14bf6ddae93c2ed8c38ec41a478520e69604b17"
+  }
+}

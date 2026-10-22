@@ -1,0 +1,11 @@
+{
+  "stage": "assess",
+  "completedAt": "2026-10-22T11:45:44Z",
+  "outputs": [
+    "assessment.md"
+  ],
+  "nextStage": "analyze",
+  "summaryForNext": "Every phase goal NOT MET on main@90a6194: C1 capacity violation in both WorkerPools, no panic containment, Postgres queue/mailbox non-functional (block_on inside runtime), silent task loss on WorkerPool shutdown, HookBus never emitted, no Notifier contract, CI fully red (MSRV vs pgmq/sqlx 0.9, 355 fmt hunks, cargo-deny), benches/examples do not compile, .codex credentials tracked in a public repo. For plan: add an M0 build-baseline change (compile all targets, commit Cargo.lock, pull pgmq drop/pin forward from CR-30, fmt) before M1; operator must amend constraints.md .codex clause before CR-15 and decide risk acceptance (0.3.0 API breaks, red CI during M0); workspace-split ADR and Notifier/lease contracts before fan-out. Adversarial review PASS 0/7/2 (same-family, harness-native; all warnings applied).",
+  "skipped": false,
+  "skipReason": null
+}

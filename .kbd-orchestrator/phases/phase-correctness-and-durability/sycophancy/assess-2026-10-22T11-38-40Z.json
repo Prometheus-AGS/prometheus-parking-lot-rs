@@ -1,0 +1,1 @@
+{"tool":"detect_sycophancy","input":"condensed summary of assessment.md (full text not passed)","strictness":"standard","evaluation_domain":"project_assessment","sycophancy_score":0.0,"classifications":[],"correction_mandatory":false,"executed_at":"2026-10-22T11:38:40.063207Z"}
