@@ -31,8 +31,25 @@ flowchart LR
 
 | Section | Change | Status |
 | --- | --- | --- |
-| Site, theme, search and verification | `cr-45-docs-site` | In progress |
-| [Concepts](./concepts/index.md) | `cr-46-docs-theory` | Placeholder |
+| Site, theme, search and verification | `cr-45-docs-site` | Merged |
+| [Concepts](./concepts/index.md) | `cr-46-docs-theory` | Merged |
 | [Guides](./guides/index.md) | `cr-47-docs-guides` | Placeholder |
+
+## Concepts
+
+The concept chapters explain the ideas the library is built on, with primary
+sources, and say which parts exist on `main` and which are planned:
+
+- [Parking lots](./concepts/parking-lots.md): parking work instead of threads.
+- [Admission control](./concepts/admission-control.md): weighted admission,
+  bin packing, priority and starvation.
+- [Leases and delivery](./concepts/leases.md): leases, at-least-once delivery
+  and idempotency.
+- [Mailboxes and actors](./concepts/mailboxes-and-actors.md): the result
+  mailbox for disconnected clients.
+- [Worker pools](./concepts/worker-pools.md): dedicated threads for heavy work.
+- [Event logs](./concepts/event-logs.md): events and notifications.
+- [Agentic value](./concepts/agentic-value.md): why agent workloads need all
+  of the above together.
 
 To build or check the site itself, see [Working on this site](./contributing/docs-site.md).

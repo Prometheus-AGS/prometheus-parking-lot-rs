@@ -1,481 +1,326 @@
 # prometheus_parking_lot
 
-A configurable, runtime-agnostic **parking-lot scheduler** for Prometheus AI agents and services.
+A resource-aware scheduler for expensive work such as LLM inference. Each task
+declares what it costs (for example 4 units of GPU memory). A pool starts the
+task when its cost fits in the capacity that is free and nothing is waiting
+ahead of it; otherwise it parks the task and starts parked tasks, highest
+priority first and in submission order within a priority, as running tasks
+release their units. A task that costs more than the pool's total capacity is
+rejected at submission instead of blocking the queue forever.
 
-This crate provides a dedicated scheduling layer that:
+Two pools share one admission core:
 
-- Manages **resource-constrained pools** (CPU, GPU VRAM, web workers, etc.).
-- Queues excess work in a **"parking lot"** and wakes it when capacity is free.
-- Handles **timeouts** and **disconnected clients** via a mailbox abstraction.
-- Supports multiple **queue backends** (in-memory, Postgres, pgmq, Yaque).
-- Supports multiple **mailbox backends** (in-memory, Postgres, REST callbacks).
-- Is configured via simple **JSON/YAML** so you can change behavior without code changes.
+- **`ResourcePool`** runs async executors on a tokio runtime and delivers each
+  outcome (value or error) to a **mailbox** keyed by tenant, user and session,
+  so a client that disconnected can collect it later.
+- **`WorkerPool`** runs executors on dedicated OS threads, each with its own
+  single-threaded tokio runtime, so CPU- or GPU-bound work never blocks your
+  async runtime. Results need not be serializable (a streaming channel is
+  fine) and are collected with `retrieve`.
 
-It is designed to be the common scheduling engine for the **Prometheus AI platform** across:
+Every execution runs under a budget: the task's deadline or the pool's default
+timeout, whichever is nearer. Work still running at its budget is cancelled and
+its units are released.
 
-- Local / desktop agents (e.g., Tauri apps running local LLMs),
-- Web services (web workers + PGlite),
-- Cloud services (GPU-backed agent gateways, microservices).
+This README describes `main`, which will be released as **0.3.0**. 0.3.0 is
+source-breaking for 0.2 users; the [CHANGELOG](CHANGELOG.md) has the
+migration notes.
 
----
+## Status: what holds today and what does not
 
-## Why this exists
+| Guarantee | Today |
+| --- | --- |
+| Admitted units never exceed `max_units` | Yes, for both pools: one dispatcher and one unit-weighted semaphore, covered by loom and property tests. |
+| Priority, then FIFO | Yes. Letting small tasks skip ahead of a large head task is planned (cr-20). |
+| Execution budgets | Yes, for both pools. |
+| Multi-resource admission | Costs are already vectors, but pools admit by the sum of units against one `max_units`; per-dimension limits are cr-23. |
+| Executor panics | **Not contained yet** (cr-21). A panic is not turned into a `TaskError::ExecutorPanicked` outcome; do not rely on a pool surviving one. |
+| Accepted work survives a crash | **No.** The in-memory backends lose everything on restart. The current Postgres queue deletes a row when it dequeues it (at-most-once) and bridges async calls with `block_on`, which panics inside a tokio runtime. Leasing, durable backends replace it: Postgres (cr-26, cr-27) and redb (cr-28). Until then use the in-memory backends. |
 
-Prometheus agents often run in **resource-constrained environments**:
+## Crates and features
 
-- A desktop with a single GPU running a local LLM.
-- A Tauri app with limited CPU & memory.
-- A cloud VM with a fixed number of GPU/CPU slots.
-- A browser using a small pool of web workers.
+Most applications depend only on the facade, `prometheus_parking_lot`, which
+re-exports the rest.
 
-You need to:
+| Crate | What it holds |
+| --- | --- |
+| `prometheus_parking_lot` | Facade: re-exports, scheduler configuration (`config`), pool builders (`builders`) |
+| `prometheus-parking-lot-core` | Runtime-free contracts and types, the dispatcher and semaphore, hooks and audit types, in-memory backends. No async runtime, IO or database dependency. |
+| `prometheus-parking-lot-runtime-tokio` | `ResourcePool`, the native `WorkerPool`, shutdown, cancellation, `TokioSpawner` |
+| `prometheus-parking-lot-pg` | Postgres queue, mailbox and audit sink (SeaORM) and migrations; replaced by cr-26 and cr-27 |
+| `prometheus-parking-lot-embedded` | File-backed queue and mailbox for desktop use; replaced by redb in cr-28 |
+| `prometheus-parking-lot-wasm` | `WorkerPool` for `wasm32` (async tasks instead of threads); building it for `wasm32-unknown-unknown` is cr-38 |
 
-- Limit concurrency by **real resource usage**, not just "number of tasks".
-- Queue additional work and **wake it intelligently**.
-- Handle **timeouts** and **clients that disconnect**.
-- Use different **queue technologies** depending on the environment:
-  - In-memory during development.
-  - Postgres or `pgmq` in the cloud.
-  - Yaque (embedded, file-backed) for Tauri / local.
+| Facade feature | Enables | Default |
+| --- | --- | --- |
+| `tokio-runtime` | `ResourcePool`, native `WorkerPool`, shutdown, cancellation, `TokioSpawner`, `builders`, `runtime` | yes |
+| `postgres` | `infra::queue::PostgresQueue`, `infra::mailbox::PostgresMailbox`, `core::PostgresAuditSink`, SeaORM entities | no |
+| `embedded` | `infra::YaqueQueue`, `infra::YaqueMailbox` | no |
 
-This crate centralizes that logic into a **single, reusable scheduler**.
+The core crate has one feature, `conformance`, which publishes the test suite
+every queue and mailbox backend must pass.
 
----
+## Quick start
 
-## Core concepts
-
-### TaskPayload
-
-A **serializable description** of work to do (e.g., an LLM request):
-
-```rust
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-struct LlmJob {
-    model: String,
-    prompt: String,
-    max_tokens: u32,
-}
-```
-
-Anything that is `Send + Sync + Serialize + DeserializeOwned + 'static` can be a `TaskPayload`.
-
-### TaskExecutor<P, T>
-
-An async trait that knows how to execute `P` and produce `T`:
-
-```rust
-use prometheus_parking_lot::{TaskExecutor, TaskMetadata};
-use async_trait::async_trait;
-
-#[derive(Clone)]
-struct LlmExecutor;
-
-#[async_trait]
-impl TaskExecutor<LlmJob, String> for LlmExecutor {
-    async fn execute(&self, payload: LlmJob, _meta: TaskMetadata) -> String {
-        // Call your LLM / agent execution logic here.
-        format!("LLM({}): {}", payload.model, payload.prompt)
-    }
-}
-```
-
-### TaskQueue<P>
-
-Abstracts how jobs are stored and dequeued.
-
-**Backends** (implementing `TaskQueue<P>`):
-
-- `InMemoryQueue<P>` – simple, fast, in-process.
-- `SeaOrmQueue<P>` – Postgres custom table (pl_queue_jobs).
-- `PgmqQueue<P>` – Postgres pgmq extension queue.
-- `YaqueQueue<P>` – Yaque-based embedded file-backed queue (ideal for Tauri / local).
-
-### Mailbox<T>
-
-Abstracts how results are stored and retrieved, and optionally how notifications are sent.
-
-Internally, it's composed of:
-
-- **MailboxStorage<T>** – actual storage:
-  - `InMemoryStorage<T>`
-  - `SeaOrmMailboxStorage<T>` (Postgres pl_mailbox_messages)
-  - Other storages can be added (SurrealDB, etc.).
-
-- **MailboxNotifier<T>** – optional notifier:
-  - `HttpCallbackNotifier<T>` – REST webhook callback.
-
-High-level trait:
-
-```rust
-use prometheus_parking_lot::{Mailbox, MailboxKey, MailboxMessage};
-
-#[async_trait::async_trait]
-pub trait Mailbox<T> {
-    async fn deliver(&self, key: &MailboxKey, msg: MailboxMessage<T>);
-    async fn fetch(
-        &self,
-        key: &MailboxKey,
-        since_ms: Option<u128>,
-        limit: usize,
-    ) -> Vec<MailboxMessage<T>>;
-}
-```
-
-So if a client disconnects, the result can be stored and picked up later, and optionally a REST hook can notify that it's ready.
-
-### ResourcePool
-
-The parking-lot scheduler for async workloads.
-
-- Enforces a `max_units` capacity (e.g., GPU units, CPU slots, worker slots).
-- If there's room → execute immediately.
-- If not → enqueue into a `TaskQueue<P>`.
-- When tasks finish, it wakes queued tasks that fit within current capacity.
-- Uses a `Mailbox<T>` to deliver results and handle timeouts/expired work.
-
-### WorkerPool (NEW - for CPU/GPU-bound work)
-
-A dedicated worker thread pool for **heavy CPU/GPU-bound tasks** like LLM inference:
-
-```rust
-use prometheus_parking_lot::core::{WorkerPool, WorkerExecutor, TaskMetadata, PoolError};
-use prometheus_parking_lot::config::WorkerPoolConfig;
-use async_trait::async_trait;
-use std::time::Duration;
-
-// Your executor - result type does NOT need to be Serializable!
-// This allows returning channels for streaming responses.
-#[derive(Clone)]
-struct LlmExecutor { /* ... */ }
-
-#[async_trait]
-impl WorkerExecutor<InferenceJob, InferenceResult> for LlmExecutor {
-    async fn execute(&self, job: InferenceJob, meta: TaskMetadata) -> InferenceResult {
-        // This runs in a dedicated worker thread with its own tokio runtime,
-        // NOT blocking the main async runtime!
-        do_inference(job).await
-    }
-}
-
-// Create pool with dedicated OS threads (native) or async tasks (WASM)
-let pool = WorkerPool::new(
-    WorkerPoolConfig::new()
-        .with_worker_count(4)         // 4 worker threads
-        .with_max_units(1000)          // Resource capacity
-        .with_max_queue_depth(500),    // Queue limit
-    executor,
-)?;
-
-// Async API (works on native AND WASM - unified programming model)
-let key = pool.submit_async(job, meta).await?;
-let result = pool.retrieve_async(&key, Duration::from_secs(120)).await?;
-
-// Blocking API (native only, slightly faster for sync contexts)
-#[cfg(not(target_arch = "wasm32"))]
-{
-    let key = pool.submit(job, meta)?;
-    let result = pool.retrieve(&key, Duration::from_secs(120))?;
-}
-```
-
-**Key features:**
-- **No polling** - uses `parking_lot::Condvar` and oneshot channels for efficient signaling
-- **Lock-free fast paths** - atomic counters, brief critical sections
-- **Non-serializable results** - supports streaming channels, handles, etc.
-- **Cross-platform** - same API on native (OS threads) and WASM (async tasks)
-
----
-
-## Architecture overview
-
-The crate follows a feature-based, clean architecture:
-
-```
-src/
-  core/        # Pure domain + scheduler (no infra deps)
-  config/      # serde config models
-  builders/    # config → core abstractions
-  infra/       # queue/mailbox/runtime backends (Postgres, pgmq, Yaque, etc.)
-  util/        # shared utilities (e.g. Clock abstraction)
-```
-
-- **core**: types, traits, scheduler; no direct DB, HTTP, runtime dependencies.
-- **infra**: concrete backends, each behind traits.
-- **config + builders**: glue to turn JSON/YAML configs into complete ResourcePools.
-
-This keeps the core logic testable and independent of any particular database, runtime, or environment.
-
----
-
-## Installing
-
-Add to your `Cargo.toml`:
+0.3.0 is not on crates.io yet. Until it is, depend on the repository:
 
 ```toml
 [dependencies]
-prometheus_parking_lot = { git = "https://github.com/your-org/prometheus_parking_lot.git", features = ["native", "postgres", "pgmq", "yaque", "config"] }
+prometheus_parking_lot = { git = "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs" }
+async-trait = "0.1"
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
 ```
 
-**Features:**
+Then pick a pool:
 
-- `native` – enable Tokio runtime adapter.
-- `postgres` – enable SeaORM-based Postgres queue/mailbox.
-- `pgmq` – enable pgmq queue adapter.
-- `yaque` – enable Yaque embedded queue adapter.
-- `config` – enable serde-based config model and HTTP notifier.
+- Use **`WorkerPool`** when the work is CPU- or GPU-bound, or the result
+  cannot be serialized, and the caller waits for the result.
+- Use **`ResourcePool`** when the work is async and its result should land in
+  a mailbox that a client can read later.
 
----
+Both examples below are compiled and run as doctests of the facade crate
+(`cargo test --doc`) on every CI run.
 
-## Configuration (JSON / YAML)
+## Example: `WorkerPool`
 
-You define pools and backends in a `scheduler-config.json`:
-
-```json
-{
-  "pools": {
-    "llm_inference": {
-      "max_units": 20,
-      "max_queue_depth": 10000,
-      "default_timeout_secs": 60,
-      "queue": {
-        "type": "postgres_pgmq",
-        "queue_name": "llm_inference"
-      },
-      "mailbox": {
-        "storage": {
-          "type": "postgres",
-          "table": "pl_mailbox_messages"
-        },
-        "notifier": {
-          "type": "http",
-          "base_url": "https://prometheus-gw.example.com/hooks/mailbox",
-          "auth_header": "Bearer YOUR_TOKEN"
-        }
-      }
-    },
-
-    "tauri_local_llm": {
-      "max_units": 8,
-      "max_queue_depth": 1000,
-      "default_timeout_secs": 60,
-      "queue": {
-        "type": "yaque",
-        "path": "./data/queues",
-        "stream": "tauri_llm"
-      },
-      "mailbox": {
-        "storage": {
-          "type": "in_memory"
-        }
-      }
-    }
-  }
-}
-```
-
-Each pool corresponds to a logical resource pool in your service.
-
----
-
-## Basic usage example (Tokio + in-memory)
+Two worker threads and 8 units of capacity. An executor returns
+`Result<R, TaskError>`; a failure comes back from `retrieve` as
+`SchedulerError::Task`.
 
 ```rust
-use prometheus_parking_lot::{
-    TaskExecutor, TaskMetadata, TaskPayload, ScheduledTask,
-    MailboxKey, TenantId, Priority, ResourceCost, ResourceKind,
-    SchedulerConfig, QueueBuilderContext,
-    build_pools_from_scheduler_config,
-    TokioSpawner,
-};
+use std::time::Duration;
+
 use async_trait::async_trait;
-use std::{fs, time::Duration};
+use prometheus_parking_lot::WorkerPool;
+use prometheus_parking_lot::config::WorkerPoolConfig;
+use prometheus_parking_lot::core::{SchedulerError, TaskError, TaskMetadata, WorkerExecutor};
+use prometheus_parking_lot::util::{Priority, ResourceCost, ResourceKind, now_ms};
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-struct LlmJob {
-    model: String,
-    prompt: String,
-    max_tokens: u32,
-}
-
+/// Splits text into words. Stands in for an inference call.
 #[derive(Clone)]
-struct LlmExecutor;
+struct Tokenizer;
 
 #[async_trait]
-impl TaskExecutor<LlmJob, String> for LlmExecutor {
-    async fn execute(&self, payload: LlmJob, _meta: TaskMetadata) -> String {
-        // Your LLM/agent logic here.
-        format!("LLM({}): {}", payload.model, payload.prompt)
+impl WorkerExecutor<String, Vec<String>> for Tokenizer {
+    async fn execute(&self, text: String, _meta: TaskMetadata) -> Result<Vec<String>, TaskError> {
+        if text.is_empty() {
+            return Err(TaskError::executor("empty input"));
+        }
+        Ok(text.split_whitespace().map(str::to_owned).collect())
     }
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    // 1. Load scheduler config (could be JSON or YAML).
-    let cfg_bytes = fs::read("scheduler-config.json")?;
-    let sched_cfg: SchedulerConfig = serde_json::from_slice(&cfg_bytes)?;
-
-    // 2. Choose context (Postgres vs Embedded).
-    let ctx = QueueBuilderContext::Embedded;
-
-    // 3. Build pools – in this example, all use the same executor type.
-    let pools = build_pools_from_scheduler_config::<LlmJob, String, LlmExecutor, TokioSpawner>(
-        &sched_cfg,
-        &ctx,
-        None,                           // no DB in embedded/in-memory mode
-        |_name| LlmExecutor,            // executor factory by pool name
-        TokioSpawner,
-    );
-
-    let pool = pools.pools.get("tauri_local_llm").expect("pool not found");
-
-    // 4. Submit a job.
-    let meta = TaskMetadata {
-        id: prometheus_parking_lot::TaskId(1),
-        priority: Priority::High,
-        cost: ResourceCost { kind: ResourceKind::GpuVram, units: 4 },
-        created_at_ms: 0,
+fn meta(cpu_units: u32) -> TaskMetadata {
+    TaskMetadata {
+        id: 0,
+        mailbox: None,
+        priority: Priority::Normal,
+        cost: ResourceCost::new(ResourceKind::Cpu, cpu_units),
         deadline_ms: None,
-        mailbox: Some(MailboxKey {
-            tenant: TenantId("tenant-1".into()),
-            user_id: Some("user-123".into()),
-            session_id: None,
-        }),
-    };
+        created_at_ms: now_ms(),
+        idempotency_key: None,
+        sequence: 0, // the pool stamps the submission order
+    }
+}
 
-    let job = LlmJob {
-        model: "llama-3.1-8b".into(),
-        prompt: "Hello from local pool".into(),
-        max_tokens: 256,
-    };
+fn main() -> Result<(), SchedulerError> {
+    let pool = WorkerPool::new(
+        WorkerPoolConfig::new()
+            .with_worker_count(2)
+            .with_max_units(8)
+            .with_max_queue_depth(16)
+            .with_timeout_ms(5_000), // execution budget per task
+        Tokenizer,
+    )?;
 
-    let _enqueue = pool.submit(ScheduledTask { meta, payload: job }).await;
+    // Submit, then wait up to five seconds for the result.
+    let key = pool.submit("the quick brown fox".to_owned(), meta(2))?;
+    let words = pool.retrieve(&key, Duration::from_secs(5))?;
+    assert_eq!(words, ["the", "quick", "brown", "fox"]);
 
+    // The executor's error reaches the caller.
+    let key = pool.submit(String::new(), meta(1))?;
+    let err = pool.retrieve(&key, Duration::from_secs(5)).unwrap_err();
+    assert!(matches!(err, SchedulerError::Task(TaskError::Executor { .. })));
+
+    // A task costing more than the pool's 8 units could never start.
+    let err = pool.submit("too big".to_owned(), meta(9)).unwrap_err();
+    assert!(matches!(err, SchedulerError::CapacityExceeded { .. }));
+
+    println!("{:?}", pool.stats());
+    pool.shutdown();
     Ok(())
 }
 ```
 
----
+From async code, use `submit_async` and `retrieve_async`; they take the same
+arguments.
 
-## Use cases
+## Example: `ResourcePool` with a mailbox
 
-### 0. LLM Inference (candle-vllm pattern)
+Four GPU units and three tasks of two units each: two run, the third parks
+until one finishes. Each outcome is delivered to the mailbox under the task's
+`MailboxKey`, and the caller collects it afterwards, as a client that
+reconnects would.
 
-The `WorkerPool` is designed specifically for LLM inference workloads like **candle-vllm**:
+The pool owns its mailbox, so this example wraps the in-memory mailbox in a
+shared handle. The gate only makes the example deterministic: it holds the
+executors while the example inspects the pool.
 
 ```rust
-use prometheus_parking_lot::core::{WorkerPool, WorkerExecutor, TaskMetadata};
-use prometheus_parking_lot::config::WorkerPoolConfig;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
-// candle-vllm just needs to implement WorkerExecutor
+use async_trait::async_trait;
+use prometheus_parking_lot::core::{
+    Mailbox, PoolLimits, ResourcePool, ScheduledTask, SchedulerError, TaskError, TaskExecutor,
+    TaskMetadata, TaskStatus,
+};
+use prometheus_parking_lot::infra::{InMemoryMailbox, InMemoryQueue};
+use prometheus_parking_lot::runtime::TokioSpawner;
+use prometheus_parking_lot::util::{MailboxKey, Priority, ResourceCost, ResourceKind, now_ms};
+use tokio::sync::Semaphore;
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct Prompt {
+    text: String,
+}
+
+/// Upper-cases the prompt once the gate lets it through.
 #[derive(Clone)]
-pub struct LlmExecutor {
-    pipeline: Arc<Pipeline>,
-    cache_engine: Arc<CacheEngine>,
+struct Shout {
+    gate: Arc<Semaphore>,
 }
 
 #[async_trait]
-impl WorkerExecutor<InferenceJob, InferenceResult> for LlmExecutor {
-    async fn execute(&self, job: InferenceJob, _meta: TaskMetadata) -> InferenceResult {
-        // This runs in a DEDICATED WORKER THREAD, not blocking tokio!
-        if job.is_streaming {
-            let (tx, rx) = flume::unbounded();
-            // Streaming generation...
-            InferenceResult::Streaming { rx }  // Can return non-serializable channels!
-        } else {
-            InferenceResult::Completion { text: self.generate(&job) }
-        }
+impl TaskExecutor<Prompt, String> for Shout {
+    async fn execute(&self, job: Prompt, _meta: TaskMetadata) -> Result<String, TaskError> {
+        let _pass = self.gate.acquire().await.map_err(TaskError::executor)?;
+        Ok(job.text.to_uppercase())
     }
 }
 
-// At server startup - create ONE pool
-let pool = WorkerPool::new(
-    WorkerPoolConfig::new()
-        .with_worker_count(4)          // 4 inference workers
-        .with_max_queue_depth(1000),   // Queue up to 1000 requests
-    llm_executor,
-)?;
+/// One in-memory mailbox shared by the pool (which delivers) and the caller
+/// (which collects).
+#[derive(Clone, Default)]
+struct SharedMailbox(Arc<Mutex<InMemoryMailbox<String>>>);
 
-// In your HTTP handler - NO thread management needed!
-async fn handle_completion(pool: &WorkerPool<...>, request: Request) -> Response {
-    let job = InferenceJob::from(request);
-    let meta = TaskMetadata::new(request.id, ResourceCost::gpu_vram(100));
-    
-    let key = pool.submit_async(job, meta).await?;
-    let result = pool.retrieve_async(&key, Duration::from_secs(120)).await?;
-    
-    Response::from(result)
+impl Mailbox<String> for SharedMailbox {
+    fn deliver(
+        &mut self,
+        key: &MailboxKey,
+        status: TaskStatus,
+        payload: Option<String>,
+    ) -> Result<(), SchedulerError> {
+        self.0.lock().expect("mailbox lock").deliver(key, status, payload)
+    }
+}
+
+impl SharedMailbox {
+    /// Wait (up to five seconds) for the outcome under `key` and take it.
+    async fn collect(&self, key: &MailboxKey) -> (TaskStatus, Option<String>) {
+        for _ in 0..500 {
+            let outcome = self.0.lock().expect("mailbox lock").consume(key).expect("consume");
+            if let Some(outcome) = outcome {
+                return outcome;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        panic!("no outcome for {key:?}");
+    }
+}
+
+fn session(id: &str) -> MailboxKey {
+    MailboxKey {
+        tenant: "acme".into(),
+        user_id: Some("user-1".into()),
+        session_id: Some(id.into()),
+    }
+}
+
+fn task(id: u64, gpu_units: u32, key: &MailboxKey, text: &str) -> ScheduledTask<Prompt> {
+    ScheduledTask {
+        meta: TaskMetadata {
+            id,
+            mailbox: Some(key.clone()),
+            priority: Priority::Normal,
+            cost: ResourceCost::new(ResourceKind::GpuVram, gpu_units),
+            deadline_ms: None,
+            created_at_ms: now_ms(),
+            idempotency_key: None,
+            sequence: 0, // the pool stamps the submission order
+        },
+        payload: Prompt { text: text.into() },
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), SchedulerError> {
+    let gate = Arc::new(Semaphore::new(0));
+    let mailbox = SharedMailbox::default();
+    let pool = ResourcePool::new(
+        PoolLimits {
+            max_units: 4,
+            max_queue_depth: 16,
+            default_timeout: Duration::from_secs(30), // execution budget per task
+        },
+        InMemoryQueue::new(16),
+        mailbox.clone(),
+        Shout { gate: Arc::clone(&gate) },
+        TokioSpawner::new(tokio::runtime::Handle::current()),
+    );
+
+    let keys = [session("a"), session("b"), session("c")];
+    let mut statuses = Vec::new();
+    for (id, key) in (1..).zip(&keys) {
+        statuses.push(pool.submit(task(id, 2, key, "hello")).await?);
+    }
+    assert_eq!(
+        statuses,
+        [TaskStatus::Running, TaskStatus::Running, TaskStatus::Queued]
+    );
+    assert_eq!(
+        (pool.active_units(), pool.running_tasks(), pool.queued_tasks()),
+        (4, 2, 1)
+    );
+
+    // A task costing more than the pool's 4 units is rejected, not parked.
+    let err = pool.submit(task(4, 5, &session("d"), "huge")).await.unwrap_err();
+    assert!(matches!(err, SchedulerError::CapacityExceeded { .. }));
+
+    // Let the executors finish. The parked task starts when units free up.
+    gate.add_permits(keys.len());
+    for key in &keys {
+        let (status, value) = mailbox.collect(key).await;
+        assert_eq!(status, TaskStatus::Completed);
+        assert_eq!(value.as_deref(), Some("HELLO"));
+    }
+    assert_eq!(pool.active_units(), 0);
+    Ok(())
 }
 ```
 
-**Why this matters for candle-vllm:**
-- CPU/GPU inference runs in dedicated threads, not blocking the async HTTP server
-- Streaming results can include channels (no serialization requirement)
-- The library handles ALL thread management - clients write zero thread code
-- Same code works on native (OS threads) and WASM (web workers)
+A failed task is delivered as `TaskStatus::Failed(TaskError)` with no payload.
+A task with `mailbox: None` runs, but its outcome is not stored.
 
-### 1. Local / Tauri / desktop agents
+## Configuration
 
-- **Queue backend:** Yaque or InMemory for embedded queueing.
-- **Mailbox:** `InMemoryMailbox<T>` or a small embedded DB for persistence.
-- **Capacity:** defined in terms of:
-  - GPU units (VRAM).
-  - CPU slots.
-- Great for local LLMs running in Prometheus Studio / Tauri shells.
-
-### 2. Cloud AI gateways (GPU-backed)
-
-- **Queue backend:** `postgres_pgmq` or `postgres_custom`.
-- **Mailbox:** Postgres-backed with REST notifier to your gateway.
-- **Capacity:** defined in terms of:
-  - GPU VRAM units (model + KV cache).
-  - CPU-based cost model for heavy tasks.
-- Great for multi-tenant inference gateways and agent farms.
-
-### 3. Web apps with web workers
-
-- **Queue backend on server:** Postgres or pgmq.
-- **On the client (if needed):** an embedded queue (future IndexedDB/PGlite backend).
-- **Capacity:** number of web workers or per-tenant rate limits.
-- Nice fit for browser-based AI apps backed by Prometheus.
-
----
-
-## Design notes
-
-- **Clean architecture:** core scheduling logic is completely independent of queue/mailbox technologies and runtimes.
-- **Testable:** `ResourcePool` uses traits (`TaskQueue`, `Mailbox`, `Spawn`) and can be tested with in-memory fakes.
-- **Config-driven:** behavior is controlled by `SchedulerConfig` so you can change backends and capacity without recompiling.
-- **Extensible:**
-  - Add new queue backends by implementing `TaskQueue<P>`.
-  - Add new mailbox storages by implementing `MailboxStorage<T>`.
-  - Add new notifiers by implementing `MailboxNotifier<T>`.
-  - Add new runtimes by implementing `Spawn` (web workers, WASM, etc.).
-
----
-
-## Status
-
-🚧 **Version 1.0 in Development** - This library is following a phased implementation plan with clean architecture principles.
-
-See the [docs/](docs/) directory for detailed specifications and implementation plans.
-
----
+`config::SchedulerConfig::from_json_str` parses and validates a JSON file of
+named pools (limits plus the kind of queue, mailbox and runtime), and
+`builders::build_pools` turns it into `ResourcePool`s from factories you
+supply. See
+[`examples/configs/scheduler-config.json`](examples/configs/scheduler-config.json).
 
 ## Documentation
 
-For comprehensive documentation, see:
-
-- [DESIGN.md](docs/DESIGN.md) - Architecture and design decisions
-- [IMPLEMENTATION.md](docs/IMPLEMENTATION.md) - Implementation roadmap
-- [API.md](docs/API.md) - Detailed API documentation
-- [CHANGELOG.md](docs/CHANGELOG.md) - Version history
-
----
+- [docs/API.md](docs/API.md): map of the public API by module and feature.
+- [docs/adr/](docs/adr/): design decisions (workspace split, core contracts,
+  backend contracts).
+- [CHANGELOG.md](CHANGELOG.md): what changed, with migration notes.
+- [docs/README.md](docs/README.md): index of the rest.
+- Rustdoc: `cargo doc --workspace --no-deps --all-features --open`.
 
 ## License
 
-Licensed under the MIT license ([LICENSE-MIT](LICENSE-MIT)).
-
----
-
-*This README describes a version 1 structure meant to be minimal but immediately useful, safe and explicit in its abstractions, and ready to be integrated into the Prometheus AI platform as the standard scheduling layer for agent workloads.*
+MIT ([LICENSE-MIT](LICENSE-MIT)).

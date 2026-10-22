@@ -79,6 +79,11 @@
 #![warn(clippy::pedantic)]
 #![warn(clippy::nursery)]
 
+// Every Rust example in README.md runs as a doctest of this crate (cr-16).
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+mod readme_doctests {}
+
 /// Builders to construct scheduler components from configuration.
 #[cfg(feature = "tokio-runtime")]
 pub mod builders;
