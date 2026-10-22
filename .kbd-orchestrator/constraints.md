@@ -48,6 +48,16 @@ constraints:
     description: 'No hardcoded API keys, tokens, passwords, or DB URLs with credentials in source'
     check: "grep -rnE 'sk-[A-Za-z0-9]|postgres://[^:\"]+:[^@\"]+@|Bearer [A-Za-z0-9]{16,}' src/"
 
+  - id: no-tracked-tool-credentials
+    severity: blocking
+    description: 'No agent-tool runtime state or credentials tracked in git (see Path Ownership)'
+    check: "git ls-files .codex/auth.json .codex/config.toml .codex/history.jsonl .codex/version.json .codex/sessions .serena '*.env'"
+
+  - id: package-allowlist
+    severity: blocking
+    description: 'cargo package ships only allowlisted paths (CR-15 include allowlist)'
+    command: 'cargo package --list --allow-dirty'
+
   - id: supply-chain-clean
     severity: blocking
     description: 'cargo-deny advisories/licenses/bans pass (deny.toml) — mirrors CI'
@@ -84,18 +94,46 @@ constraints:
 
   - id: msrv-respected
     severity: warning
-    description: 'No features newer than rust-version 1.91.1 (CI tests MSRV)'
+    description: 'No features newer than rust-version 1.95 (CI tests MSRV 1.95 and pinned 1.99.1)'
 ```
 
 ---
 
 ## Path Ownership
 
-- `.kbd-orchestrator/`, `openspec/`, `.claude/`, `.agents/`, `.kimi-code/`,
-  `.opencode/`, `.codex/`, `.cursor/`, `.roo/`, `.specify/` are tracked tooling
-  state — do not delete as disposable. They are excluded from the published
-  package via `Cargo.toml` `exclude` where applicable.
-- `specs/001-parking-system-build/` is historical spec-kit output; read-only reference.
+- Project-owned agent definitions and specs are tracked and must not be deleted as
+  disposable: `.kbd-orchestrator/`, `openspec/`, `.agent-team/` (except `state.json`),
+  `.claude/` (agents, rules, hooks, skills, commands, settings.json), `.agents/`,
+  `.kimi-code/`, `.opencode/`, `.minimax/`, `.dsh/`, `.codex/agents/`, `.prometheus/`
+  (except `recovery/`).
+- Agent-tool **runtime state and credentials are never tracked**: `.codex/auth.json`,
+  `.codex/config.toml`, `.codex/history.jsonl`, `.codex/version.json`,
+  `.codex/sessions/`, `.serena/`, any `*.env`. They are gitignored; committing one is a
+  blocking violation (amended 2026-10-22 after `.codex/auth.json` with an
+  `OPENAI_API_KEY` was found tracked in this public repo — CR-15 rotates and purges it).
+- None of the above ships to crates.io: packaging moves from an `exclude` list to an
+  `include` allowlist (CR-15). Until then the old claim that `.codex/` is excluded was
+  false.
+- Legacy spec-kit/Cursor/Roo material (`specs/001-parking-system-build/`, `.specify/`,
+  `.codex/prompts/speckit.*`, `.cursor/`, `.roo/`) is superseded by OpenSpec + KBD;
+  read-only until CR-16 archives it.
+
+## Phase decisions (operator, 2026-10-22)
+
+- Correctness over compatibility: breaking public-API changes are accepted and ship as
+  `0.3.0`. CI may stay red until the M0 build baseline (`cr-41`) lands. For changes merged
+  before `cr-41` only (`cr-15`, `cr-17` — no Rust source edits), the blocking build-passes,
+  clippy-clean, tests-pass, fmt-clean and docs-build constraints are waived; every other
+  blocking constraint applies, and no gate is waived for any later change.
+- Release: 0.3.0 is the first crates.io publication. Publishing (cr-52) runs only after the
+  phase boundary packet passes and the operator approves, via crates.io trusted publishing.
+  Published package names are `prometheus-parking-lot-*` (crates.io treats `-`/`_` alike;
+  `parking-lot-core` belongs to the parking_lot project).
+- Toolchain: pinned stable Rust **1.99.1** in `rust-toolchain.toml`; `rust-version`
+  (MSRV) **1.95**; edition **2024**. Constraint commands below run on that toolchain.
+- The pgmq Rust client crate is dropped; the pgmq backend talks to the pgmq extension
+  through SQL with `sqlx`. Postgres tests run against a project Postgres 18 image
+  modelled on flint-forge's `images/postgres18/Dockerfile`.
 
 ---
 
