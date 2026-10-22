@@ -1,6 +1,14 @@
 [alias]
-fmt = "fmt --all"
-clippy = "clippy --all-targets --all-features -- -D warnings"
+# `fmt` and `clippy` are external subcommands; aliasing them to themselves is a
+# recursive alias, so the old entries made `cargo clippy` / `cargo fmt` error out
+# without running. Canonical per-role loops (docs/build-performance.md): keep one
+# feature set per worktree so artifacts are reused instead of rebuilt.
+ck = "check --all-targets"
+lint = "clippy --all-targets -- -D warnings"
+t = "nextest run"
+ck-pg = "check --all-targets --features postgres"
+lint-pg = "clippy --all-targets --features postgres -- -D warnings"
+t-pg = "nextest run --features postgres"
 
 [build]
 target-dir = "target"
