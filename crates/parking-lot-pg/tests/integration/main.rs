@@ -1,131 +1,87 @@
-//! Integration test infrastructure for Postgres backends.
+//! Integration tests for the Postgres backends (queue and mailbox).
 //!
-//! This module provides test utilities for running integration tests against
-//! a real Postgres database using testcontainers.
-
-#![cfg(feature = "postgres")]
+//! One test target (`--test integration`): Cargo auto-discovers
+//! `tests/integration/main.rs` and the modules below are its siblings (cr-35).
+//!
+//! These need Docker, so every test is `#[ignore]`d; they compile in CI and run
+//! with:
+//!
+//! ```text
+//! cargo test -p prometheus-parking-lot-pg --test integration -- --ignored
+//! ```
+//!
+//! Containers come from the cr-43 helper (`tests/support`), which builds or
+//! reuses the `parking-lot-pg:<major>` image.
 
 use sea_orm::{Database, DatabaseConnection};
-use std::time::Duration;
-use testcontainers::{clients::Cli, core::WaitFor, Container, Image, RunnableImage};
-use testcontainers_modules::postgres::Postgres;
 
-pub mod postgres_queue_test;
-pub mod postgres_mailbox_test;
+#[path = "../support/mod.rs"]
+mod support;
 
-/// Custom Postgres image with our initialization SQL.
-#[derive(Debug, Default, Clone)]
-pub struct CustomPostgres {
-    inner: Postgres,
+mod postgres_mailbox_test;
+mod postgres_queue_test;
+
+use support::{PgContainer, TestResult};
+
+/// Postgres major version the suites run against. The 17/18 matrix is cr-36.
+const PG_MAJOR: u8 = 18;
+
+/// Runs a synchronous backend call (the `TaskQueue` and `Mailbox` contracts are
+/// synchronous and bridge onto async `SeaORM` with `Handle::block_on`) from an
+/// async test without panicking inside the runtime. Tests using it must be
+/// `flavor = "multi_thread"`.
+macro_rules! blocking {
+    ($call:expr) => {
+        ::tokio::task::block_in_place(|| $call)
+    };
+}
+pub(crate) use blocking;
+
+/// A running Postgres container with the queue and mailbox tables created.
+pub(crate) struct PostgresTestFixture {
+    // Held so the container is removed on drop.
+    _pg: PgContainer,
+    pub(crate) db: DatabaseConnection,
 }
 
-impl Image for CustomPostgres {
-    type Args = <Postgres as Image>::Args;
+impl PostgresTestFixture {
+    /// Start a container, run the table migrations and open a `SeaORM` connection.
+    pub(crate) async fn new() -> TestResult<Self> {
+        let pg = PgContainer::start(PG_MAJOR).await?;
 
-    fn name(&self) -> String {
-        self.inner.name()
-    }
+        for migration in [
+            include_str!("../../migrations/001_create_queue_table.sql"),
+            include_str!("../../migrations/002_create_mailbox_table.sql"),
+        ] {
+            sqlx::raw_sql(migration).execute(&pg.pool).await?;
+        }
 
-    fn tag(&self) -> String {
-        self.inner.tag()
-    }
-
-    fn ready_conditions(&self) -> Vec<WaitFor> {
-        self.inner.ready_conditions()
-    }
-
-    fn env_vars(&self) -> Box<dyn Iterator<Item = (&String, &String)> + '_> {
-        self.inner.env_vars()
-    }
-}
-
-/// Test fixture that manages a Postgres container and database connection.
-pub struct PostgresTestFixture<'a> {
-    _container: Container<'a, CustomPostgres>,
-    pub db: DatabaseConnection,
-}
-
-impl<'a> PostgresTestFixture<'a> {
-    /// Create a new test fixture with a running Postgres container.
-    pub async fn new(docker: &'a Cli) -> Result<Self, Box<dyn std::error::Error>> {
-        // Start Postgres container
-        let postgres_image = CustomPostgres::default();
-        let runnable = RunnableImage::from(postgres_image)
-            .with_tag("17-alpine");
-        
-        let container = docker.run(runnable);
-        
-        // Wait a bit for container to be fully ready
-        tokio::time::sleep(Duration::from_secs(2)).await;
-
-        // Get connection info
-        let port = container.get_host_port_ipv4(5432);
-        let connection_string = format!(
-            "postgresql://postgres:postgres@127.0.0.1:{}/postgres",
-            port
-        );
-
-        // Connect to database
-        let db = Database::connect(&connection_string).await?;
-
-        // Run migrations
-        Self::run_migrations(&db).await?;
-
-        Ok(Self {
-            _container: container,
-            db,
-        })
-    }
-
-    /// Run migration SQL to create tables.
-    async fn run_migrations(db: &DatabaseConnection) -> Result<(), Box<dyn std::error::Error>> {
-        use sea_orm::Statement;
-
-        // Create queue table
-        let queue_migration = include_str!("../../migrations/001_create_queue_table.sql");
-        db.execute(Statement::from_string(
-            sea_orm::DatabaseBackend::Postgres,
-            queue_migration.to_string(),
-        ))
-        .await?;
-
-        // Create mailbox table
-        let mailbox_migration = include_str!("../../migrations/002_create_mailbox_table.sql");
-        db.execute(Statement::from_string(
-            sea_orm::DatabaseBackend::Postgres,
-            mailbox_migration.to_string(),
-        ))
-        .await?;
-
-        Ok(())
-    }
-
-    /// Clean up all test data from tables.
-    pub async fn cleanup(&self) -> Result<(), Box<dyn std::error::Error>> {
-        use sea_orm::Statement;
-
-        self.db.execute(Statement::from_string(
-            sea_orm::DatabaseBackend::Postgres,
-            "TRUNCATE TABLE pl_queue_jobs, pl_mailbox_messages RESTART IDENTITY".to_string(),
-        ))
-        .await?;
-
-        Ok(())
+        let db = Database::connect(pg.url.as_str()).await?;
+        Ok(Self { _pg: pg, db })
     }
 }
 
-/// Helper to create a test payload for queue tests.
+/// Test payload for queue and mailbox tests.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
-pub struct TestPayload {
-    pub id: u64,
-    pub data: String,
+pub(crate) struct TestPayload {
+    pub(crate) id: u64,
+    pub(crate) data: String,
 }
 
 impl TestPayload {
-    pub fn new(id: u64, data: impl Into<String>) -> Self {
+    pub(crate) fn new(id: u64, data: impl Into<String>) -> Self {
         Self {
             id,
             data: data.into(),
         }
     }
+}
+
+/// Await every handle in order (a stand-in for `futures::future::join_all`).
+pub(crate) async fn join_all<T>(handles: Vec<tokio::task::JoinHandle<T>>) -> Vec<Result<T, tokio::task::JoinError>> {
+    let mut out = Vec::with_capacity(handles.len());
+    for handle in handles {
+        out.push(handle.await);
+    }
+    out
 }

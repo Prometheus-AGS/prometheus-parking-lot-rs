@@ -1,14 +1,9 @@
 //! Integration tests for PostgresMailbox implementation.
 
-#![cfg(feature = "postgres")]
+use prometheus_parking_lot_core::{Mailbox, MailboxKey, TaskError, TaskStatus, now_ms};
+use prometheus_parking_lot_pg::PostgresMailbox;
 
-use prometheus_parking_lot::core::{Mailbox, TaskStatus};
-use prometheus_parking_lot::infra::mailbox::postgres::PostgresMailbox;
-use prometheus_parking_lot::util::clock::now_ms;
-use prometheus_parking_lot::util::serde::MailboxKey;
-use testcontainers::clients::Cli;
-
-use super::{PostgresTestFixture, TestPayload};
+use super::{PostgresTestFixture, TestPayload, blocking};
 
 fn make_key(tenant: &str, user_id: Option<&str>, session_id: Option<&str>) -> MailboxKey {
     MailboxKey {
@@ -18,10 +13,10 @@ fn make_key(tenant: &str, user_id: Option<&str>, session_id: Option<&str>) -> Ma
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs Docker: starts a parking-lot-pg container; run with `cargo test -p prometheus-parking-lot-pg -- --ignored`"]
 async fn test_postgres_mailbox_deliver_and_fetch() {
-    let docker = Cli::default();
-    let fixture = PostgresTestFixture::new(&docker)
+    let fixture = PostgresTestFixture::new()
         .await
         .expect("Failed to create test fixture");
 
@@ -30,8 +25,8 @@ async fn test_postgres_mailbox_deliver_and_fetch() {
 
     // Deliver a message
     let payload = TestPayload::new(1, "result-1");
-    mailbox
-        .deliver(&key, TaskStatus::Completed, Some(payload.clone()))
+    blocking!(mailbox
+        .deliver(&key, TaskStatus::Completed, Some(payload.clone())))
         .expect("deliver failed");
 
     // Fetch messages
@@ -45,10 +40,10 @@ async fn test_postgres_mailbox_deliver_and_fetch() {
     assert_eq!(messages[0].status, "Completed");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs Docker: starts a parking-lot-pg container; run with `cargo test -p prometheus-parking-lot-pg -- --ignored`"]
 async fn test_postgres_mailbox_fetch_by_key() {
-    let docker = Cli::default();
-    let fixture = PostgresTestFixture::new(&docker)
+    let fixture = PostgresTestFixture::new()
         .await
         .expect("Failed to create test fixture");
 
@@ -59,9 +54,9 @@ async fn test_postgres_mailbox_fetch_by_key() {
     let key2 = make_key("tenant1", Some("user2"), None);
     let key3 = make_key("tenant2", Some("user1"), None);
 
-    mailbox.deliver(&key1, TaskStatus::Completed, Some(TestPayload::new(1, "t1-u1"))).expect("deliver failed");
-    mailbox.deliver(&key2, TaskStatus::Completed, Some(TestPayload::new(2, "t1-u2"))).expect("deliver failed");
-    mailbox.deliver(&key3, TaskStatus::Completed, Some(TestPayload::new(3, "t2-u1"))).expect("deliver failed");
+    blocking!(mailbox.deliver(&key1, TaskStatus::Completed, Some(TestPayload::new(1, "t1-u1")))).expect("deliver failed");
+    blocking!(mailbox.deliver(&key2, TaskStatus::Completed, Some(TestPayload::new(2, "t1-u2")))).expect("deliver failed");
+    blocking!(mailbox.deliver(&key3, TaskStatus::Completed, Some(TestPayload::new(3, "t2-u1")))).expect("deliver failed");
 
     // Fetch for key1 should only return its messages
     let messages1 = mailbox.fetch(&key1, None, 10).await.expect("fetch failed");
@@ -79,10 +74,10 @@ async fn test_postgres_mailbox_fetch_by_key() {
     assert_eq!(messages3[0].payload.as_ref().unwrap().id, 3);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs Docker: starts a parking-lot-pg container; run with `cargo test -p prometheus-parking-lot-pg -- --ignored`"]
 async fn test_postgres_mailbox_fetch_since_timestamp() {
-    let docker = Cli::default();
-    let fixture = PostgresTestFixture::new(&docker)
+    let fixture = PostgresTestFixture::new()
         .await
         .expect("Failed to create test fixture");
 
@@ -90,14 +85,14 @@ async fn test_postgres_mailbox_fetch_since_timestamp() {
     let key = make_key("tenant1", Some("user1"), None);
 
     // Deliver messages at different times
-    mailbox.deliver(&key, TaskStatus::Completed, Some(TestPayload::new(1, "msg1"))).expect("deliver failed");
+    blocking!(mailbox.deliver(&key, TaskStatus::Completed, Some(TestPayload::new(1, "msg1")))).expect("deliver failed");
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     
     let timestamp_between = now_ms();
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     
-    mailbox.deliver(&key, TaskStatus::Completed, Some(TestPayload::new(2, "msg2"))).expect("deliver failed");
-    mailbox.deliver(&key, TaskStatus::Completed, Some(TestPayload::new(3, "msg3"))).expect("deliver failed");
+    blocking!(mailbox.deliver(&key, TaskStatus::Completed, Some(TestPayload::new(2, "msg2")))).expect("deliver failed");
+    blocking!(mailbox.deliver(&key, TaskStatus::Completed, Some(TestPayload::new(3, "msg3")))).expect("deliver failed");
 
     // Fetch all messages
     let all_messages = mailbox.fetch(&key, None, 10).await.expect("fetch failed");
@@ -109,10 +104,10 @@ async fn test_postgres_mailbox_fetch_since_timestamp() {
     assert!(recent_messages.iter().all(|m| m.payload.as_ref().unwrap().id >= 2));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs Docker: starts a parking-lot-pg container; run with `cargo test -p prometheus-parking-lot-pg -- --ignored`"]
 async fn test_postgres_mailbox_multiple_messages_ordering() {
-    let docker = Cli::default();
-    let fixture = PostgresTestFixture::new(&docker)
+    let fixture = PostgresTestFixture::new()
         .await
         .expect("Failed to create test fixture");
 
@@ -121,8 +116,8 @@ async fn test_postgres_mailbox_multiple_messages_ordering() {
 
     // Deliver multiple messages
     for i in 1..=5 {
-        mailbox
-            .deliver(&key, TaskStatus::Completed, Some(TestPayload::new(i, format!("msg{}", i))))
+        blocking!(mailbox
+            .deliver(&key, TaskStatus::Completed, Some(TestPayload::new(i, format!("msg{}", i)))))
             .expect("deliver failed");
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
@@ -136,10 +131,10 @@ async fn test_postgres_mailbox_multiple_messages_ordering() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs Docker: starts a parking-lot-pg container; run with `cargo test -p prometheus-parking-lot-pg -- --ignored`"]
 async fn test_postgres_mailbox_fetch_with_limit() {
-    let docker = Cli::default();
-    let fixture = PostgresTestFixture::new(&docker)
+    let fixture = PostgresTestFixture::new()
         .await
         .expect("Failed to create test fixture");
 
@@ -148,8 +143,8 @@ async fn test_postgres_mailbox_fetch_with_limit() {
 
     // Deliver 10 messages
     for i in 1..=10 {
-        mailbox
-            .deliver(&key, TaskStatus::Completed, Some(TestPayload::new(i, format!("msg{}", i))))
+        blocking!(mailbox
+            .deliver(&key, TaskStatus::Completed, Some(TestPayload::new(i, format!("msg{}", i)))))
             .expect("deliver failed");
     }
 
@@ -161,10 +156,10 @@ async fn test_postgres_mailbox_fetch_with_limit() {
     assert_eq!(messages[2].payload.as_ref().unwrap().id, 3);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs Docker: starts a parking-lot-pg container; run with `cargo test -p prometheus-parking-lot-pg -- --ignored`"]
 async fn test_postgres_mailbox_prune_old_messages() {
-    let docker = Cli::default();
-    let fixture = PostgresTestFixture::new(&docker)
+    let fixture = PostgresTestFixture::new()
         .await
         .expect("Failed to create test fixture");
 
@@ -172,16 +167,16 @@ async fn test_postgres_mailbox_prune_old_messages() {
     let key = make_key("tenant1", Some("user1"), None);
 
     // Deliver old messages
-    mailbox.deliver(&key, TaskStatus::Completed, Some(TestPayload::new(1, "old1"))).expect("deliver failed");
-    mailbox.deliver(&key, TaskStatus::Completed, Some(TestPayload::new(2, "old2"))).expect("deliver failed");
+    blocking!(mailbox.deliver(&key, TaskStatus::Completed, Some(TestPayload::new(1, "old1")))).expect("deliver failed");
+    blocking!(mailbox.deliver(&key, TaskStatus::Completed, Some(TestPayload::new(2, "old2")))).expect("deliver failed");
     
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     let cutoff_time = now_ms();
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
     // Deliver new messages
-    mailbox.deliver(&key, TaskStatus::Completed, Some(TestPayload::new(3, "new1"))).expect("deliver failed");
-    mailbox.deliver(&key, TaskStatus::Completed, Some(TestPayload::new(4, "new2"))).expect("deliver failed");
+    blocking!(mailbox.deliver(&key, TaskStatus::Completed, Some(TestPayload::new(3, "new1")))).expect("deliver failed");
+    blocking!(mailbox.deliver(&key, TaskStatus::Completed, Some(TestPayload::new(4, "new2")))).expect("deliver failed");
 
     // Prune old messages
     let pruned = mailbox.prune_old(cutoff_time).await.expect("prune failed");
@@ -194,10 +189,10 @@ async fn test_postgres_mailbox_prune_old_messages() {
     assert_eq!(messages[1].payload.as_ref().unwrap().id, 4);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs Docker: starts a parking-lot-pg container; run with `cargo test -p prometheus-parking-lot-pg -- --ignored`"]
 async fn test_postgres_mailbox_different_statuses() {
-    let docker = Cli::default();
-    let fixture = PostgresTestFixture::new(&docker)
+    let fixture = PostgresTestFixture::new()
         .await
         .expect("Failed to create test fixture");
 
@@ -205,11 +200,11 @@ async fn test_postgres_mailbox_different_statuses() {
     let key = make_key("tenant1", Some("user1"), None);
 
     // Deliver messages with different statuses
-    mailbox.deliver(&key, TaskStatus::Queued, None::<TestPayload>).expect("deliver failed");
-    mailbox.deliver(&key, TaskStatus::Running, None::<TestPayload>).expect("deliver failed");
-    mailbox.deliver(&key, TaskStatus::Completed, Some(TestPayload::new(1, "result"))).expect("deliver failed");
-    mailbox.deliver(&key, TaskStatus::Failed(prometheus_parking_lot::core::TaskError::executor("error")), None::<TestPayload>).expect("deliver failed");
-    mailbox.deliver(&key, TaskStatus::Expired, None::<TestPayload>).expect("deliver failed");
+    blocking!(mailbox.deliver(&key, TaskStatus::Queued, None::<TestPayload>)).expect("deliver failed");
+    blocking!(mailbox.deliver(&key, TaskStatus::Running, None::<TestPayload>)).expect("deliver failed");
+    blocking!(mailbox.deliver(&key, TaskStatus::Completed, Some(TestPayload::new(1, "result")))).expect("deliver failed");
+    blocking!(mailbox.deliver(&key, TaskStatus::Failed(TaskError::executor("error")), None::<TestPayload>)).expect("deliver failed");
+    blocking!(mailbox.deliver(&key, TaskStatus::Expired, None::<TestPayload>)).expect("deliver failed");
 
     let messages = mailbox.fetch(&key, None, 10).await.expect("fetch failed");
     assert_eq!(messages.len(), 5);
@@ -221,10 +216,10 @@ async fn test_postgres_mailbox_different_statuses() {
     assert_eq!(messages[4].status, "Expired");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs Docker: starts a parking-lot-pg container; run with `cargo test -p prometheus-parking-lot-pg -- --ignored`"]
 async fn test_postgres_mailbox_session_isolation() {
-    let docker = Cli::default();
-    let fixture = PostgresTestFixture::new(&docker)
+    let fixture = PostgresTestFixture::new()
         .await
         .expect("Failed to create test fixture");
 
@@ -234,8 +229,8 @@ async fn test_postgres_mailbox_session_isolation() {
     let key1 = make_key("tenant1", Some("user1"), Some("session1"));
     let key2 = make_key("tenant1", Some("user1"), Some("session2"));
 
-    mailbox.deliver(&key1, TaskStatus::Completed, Some(TestPayload::new(1, "s1"))).expect("deliver failed");
-    mailbox.deliver(&key2, TaskStatus::Completed, Some(TestPayload::new(2, "s2"))).expect("deliver failed");
+    blocking!(mailbox.deliver(&key1, TaskStatus::Completed, Some(TestPayload::new(1, "s1")))).expect("deliver failed");
+    blocking!(mailbox.deliver(&key2, TaskStatus::Completed, Some(TestPayload::new(2, "s2")))).expect("deliver failed");
 
     // Each session should only see its own messages
     let messages1 = mailbox.fetch(&key1, None, 10).await.expect("fetch failed");
