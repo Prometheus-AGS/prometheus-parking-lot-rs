@@ -1,0 +1,536 @@
+//! The priority dispatcher: one owner for the parked queue and the
+//! unit-weighted semaphore.
+//!
+//! ## Protocol
+//!
+//! Every decision about parked work is made under one mutex (the *dispatch
+//! lock*), which guards the parked queue and the sequence counter:
+//!
+//! - **submit**: stamp the sequence, then either start the item (queue empty
+//!   and it fits), reject it (queue at depth), or park it and run the drain.
+//!   The depth check and the enqueue are one critical section, so the depth
+//!   limit holds exactly (no TOCTOU) and a park cannot interleave with a drain.
+//! - **drain**: while the head exists: an expired head is popped and reported;
+//!   a head that fits is popped and started; a head that does not fit stays
+//!   where it is and the drain stops. The head is never popped to be looked at
+//!   and pushed back (audit C4).
+//! - **complete**: return the finished item's permit *under the dispatch
+//!   lock*, then drain.
+//!
+//! The dispatcher never runs anything: started items come back to the caller
+//! as [`Grant`]s (item plus [`Permit`]) to spawn outside the lock.
+//!
+//! ## Capacity invariant
+//!
+//! Units are claimed only through [`UnitSemaphore::try_acquire`], whose CAS
+//! never moves the count past `max_units` (see `crate::semaphore`). A started
+//! item holds a [`Permit`] until it completes, so the units of all running
+//! items never exceed `max_units`.
+//!
+//! ## No lost wakeup
+//!
+//! Claim: when `complete` returns, no parked head that fits the free capacity
+//! is left parked. A parked item becomes startable only when units are
+//! returned (a `complete`) or when it reaches the head (a pop, or a park of a
+//! higher-priority item; both happen inside a drain-ending critical section).
+//! Both `complete` and the park branch of `submit` hold the dispatch lock while
+//! they change the state *and* while they drain, so these critical sections
+//! are totally ordered by the lock. Take any park P and any completion C:
+//!
+//! - P before C: the unlock at the end of P synchronizes-with C's lock, so C's
+//!   drain sees the parked item and the returned units.
+//! - C before P: C's release is sequenced before C's unlock, which
+//!   synchronizes-with P's lock; P's own drain therefore observes the returned
+//!   units (`try_acquire` reads the latest value in modification order that
+//!   happens-before it, or later).
+//!
+//! The happens-before edge is the mutex unlock → lock pair; it does not depend
+//! on the semaphore's own orderings. The `loom_wakeup` model checks this, and
+//! fails under `--cfg parking_lot_negative_control="s-2"`, which restores the
+//! shape of `main@90a6194`: the admission decision and the enqueue in separate
+//! critical sections, with no drain after the enqueue.
+
+use std::marker::PhantomData;
+
+use crate::contracts::SchedulerError;
+use crate::semaphore::sync::{Arc, Mutex};
+use crate::semaphore::{Permit, UnitSemaphore};
+
+use super::parked::{Parkable, ParkedQueue, PriorityQueue};
+
+/// An admitted item and the permit it runs under.
+#[derive(Debug)]
+pub struct Grant<T> {
+    /// The item to start.
+    pub item: T,
+    /// Its claim on the semaphore. Return it with
+    /// [`Dispatcher::complete`] when the item finishes.
+    pub permit: Permit,
+}
+
+/// What a dispatcher operation took off the parked queue.
+#[derive(Debug)]
+#[must_use = "started items must be spawned and expired items reported"]
+pub struct Dispatched<T> {
+    /// Items admitted, in dispatch order. The caller must start every one.
+    pub started: Vec<Grant<T>>,
+    /// Items whose deadline passed while parked. They never ran; the caller
+    /// reports them (for example `TaskStatus::Expired`).
+    pub expired: Vec<T>,
+}
+
+impl<T> Default for Dispatched<T> {
+    fn default() -> Self {
+        Self {
+            started: Vec::new(),
+            expired: Vec::new(),
+        }
+    }
+}
+
+impl<T> Dispatched<T> {
+    /// True when nothing was started or expired.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.started.is_empty() && self.expired.is_empty()
+    }
+}
+
+/// The result of an accepted submission.
+#[derive(Debug)]
+#[must_use = "started items must be spawned and expired items reported"]
+pub struct Admission<T> {
+    /// The sequence number stamped on the submitted item.
+    pub sequence: u64,
+    /// Whether the submitted item itself is among `dispatched.started`
+    /// (otherwise it is parked).
+    pub started: bool,
+    /// Everything the submission started or expired, including the
+    /// submitted item when it started.
+    pub dispatched: Dispatched<T>,
+}
+
+/// State guarded by the dispatch lock.
+#[derive(Debug)]
+struct State<Q> {
+    queue: Q,
+    /// Last sequence stamped; the next item gets `last_sequence + 1`, so the
+    /// first is 1 and 0 stays "unsequenced".
+    last_sequence: u64,
+}
+
+/// Priority dispatcher over a unit-weighted semaphore. See the module docs.
+#[derive(Debug)]
+pub struct Dispatcher<T, Q = PriorityQueue<T>> {
+    pool: String,
+    semaphore: Arc<UnitSemaphore>,
+    max_queue_depth: usize,
+    state: Mutex<State<Q>>,
+    _items: PhantomData<fn(T) -> T>,
+}
+
+impl<T: Parkable> Dispatcher<T, PriorityQueue<T>> {
+    /// A dispatcher with an in-memory parked queue.
+    pub fn in_memory(
+        pool: impl Into<String>,
+        semaphore: UnitSemaphore,
+        max_queue_depth: usize,
+    ) -> Self {
+        Self::new(pool, semaphore, max_queue_depth, PriorityQueue::new())
+    }
+
+    /// Remove and return every parked item (for shutdown), in no particular
+    /// order.
+    pub fn take_parked(&self) -> Vec<T> {
+        self.state.lock().queue.take_all()
+    }
+}
+
+impl<T, Q> Dispatcher<T, Q> {
+    /// A dispatcher named `pool` (used in errors) admitting through
+    /// `semaphore` and parking at most `max_queue_depth` items in `queue`.
+    pub fn new(
+        pool: impl Into<String>,
+        semaphore: UnitSemaphore,
+        max_queue_depth: usize,
+        queue: Q,
+    ) -> Self {
+        Self {
+            pool: pool.into(),
+            semaphore: Arc::new(semaphore),
+            max_queue_depth,
+            state: Mutex::new(State {
+                queue,
+                last_sequence: 0,
+            }),
+            _items: PhantomData,
+        }
+    }
+
+    /// Total units.
+    #[must_use]
+    pub fn max_units(&self) -> u32 {
+        self.semaphore.max_units()
+    }
+
+    /// Units held by started, not yet completed items.
+    #[must_use]
+    pub fn units_in_use(&self) -> u32 {
+        self.semaphore.units_in_use()
+    }
+
+    /// Started, not yet completed items.
+    #[must_use]
+    pub fn running(&self) -> u32 {
+        self.semaphore.permits_outstanding()
+    }
+}
+
+impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
+    /// Items currently parked.
+    #[must_use]
+    pub fn parked(&self) -> usize {
+        self.state.lock().queue.len()
+    }
+
+    /// Submit `item`: start it, park it, or reject it.
+    ///
+    /// The dispatcher stamps the item's sequence. The item starts at once only
+    /// when nothing is parked and it fits; otherwise it is parked, and the
+    /// drain that follows may start it (or other items) right away.
+    ///
+    /// # Errors
+    ///
+    /// - [`SchedulerError::CapacityExceeded`] when the item needs more units
+    ///   than the semaphore has in total (it could never start);
+    /// - [`SchedulerError::QueueFull`] when it must wait and `max_queue_depth`
+    ///   items are already parked;
+    /// - the parked queue's error when it cannot store the item.
+    ///
+    /// On error the item is dropped and nothing else changes (its sequence
+    /// number stays unused).
+    pub fn submit(&self, mut item: T, now_ms: u128) -> Result<Admission<T>, SchedulerError> {
+        let units = item.ticket().units;
+        if units > self.semaphore.max_units() {
+            return Err(SchedulerError::CapacityExceeded {
+                pool: self.pool.clone(),
+                requested: units,
+                available: self.semaphore.max_units(),
+            });
+        }
+
+        let mut state = self.state.lock();
+        state.last_sequence += 1;
+        let sequence = state.last_sequence;
+        item.set_sequence(sequence);
+
+        if state.queue.is_empty()
+            && let Some(permit) = UnitSemaphore::try_acquire(&self.semaphore, units)
+        {
+            drop(state);
+            return Ok(Admission {
+                sequence,
+                started: true,
+                dispatched: Dispatched {
+                    started: vec![Grant { item, permit }],
+                    expired: Vec::new(),
+                },
+            });
+        }
+
+        let depth = state.queue.len();
+        if depth >= self.max_queue_depth {
+            return Err(SchedulerError::queue_full(
+                self.pool.clone(),
+                depth,
+                self.max_queue_depth,
+            ));
+        }
+
+        #[cfg(parking_lot_negative_control = "s-2")]
+        {
+            // Negative control S-2 (main@90a6194): the admission decision and
+            // the enqueue are separate critical sections, and the enqueue does
+            // not drain. A completion between the two finds an empty queue,
+            // and the item is then parked with nothing left to wake it.
+            drop(state);
+            self.state.lock().queue.push(item)?;
+            return Ok(Admission {
+                sequence,
+                started: false,
+                dispatched: Dispatched::default(),
+            });
+        }
+
+        #[cfg(not(parking_lot_negative_control = "s-2"))]
+        {
+            state.queue.push(item)?;
+            let dispatched = self.drain_locked(&mut state, now_ms);
+            drop(state);
+            let started = dispatched
+                .started
+                .iter()
+                .any(|grant| grant.item.ticket().sequence == sequence);
+            Ok(Admission {
+                sequence,
+                started,
+                dispatched,
+            })
+        }
+    }
+
+    /// Return a finished item's permit and take whatever the freed capacity
+    /// admits.
+    ///
+    /// The permit is released under the dispatch lock; see the module docs
+    /// for why that rules out a lost wakeup.
+    pub fn complete(&self, permit: Permit, now_ms: u128) -> Dispatched<T> {
+        let mut state = self.state.lock();
+        drop(permit);
+        let dispatched = self.drain_locked(&mut state, now_ms);
+        drop(state);
+        dispatched
+    }
+
+    /// Run the drain on its own: start every head that fits and report
+    /// expired heads. Pools call it after anything that may unblock the head
+    /// outside `submit`/`complete` (for example a permit dropped by an
+    /// unwinding task).
+    pub fn poke(&self, now_ms: u128) -> Dispatched<T> {
+        let mut state = self.state.lock();
+        let dispatched = self.drain_locked(&mut state, now_ms);
+        drop(state);
+        dispatched
+    }
+
+    /// Remove parked items whose deadline passed at `now_ms`, then drain
+    /// (removing a head that did not fit can unblock the items behind it).
+    ///
+    /// # Errors
+    ///
+    /// The parked queue's error when pruning fails; nothing is drained then.
+    pub fn prune_expired(&self, now_ms: u128) -> Result<(usize, Dispatched<T>), SchedulerError> {
+        let mut state = self.state.lock();
+        let removed = state.queue.prune_expired(now_ms)?;
+        let dispatched = self.drain_locked(&mut state, now_ms);
+        drop(state);
+        Ok((removed, dispatched))
+    }
+
+    /// The drain. Callers hold the dispatch lock.
+    ///
+    /// Peek-then-pop: the head is removed only once it is known to be expired
+    /// or admitted, so a head that does not fit never leaves the queue.
+    fn drain_locked(&self, state: &mut State<Q>, now_ms: u128) -> Dispatched<T> {
+        let mut dispatched = Dispatched::default();
+        loop {
+            let ticket = match state.queue.head() {
+                Ok(Some(ticket)) => ticket,
+                Ok(None) => break,
+                Err(error) => {
+                    // Nothing was removed; the next submit/complete retries.
+                    tracing::error!(pool = %self.pool, %error, "parked queue head unreadable");
+                    break;
+                }
+            };
+            if ticket.is_expired(now_ms) {
+                if let Some(item) = state.queue.pop_head() {
+                    dispatched.expired.push(item);
+                }
+                continue;
+            }
+            let Some(permit) = UnitSemaphore::try_acquire(&self.semaphore, ticket.units) else {
+                break;
+            };
+            match state.queue.pop_head() {
+                Some(item) => dispatched.started.push(Grant { item, permit }),
+                None => break,
+            }
+        }
+        dispatched
+    }
+}
+
+#[cfg(all(test, not(parking_lot_loom)))]
+mod tests {
+    use super::super::parked::Ticket;
+    use super::*;
+    use crate::contracts::Priority;
+
+    #[derive(Debug)]
+    struct Item {
+        name: &'static str,
+        priority: Priority,
+        units: u32,
+        deadline_ms: Option<u128>,
+        sequence: u64,
+    }
+
+    const fn item(name: &'static str, priority: Priority, units: u32) -> Item {
+        Item {
+            name,
+            priority,
+            units,
+            deadline_ms: None,
+            sequence: 0,
+        }
+    }
+
+    impl Parkable for Item {
+        fn ticket(&self) -> Ticket {
+            Ticket {
+                priority: self.priority,
+                sequence: self.sequence,
+                units: self.units,
+                deadline_ms: self.deadline_ms,
+            }
+        }
+
+        fn set_sequence(&mut self, sequence: u64) {
+            self.sequence = sequence;
+        }
+    }
+
+    fn names(grants: &[Grant<Item>]) -> Vec<&'static str> {
+        grants.iter().map(|grant| grant.item.name).collect()
+    }
+
+    #[test]
+    fn starts_parks_and_wakes_in_priority_then_fifo_order() {
+        let dispatcher = Dispatcher::in_memory("test", UnitSemaphore::new(4), 8);
+        let first = dispatcher
+            .submit(item("first", Priority::Low, 4), 0)
+            .expect("accepted");
+        assert!(first.started);
+        let mut running = first.dispatched.started;
+
+        for (name, priority) in [
+            ("low", Priority::Low),
+            ("high-1", Priority::High),
+            ("high-2", Priority::High),
+        ] {
+            let admission = dispatcher
+                .submit(item(name, priority, 2), 0)
+                .expect("accepted");
+            assert!(!admission.started);
+            assert!(admission.dispatched.is_empty());
+        }
+        assert_eq!(dispatcher.parked(), 3);
+
+        let woken = dispatcher.complete(running.pop().expect("first").permit, 0);
+        assert_eq!(names(&woken.started), vec!["high-1", "high-2"]);
+        assert_eq!(dispatcher.units_in_use(), 4);
+        assert_eq!(dispatcher.parked(), 1);
+    }
+
+    #[test]
+    fn head_that_does_not_fit_blocks_and_stays_parked() {
+        let dispatcher = Dispatcher::in_memory("test", UnitSemaphore::new(4), 8);
+        let blocker = dispatcher
+            .submit(item("blocker", Priority::Normal, 2), 0)
+            .expect("ok");
+        let big = dispatcher
+            .submit(item("big", Priority::High, 4), 0)
+            .expect("ok");
+        assert!(!big.started);
+        // Strict order (skip-ahead is cr-20): the small task waits behind the
+        // big head even though it would fit.
+        let small = dispatcher
+            .submit(item("small", Priority::Low, 1), 0)
+            .expect("ok");
+        assert!(!small.started);
+        assert_eq!(dispatcher.parked(), 2);
+        let mut grants = blocker.dispatched.started;
+        let woken = dispatcher.complete(grants.pop().expect("blocker").permit, 0);
+        assert_eq!(names(&woken.started), vec!["big"]);
+    }
+
+    #[test]
+    fn depth_limit_and_oversized_items_are_rejected() {
+        let dispatcher = Dispatcher::in_memory("test", UnitSemaphore::new(2), 1);
+        let running = dispatcher
+            .submit(item("a", Priority::Normal, 2), 0)
+            .expect("ok");
+        let parked = dispatcher
+            .submit(item("b", Priority::Normal, 1), 0)
+            .expect("ok");
+        assert!(!parked.started);
+        assert!(matches!(
+            dispatcher.submit(item("c", Priority::Normal, 1), 0),
+            Err(SchedulerError::QueueFull { depth: 1, .. })
+        ));
+        assert!(matches!(
+            dispatcher.submit(item("d", Priority::Normal, 3), 0),
+            Err(SchedulerError::CapacityExceeded { requested: 3, .. })
+        ));
+        drop(running);
+    }
+
+    #[test]
+    fn expired_heads_are_reported_not_started() {
+        let dispatcher = Dispatcher::in_memory("test", UnitSemaphore::new(1), 8);
+        let running = dispatcher
+            .submit(item("a", Priority::Normal, 1), 0)
+            .expect("ok");
+        let mut late = item("late", Priority::High, 1);
+        late.deadline_ms = Some(5);
+        let _ = dispatcher.submit(late, 0).expect("ok");
+        let _ = dispatcher
+            .submit(item("b", Priority::Normal, 1), 0)
+            .expect("ok");
+        let mut grants = running.dispatched.started;
+        let woken = dispatcher.complete(grants.pop().expect("a").permit, 10);
+        assert_eq!(woken.expired.len(), 1);
+        assert_eq!(names(&woken.started), vec!["b"]);
+    }
+
+    /// Threads submit and complete concurrently; every accepted item runs
+    /// exactly once and capacity is never exceeded. Also the miri target for
+    /// the dispatcher's lock + atomics path.
+    #[test]
+    fn concurrent_submit_and_complete_lose_nothing() {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        const THREADS: u32 = 4;
+        let per_thread: u32 = if cfg!(miri) { 8 } else { 500 };
+        let dispatcher = std::sync::Arc::new(Dispatcher::in_memory(
+            "test",
+            UnitSemaphore::new(3),
+            usize::MAX,
+        ));
+        let held = std::sync::Arc::new(AtomicU32::new(0));
+        let ran = std::sync::Arc::new(AtomicU32::new(0));
+        let handles: Vec<_> = (0..THREADS)
+            .map(|thread| {
+                let dispatcher = std::sync::Arc::clone(&dispatcher);
+                let held = std::sync::Arc::clone(&held);
+                let ran = std::sync::Arc::clone(&ran);
+                std::thread::spawn(move || {
+                    let run = |grants: Vec<Grant<Item>>| {
+                        let mut pending = grants;
+                        while let Some(grant) = pending.pop() {
+                            let units = grant.item.units;
+                            let now = held.fetch_add(units, Ordering::SeqCst) + units;
+                            assert!(now <= 3, "held {now} of 3 units");
+                            held.fetch_sub(units, Ordering::SeqCst);
+                            ran.fetch_add(1, Ordering::SeqCst);
+                            pending.extend(dispatcher.complete(grant.permit, 0).started);
+                        }
+                    };
+                    for round in 0..per_thread {
+                        let units = 1 + (thread + round) % 3;
+                        let admission = dispatcher
+                            .submit(item("x", Priority::Normal, units), 0)
+                            .expect("unbounded queue accepts");
+                        run(admission.dispatched.started);
+                    }
+                })
+            })
+            .collect();
+        for handle in handles {
+            handle.join().expect("thread");
+        }
+        assert_eq!(ran.load(Ordering::SeqCst), THREADS * per_thread);
+        assert_eq!(dispatcher.parked(), 0);
+        assert_eq!(dispatcher.units_in_use(), 0);
+    }
+}
