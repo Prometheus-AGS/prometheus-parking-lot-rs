@@ -4,7 +4,9 @@
 //! contracts (the async lease queue and result mailbox backends implement, the
 //! in-process queue and mailbox, spawner, executors, task metadata, errors),
 //! lifecycle hooks and audit types, in-memory reference backends, and the
-//! worker pool configuration.
+//! worker pool configuration. With the `conformance` feature it also publishes
+//! the backend conformance suite (`conformance`, `lease_queue_conformance!`,
+//! `result_mailbox_conformance!`; ADR 0003).
 //!
 //! This crate performs no IO and depends on no async runtime, database or
 //! network crate, so it builds for every target the scheduler supports. Runtime
@@ -20,6 +22,8 @@ pub mod hooks;
 pub mod mailbox;
 pub mod semaphore;
 
+#[cfg(any(test, feature = "conformance"))]
+pub use contracts::conformance;
 pub use contracts::{
     AppResult, Clock, DeadLetter, Delivery, DeliveryOutcome, Enqueued, InMemoryLeaseQueue,
     InMemoryQueue, InMemoryResultMailbox, LeaseQueue, LeaseToken, LeasedTask, Mailbox,

@@ -15,6 +15,8 @@
 //!   contracts and the backends drop their synchronous implementations.
 
 pub mod clock;
+#[cfg(any(test, feature = "conformance"))]
+pub mod conformance;
 pub mod error;
 pub mod executor;
 pub mod lease_queue;
