@@ -1,0 +1,170 @@
+//! The shared redb database handle behind the queue and the mailbox.
+
+use std::error::Error;
+use std::fs;
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
+
+use prometheus_parking_lot_core::{Clock, SchedulerError, SystemClock};
+use redb::{Database, WriteTransaction};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+
+use crate::fault::{self, Phase};
+use crate::mailbox::{self, RedbResultMailbox};
+use crate::queue::{self, RedbLeaseQueue};
+
+/// Version of the on-disk layout; stored in the database and checked on open.
+const SCHEMA_VERSION: u64 = 1;
+
+/// Name of the `schema_version` row in the queue's metadata table.
+const SCHEMA_KEY: &str = "schema_version";
+
+/// An open redb database file that hosts a [`RedbLeaseQueue`] and a
+/// [`RedbResultMailbox`].
+///
+/// redb allows one open handle per file, so the queue and the mailbox of one
+/// application share a store: clone it freely (it is a pair of `Arc`s).
+#[derive(Debug, Clone)]
+pub struct EmbeddedStore {
+    pub(crate) db: Arc<Database>,
+    pub(crate) clock: Arc<dyn Clock>,
+}
+
+impl EmbeddedStore {
+    /// Open (or create) the database file at `path`, creating missing parent
+    /// directories, timed by the system clock.
+    ///
+    /// # Errors
+    ///
+    /// [`SchedulerError::Backend`] when the file cannot be created or opened (for
+    /// example another process holds it open), is not a redb database, or was
+    /// written by an incompatible version of this crate.
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, SchedulerError> {
+        Self::open_with_clock(path, SystemClock::new())
+    }
+
+    /// Like [`open`](Self::open), with leases and TTLs timed by `clock`
+    /// (tests drive time with a `TestClock`).
+    ///
+    /// # Errors
+    ///
+    /// As for [`open`](Self::open).
+    pub fn open_with_clock(
+        path: impl AsRef<Path>,
+        clock: impl Clock + 'static,
+    ) -> Result<Self, SchedulerError> {
+        let path = path.as_ref();
+        if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+            fs::create_dir_all(parent).map_err(backend("embedded::open::create_dir"))?;
+        }
+        let db = Database::create(path).map_err(backend("embedded::open"))?;
+        let store = Self {
+            db: Arc::new(db),
+            clock: Arc::new(clock),
+        };
+        store.initialise()?;
+        Ok(store)
+    }
+
+    /// A lease queue holding at most `max_depth` live entries in this store.
+    #[must_use]
+    pub fn lease_queue<P>(&self, max_depth: usize) -> RedbLeaseQueue<P>
+    where
+        P: Serialize + DeserializeOwned + Send + 'static,
+    {
+        RedbLeaseQueue::new(self.clone(), max_depth)
+    }
+
+    /// A result mailbox in this store.
+    #[must_use]
+    pub fn result_mailbox<T>(&self) -> RedbResultMailbox<T>
+    where
+        T: Serialize + DeserializeOwned + Send + 'static,
+    {
+        RedbResultMailbox::new(self.clone())
+    }
+
+    /// Create every table (readers cannot open a table that does not exist yet)
+    /// and check the layout version, in one transaction.
+    fn initialise(&self) -> Result<(), SchedulerError> {
+        let txn = self
+            .db
+            .begin_write()
+            .map_err(backend("embedded::open::begin"))?;
+        queue::create_tables(&txn)?;
+        mailbox::create_tables(&txn)?;
+        let found = queue::meta_get(&txn, SCHEMA_KEY)?;
+        match found {
+            None => queue::meta_set(&txn, SCHEMA_KEY, SCHEMA_VERSION)?,
+            Some(SCHEMA_VERSION) => {}
+            Some(other) => {
+                return Err(SchedulerError::invalid_config(format!(
+                    "embedded store has layout version {other}, this build understands {SCHEMA_VERSION}"
+                )));
+            }
+        }
+        txn.commit().map_err(backend("embedded::open::commit"))
+    }
+
+    /// Run `work` on the blocking pool with the database and the clock.
+    ///
+    /// If the returned future is dropped, `work` still runs to completion, so a
+    /// started transaction is committed or rolled back, never left half done.
+    pub(crate) async fn blocking<R, F>(&self, work: F) -> Result<R, SchedulerError>
+    where
+        R: Send + 'static,
+        F: FnOnce(&Database, &dyn Clock) -> Result<R, SchedulerError> + Send + 'static,
+    {
+        let db = Arc::clone(&self.db);
+        let clock = Arc::clone(&self.clock);
+        tokio::task::spawn_blocking(move || work(&db, &*clock))
+            .await
+            .map_err(|e| SchedulerError::internal(format!("embedded store task failed: {e}")))?
+    }
+}
+
+/// Commit `txn`, running the crash-point hooks around the commit.
+///
+/// Every state change in this crate ends here, so "committed durably before the
+/// caller is told" is enforced in one place.
+pub fn commit(txn: WriteTransaction, operation: &'static str) -> Result<(), SchedulerError> {
+    fault::point(operation, Phase::BeforeCommit);
+    // Negative control for scenario S-8: acknowledge an enqueue without
+    // committing it. The crash-point tests must catch the lost task.
+    #[cfg(parking_lot_negative_control = "s-8")]
+    if operation == "enqueue" {
+        drop(txn);
+        fault::point(operation, Phase::AfterCommit);
+        return Ok(());
+    }
+    txn.commit().map_err(backend("embedded::commit"))?;
+    fault::point(operation, Phase::AfterCommit);
+    Ok(())
+}
+
+/// Wrap a storage error as [`SchedulerError::Backend`] with `context`.
+pub fn backend<E>(context: &'static str) -> impl FnOnce(E) -> SchedulerError
+where
+    E: Error + Send + Sync + 'static,
+{
+    move |source| SchedulerError::backend(context, source)
+}
+
+/// Wall-clock milliseconds as stored on disk.
+pub fn now_ms(clock: &dyn Clock) -> u64 {
+    u64::try_from(clock.now_ms()).unwrap_or(u64::MAX)
+}
+
+/// A duration in whole milliseconds, rounded up so a non-zero duration is never
+/// stored as zero.
+pub fn duration_ms(duration: Duration) -> u64 {
+    let whole = duration.as_millis();
+    let rounded = if duration.subsec_nanos().is_multiple_of(1_000_000) {
+        whole
+    } else {
+        whole + 1
+    };
+    u64::try_from(rounded).unwrap_or(u64::MAX)
+}

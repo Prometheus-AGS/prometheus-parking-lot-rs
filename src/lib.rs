@@ -96,14 +96,12 @@ pub mod util;
 ///
 /// The in-memory backends come from `prometheus-parking-lot-core`; the
 /// Postgres backends (feature `postgres`) from `prometheus-parking-lot-pg`; the
-/// embedded file-backed backends (feature `embedded`) from
+/// embedded redb-backed backends (feature `embedded`) from
 /// `prometheus-parking-lot-embedded`.
 pub mod infra {
     /// Queue backends.
     pub mod queue {
         pub use prometheus_parking_lot_core::contracts::memory_queue as memory;
-        #[cfg(feature = "embedded")]
-        pub use prometheus_parking_lot_embedded::queue::yaque;
         #[cfg(feature = "postgres")]
         pub use prometheus_parking_lot_pg::queue as postgres;
 
@@ -114,14 +112,12 @@ pub mod infra {
             DeadLetter, InMemoryLeaseQueue,
         };
         #[cfg(feature = "embedded")]
-        pub use yaque::YaqueQueue;
+        pub use prometheus_parking_lot_embedded::RedbLeaseQueue;
     }
 
     /// Mailbox backends.
     pub mod mailbox {
         pub use prometheus_parking_lot_core::mailbox::memory;
-        #[cfg(feature = "embedded")]
-        pub use prometheus_parking_lot_embedded::mailbox::yaque;
         #[cfg(feature = "postgres")]
         pub use prometheus_parking_lot_pg::mailbox as postgres;
 
@@ -130,7 +126,7 @@ pub mod infra {
         pub use postgres::PostgresMailbox;
         pub use prometheus_parking_lot_core::contracts::memory_result_mailbox::InMemoryResultMailbox;
         #[cfg(feature = "embedded")]
-        pub use yaque::YaqueMailbox;
+        pub use prometheus_parking_lot_embedded::RedbResultMailbox;
     }
 
     #[cfg(feature = "postgres")]
@@ -138,10 +134,12 @@ pub mod infra {
 
     pub use mailbox::InMemoryMailbox;
     #[cfg(feature = "embedded")]
-    pub use mailbox::YaqueMailbox;
+    pub use mailbox::RedbResultMailbox;
+    #[cfg(feature = "embedded")]
+    pub use prometheus_parking_lot_embedded::EmbeddedStore;
     pub use queue::InMemoryQueue;
     #[cfg(feature = "embedded")]
-    pub use queue::YaqueQueue;
+    pub use queue::RedbLeaseQueue;
 }
 
 // ── Top-level convenience re-exports ─────────────────────────────────────────
