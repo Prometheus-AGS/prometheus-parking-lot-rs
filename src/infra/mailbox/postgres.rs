@@ -4,10 +4,13 @@
 //! and optional HTTP webhook notifications.
 
 #[cfg(feature = "postgres")]
-use sea_orm::{ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect,
+};
 
 #[cfg(feature = "postgres")]
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::core::{Mailbox, SchedulerError, TaskStatus};
 use crate::util::serde::MailboxKey;
@@ -42,8 +45,7 @@ impl<P> PostgresMailbox<P> {
 
     /// Migration statements for mailbox storage.
     pub fn migrations() -> &'static [&'static str] {
-        &[
-            r#"
+        &[r#"
 CREATE TABLE IF NOT EXISTS pl_mailbox_messages (
     id BIGSERIAL PRIMARY KEY,
     tenant TEXT NOT NULL,
@@ -60,8 +62,7 @@ CREATE INDEX IF NOT EXISTS idx_pl_mailbox_messages_lookup
 CREATE INDEX IF NOT EXISTS idx_pl_mailbox_messages_task_id
     ON pl_mailbox_messages (task_id)
     WHERE task_id IS NOT NULL;
-"#,
-        ]
+"#]
     }
 
     /// Convert TaskStatus to string representation.
@@ -88,8 +89,8 @@ CREATE INDEX IF NOT EXISTS idx_pl_mailbox_messages_task_id
     where
         P: DeserializeOwned,
     {
-        let mut query = MailboxMessage::find()
-            .filter(mailbox_message::Column::Tenant.eq(&key.tenant));
+        let mut query =
+            MailboxMessage::find().filter(mailbox_message::Column::Tenant.eq(&key.tenant));
 
         if let Some(user_id) = &key.user_id {
             query = query.filter(mailbox_message::Column::UserId.eq(user_id));
@@ -116,14 +117,14 @@ CREATE INDEX IF NOT EXISTS idx_pl_mailbox_messages_task_id
 
         let mut results = Vec::new();
         for msg in messages {
-            let payload = if let Some(payload_json) = msg.payload {
-                Some(
-                    serde_json::from_value(payload_json)
-                        .map_err(|e| SchedulerError::backend("payload deserialization failed", e))?,
-                )
-            } else {
-                None
-            };
+            let payload =
+                if let Some(payload_json) = msg.payload {
+                    Some(serde_json::from_value(payload_json).map_err(|e| {
+                        SchedulerError::backend("payload deserialization failed", e)
+                    })?)
+                } else {
+                    None
+                };
 
             results.push(MailboxMessageDto {
                 id: msg.id,

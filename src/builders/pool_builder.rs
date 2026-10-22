@@ -37,7 +37,13 @@ where
         let queue = queue_factory(name, pool_cfg)?;
         let mailbox = mailbox_factory(name, pool_cfg)?;
         let executor = executor_factory(name, pool_cfg)?;
-        let pool = ResourcePool::<P, T, Q, M, E, S>::new(limits, queue, mailbox, executor, spawner.clone());
+        let pool = ResourcePool::<P, T, Q, M, E, S>::new(
+            limits,
+            queue,
+            mailbox,
+            executor,
+            spawner.clone(),
+        );
         pools.insert(name.clone(), pool);
     }
 

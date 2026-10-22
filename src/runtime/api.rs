@@ -84,9 +84,7 @@ where
 }
 
 /// Build pool listings from config snapshot.
-pub fn list_pools(
-    cfg: &crate::config::SchedulerConfig,
-) -> Vec<PoolSnapshot> {
+pub fn list_pools(cfg: &crate::config::SchedulerConfig) -> Vec<PoolSnapshot> {
     cfg.pools
         .iter()
         .map(|(name, pool)| PoolSnapshot {

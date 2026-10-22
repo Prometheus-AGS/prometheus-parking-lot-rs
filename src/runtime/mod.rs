@@ -3,5 +3,5 @@
 pub mod api;
 pub mod tokio_spawner;
 
-pub use api::{submit_task, TaskStatusResponse, TaskSubmission};
+pub use api::{TaskStatusResponse, TaskSubmission, submit_task};
 pub use tokio_spawner::TokioSpawner;

@@ -67,8 +67,7 @@ pub struct PostgresAuditSink;
 impl PostgresAuditSink {
     /// Returns SQL migration statements for the audit log.
     pub fn migrations() -> &'static [&'static str] {
-        &[
-            r#"
+        &[r#"
 CREATE TABLE IF NOT EXISTS pl_audit_events (
     event_id TEXT PRIMARY KEY,
     task_id TEXT NOT NULL,
@@ -81,8 +80,7 @@ CREATE TABLE IF NOT EXISTS pl_audit_events (
 CREATE INDEX IF NOT EXISTS idx_pl_audit_events_tenant_created ON pl_audit_events (tenant, created_at);
 CREATE INDEX IF NOT EXISTS idx_pl_audit_events_task ON pl_audit_events (task_id);
 CREATE INDEX IF NOT EXISTS idx_pl_audit_events_pool ON pl_audit_events (pool);
-"#,
-        ]
+"#]
     }
 }
 

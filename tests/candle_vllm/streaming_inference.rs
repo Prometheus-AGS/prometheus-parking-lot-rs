@@ -7,7 +7,10 @@ use prometheus_parking_lot::util::{Priority, ResourceCost, ResourceKind};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 fn now_ms() -> u128 {
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis()
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis()
 }
 
 fn make_gpu_meta(task_id: u64, units: u32) -> TaskMetadata {
@@ -15,12 +18,15 @@ fn make_gpu_meta(task_id: u64, units: u32) -> TaskMetadata {
         id: task_id,
         mailbox: None,
         priority: Priority::Normal,
-        cost: ResourceCost { kind: ResourceKind::GpuVram, units },
+        cost: ResourceCost {
+            kind: ResourceKind::GpuVram,
+            units,
+        },
         deadline_ms: None,
         created_at_ms: now_ms(),
 
-            idempotency_key: None,
-        }
+        idempotency_key: None,
+    }
 }
 
 #[derive(Clone)]
@@ -45,35 +51,44 @@ impl WorkerExecutor<String, StreamingResult> for StreamingExecutor {
         }
         drop(tx);
 
-        StreamingResult { receiver: rx, total_tokens }
+        StreamingResult {
+            receiver: rx,
+            total_tokens,
+        }
     }
 }
 
 #[tokio::test]
 async fn test_streaming_inference() {
     println!("\n=== test_streaming_inference ===");
-    
+
     let config = WorkerPoolConfig::new()
         .with_worker_count(2)
         .with_max_units(100)
         .with_max_queue_depth(10);
-    
+
     let pool = WorkerPool::new(config, StreamingExecutor).expect("Failed to create pool");
-    
+
     let meta = make_gpu_meta(1, 50);
     let key = pool.submit_async("hello".to_string(), meta).await.unwrap();
-    
-    let result = pool.retrieve_async(&key, Duration::from_secs(5)).await.unwrap();
+
+    let result = pool
+        .retrieve_async(&key, Duration::from_secs(5))
+        .await
+        .unwrap();
     assert_eq!(result.total_tokens, 5);
-    
+
     let mut tokens = Vec::new();
     while let Ok(token) = result.receiver.recv_async().await {
         tokens.push(token);
     }
-    
+
     assert_eq!(tokens.len(), 5);
     assert!(tokens[0].contains("hello:token_0"));
-    
-    println!("Streaming inference verified: {} tokens received", tokens.len());
+
+    println!(
+        "Streaming inference verified: {} tokens received",
+        tokens.len()
+    );
     println!("=== test_streaming_inference PASSED ===\n");
 }

@@ -2,8 +2,8 @@
 
 use std::future::Future;
 use std::marker::PhantomData;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
 
 use parking_lot::{Condvar, Mutex};

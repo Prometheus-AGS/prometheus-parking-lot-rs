@@ -267,10 +267,7 @@ impl<P: Send + Sync + 'static> CancellationChannel<P> {
     ///
     /// The drain task runs until all senders are dropped (i.e. the pool shuts
     /// down) and has processed the remaining queue.
-    pub fn new(
-        sink: Arc<dyn CancellationSink<P>>,
-        config: CancellationConfig,
-    ) -> Self {
+    pub fn new(sink: Arc<dyn CancellationSink<P>>, config: CancellationConfig) -> Self {
         let (tx, mut rx) = mpsc::channel::<CancelledTask<P>>(config.channel_capacity);
 
         // Spawn the drain task — runs independently, bounded by delta per call.
@@ -289,7 +286,9 @@ impl<P: Send + Sync + 'static> CancellationChannel<P> {
                     }
                     Err(_) => {
                         // sink overran its deadline
-                        warn!("cancellation sink exceeded delta — task dropped (use a faster sink or increase delta)");
+                        warn!(
+                            "cancellation sink exceeded delta — task dropped (use a faster sink or increase delta)"
+                        );
                         if should_log_drop {
                             warn!("auto-requeue task was not durably captured; work may be lost");
                         }
@@ -321,7 +320,10 @@ mod tests {
             id,
             mailbox: None,
             priority: Priority::Normal,
-            cost: ResourceCost { kind: ResourceKind::Cpu, units: 1 },
+            cost: ResourceCost {
+                kind: ResourceKind::Cpu,
+                units: 1,
+            },
             deadline_ms: None,
             created_at_ms: 0,
             idempotency_key: None,
@@ -408,10 +410,7 @@ mod tests {
             ..Default::default()
         };
         // Fill the channel
-        let ch = CancellationChannel::new(
-            sink as Arc<dyn CancellationSink<String>>,
-            config,
-        );
+        let ch = CancellationChannel::new(sink as Arc<dyn CancellationSink<String>>, config);
         let make_task = || CancelledTask {
             payload: "t".to_string(),
             meta: make_meta(1),

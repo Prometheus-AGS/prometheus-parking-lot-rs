@@ -327,19 +327,32 @@ impl Hook for TracingHook {
             LifecycleEvent::Submitted { task_id, .. } => {
                 tracing::debug!(pool = %self.pool, task_id, "task submitted");
             }
-            LifecycleEvent::Started { task_id, worker_id, .. } => {
+            LifecycleEvent::Started {
+                task_id, worker_id, ..
+            } => {
                 tracing::debug!(pool = %self.pool, task_id, worker_id, "task started");
             }
-            LifecycleEvent::Completed { task_id, duration_ms, .. } => {
+            LifecycleEvent::Completed {
+                task_id,
+                duration_ms,
+                ..
+            } => {
                 tracing::info!(pool = %self.pool, task_id, duration_ms, "task completed");
             }
             LifecycleEvent::Failed { task_id, error, .. } => {
                 tracing::warn!(pool = %self.pool, task_id, %error, "task failed");
             }
-            LifecycleEvent::Rejected { task_id, reason, .. } => {
+            LifecycleEvent::Rejected {
+                task_id, reason, ..
+            } => {
                 tracing::warn!(pool = %self.pool, task_id, ?reason, "task rejected");
             }
-            LifecycleEvent::Cancelled { task_id, reason, attempt, .. } => {
+            LifecycleEvent::Cancelled {
+                task_id,
+                reason,
+                attempt,
+                ..
+            } => {
                 tracing::warn!(pool = %self.pool, task_id, ?reason, attempt, "task cancelled");
             }
             _ => {}
@@ -406,7 +419,12 @@ pub fn emit_submitted(
 }
 
 /// Convenience: emit a `Rejected` event.
-pub fn emit_rejected(bus: &HookBus, task_id: u64, pool: impl Into<String>, reason: RejectionReason) {
+pub fn emit_rejected(
+    bus: &HookBus,
+    task_id: u64,
+    pool: impl Into<String>,
+    reason: RejectionReason,
+) {
     if bus.is_active() {
         bus.emit(&LifecycleEvent::Rejected {
             task_id,

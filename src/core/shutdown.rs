@@ -135,7 +135,7 @@ impl ShutdownHandle {
 pub async fn wait_for_signal() {
     #[cfg(unix)]
     {
-        use tokio::signal::unix::{signal, SignalKind};
+        use tokio::signal::unix::{SignalKind, signal};
         let ctrl_c = tokio::signal::ctrl_c();
         // SAFETY: signal() may fail only on OOM or bad kind; both are bugs.
         let mut sigterm =

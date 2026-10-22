@@ -14,8 +14,8 @@
 use prometheus_parking_lot::core::{
     PoolLimits, ResourcePool, ScheduledTask, Spawn, TaskExecutor, TaskMetadata,
 };
-use prometheus_parking_lot::infra::queue::yaque::YaqueQueue;
 use prometheus_parking_lot::infra::mailbox::memory::InMemoryMailbox;
+use prometheus_parking_lot::infra::queue::yaque::YaqueQueue;
 use prometheus_parking_lot::util::clock::now_ms;
 use prometheus_parking_lot::util::serde::{MailboxKey, Priority, ResourceCost, ResourceKind};
 
@@ -50,7 +50,7 @@ impl TaskExecutor<LlmInferenceTask, LlmResult> for LocalLlmExecutor {
         // Simulate LLM inference
         println!("  🤖 Processing: {}", payload.prompt);
         tokio::time::sleep(Duration::from_millis(500)).await;
-        
+
         LlmResult {
             text: format!(
                 "Generated response for '{}' using model {}",
@@ -93,7 +93,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Configure pool
     let limits = PoolLimits {
-        max_units: 8,  // Simulating 8GB VRAM limit
+        max_units: 8, // Simulating 8GB VRAM limit
         max_queue_depth: 100,
         default_timeout: Duration::from_secs(120),
     };
@@ -115,7 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Submit LLM inference tasks
     println!("Submitting LLM inference tasks...\n");
-    
+
     let prompts = vec![
         "Explain quantum computing in simple terms",
         "Write a haiku about programming",
@@ -124,7 +124,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for (i, prompt) in prompts.iter().enumerate() {
         let task_id = (i + 1) as u64;
-        
+
         let task = ScheduledTask {
             meta: TaskMetadata {
                 id: task_id,
@@ -136,7 +136,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 priority: Priority::Normal,
                 cost: ResourceCost {
                     kind: ResourceKind::GpuVram,
-                    units: 4,  // 4GB VRAM per task
+                    units: 4, // 4GB VRAM per task
                 },
                 deadline_ms: None,
                 created_at_ms: now_ms(),
@@ -156,12 +156,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\n✓ All tasks submitted");
     println!("\n⏳ Waiting for tasks to process...\n");
-    
+
     // Wait for tasks to complete
     tokio::time::sleep(Duration::from_secs(3)).await;
 
     println!("\n✓ All tasks processed");
-    
+
     // Show persistence
     println!("\n📝 Queue File Status:");
     let queue_file = data_dir.join("llm_tasks.jsonl");

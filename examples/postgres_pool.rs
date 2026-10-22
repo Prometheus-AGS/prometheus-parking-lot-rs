@@ -20,8 +20,8 @@
 use prometheus_parking_lot::core::{
     PoolLimits, ResourcePool, ScheduledTask, Spawn, TaskExecutor, TaskMetadata,
 };
-use prometheus_parking_lot::infra::queue::postgres::PostgresQueue;
 use prometheus_parking_lot::infra::mailbox::postgres::PostgresMailbox;
+use prometheus_parking_lot::infra::queue::postgres::PostgresQueue;
 use prometheus_parking_lot::util::clock::now_ms;
 use prometheus_parking_lot::util::serde::{MailboxKey, Priority, ResourceCost, ResourceKind};
 
@@ -56,7 +56,7 @@ impl TaskExecutor<DemoTask, DemoResult> for DemoExecutor {
     async fn execute(&self, payload: DemoTask, meta: TaskMetadata) -> DemoResult {
         // Simulate some work
         tokio::time::sleep(Duration::from_millis(100)).await;
-        
+
         DemoResult {
             task_id: meta.id,
             output: format!("Processed {}: {}", payload.operation, payload.data),
@@ -88,7 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Connect to database
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://testuser:testpass@localhost:5433/testdb".into());
-    
+
     println!("Connecting to database: {}", database_url);
     let db = Database::connect(&database_url).await?;
     println!("✓ Connected to database\n");
@@ -156,7 +156,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\n✓ All tasks submitted");
     println!("\nWaiting for tasks to complete...");
-    
+
     // Wait a bit for tasks to process
     tokio::time::sleep(Duration::from_secs(2)).await;
 

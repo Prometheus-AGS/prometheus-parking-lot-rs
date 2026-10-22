@@ -11,7 +11,7 @@ use sea_orm::{
 };
 
 #[cfg(feature = "postgres")]
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::core::{ScheduledTask, SchedulerError, TaskQueue};
 #[cfg(feature = "postgres")]
@@ -24,7 +24,8 @@ use crate::infra::entities::queue_job::{self, Entity as QueueJob};
 pub struct PostgresQueue<P> {
     #[cfg(feature = "postgres")]
     db: DatabaseConnection,
-    #[cfg_attr(not(feature = "postgres"), allow(dead_code))] // only read by postgres-enabled query paths
+    #[cfg_attr(not(feature = "postgres"), allow(dead_code))]
+    // only read by postgres-enabled query paths
     queue_name: String,
     max_depth: usize,
     _marker: std::marker::PhantomData<P>,
@@ -54,8 +55,7 @@ impl<P> PostgresQueue<P> {
 
     /// Migration statements for custom queue table.
     pub fn migrations() -> &'static [&'static str] {
-        &[
-            r#"
+        &[r#"
 CREATE TABLE IF NOT EXISTS pl_queue_jobs (
     id BIGSERIAL PRIMARY KEY,
     queue_name TEXT NOT NULL,
@@ -75,8 +75,7 @@ CREATE INDEX IF NOT EXISTS idx_pl_queue_jobs_dequeue
 CREATE INDEX IF NOT EXISTS idx_pl_queue_jobs_deadline 
     ON pl_queue_jobs (deadline_ms) 
     WHERE deadline_ms IS NOT NULL;
-"#,
-        ]
+"#]
     }
 
     /// Convert Priority enum to database SMALLINT.
@@ -113,7 +112,7 @@ where
         // Use tokio runtime to execute async operation synchronously
         let rt = tokio::runtime::Handle::try_current()
             .map_err(|_| SchedulerError::internal("no tokio runtime available"))?;
-        
+
         rt.block_on(async {
             // Check queue depth
             let count = QueueJob::find()
@@ -133,20 +132,23 @@ where
             // Serialize metadata and payload
             let metadata_json = serde_json::to_value(&task.meta)
                 .map_err(|e| SchedulerError::backend("metadata serialization failed", e))?;
-            
+
             let payload_json = serde_json::to_value(&task.payload)
                 .map_err(|e| SchedulerError::backend("payload serialization failed", e))?;
 
             // Convert deadline_ms to i64 and chrono timestamp
             let deadline_at = task.meta.deadline_ms.map(|ms| {
-                chrono::DateTime::from_timestamp((ms / 1000) as i64, ((ms % 1000) * 1_000_000) as u32)
-                    .unwrap_or_else(chrono::Utc::now)
-                    .into()
+                chrono::DateTime::from_timestamp(
+                    (ms / 1000) as i64,
+                    ((ms % 1000) * 1_000_000) as u32,
+                )
+                .unwrap_or_else(chrono::Utc::now)
+                .into()
             });
 
             let created_at = chrono::DateTime::from_timestamp(
-                (task.meta.created_at_ms / 1000) as i64, 
-                ((task.meta.created_at_ms % 1000) * 1_000_000) as u32
+                (task.meta.created_at_ms / 1000) as i64,
+                ((task.meta.created_at_ms % 1000) * 1_000_000) as u32,
             )
             .unwrap_or_else(chrono::Utc::now)
             .into();
@@ -179,10 +181,13 @@ where
     fn dequeue(&mut self) -> Result<Option<ScheduledTask<P>>, SchedulerError> {
         let rt = tokio::runtime::Handle::try_current()
             .map_err(|_| SchedulerError::internal("no tokio runtime available"))?;
-        
+
         rt.block_on(async {
             // Use transaction for atomic dequeue
-            let txn = self.db.begin().await
+            let txn = self
+                .db
+                .begin()
+                .await
                 .map_err(|e| SchedulerError::backend("transaction start failed", e))?;
 
             // Find and lock the highest priority task (SKIP LOCKED for concurrency)
@@ -196,7 +201,8 @@ where
                 .map_err(|e| SchedulerError::backend("dequeue query failed", e))?;
 
             let Some(model) = task_model else {
-                txn.commit().await
+                txn.commit()
+                    .await
                     .map_err(|e| SchedulerError::backend("transaction commit failed", e))?;
                 return Ok(None);
             };
@@ -204,7 +210,7 @@ where
             // Deserialize metadata and payload
             let meta = serde_json::from_value(model.metadata.clone())
                 .map_err(|e| SchedulerError::backend("metadata deserialization failed", e))?;
-            
+
             let payload = serde_json::from_value(model.payload.clone())
                 .map_err(|e| SchedulerError::backend("payload deserialization failed", e))?;
 
@@ -214,7 +220,8 @@ where
                 .await
                 .map_err(|e| SchedulerError::backend("task deletion failed", e))?;
 
-            txn.commit().await
+            txn.commit()
+                .await
                 .map_err(|e| SchedulerError::backend("transaction commit failed", e))?;
 
             Ok(Some(ScheduledTask { meta, payload }))
@@ -224,7 +231,7 @@ where
     fn prune_expired(&mut self, now_ms: u128) -> Result<usize, SchedulerError> {
         let rt = tokio::runtime::Handle::try_current()
             .map_err(|_| SchedulerError::internal("no tokio runtime available"))?;
-        
+
         rt.block_on(async {
             let result = QueueJob::delete_many()
                 .filter(queue_job::Column::QueueName.eq(&self.queue_name))

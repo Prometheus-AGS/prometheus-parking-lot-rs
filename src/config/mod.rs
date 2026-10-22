@@ -2,4 +2,7 @@
 
 pub mod pool;
 
-pub use pool::{MailboxBackendConfig, PoolConfig, QueueBackendConfig, RuntimeConfig, SchedulerConfig, WorkerPoolConfig};
+pub use pool::{
+    MailboxBackendConfig, PoolConfig, QueueBackendConfig, RuntimeConfig, SchedulerConfig,
+    WorkerPoolConfig,
+};

@@ -10,28 +10,28 @@ pub struct Model {
     /// Primary key.
     #[sea_orm(primary_key)]
     pub id: i64,
-    
+
     /// Tenant identifier.
     pub tenant: String,
-    
+
     /// User identifier (optional).
     pub user_id: Option<String>,
-    
+
     /// Session identifier (optional).
     pub session_id: Option<String>,
-    
+
     /// Task ID (optional).
     pub task_id: Option<i64>,
-    
+
     /// Creation timestamp.
     pub created_at: DateTimeWithTimeZone,
-    
+
     /// Creation timestamp in milliseconds since epoch.
     pub created_at_ms: i64,
-    
+
     /// Task status (Queued, Running, Completed, Failed, Expired, Dropped).
     pub status: String,
-    
+
     /// Task result payload as JSON (optional).
     pub payload: Option<Json>,
 }

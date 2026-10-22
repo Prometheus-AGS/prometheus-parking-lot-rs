@@ -223,7 +223,14 @@ mod tests {
     #[test]
     fn is_retryable_classification() {
         assert!(SchedulerError::queue_full("p", 1, 1).is_retryable());
-        assert!(SchedulerError::CapacityExceeded { pool: "p".into(), requested: 1, available: 0 }.is_retryable());
+        assert!(
+            SchedulerError::CapacityExceeded {
+                pool: "p".into(),
+                requested: 1,
+                available: 0
+            }
+            .is_retryable()
+        );
         assert!(SchedulerError::Timeout { task_id: None }.is_retryable());
         assert!(!SchedulerError::DeadlineExpired { task_id: 1 }.is_retryable());
         assert!(!SchedulerError::PoolShutdown { pool: "p".into() }.is_retryable());

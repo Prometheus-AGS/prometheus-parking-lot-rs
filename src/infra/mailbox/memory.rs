@@ -183,7 +183,8 @@ mod tests {
     fn deliver_and_consume_once() {
         let mut mb = InMemoryMailbox::<String>::new();
         let k = key("t1");
-        mb.deliver(&k, TaskStatus::Completed, Some("result".into())).unwrap();
+        mb.deliver(&k, TaskStatus::Completed, Some("result".into()))
+            .unwrap();
         assert_eq!(mb.len(), 1);
 
         // Consume retrieves and removes
@@ -201,10 +202,24 @@ mod tests {
         let mut mb = InMemoryMailbox::<String>::new();
         let k = key("t1");
 
-        mb.deliver_inner(&k, TaskStatus::Completed, Some("first".into()), None, Some("idem-1".into())).unwrap();
+        mb.deliver_inner(
+            &k,
+            TaskStatus::Completed,
+            Some("first".into()),
+            None,
+            Some("idem-1".into()),
+        )
+        .unwrap();
         // Duplicate with same idempotency key — must be silently dropped
         let k2 = key("t1-dup");
-        mb.deliver_inner(&k2, TaskStatus::Completed, Some("second".into()), None, Some("idem-1".into())).unwrap();
+        mb.deliver_inner(
+            &k2,
+            TaskStatus::Completed,
+            Some("second".into()),
+            None,
+            Some("idem-1".into()),
+        )
+        .unwrap();
 
         // Only the first message exists
         assert_eq!(mb.len(), 1);
@@ -219,7 +234,8 @@ mod tests {
         let k2 = key("t2");
 
         // k1: expires at ms=100
-        mb.deliver_with_ttl(&k1, TaskStatus::Completed, None, 0).unwrap();
+        mb.deliver_with_ttl(&k1, TaskStatus::Completed, None, 0)
+            .unwrap();
         // k2: no TTL
         mb.deliver(&k2, TaskStatus::Completed, None).unwrap();
 

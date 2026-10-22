@@ -22,8 +22,8 @@ use prometheus_parking_lot::util::serde::{MailboxKey, Priority, ResourceCost, Re
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
 #[derive(Clone)]
