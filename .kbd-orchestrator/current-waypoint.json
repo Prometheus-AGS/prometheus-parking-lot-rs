@@ -2,38 +2,38 @@
   "schemaVersion": "5",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 14,
-  "derivedRevision": 14,
+  "sourceRevision": 18,
+  "derivedRevision": 18,
   "frontier": {
-    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 14
+    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 18
   },
   "conflictCount": 0,
   "projectId": "f6c384db-6ee1-4f1b-9bab-0e1602ec2615",
   "runId": "phase-certification-remediation-20261022T103344Z",
   "path": [
-    "phase-certification-remediation"
+    "phase-correctness-and-durability"
   ],
   "phaseIds": [
-    "phase-certification-remediation"
+    "phase-correctness-and-durability"
   ],
-  "activePhaseId": "phase-certification-remediation",
-  "activePhase": "phase-certification-remediation",
-  "phase": "phase-certification-remediation",
+  "activePhaseId": "phase-correctness-and-durability",
+  "activePhase": "phase-correctness-and-durability",
+  "phase": "phase-correctness-and-durability",
   "parentPhase": null,
   "childPointer": null,
   "change": null,
   "currentTask": null,
   "status": "ready",
   "lifecycle": "ready",
-  "stageId": "complete",
+  "stageId": null,
   "stageStatus": null,
   "completionMetric": "implementation",
   "implementationCompleted": 14,
   "implementationTotal": 14,
   "planRevision": 1,
-  "revision": 14,
-  "exactNextCommand": null,
+  "revision": 18,
+  "exactNextCommand": "/kbd-assess phase-correctness-and-durability",
   "nextChange": null,
   "nextTask": null,
-  "updatedAt": "2026-10-22T10:34:51.206424Z"
+  "updatedAt": "2026-10-22T11:31:17.306399Z"
 }

@@ -2,16 +2,16 @@
   "schemaVersion": "2",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 2,
-  "derivedRevision": 2,
+  "sourceRevision": 15,
+  "derivedRevision": 15,
   "frontier": {
-    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 2
+    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 15
   },
   "conflictCount": 0,
   "phase": "phase-certification-remediation",
   "phaseId": "phase-certification-remediation",
   "parentPhase": null,
-  "last_updated": "2026-10-22T10:34:18.181429Z",
+  "last_updated": "2026-10-22T11:31:13.949682Z",
   "last_updated_by": "kbd-runtime",
   "changes_total": 14,
   "changes_completed": 14,
