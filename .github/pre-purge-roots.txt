@@ -1,0 +1,8 @@
+# Pre-purge root set (cr-51 pre-purge gate).
+# One commit SHA per line (optional trailing comment). The gate fails any branch whose
+# HEAD descends from a listed commit, so a pre-purge branch cannot reintroduce the
+# credential history on merge.
+#
+# EMPTY on purpose until cr-15 (key rotation + history purge) runs: the gate passes
+# when this file has no entries. cr-15 must populate it with the pre-purge tip
+# (e.g. 88f805c and the old main tip) immediately after the force-push.
