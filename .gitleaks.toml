@@ -1,0 +1,9 @@
+# gitleaks config (cr-51): default ruleset plus a catch-all for sk- style API keys.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "sk-prefixed-api-key"
+description = "sk- prefixed API key"
+regex = '''\bsk-[A-Za-z0-9_-]{20,}\b'''
+keywords = ["sk-"]
