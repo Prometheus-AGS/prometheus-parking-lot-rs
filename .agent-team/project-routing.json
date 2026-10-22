@@ -2,16 +2,15 @@
   "schemaVersion": 1,
   "activeTeam": "parking-lot-core",
   "manifest": ".agent-team/parking-lot-core/team.json",
-  "target": "deepseek",
+  "target": "claude",
   "nativeDefinitions": [
-    ".dsh/profiles/parking-lot-core-product-manager/cordis.patch.yml",
-    ".dsh/profiles/parking-lot-core-tech-lead/cordis.patch.yml",
-    ".dsh/profiles/parking-lot-core-scheduler-engineer/cordis.patch.yml",
-    ".dsh/profiles/parking-lot-core-postgres-engineer/cordis.patch.yml",
-    ".dsh/profiles/parking-lot-core-events-engineer/cordis.patch.yml",
-    ".dsh/profiles/parking-lot-core-platform-engineer/cordis.patch.yml",
-    ".dsh/profiles/parking-lot-core-reviewer/cordis.patch.yml",
-    ".dsh/profiles/parking-lot-core-team/cordis.patch.yml"
+    ".claude/agents/product-manager.md",
+    ".claude/agents/tech-lead.md",
+    ".claude/agents/scheduler-engineer.md",
+    ".claude/agents/postgres-engineer.md",
+    ".claude/agents/events-engineer.md",
+    ".claude/agents/platform-engineer.md",
+    ".claude/agents/reviewer.md"
   ],
   "instructionFiles": [
     "AGENTS.md",
