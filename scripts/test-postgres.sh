@@ -1,40 +1,7 @@
-#!/bin/bash
-# Test script for running Postgres integration tests
+#!/usr/bin/env bash
+# Run the Postgres substrate tests (CR-43) against real PG 18 and PG 17 images.
+# The testcontainers helper builds parking-lot-pg:18 / :17 on first use.
+set -euo pipefail
+cd "$(dirname "$0")/.."
 
-set -e
-
-echo "=== Postgres Integration Tests ==="
-echo
-
-# Start Docker Compose
-echo "Starting Postgres container..."
-docker-compose -f docker-compose.test.yml up -d
-
-# Wait for Postgres to be ready
-echo "Waiting for Postgres to be ready..."
-sleep 5
-
-# Set environment variable for tests
-export DATABASE_URL="postgresql://testuser:testpass@localhost:5433/testdb"
-
-# Run integration tests
-echo "Running integration tests..."
-cargo test --features postgres --test integration -- --test-threads=1
-
-# Capture test result
-TEST_RESULT=$?
-
-# Cleanup
-echo
-echo "Cleaning up..."
-docker-compose -f docker-compose.test.yml down
-
-if [ $TEST_RESULT -eq 0 ]; then
-    echo
-    echo "✓ All tests passed!"
-    exit 0
-else
-    echo
-    echo "✗ Tests failed!"
-    exit 1
-fi
+cargo test -p prometheus-parking-lot-pg -- --ignored --test-threads=1
