@@ -1,0 +1,465 @@
+[
+  {
+    "seq": 1,
+    "id": "cr-15-containment",
+    "title": "Contain leaked agent credentials and ship only allowlisted files",
+    "round": 1,
+    "owner": "operator",
+    "tasks": [
+      "Operator rotates OPENAI_API_KEY and Codex OAuth tokens exposed in .codex/auth.json and records confirmation (no secret values) in execution.md",
+      "After the plan branch merges and with explicit operator approval: the KBD driver (no team worktree) purges .codex/{auth.json,config.toml,history.jsonl,version.json,sessions/} with git filter-repo in a fresh mirror clone, force-pushes, records old/new main SHAs and the pre-purge root commit set, and the operator re-clones every checkout",
+      "Operator asks GitHub Support to purge cached refs/pull/* for the removed paths and records the ticket ID",
+      "Verify on a fresh mirror clone that the path-history query is empty and record the output"
+    ]
+  },
+  {
+    "seq": 2,
+    "id": "cr-41-toolchain-baseline",
+    "title": "Rust 1.99.1 / MSRV 1.95 / edition 2024 build baseline where every target compiles",
+    "round": 2,
+    "owner": "tech-lead",
+    "tasks": [
+      "Pin rust-toolchain.toml to 1.99.1, set rust-version = \"1.95\" and edition = \"2024\", run cargo fix --edition, and commit Cargo.lock (remove it from .gitignore)",
+      "Drop the pgmq client crate and pgmq-ext feature wiring; keep sea-orm 1.x/sqlx 0.8 until cr-27 removes them; update constraints.md checks for MSRV 1.95 (operator-adopted amendment) and the role prompts via the team manifest",
+      "Make benches/queue_bench.rs and both examples compile (idempotency_key, missing main), remove #![deny(warnings)], fix repository/homepage URLs; declare check-cfg for parking_lot_loom and keyed parking_lot_negative_control values under [lints.rust] unexpected_cfgs",
+      "Single rustfmt pass, then resolve clippy -D warnings findings (fix; #[expect(..., reason)] only where a lint is wrong for this crate)",
+      "Independent review at the merge gate (MSRV correctness, no behaviour change hidden in lint fixes)"
+    ]
+  },
+  {
+    "seq": 3,
+    "id": "cr-17-kbd-correction",
+    "title": "Correct the certification phase record through superseding KBD decisions",
+    "round": 2,
+    "owner": "product-manager",
+    "tasks": [
+      "Verify by reading code which certification-phase changes are unwired (CR-03, CR-07, CR-13, CR-14 at minimum)",
+      "Record superseding decisions with prometheus kbd decision record --supersedes for each overstated change",
+      "Independent review at the merge gate (record accuracy vs code)"
+    ]
+  },
+  {
+    "seq": 4,
+    "id": "cr-48-workspace-split",
+    "title": "Split into a Cargo workspace with a wasm-safe core and per-backend crates",
+    "round": 3,
+    "owner": "tech-lead",
+    "tasks": [
+      "Write docs/adr/0001-workspace-split.md (crate map, dependency rules, feature mapping, MSRV per crate)",
+      "Perform the split in one change: move modules and tests to crates/*, workspace Cargo.toml, facade re-exports, per-crate include allowlists; no behaviour change",
+      "Rewrite constraints.md checks for the workspace (core boundary via cargo tree, unsafe grep over crates/** with the FFI exemption) as an operator-adopted amendment",
+      "Independent review at the merge gate (dependency boundaries, no behaviour drift)"
+    ]
+  },
+  {
+    "seq": 5,
+    "id": "cr-42-ci-rebuild",
+    "title": "Green, cached, locked CI on stable and MSRV",
+    "round": 4,
+    "owner": "platform-engineer",
+    "tasks": [
+      "Rewrite .github/workflows/ci.yml: rust-cache, --locked, nextest, toolchain matrix 1.99.1 + 1.95",
+      "Resolve cargo-deny: upgrade testcontainers (tokio-tar RUSTSEC-2025-0111) via tech-lead handoff; fix deny.toml license policy",
+      "Update .cargo/config.toml aliases and docs/build-performance.md for the workspace",
+      "Independent review at the merge gate (CI covers every required job; no job silently skipped)"
+    ]
+  },
+  {
+    "seq": 6,
+    "id": "cr-45-docs-site",
+    "title": "Branded Docusaurus documentation site (know-me brand, Flat 2.0)",
+    "round": 4,
+    "owner": "product-manager",
+    "tasks": [
+      "Scaffold website/ with build-branded-docusaurus; pin versions; map know-me dark/light tokens, typography and logo",
+      "Add Mermaid, local search, sanitizer (no private paths/secrets/raw wiki), SITE_URL/BASE_URL, container",
+      "Vendor the build-branded-docusaurus verify script as `npm run verify` (build, links, light/dark screenshots, a11y) and hand platform-engineer the GitHub Pages workflow and verify job",
+      "Independent review at the merge gate (brand fidelity, a11y, sanitizer)"
+    ]
+  },
+  {
+    "seq": 7,
+    "id": "cr-18-core-contracts",
+    "title": "Core contracts: Arc<Inner>, Clock, Result executors, error taxonomy",
+    "round": 4,
+    "owner": "tech-lead",
+    "tasks": [
+      "Arc<Inner> refactor of ResourcePool; delete sync_wake_worker_loop; Clock trait + TestClock",
+      "Result-returning TaskExecutor contract and error taxonomy; monotonic FIFO sequence with consistent Eq/Ord; resource-vector cost type (serde, one-dimension default)",
+      "Migrate existing tests and examples to the new contracts; CHANGELOG 0.3.0 entry",
+      "Independent review at the merge gate (API soundness, Send/Sync bounds, semver notes)"
+    ]
+  },
+  {
+    "seq": 8,
+    "id": "cr-51-supply-chain-gates",
+    "title": "CI gates: secrets, purged paths, pre-purge history and package allowlists",
+    "round": 5,
+    "owner": "platform-engineer",
+    "tasks": [
+      "Add CI jobs (fetch-depth 0): gitleaks full history, path-history emptiness assertion, pre-purge root-set ancestry rejection, per-crate cargo package --list allowlist check",
+      "Prove each gate with a negative-control scratch branch and record the failing run URLs",
+      "Independent review at the merge gate (gate completeness, shallow-clone pitfalls)"
+    ]
+  },
+  {
+    "seq": 9,
+    "id": "cr-43-postgres18-image",
+    "title": "Project Postgres 18 image (flint-forge pattern) with pgmq for tests and local dev",
+    "round": 5,
+    "owner": "postgres-engineer",
+    "tasks": [
+      "Write docker/postgres18/Dockerfile (+ pg17 variant) modelled on flint-forge images/postgres18: PGDG base, pgmq from pinned tag, tuned conf, init scripts; no Flint-specific extensions",
+      "Add a testcontainers helper that builds/reuses the image and exposes a pool; add a compose service for local use",
+      "Hand platform-engineer the CI image-build step with layer caching",
+      "Independent review at the merge gate (image pinning, extension availability)"
+    ]
+  },
+  {
+    "seq": 10,
+    "id": "cr-25-backend-contracts",
+    "title": "Async lease/ack queue, async mailbox and Notifier contracts with a conformance suite",
+    "round": 5,
+    "owner": "tech-lead",
+    "tasks": [
+      "Define async TaskQueue (lease/ack/nack/extend), async Mailbox (deliver/consume-once/TTL) and Notifier traits",
+      "In-memory reference implementations; StorageMailbox<S, N> type signature only (behaviour in cr-34)",
+      "Backend conformance test suite (generic over backend) published for backend crates",
+      "Independent review at the merge gate (contract completeness, cancellation safety of async fns)"
+    ]
+  },
+  {
+    "seq": 11,
+    "id": "cr-19-dispatcher-semaphore",
+    "title": "Unit-weighted semaphore and priority dispatcher shared by every pool",
+    "round": 5,
+    "owner": "scheduler-engineer",
+    "tasks": [
+      "Implement the dispatcher + unit-weighted semaphore; atomic depth-check/enqueue; peek-then-pop",
+      "Port ResourcePool and the native WorkerPool onto the dispatcher; add execution budgets to the native WorkerPool",
+      "loom models (loom_capacity, loom_wakeup) on parking-lot-core under --cfg parking_lot_loom with negative controls under --cfg parking_lot_negative_control; proptest suites for the tokio pools; budget_ tests (wedged executor, cancel witness) for ResourcePool and the native WorkerPool; miri on atomics paths",
+      "Independent review at the merge gate (memory ordering, lost-wakeup proof, negative control)"
+    ]
+  },
+  {
+    "seq": 12,
+    "id": "cr-46-docs-theory",
+    "title": "Concepts: theory and history of parking lots, admission, mailboxes and worker pools",
+    "round": 5,
+    "owner": "product-manager",
+    "tasks": [
+      "Research and outline concept chapters with primary sources (deep-research skill)",
+      "Write concept chapters with Mermaid diagrams",
+      "Independent review at the merge gate (factual accuracy and citations)"
+    ]
+  },
+  {
+    "seq": 13,
+    "id": "cr-35-test-targets",
+    "title": "Unit and integration suites become real test targets on the current testcontainers API",
+    "round": 6,
+    "owner": "platform-engineer",
+    "tasks": [
+      "Register unit/integration suites as test targets in their crates",
+      "Port Postgres integration tests to the current testcontainers API and the CR-43 image (with postgres-engineer)",
+      "Add the orphan-test check script to CI",
+      "Independent review at the merge gate (no test silently dropped)"
+    ]
+  },
+  {
+    "seq": 14,
+    "id": "cr-16-docs-truth",
+    "title": "Archive invalid docs and make README examples compile",
+    "round": 6,
+    "owner": "product-manager",
+    "tasks": [
+      "Archive invalid docs (PLAN-/SPEC-/TASKS-*, primitives docs, stale reports) to docs/archive/ with an index of reasons",
+      "Rewrite README.md against the real API and wire it as a doctest on the facade (tech-lead applies the lib.rs attribute)",
+      "Independent review at the merge gate (no stale API claims remain)"
+    ]
+  },
+  {
+    "seq": 15,
+    "id": "cr-21-panic-containment",
+    "title": "Executor panics never leak capacity or kill the pool",
+    "round": 6,
+    "owner": "scheduler-engineer",
+    "tasks": [
+      "catch_unwind + RAII permits on every execution path; worker respawn; counters",
+      "Panic tests for ResourcePool and the native WorkerPool, with a negative control under --cfg parking_lot_negative_control (catch_unwind skipped)",
+      "Independent review at the merge gate (unwind safety, permit release on all paths)"
+    ]
+  },
+  {
+    "seq": 16,
+    "id": "cr-28-embedded-redb-queue",
+    "title": "Crash-safe embedded queue (redb) replacing the JSONL Yaque queue",
+    "round": 6,
+    "owner": "events-engineer",
+    "tasks": [
+      "One-day spike: redb vs rustqueue; record the decision in docs/adr",
+      "redb lease queue + mailbox implementing the contracts; remove Yaque",
+      "Conformance suite + crash-point fault-injection tests; negative control under --cfg parking_lot_negative_control skips the redb commit and must lose a task",
+      "Independent review at the merge gate (durability under crash)"
+    ]
+  },
+  {
+    "seq": 17,
+    "id": "cr-22-result-slots",
+    "title": "Async result slots with TTL that use no blocking threads",
+    "round": 7,
+    "owner": "scheduler-engineer",
+    "tasks": [
+      "Replace condvar slots with oneshot/Notify slots; blocking API via blocking_recv; TTL sweeper",
+      "Load test for blocking-thread usage and TTL tests",
+      "Independent review at the merge gate (no blocking in async context)"
+    ]
+  },
+  {
+    "seq": 18,
+    "id": "cr-26-pg-lease-queue",
+    "title": "Postgres lease queue on raw sqlx with SKIP LOCKED, NOTIFY and a reaper",
+    "round": 7,
+    "owner": "postgres-engineer",
+    "tasks": [
+      "Lease/ack/nack/extend SQL and migrations; LISTEN/NOTIFY wake-up; reaper; backoff",
+      "Async sqlx 0.9 implementation of the TaskQueue contract; remove block_on from the queue",
+      "Conformance suite + SIGKILL redelivery + concurrent dispatcher tests on the PG18 image; negative controls under --cfg parking_lot_negative_control (lease never expires; SKIP LOCKED omitted)",
+      "Independent review at the merge gate (SQL correctness, isolation level, lease races)"
+    ]
+  },
+  {
+    "seq": 19,
+    "id": "cr-38-wasm-target",
+    "title": "WASM pool on spawn_local with a CI check job",
+    "round": 7,
+    "owner": "platform-engineer",
+    "tasks": [
+      "Port the wasm pool onto the dispatcher in parking-lot-wasm (spawn_local + JS timers, capacity admission, budgets); getrandom config; document panic=abort limit",
+      "CI wasm check, core dependency-graph check, and wasm-bindgen-test smoke/capacity/budget job",
+      "Independent review at the merge gate (no tokio runtime on wasm)"
+    ]
+  },
+  {
+    "seq": 20,
+    "id": "cr-27-pg-mailbox",
+    "title": "Postgres mailbox: consume-once, TTL eviction, first-write-wins idempotency",
+    "round": 8,
+    "owner": "postgres-engineer",
+    "tasks": [
+      "Mailbox SQL (DELETE ... RETURNING, TTL, ON CONFLICT) and migration",
+      "Async implementation + conformance tests on PG18; consume-once race test with two transactions coordinated by a barrier; remove sea-orm/sqlx 0.8 from parking-lot-pg via tech-lead Cargo handoff",
+      "Independent review at the merge gate (consume-once race, TTL)"
+    ]
+  },
+  {
+    "seq": 21,
+    "id": "cr-37-config-schema",
+    "title": "Config schema carrying backend parameters and a real build_pools_from_scheduler_config",
+    "round": 8,
+    "owner": "tech-lead",
+    "tasks": [
+      "Config types + validation + builder",
+      "Doc-example deserialization tests",
+      "Independent review at the merge gate (schema strictness)"
+    ]
+  },
+  {
+    "seq": 22,
+    "id": "cr-30-pgmq-sql-backend",
+    "title": "pgmq backend through SQL (one queue per priority), no client crate",
+    "round": 9,
+    "owner": "postgres-engineer",
+    "tasks": [
+      "SQL implementation over pgmq functions with visibility-timeout leases and per-priority queues; add the pgmq config section and example test (tech-lead config handoff)",
+      "Conformance suite against the PG18 image with pgmq",
+      "Independent review at the merge gate (lease mapping to visibility timeout)"
+    ]
+  },
+  {
+    "seq": 23,
+    "id": "cr-34-mailbox-composition",
+    "title": "Composable mailbox: storage plus optional notifier",
+    "round": 9,
+    "owner": "events-engineer",
+    "tasks": [
+      "StorageMailbox<S, N> behaviour in crates/parking-lot-core/src/mailbox/ with off-path bounded notification",
+      "Failure-injection tests in prometheus-parking-lot-core with in-memory storage and a failing notifier",
+      "Independent review at the merge gate (ordering of store vs notify)"
+    ]
+  },
+  {
+    "seq": 24,
+    "id": "cr-44-mobile-desktop-bindings",
+    "title": "Mobile (UniFFI) bindings and desktop (Tauri) integration",
+    "round": 9,
+    "owner": "platform-engineer",
+    "tasks": [
+      "UniFFI crate over the embedded backend; generated bindings",
+      "Android/iOS check jobs; Tauri example with restart test",
+      "Independent review at the merge gate (FFI safety (crate denies unsafe outside generated code))"
+    ]
+  },
+  {
+    "seq": 25,
+    "id": "cr-49-durable-dispatch",
+    "title": "Pools persist accepted work through the durable queue (persist, lease, ack after delivery, extend)",
+    "round": 10,
+    "owner": "scheduler-engineer",
+    "tasks": [
+      "Dispatcher sources from TaskQueue::lease when durable; persist-before-accept on submit; ack after mailbox write; lease heartbeat",
+      "Contract additions (if any) via tech-lead handoff; facade config wiring",
+      "Child-process SIGKILL tests for ResourcePool on PG18 and redb, ack-ordering test, long-task lease test, negative control",
+      "Independent review at the merge gate (durability ordering: persist, lease, deliver, ack)"
+    ]
+  },
+  {
+    "seq": 26,
+    "id": "cr-36-pg-matrix",
+    "title": "Postgres 17 + 18 CI matrix, autovacuum tuning and PG18 runbook",
+    "round": 10,
+    "owner": "postgres-engineer",
+    "tasks": [
+      "CI matrix job (handoff to platform-engineer) and per-table autovacuum migration",
+      "PG18 runbook",
+      "Independent review at the merge gate (matrix coverage)"
+    ]
+  },
+  {
+    "seq": 27,
+    "id": "cr-29-shutdown-cancellation",
+    "title": "Wire shutdown policy and cancellation capture into both pools",
+    "round": 11,
+    "owner": "scheduler-engineer",
+    "tasks": [
+      "Wire ShutdownPolicy + cancellation channel into ResourcePool and WorkerPool; fix received-task drop",
+      "Requeue -> TaskQueue::nack through the contract (no edits inside parking-lot-pg or parking-lot-embedded)",
+      "Shutdown and restart tests on PG18 and redb; negative control under --cfg parking_lot_negative_control drops a received task and must be detected",
+      "Independent review at the merge gate (no silent loss on any shutdown path)"
+    ]
+  },
+  {
+    "seq": 28,
+    "id": "cr-31-hook-emission",
+    "title": "Emit lifecycle events at every transition",
+    "round": 12,
+    "owner": "scheduler-engineer",
+    "tasks": [
+      "Emit events from the dispatcher and pools; builder registration (tech-lead handoff); hooks.rs API adjustments via events-engineer handoff",
+      "Ordering tests and overhead benchmark",
+      "Independent review at the merge gate (event completeness, overhead)"
+    ]
+  },
+  {
+    "seq": 29,
+    "id": "cr-20-skip-ahead",
+    "title": "Skip-ahead bin-packing with a starvation guard",
+    "round": 13,
+    "owner": "scheduler-engineer",
+    "tasks": [
+      "Skip-ahead policy with starvation guard (config field via tech-lead handoff); emit lifecycle events for skipped/promoted dispatch",
+      "Starvation and utilization tests/benchmarks; event-ordering test still passes",
+      "Independent review at the merge gate (starvation bound proof)"
+    ]
+  },
+  {
+    "seq": 30,
+    "id": "cr-32-iggy-events",
+    "title": "Iggy hook and notifier (events only, not storage or work queue)",
+    "round": 13,
+    "owner": "events-engineer",
+    "tasks": [
+      "IggyHook + IggyNotifier with bounded publisher and UUIDv5 IDs; iggy config section + example test (tech-lead config handoff)",
+      "Integration tests against a pinned Iggy 0.11-compatible server container: same idempotency key published twice yields one message ID; a paused server does not raise dispatch latency beyond the bound",
+      "Independent review at the merge gate (backpressure, ID determinism)"
+    ]
+  },
+  {
+    "seq": 31,
+    "id": "cr-23-multi-resource",
+    "title": "Multi-resource cost vectors (e.g. VRAM + worker slots)",
+    "round": 14,
+    "owner": "scheduler-engineer",
+    "tasks": [
+      "Vector-aware semaphore/dispatcher admission; multi-dimension limits via tech-lead config handoff; lifecycle events per dimension",
+      "Extend loom/proptest invariants and negative controls to vectors",
+      "Independent review at the merge gate (invariant per dimension)"
+    ]
+  },
+  {
+    "seq": 32,
+    "id": "cr-33-stream-replay",
+    "title": "(Stretch) Streaming-token replay for reconnecting clients",
+    "round": 14,
+    "owner": "events-engineer",
+    "tasks": [
+      "IggyStreamSink and resume API",
+      "Disconnect/reconnect test",
+      "Independent review at the merge gate (gap/duplicate proof)"
+    ]
+  },
+  {
+    "seq": 33,
+    "id": "cr-39-dependency-hygiene",
+    "title": "Dependency prune and semver checks",
+    "round": 14,
+    "owner": "platform-engineer",
+    "tasks": [
+      "Prune dependencies (handoff Cargo.toml edits to tech-lead)",
+      "cargo-semver-checks + udeps CI jobs",
+      "Independent review at the merge gate (no needed dependency removed)"
+    ]
+  },
+  {
+    "seq": 34,
+    "id": "cr-40-benchmarks",
+    "title": "CI-reproducible benchmarks and published numbers",
+    "round": 15,
+    "owner": "scheduler-engineer",
+    "tasks": [
+      "Criterion suites (throughput, latency, utilization)",
+      "Bench CI job and ARCHITECTURE.md numbers (tech-lead)",
+      "Independent review at the merge gate (benchmark validity)"
+    ]
+  },
+  {
+    "seq": 35,
+    "id": "cr-47-docs-guides",
+    "title": "Guides and scenarios with compiled examples and agentic value",
+    "round": 15,
+    "owner": "product-manager",
+    "tasks": [
+      "Write scenario guides backed by examples/ sources; every JSON/TOML config shown is added to the config example test (tech-lead reviews API usage)",
+      "Agentic-value chapter and API reference integration",
+      "Hand platform-engineer the docs-example CI job",
+      "Independent review at the merge gate (examples compile and match the API)"
+    ]
+  },
+  {
+    "seq": 36,
+    "id": "cr-53-wasm-parity",
+    "title": "WASM pool parity with later dispatcher changes",
+    "round": 15,
+    "owner": "platform-engineer",
+    "tasks": [
+      "Adapt the WASM pool to vector admission, skip-ahead and lifecycle events",
+      "Shared admission/event cases under wasm-bindgen-test",
+      "Independent review at the merge gate (parity with native pools)"
+    ]
+  },
+  {
+    "seq": 37,
+    "id": "cr-52-release",
+    "title": "Version, publish and tag 0.3.0 (crates.io trusted publishing, signed tag, GitHub release, docs deploy)",
+    "round": 16,
+    "owner": "platform-engineer",
+    "tasks": [
+      "Versioning ADR (SemVer, workspace version 0.3.0, inter-crate pins, MSRV policy); release-plz.toml and cliff.toml",
+      "Operator configures crates.io trusted publishing for each prometheus-parking-lot* crate and retires CARGO_REGISTRY_TOKEN from the shell profile",
+      "Release workflow: requires boundary receipt + operator approval environment, publishes in dependency order via OIDC, creates signed tag v0.3.0 and GitHub release, deploys docs",
+      "Operator approves and triggers the 0.3.0 release; record crate versions, tag SHA and release URL",
+      "Post-release verification: fresh-project install for each feature set; docs site reachable at the tag",
+      "Independent review at the merge gate (release gating, publish order, tag integrity)"
+    ]
+  }
+]

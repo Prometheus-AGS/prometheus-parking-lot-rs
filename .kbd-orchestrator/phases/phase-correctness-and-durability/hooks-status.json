@@ -1,1 +1,1 @@
-{"totalRuns":2,"failedRuns":0,"lastRun":{"ts":"2026-10-22T11:31:18Z","kind":"phase","edge":"before","name":"phase-correctness-and-durability","hookId":"kbd-memory-log","layer":"builtin","mode":"augment","status":0},"lastFailure":null}
+{"totalRuns":16,"failedRuns":0,"lastRun":{"ts":"2026-10-22T12:45:48Z","kind":"plan","edge":"after","name":"phase-correctness-and-durability","hookId":"legacy-plan-complete","layer":"builtin","mode":"augment","status":0},"lastFailure":null}

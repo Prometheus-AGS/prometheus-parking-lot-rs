@@ -1,0 +1,493 @@
+{
+  "contractVersion": "1",
+  "kind": "kbd.adopted-contract",
+  "identity": {
+    "projectId": "f6c384db-6ee1-4f1b-9bab-0e1602ec2615",
+    "runId": "phase-certification-remediation-20261022T103344Z",
+    "phaseId": "phase-correctness-and-durability",
+    "planRevision": 1,
+    "contractDigest": "bb9c2939a6b56c58200dd816e14bf6ddae93c2ed8c38ec41a478520e69604b17"
+  },
+  "digestNormalization": {
+    "algorithm": "sha256",
+    "command": "jq -S -c 'del(.identity.contractDigest) | del(.identity.planRevision)'",
+    "rationale": "contractDigest is excluded to avoid self-reference; planRevision is bound by the canonical decision.",
+    "stalenessRule": "REJECT-STALE when the digest differs from the latest non-superseded adoption decision for this contract path."
+  },
+  "adoptionSource": "Operator instructions 2026-10-22: adopt docs/update-plan-10-22-2026.md as the plan (\"that is the plan for what we do next\"); \"run /kbd-assess\"; decisions \"1. Research what is correct and do it 2. Update the version of rust to the latest advisable version and pull it forward ... flint-forge ... postgres 18 3. DO what is most correct and do not be afraid to change things\"; \"Include in the plan a branded docusaurus site ... know-me ...\"",
+  "decisionOwner": "Operator (Travis James); merges are operator-only",
+  "amendmentPolicy": "Material scope or acceptance changes require explicit operator adoption recorded as a new canonical decision with --supersedes; review suggestions never auto-enter task totals.",
+  "releaseClaim": {
+    "userOperation": "A service, desktop app or mobile app submits weighted AI tasks to a pool; the pool never runs more than its capacity in any resource dimension, never silently loses an accepted task across executor panic, shutdown or process crash (Postgres lease queue or embedded store; the pgmq backend provides lease redelivery per S-18 but pool-level crash durability on pgmq is not claimed), and the caller retrieves the result later from the mailbox even after disconnecting. Documented on a branded site with cited theory and compiled examples.",
+    "supportedEnvironments": [
+      "macOS aarch64 and Linux x86_64 (full tests)",
+      "Rust 1.99.1 (pinned) and MSRV 1.95",
+      "PostgreSQL 17 and 18 (project images, pgmq >= 1.8)",
+      "Tauri desktop via embedded redb store",
+      "wasm32-unknown-unknown (check + browser smoke)",
+      "Android arm64 and iOS device/simulator (check builds)"
+    ],
+    "currentCapabilities": "As of main@90a6194 (assessment.md): capacity enforced only in ResourcePool; no panic containment; Postgres backends non-functional; JSONL embedded queue not crash-safe; hooks unwired; CI fully red; no docs site.",
+    "explicitUnknowns": [
+      "Throughput/latency figures (benchmarks do not compile today)",
+      "pgmq extension build on PG18 inside the project image (unproven until cr-43)",
+      "UniFFI async support level for the chosen API surface",
+      "Iggy server version to pin for CI",
+      "Token/cost budget for a 37-change multi-agent phase"
+    ]
+  },
+  "statusVocabulary": [
+    "PASS",
+    "FAIL",
+    "BLOCKED",
+    "NOT_EXERCISED"
+  ],
+  "scenarioMatrix": [
+    {
+      "id": "S-1",
+      "name": "Capacity invariant (dispatcher + semaphore model)",
+      "ownerTask": "cr-19-dispatcher-semaphore#3",
+      "productionEntry": "RUSTFLAGS=\"--cfg parking_lot_loom\" LOOM_MAX_PREEMPTIONS=3 cargo test -p prometheus-parking-lot-core --test loom_capacity --locked",
+      "realCollaborators": [
+        "dispatcher",
+        "unit-weighted semaphore (parking-lot-core, no tokio)"
+      ],
+      "oracle": "No explored schedule has sum(active cost) > max_units and no accepted task is lost",
+      "negativeControl": "With --cfg parking_lot_negative_control=\"s-1\" (semaphore acquire skipped) the model reports a violation",
+      "fixtures": "Pure in-memory; loom with bounded preemptions",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-2",
+      "name": "No lost wakeup under submit/complete races",
+      "ownerTask": "cr-19-dispatcher-semaphore#3",
+      "productionEntry": "RUSTFLAGS=\"--cfg parking_lot_loom\" LOOM_MAX_PREEMPTIONS=3 cargo test -p prometheus-parking-lot-core --test loom_wakeup --locked",
+      "realCollaborators": [
+        "dispatcher",
+        "priority queue"
+      ],
+      "oracle": "Every accepted task is dispatched; no task stays parked while sufficient capacity is free",
+      "negativeControl": "With --cfg parking_lot_negative_control=\"s-2\" (depth check and enqueue under separate locks, as on main@90a6194) the model finds the stranded-task schedule",
+      "fixtures": "In-memory; loom",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-3",
+      "name": "Executor panic containment (native pools)",
+      "ownerTask": "cr-21-panic-containment#2",
+      "productionEntry": "cargo nextest run -p prometheus-parking-lot-runtime-tokio --locked -E \"test(panic_)\"",
+      "realCollaborators": [
+        "ResourcePool",
+        "WorkerPool native"
+      ],
+      "oracle": "1 panicking task of 100: 99 complete, capacity returns to 0, stats.failed == 1, panicked status in mailbox",
+      "negativeControl": "With --cfg parking_lot_negative_control=\"s-3\" (catch_unwind skipped) capacity leaks and the test fails",
+      "fixtures": "In-memory",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-4",
+      "name": "Bounded execution in every pool",
+      "ownerTask": "cr-19-dispatcher-semaphore#3+cr-38-wasm-target#2",
+      "productionEntry": "cargo nextest run -p prometheus-parking-lot-runtime-tokio --locked -E \"test(budget_)\" && wasm-pack test --headless --chrome crates/parking-lot-wasm",
+      "realCollaborators": [
+        "ResourcePool",
+        "WorkerPool native",
+        "WorkerPool wasm"
+      ],
+      "oracle": "A never-returning executor is cancelled at its budget; units released; timeout status delivered",
+      "negativeControl": "A cancel witness (Drop fires only on cancellation) does not fire for in-budget tasks; with --cfg parking_lot_negative_control=\"s-4\" (budget not applied) the wedged-executor test fails",
+      "fixtures": "In-memory; TestClock",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-5",
+      "name": "Postgres lease redelivery",
+      "ownerTask": "cr-26-pg-lease-queue#3",
+      "productionEntry": "cargo nextest run -p prometheus-parking-lot-pg --locked -E \"test(sigkill_redelivery)\"",
+      "realCollaborators": [
+        "Postgres 18 project image",
+        "sqlx 0.9.0",
+        "child process consumer"
+      ],
+      "oracle": "A consumer killed with SIGKILL mid-task: task redelivered after lease expiry and completed exactly once",
+      "negativeControl": "With --cfg parking_lot_negative_control=\"s-5\" (lease never expires) no redelivery occurs and the test fails",
+      "fixtures": "Fresh container per test from tag parking-lot-pg:18 (image digest recorded)",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-6",
+      "name": "No double claim with concurrent dispatchers",
+      "ownerTask": "cr-26-pg-lease-queue#3",
+      "productionEntry": "cargo nextest run -p prometheus-parking-lot-pg --locked -E \"test(concurrent_dispatchers)\"",
+      "realCollaborators": [
+        "Postgres 18 project image"
+      ],
+      "oracle": "With 8 dispatchers and 10k tasks, no task is leased by two dispatchers simultaneously",
+      "negativeControl": "With --cfg parking_lot_negative_control=\"s-6\" (SKIP LOCKED/row lock omitted) duplicates are detected",
+      "fixtures": "Fresh container; image digest recorded",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-7",
+      "name": "Consume-once mailbox with first-write-wins",
+      "ownerTask": "cr-27-pg-mailbox#2",
+      "productionEntry": "cargo nextest run -p prometheus-parking-lot-pg --locked -E \"test(mailbox_)\"",
+      "realCollaborators": [
+        "Postgres 18 project image"
+      ],
+      "oracle": "Two consume transactions coordinated by a barrier: exactly one receives the result; duplicate deliveries keep the first write; expired results are evicted",
+      "negativeControl": "With --cfg parking_lot_negative_control=\"s-7\" (SELECT then DELETE in separate statements) the barrier-coordinated test observes double delivery deterministically",
+      "fixtures": "Fresh container",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-8",
+      "name": "Embedded store crash safety",
+      "ownerTask": "cr-28-embedded-redb-queue#3",
+      "productionEntry": "cargo nextest run -p prometheus-parking-lot-embedded --locked -E \"test(crash_point_)\"",
+      "realCollaborators": [
+        "redb 4.x on a temp dir",
+        "child process aborted at instrumented points"
+      ],
+      "oracle": "After abort at every crash point and restart, each accepted task is present exactly once or redelivered per lease rules",
+      "negativeControl": "With --cfg parking_lot_negative_control=\"s-8\" (enqueue commit skipped) a task is lost and the test fails",
+      "fixtures": "Per-test tempdir; file digests recorded",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-9",
+      "name": "No loss on shutdown; requeue across restart",
+      "ownerTask": "cr-29-shutdown-cancellation#3",
+      "productionEntry": "cargo nextest run --workspace --all-features --locked --no-tests=fail -E \"test(shutdown_)\"",
+      "realCollaborators": [
+        "ResourcePool",
+        "WorkerPool native",
+        "Postgres 18 image",
+        "redb"
+      ],
+      "oracle": "Every accepted task is completed, captured by the cancellation sink, or requeued; requeued tasks run after restart",
+      "negativeControl": "With --cfg parking_lot_negative_control=\"s-9\" (received task dropped on the shutdown flag) the loss is detected",
+      "fixtures": "Fresh container + tempdir",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-10",
+      "name": "Notifier failure never loses a stored result",
+      "ownerTask": "cr-34-mailbox-composition#2",
+      "productionEntry": "cargo nextest run -p prometheus-parking-lot-core --locked --no-tests=fail -E \"test(notifier_failure)\"",
+      "realCollaborators": [
+        "StorageMailbox",
+        "in-memory storage",
+        "failing notifier"
+      ],
+      "oracle": "With a notifier failing every call, every result is stored and consumable",
+      "negativeControl": "With --cfg parking_lot_negative_control=\"s-10\" (notify-before-store, aborting on notifier error) results are lost and the test fails",
+      "fixtures": "In-memory",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-11",
+      "name": "Iggy events: deterministic IDs and non-blocking publish",
+      "ownerTask": "cr-32-iggy-events#2",
+      "productionEntry": "cargo nextest run -p prometheus-parking-lot-iggy --locked -E \"test(iggy_)\"",
+      "realCollaborators": [
+        "pinned Iggy server container"
+      ],
+      "oracle": "A subscriber receives mailbox.ready per completed task and replays from an earlier offset; publishing the same idempotency key twice yields one message ID; with the server paused, dispatch latency stays within the configured bound",
+      "negativeControl": "With --cfg parking_lot_negative_control=\"s-11\" (random message IDs; synchronous publish) the ID and latency assertions fail",
+      "fixtures": "Pinned Iggy image digest recorded",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-12",
+      "name": "CI green on toolchain and Postgres matrix",
+      "ownerTask": "cr-42-ci-rebuild#1+cr-36-pg-matrix#1",
+      "productionEntry": "GitHub Actions ci.yml on main",
+      "realCollaborators": [
+        "GitHub Actions",
+        "PG 17 and 18 images"
+      ],
+      "oracle": "All required jobs pass on 1.99.1 and 1.95 and on PG 17 and 18",
+      "negativeControl": "A deliberately unformatted commit on a scratch branch fails the fmt job",
+      "fixtures": "CI run IDs recorded",
+      "evidence": "run URLs and job conclusions",
+      "classification": "delivery"
+    },
+    {
+      "id": "S-13",
+      "name": "Package allowlist, purged history, no secrets",
+      "ownerTask": "cr-15-containment#2+cr-51-supply-chain-gates#1",
+      "productionEntry": "git log --all --oneline -- .codex/auth.json .codex/history.jsonl .codex/sessions .codex/config.toml .codex/version.json; cargo package --workspace --locked; gitleaks detect --log-opts=--all",
+      "realCollaborators": [
+        "fresh mirror clone",
+        "cargo packaging"
+      ],
+      "oracle": "The path history query is empty; each package lists only allowlisted paths; gitleaks reports no findings",
+      "negativeControl": "A scratch branch created from pre-purge commit 88f805c fails the pre-purge gate; a scratch branch adding a fake key file fails gitleaks",
+      "fixtures": "Fresh mirror clone after purge",
+      "evidence": "query output, package listings, gitleaks report digest",
+      "classification": "delivery"
+    },
+    {
+      "id": "S-14",
+      "name": "Web, mobile and desktop reach",
+      "ownerTask": "cr-38-wasm-target#2+cr-44-mobile-desktop-bindings#2",
+      "productionEntry": "CI jobs wasm-check (incl. cargo tree core check), android-check, ios-check, tauri-example",
+      "realCollaborators": [
+        "wasm-bindgen-test headless browser",
+        "cargo-ndk",
+        "Xcode toolchain",
+        "Tauri"
+      ],
+      "oracle": "wasm tests pass and the core wasm dependency graph contains no tokio; Android and iOS check builds succeed; Tauri example retrieves a result after restart",
+      "negativeControl": "A scratch branch adding tokio to parking-lot-core fails the core graph check",
+      "fixtures": "CI runners; toolchain versions recorded",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version",
+      "classification": "delivery"
+    },
+    {
+      "id": "S-15",
+      "name": "Branded documentation site with compiled examples",
+      "ownerTask": "cr-45-docs-site#3+cr-47-docs-guides#3",
+      "productionEntry": "npm --prefix website ci && npm --prefix website run build && npm --prefix website run verify",
+      "realCollaborators": [
+        "Docusaurus",
+        "headless browser",
+        "examples/ sources"
+      ],
+      "oracle": "Build and link check pass; light/dark screenshots match know-me tokens; no serious a11y violations; every guide example compiles",
+      "negativeControl": "A scratch page with a bordered card or a broken link fails verify",
+      "fixtures": "Frozen lockfile; screenshot digests",
+      "evidence": "build log, link report, a11y report, screenshot paths",
+      "classification": "delivery"
+    },
+    {
+      "id": "S-16",
+      "name": "Pool process killed mid-execution loses nothing (durable dispatch)",
+      "ownerTask": "cr-49-durable-dispatch#3",
+      "productionEntry": "cargo nextest run -p prometheus_parking_lot --features postgres,embedded --locked --no-tests=fail -E \"test(pool_sigkill_)\"",
+      "realCollaborators": [
+        "ResourcePool in a child process",
+        "Postgres 18 image",
+        "redb"
+      ],
+      "oracle": "After SIGKILL of the pool process mid-execution (and between execution and mailbox write) and restart, the task completes and exactly one result is consumable, on PG and on redb",
+      "negativeControl": "With --cfg parking_lot_negative_control=\"s-16\" (ack before mailbox write) the result is lost and the test fails",
+      "fixtures": "Fresh container + tempdir",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-17",
+      "name": "Async waiters use no blocking threads",
+      "ownerTask": "cr-22-result-slots#2",
+      "productionEntry": "cargo nextest run -p prometheus-parking-lot-runtime-tokio --locked -E \"test(waiters_no_blocking_threads)\"",
+      "realCollaborators": [
+        "ResourcePool",
+        "tokio runtime with max_blocking_threads(1)"
+      ],
+      "oracle": "With the single blocking thread occupied, 10,000 retrieve_async waiters all resolve within the timeout; unretrieved results expire after TTL",
+      "negativeControl": "With --cfg parking_lot_negative_control=\"s-17\" (spawn_blocking waiter) the test times out",
+      "fixtures": "In-memory",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-18",
+      "name": "pgmq backend lease and priority",
+      "ownerTask": "cr-30-pgmq-sql-backend#2",
+      "productionEntry": "cargo nextest run -p prometheus-parking-lot-pg --locked -E \"test(pgmq_)\"",
+      "realCollaborators": [
+        "Postgres 18 image with pgmq"
+      ],
+      "oracle": "The queue conformance suite passes; higher-priority tasks are leased first; an unacked task reappears after its visibility timeout",
+      "negativeControl": "With --cfg parking_lot_negative_control=\"s-18\" (single queue, no priority split) the priority-order case fails",
+      "fixtures": "Fresh container; pgmq version recorded",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-19",
+      "name": "Multi-resource admission",
+      "ownerTask": "cr-23-multi-resource#2",
+      "productionEntry": "RUSTFLAGS=\"--cfg parking_lot_loom\" LOOM_MAX_PREEMPTIONS=3 cargo test -p prometheus-parking-lot-core --test loom_vector --locked",
+      "realCollaborators": [
+        "dispatcher",
+        "vector semaphore"
+      ],
+      "oracle": "No schedule exceeds capacity in any dimension; a task short in one dimension waits",
+      "negativeControl": "With --cfg parking_lot_negative_control=\"s-19\" (only the first dimension checked) a violation is reported",
+      "fixtures": "In-memory; loom",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-20",
+      "name": "Skip-ahead starvation bound",
+      "ownerTask": "cr-20-skip-ahead#2",
+      "productionEntry": "cargo nextest run -p prometheus-parking-lot-core --locked -E \"test(starvation_)\"",
+      "realCollaborators": [
+        "dispatcher"
+      ],
+      "oracle": "A large head task starts within the configured number of dispatch cycles while small tasks keep arriving",
+      "negativeControl": "With --cfg parking_lot_negative_control=\"s-20\" (guard disabled) the head starves past the bound",
+      "fixtures": "In-memory; deterministic arrival schedule",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-21",
+      "name": "Lifecycle event ordering",
+      "ownerTask": "cr-31-hook-emission#2",
+      "productionEntry": "cargo nextest run -p prometheus-parking-lot-runtime-tokio --locked -E \"test(lifecycle_events_)\"",
+      "realCollaborators": [
+        "ResourcePool",
+        "WorkerPool native",
+        "recording hook"
+      ],
+      "oracle": "Every task emits submitted before started before exactly one terminal event, including cancelled and requeued paths",
+      "negativeControl": "With --cfg parking_lot_negative_control=\"s-21\" (terminal event suppressed on cancellation) the ordering check fails",
+      "fixtures": "In-memory",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-22",
+      "name": "Config builds pools and rejects unknown fields",
+      "ownerTask": "cr-37-config-schema#2",
+      "productionEntry": "cargo nextest run -p prometheus_parking_lot --all-features --locked --no-tests=fail -E \"test(config_)\"",
+      "realCollaborators": [
+        "config loader",
+        "in-memory, Postgres and redb backends"
+      ],
+      "oracle": "Every documented example config builds its pools; a misspelled field fails naming the field",
+      "negativeControl": "Removing deny_unknown_fields makes the misspelling case fail",
+      "fixtures": "Example files digested",
+      "evidence": "argv, exit code, test names and pass/fail counts from stdout, git SHA, toolchain version"
+    },
+    {
+      "id": "S-24",
+      "name": "Release 0.3.0 installable, tagged and gated",
+      "ownerTask": "cr-52-release#5",
+      "productionEntry": "cargo add prometheus_parking_lot@0.3.0 --features postgres,embedded in a fresh project && cargo build; git tag -v v0.3.0",
+      "realCollaborators": [
+        "crates.io",
+        "GitHub release",
+        "release workflow"
+      ],
+      "oracle": "All crates resolve at 0.3.0 from crates.io and the project builds; the tag verifies; the GitHub release carries the 0.3.0 changelog",
+      "negativeControl": "Starting the publish workflow without a boundary PASS receipt refuses to publish",
+      "fixtures": "Fresh project directory; Cargo.lock digest",
+      "evidence": "cargo output, tag verification, release URL, workflow run URL",
+      "classification": "delivery"
+    },
+    {
+      "id": "S-23",
+      "name": "Core crate dependency boundary",
+      "ownerTask": "cr-48-workspace-split#2",
+      "productionEntry": "cargo tree -p prometheus-parking-lot-core -e normal",
+      "realCollaborators": [
+        "cargo metadata"
+      ],
+      "oracle": "No tokio, sqlx, sea-orm, iggy, redb or reqwest in the core graph",
+      "negativeControl": "A scratch branch adding sqlx to core fails the check",
+      "fixtures": "Cargo.lock digest",
+      "evidence": "cargo tree output",
+      "classification": "delivery"
+    }
+  ],
+  "functionalScope": [
+    "Unit-weighted (then multi-resource) admission enforced by one dispatcher shared by all pools",
+    "Panic containment, bounded execution, async result slots with TTL",
+    "Async lease/ack queue, async mailbox and notifier contracts with a conformance suite",
+    "Postgres lease queue, Postgres mailbox, pgmq-over-SQL backend, embedded redb queue",
+    "Shutdown policy with cancellation capture and durable requeue",
+    "Lifecycle events and Iggy hook/notifier",
+    "Typed configuration building pools and backends",
+    "Workspace split with a wasm-safe core; wasm, mobile (UniFFI) and Tauri reach",
+    "Branded Docusaurus site with cited theory/history chapters and compiled scenario guides",
+    "Versioned 0.3.0 release: changelog, crates.io publication of every workspace crate in dependency order, signed v0.3.0 tag, GitHub release, docs deploy"
+  ],
+  "resilienceScope": {
+    "policy": "Adopted requirements never defer via budget overflow; exhaustion checkpoints and marks BLOCKED. Only never-adopted optional items may defer.",
+    "deferredOptional": [
+      "cr-33-stream-replay (stretch)"
+    ]
+  },
+  "exclusions": [
+    "Multi-node scheduler coordination (one dispatcher per partition) — later phase",
+    "Exactly-once execution (at-least-once + idempotent executors per decision R7)",
+    "Flint-specific Postgres extensions from the flint-forge image",
+    "Pool-level crash durability on the pgmq backend (lease redelivery only)",
+    "Durable dispatch on the web target (no durable backend in the browser)"
+  ],
+  "requiredSafetyChecks": [
+    "Exposed OpenAI key and Codex tokens rotated by the operator before history purge",
+    "History purge only with recorded operator approval; no force-push without it",
+    "No agent-tool credentials or runtime state tracked (constraints no-tracked-tool-credentials)",
+    "cargo deny advisories clean; gitleaks clean across history",
+    "No unsafe code outside generated FFI glue; crate-level deny(unsafe_code) kept in core",
+    "Docs sanitizer rejects private paths, secrets and raw wiki content",
+    "crates.io publication only after boundary PASS and explicit operator approval, via trusted publishing (no long-lived token in CI)"
+  ],
+  "budgets": {
+    "timeMinutes": 14400,
+    "toolCalls": 12000,
+    "repairAttempts": 3,
+    "noProgressLimit": 2,
+    "tokenBudget": "UNKNOWN",
+    "tokenFallback": "Checkpoint at each milestone; stop and report BLOCKED after two consecutive rounds with no merged change.",
+    "exhaustion": "Checkpoint, record BLOCKED with the exhausted dimension, never report PASS; docs and state may be saved without running product tests."
+  },
+  "evidenceInvalidation": "Evidence is keyed by (scenario id, git SHA of the owning crate, toolchain version, image digest or fixture digest). A change invalidates only evidence whose key it alters; history is preserved and there is no blanket re-review.",
+  "workerRoutes": {
+    "agent": "Claude Code subagents from team parking-lot-core (.claude/agents/<role>.md) dispatched via the Agent tool, one git worktree per role",
+    "model": "anthropic/claude-opus-5-5 for tech-lead, scheduler-engineer, product-manager, reviewer; anthropic/claude-sonnet-5-5 for postgres-engineer, events-engineer, platform-engineer",
+    "billing": "Operator Claude subscription via this Claude Code session; per-token cost UNKNOWN",
+    "subagents": "Allowed for role work and independent review; reviewer gets diff + spec only; same-family review is recorded as a limitation until a cross-family judge is configured",
+    "reviewRoundsMax": 2
+  },
+  "boundaryPacket": {
+    "postImplementationOnly": true,
+    "singleRun": true,
+    "commands": [
+      "cargo fmt --all -- --check",
+      "cargo clippy --workspace --all-targets --all-features --locked -- -D warnings",
+      "cargo nextest run --workspace --all-features --locked --no-tests=fail",
+      "cargo +1.95 check --workspace --all-features --locked",
+      "RUSTFLAGS=\"--cfg parking_lot_loom\" LOOM_MAX_PREEMPTIONS=3 cargo test -p prometheus-parking-lot-core --test loom_capacity --test loom_wakeup --test loom_vector --locked",
+      "POSTGRES_IMAGE=parking-lot-pg:17 cargo nextest run -p prometheus-parking-lot-pg --locked",
+      "cargo test --doc --workspace --locked",
+      "RUSTDOCFLAGS=\"-D warnings\" cargo doc --workspace --no-deps --all-features --locked",
+      "cargo deny check",
+      "cargo package --workspace --locked",
+      "gitleaks detect --redact --log-opts=--all",
+      "rm -rf \"$TMPDIR/pl-mirror\" && git clone --mirror https://github.com/Prometheus-AGS/prometheus-parking-lot-rs.git \"$TMPDIR/pl-mirror\" && test -z \"$(git -C \"$TMPDIR/pl-mirror\" log --all --oneline -- .codex/auth.json .codex/history.jsonl .codex/sessions .codex/config.toml .codex/version.json)\"",
+      "! cargo tree -p prometheus-parking-lot-core -e normal | grep -E \" (tokio|sqlx|sea-orm|iggy|redb|reqwest) v\"",
+      "! cargo tree -p prometheus-parking-lot-core --target wasm32-unknown-unknown -e normal | grep -E \" tokio v\"",
+      "wasm-pack test --headless --chrome crates/parking-lot-wasm",
+      "cargo ndk -t arm64-v8a check -p prometheus-parking-lot-ffi --locked",
+      "cargo check -p prometheus-parking-lot-ffi --target aarch64-apple-ios-sim --locked",
+      "npm --prefix website ci && npm --prefix website run build",
+      "npm --prefix website run verify"
+    ],
+    "expectedEffects": [
+      "All commands exit 0",
+      "Scenario S-1..S-23 evidence recorded (S-24 is recorded by cr-52 after release) under .kbd-orchestrator/phases/phase-correctness-and-durability/evidence/<date>/ with a README",
+      "No files outside build/test output directories modified"
+    ],
+    "requiredApprovals": "Operator approval for the run; Docker available for Postgres/Iggy containers; no publish, tag or push is part of the packet (publication is cr-52, after this packet passes)",
+    "receipts": [
+      "evidence/<date>/README.md mapping each scenario to its command output",
+      "CI run URLs for S-12 and S-14",
+      "image digests for parking-lot-pg:17/18 and Iggy"
+    ],
+    "cleanup": [
+      "docker rm -f test containers created by the run",
+      "cargo sweep is NOT run (build-dir reuse is intentional)"
+    ],
+    "stopConditions": [
+      "Any command exits non-zero: stop, record FAIL or BLOCKED for the affected scenarios, do not continue to later commands",
+      "Docker unavailable: BLOCKED for S-5..S-11, S-16, S-18 and S-22",
+      "A secret is detected: stop and escalate to the operator"
+    ]
+  },
+  "status": {
+    "implementationComplete": false
+  }
+}

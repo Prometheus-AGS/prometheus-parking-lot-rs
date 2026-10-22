@@ -34,3 +34,12 @@ Thumbs.db
 .agent-team/state.json
 .agent-team/recovery/
 .prometheus/recovery/
+
+# Agent-tool runtime state and credentials (never commit; CR-15)
+.codex/auth.json
+.codex/config.toml
+.codex/history.jsonl
+.codex/version.json
+.codex/sessions/
+.codex/log/
+.serena/
