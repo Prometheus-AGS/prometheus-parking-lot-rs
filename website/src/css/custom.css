@@ -1,0 +1,502 @@
+/*
+ * Prometheus Parking Lot documentation theme.
+ *
+ * Tokens: know-me UI/UX standard, section 4.1 (dark and light tables), mirrored
+ * in brand/tokens.mjs for the verify script. Flat 2.0 (section 3): regions differ
+ * only by filled background; no borders, separator lines, gradients or
+ * decorative shadows. Keyboard focus stays visible.
+ *
+ * Contrast deviations (WCAG 2.2 AA wins over decoration; recorded in the cr-45 hand-off):
+ *  - Light Ember (#E04E28) is 3.7:1 on canvas, so light-mode links use primary text
+ *    with an Ember underline; primary buttons put canvas-dark text on Ember (4.8:1).
+ *  - Faint text (#6B7280) is 4.0:1 on the dark canvas, so dark mode never uses it
+ *    for body-size text; secondary text carries metadata instead.
+ *  - Light Cyan (#0891B2) is 3.4:1 on canvas, so it is used for non-text marks only.
+ */
+
+/* ---------- Brand tokens ---------- */
+:root {
+  --pl-canvas: #F7F7F8;
+  --pl-chrome: #FFFFFF;
+  --pl-surface: #FAFBFC;
+  --pl-raised: #FFFFFF;
+  --pl-hover: #F2F4F7;
+  --pl-muted: #EEF0F3;
+  --pl-text: #0B0F14;
+  --pl-text-secondary: #4B5563;
+  --pl-text-faint: #6B7280;
+  --pl-ember: #E04E28;
+  --pl-cyan: #0891B2;
+  --pl-success: #16A34A;
+  --pl-warning: #D97706;
+  --pl-error: #DC2626;
+
+  --pl-on-ember: #0B0F14;
+  --pl-link: var(--pl-text);
+  --pl-meta: var(--pl-text-faint);
+  --pl-ember-tint: color-mix(in srgb, var(--pl-ember) 12%, var(--pl-chrome));
+
+  --pl-font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --pl-font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --pl-font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  /* 4 px rhythm: 4, 8, 12, 16, 24, 32, 48 */
+  --pl-space-1: 4px;
+  --pl-space-2: 8px;
+  --pl-space-3: 12px;
+  --pl-space-4: 16px;
+  --pl-space-5: 24px;
+  --pl-space-6: 32px;
+  --pl-space-7: 48px;
+  --pl-radius: 8px;
+  --pl-radius-lg: 12px;
+  --pl-duration: 140ms;
+
+  /* ---------- Infima mapping ---------- */
+  --ifm-color-primary: var(--pl-ember);
+  --ifm-color-primary-dark: color-mix(in srgb, var(--pl-ember) 90%, #000);
+  --ifm-color-primary-darker: color-mix(in srgb, var(--pl-ember) 85%, #000);
+  --ifm-color-primary-darkest: color-mix(in srgb, var(--pl-ember) 70%, #000);
+  --ifm-color-primary-light: color-mix(in srgb, var(--pl-ember) 90%, #fff);
+  --ifm-color-primary-lighter: color-mix(in srgb, var(--pl-ember) 85%, #fff);
+  --ifm-color-primary-lightest: color-mix(in srgb, var(--pl-ember) 70%, #fff);
+  --ifm-color-primary-contrast-background: var(--pl-ember-tint);
+  --ifm-color-primary-contrast-foreground: var(--pl-text);
+  --ifm-color-success: var(--pl-success);
+  --ifm-color-warning: var(--pl-warning);
+  --ifm-color-danger: var(--pl-error);
+  --ifm-color-info: var(--pl-cyan);
+
+  --ifm-background-color: var(--pl-canvas);
+  --ifm-background-surface-color: var(--pl-surface);
+  --ifm-navbar-background-color: var(--pl-chrome);
+  --ifm-footer-background-color: var(--pl-chrome);
+  --ifm-footer-color: var(--pl-text-secondary);
+  --ifm-footer-link-color: var(--pl-text-secondary);
+  --ifm-footer-link-hover-color: var(--pl-text);
+  --ifm-footer-title-color: var(--pl-text);
+  --ifm-card-background-color: var(--pl-surface);
+  --ifm-dropdown-background-color: var(--pl-raised);
+  --ifm-dropdown-hover-background-color: var(--pl-hover);
+
+  --ifm-font-color-base: var(--pl-text);
+  --ifm-font-color-secondary: var(--pl-text-secondary);
+  --ifm-heading-color: var(--pl-text);
+  --ifm-color-content: var(--pl-text);
+  --ifm-color-content-secondary: var(--pl-text-secondary);
+  --ifm-link-color: var(--pl-link);
+  --ifm-link-hover-color: var(--pl-link);
+  --ifm-link-decoration: underline;
+  --ifm-link-hover-decoration: underline;
+
+  --ifm-font-family-base: var(--pl-font-ui);
+  --ifm-heading-font-family: var(--pl-font-display);
+  --ifm-font-family-monospace: var(--pl-font-mono);
+  --ifm-heading-font-weight: 700;
+  --ifm-line-height-base: 1.65;
+  --ifm-font-size-base: 100%;
+
+  --ifm-code-background: var(--pl-muted);
+  --ifm-code-font-size: 90%;
+  --ifm-pre-background: var(--pl-surface);
+  --ifm-code-border-radius: 6px;
+  --ifm-global-radius: var(--pl-radius);
+  --ifm-button-border-radius: var(--pl-radius);
+  --ifm-card-border-radius: var(--pl-radius-lg);
+
+  --ifm-menu-color: var(--pl-text-secondary);
+  --ifm-menu-color-active: var(--pl-text);
+  --ifm-menu-color-background-active: var(--pl-ember-tint);
+  --ifm-menu-color-background-hover: var(--pl-hover);
+  --ifm-hover-overlay: var(--pl-hover);
+  --ifm-navbar-link-color: var(--pl-text-secondary);
+  --ifm-navbar-link-hover-color: var(--pl-text);
+  --ifm-navbar-link-active-color: var(--pl-text);
+  --ifm-navbar-search-input-background-color: var(--pl-muted);
+  --ifm-navbar-search-input-color: var(--pl-text);
+  --ifm-navbar-search-input-placeholder-color: var(--pl-text-secondary);
+  --ifm-toc-link-color: var(--pl-text-secondary);
+  --ifm-breadcrumb-item-background-active: var(--pl-ember-tint);
+  --ifm-breadcrumb-color-active: var(--pl-text);
+  --ifm-table-stripe-background: var(--pl-surface);
+  --ifm-table-head-background: var(--pl-muted);
+  --ifm-table-head-color: var(--pl-text);
+  --ifm-table-background: transparent;
+
+  /* Flat 2.0: every Infima line, rule and shadow resolves to nothing. */
+  --ifm-global-border-width: 0;
+  --ifm-toc-border-color: transparent;
+  --ifm-table-border-color: transparent;
+  --ifm-table-border-width: 0;
+  --ifm-hr-height: 0;
+  --ifm-hr-background-color: transparent;
+  --ifm-blockquote-border-left-width: 0;
+  --ifm-blockquote-border-color: transparent;
+  --ifm-alert-border-width: 0;
+  --ifm-alert-border-left-width: 0;
+  --ifm-global-shadow-lw: none;
+  --ifm-global-shadow-md: none;
+  --ifm-global-shadow-tl: none;
+  --ifm-navbar-shadow: none;
+
+  /* Local search plugin */
+  --search-local-modal-background: var(--pl-raised);
+  --search-local-modal-shadow: none;
+  --search-local-hit-background: var(--pl-surface);
+  --search-local-hit-shadow: none;
+  --search-local-hit-color: var(--pl-text);
+  --search-local-hit-active-color: var(--pl-text);
+  --search-local-highlight-color: var(--pl-text);
+  --search-local-muted-color: var(--pl-text-secondary);
+  --search-local-input-active-border-color: transparent;
+
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --pl-canvas: #0B0F14;
+  --pl-chrome: #111620;
+  --pl-surface: #161D29;
+  --pl-raised: #1C2535;
+  --pl-hover: #202B40;
+  --pl-muted: #253044;
+  --pl-text: #E8EDF3;
+  --pl-text-secondary: #A7B0BC;
+  --pl-text-faint: #6B7280;
+  --pl-ember: #FF6A3D;
+  --pl-cyan: #00C2DC;
+  --pl-success: #22C55E;
+  --pl-warning: #F59E0B;
+  --pl-error: #EF4444;
+
+  --pl-link: var(--pl-ember);
+  --pl-meta: var(--pl-text-secondary);
+  --pl-ember-tint: color-mix(in srgb, var(--pl-ember) 16%, var(--pl-chrome));
+
+  color-scheme: dark;
+}
+
+/* ---------- Flat 2.0 backstop ---------- */
+*,
+*::before,
+*::after {
+  box-shadow: none !important;
+  border-color: transparent !important;
+  text-shadow: none !important;
+}
+
+hr {
+  height: 0;
+  margin: var(--pl-space-6) 0;
+  background: none;
+}
+
+html,
+body {
+  background-color: var(--pl-canvas);
+}
+
+body {
+  color: var(--pl-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, .navbar__title {
+  font-family: var(--pl-font-display);
+  letter-spacing: -0.02em;
+}
+
+/* ---------- Links and focus ---------- */
+a {
+  text-decoration-color: var(--pl-ember);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.navbar a,
+.menu a,
+.table-of-contents a,
+.pagination-nav a,
+.footer a,
+.breadcrumbs a,
+.button,
+.pl-card {
+  text-decoration: none;
+}
+
+:focus-visible {
+  outline: 3px solid var(--pl-ember);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.menu__link:focus-visible,
+.navbar__link:focus-visible,
+.table-of-contents__link:focus-visible,
+.pl-card:focus-visible {
+  background-color: var(--pl-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}
+
+/* ---------- Chrome: navbar, sidebar, footer ---------- */
+.navbar {
+  background-color: var(--pl-chrome);
+}
+
+.navbar__title {
+  font-weight: 700;
+  color: var(--pl-text);
+}
+
+.navbar__link--active {
+  background-color: var(--pl-ember-tint);
+  border-radius: var(--pl-radius);
+  font-weight: 600;
+}
+
+.navbar-sidebar,
+.navbar-sidebar__brand,
+.navbar-sidebar__items {
+  background-color: var(--pl-surface);
+}
+
+.navbar-sidebar__backdrop {
+  background-color: rgb(11 15 20 / 0.6);
+}
+
+.theme-doc-sidebar-container,
+.menu {
+  background-color: var(--pl-chrome);
+}
+
+.menu__link {
+  border-radius: var(--pl-radius);
+  transition: background-color var(--pl-duration) ease;
+}
+
+.menu__link--active:not(.menu__link--sublist) {
+  background-color: var(--pl-ember-tint);
+  color: var(--pl-text);
+  font-weight: 600;
+}
+
+.footer {
+  background-color: var(--pl-chrome);
+}
+
+.footer__copyright {
+  color: var(--pl-text-secondary);
+}
+
+.navbar__search-input {
+  background-color: var(--pl-muted);
+  color: var(--pl-text);
+  border-radius: var(--pl-radius);
+}
+
+/* ---------- Content surfaces ---------- */
+pre,
+.prism-code,
+div[class*='codeBlockContainer'] {
+  background-color: var(--pl-surface);
+  border-radius: var(--pl-radius);
+}
+
+div[class*='codeBlockTitle'] {
+  background-color: var(--pl-muted);
+  font-family: var(--pl-font-mono);
+}
+
+code {
+  font-family: var(--pl-font-mono);
+  background-color: var(--pl-muted);
+}
+
+blockquote {
+  background-color: var(--pl-surface);
+  border-radius: var(--pl-radius);
+  padding: var(--pl-space-4) var(--pl-space-5);
+  color: var(--pl-text-secondary);
+}
+
+table thead tr {
+  background-color: var(--pl-muted);
+}
+
+.theme-admonition {
+  color: var(--pl-text);
+  border-radius: var(--pl-radius);
+}
+
+.theme-admonition a {
+  color: var(--pl-link);
+}
+
+.alert--info { background-color: color-mix(in srgb, var(--pl-cyan) 12%, var(--pl-surface)); }
+.alert--success { background-color: color-mix(in srgb, var(--pl-success) 12%, var(--pl-surface)); }
+.alert--warning { background-color: color-mix(in srgb, var(--pl-warning) 14%, var(--pl-surface)); }
+.alert--danger { background-color: color-mix(in srgb, var(--pl-error) 12%, var(--pl-surface)); }
+.alert--secondary { background-color: var(--pl-surface); }
+
+.alert--info [class*='admonitionIcon'] svg { fill: var(--pl-cyan); }
+.alert--success [class*='admonitionIcon'] svg { fill: var(--pl-success); }
+.alert--warning [class*='admonitionIcon'] svg { fill: var(--pl-warning); }
+.alert--danger [class*='admonitionIcon'] svg { fill: var(--pl-error); }
+
+[class*='admonitionHeading'] {
+  color: var(--pl-text);
+  font-family: var(--pl-font-ui);
+  letter-spacing: 0.02em;
+}
+
+.pagination-nav__link {
+  background-color: var(--pl-surface);
+  transition: background-color var(--pl-duration) ease;
+}
+
+.pagination-nav__link:hover {
+  background-color: var(--pl-hover);
+}
+
+.pagination-nav__sublabel {
+  color: var(--pl-text-secondary);
+}
+
+.table-of-contents__link--active {
+  color: var(--pl-text);
+  font-weight: 600;
+}
+
+.breadcrumbs__link {
+  background-color: var(--pl-surface);
+}
+
+.theme-doc-footer {
+  color: var(--pl-meta);
+}
+
+/* ---------- Buttons ---------- */
+.button {
+  font-family: var(--pl-font-ui);
+  font-weight: 600;
+  transition: background-color var(--pl-duration) ease;
+}
+
+/* Doubled class: Infima's .button--secondary colour otherwise wins in dark mode. */
+.button.button--primary,
+.button.button--primary:hover {
+  color: var(--pl-on-ember);
+}
+
+.button.button--primary {
+  background-color: var(--pl-ember);
+}
+
+.button.button--primary:hover {
+  background-color: var(--ifm-color-primary-dark);
+}
+
+.button.button--secondary,
+.button.button--secondary:hover {
+  color: var(--pl-text);
+}
+
+.button.button--secondary {
+  background-color: var(--pl-muted);
+}
+
+.button.button--secondary:hover {
+  background-color: var(--pl-hover);
+}
+
+/* ---------- Mermaid (coordinated with tokens, borderless nodes) ---------- */
+.docusaurus-mermaid-container {
+  background-color: var(--pl-surface);
+  border-radius: var(--pl-radius-lg);
+  padding: var(--pl-space-5);
+  margin-bottom: var(--pl-space-5);
+}
+
+.docusaurus-mermaid-container svg {
+  font-family: var(--pl-font-ui) !important;
+}
+
+.docusaurus-mermaid-container svg .node rect,
+.docusaurus-mermaid-container svg .node polygon,
+.docusaurus-mermaid-container svg .node circle,
+.docusaurus-mermaid-container svg .node path,
+.docusaurus-mermaid-container svg .node .label-container {
+  fill: var(--pl-raised) !important;
+  stroke: none !important;
+}
+
+.docusaurus-mermaid-container svg .cluster rect {
+  fill: var(--pl-muted) !important;
+  stroke: none !important;
+}
+
+.docusaurus-mermaid-container svg .nodeLabel,
+.docusaurus-mermaid-container svg .cluster-label,
+.docusaurus-mermaid-container svg .label,
+.docusaurus-mermaid-container svg text {
+  color: var(--pl-text) !important;
+  fill: var(--pl-text) !important;
+}
+
+.docusaurus-mermaid-container svg .edgePath .path,
+.docusaurus-mermaid-container svg .flowchart-link {
+  stroke: var(--pl-cyan) !important;
+}
+
+.docusaurus-mermaid-container svg marker path,
+.docusaurus-mermaid-container svg .arrowheadPath,
+.docusaurus-mermaid-container svg .arrowMarkerPath {
+  fill: var(--pl-cyan) !important;
+  stroke: var(--pl-cyan) !important;
+}
+
+.docusaurus-mermaid-container svg .edgeLabel,
+.docusaurus-mermaid-container svg .edgeLabel rect,
+.docusaurus-mermaid-container svg .labelBkg {
+  background-color: var(--pl-surface) !important;
+  fill: var(--pl-surface) !important;
+  color: var(--pl-text-secondary) !important;
+}
+
+/* ---------- Status pills and metadata ---------- */
+.pl-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--pl-space-2);
+  padding: var(--pl-space-1) var(--pl-space-3);
+  border-radius: 999px;
+  background-color: var(--pl-muted);
+  color: var(--pl-text);
+  font-family: var(--pl-font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.pl-pill::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--pl-cyan);
+}
+
+.pl-pill--planned::before {
+  background-color: var(--pl-warning);
+}
+
+.pl-meta {
+  color: var(--pl-meta);
+  font-family: var(--pl-font-mono);
+  font-size: 0.8125rem;
+}

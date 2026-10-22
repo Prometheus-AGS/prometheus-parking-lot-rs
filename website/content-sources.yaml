@@ -1,0 +1,21 @@
+# Source classification for the public site (build-branded-docusaurus).
+# public: published as written. public-normalize: rewritten for a public reader.
+# private-synthesis-only: may inform writing, never copied. excluded: never used.
+schema_version: 1
+sources:
+  - path: website/docs
+    classification: public
+  - path: README.md
+    classification: public-normalize
+  - path: CHANGELOG.md
+    classification: public-normalize
+  - path: docs
+    classification: public-normalize
+  - path: openspec
+    classification: private-synthesis-only
+  - path: .kbd-orchestrator
+    classification: private-synthesis-only
+  - path: .prometheus
+    classification: excluded
+  - path: events.jsonl
+    classification: excluded
