@@ -78,7 +78,9 @@ impl TestPayload {
 }
 
 /// Await every handle in order (a stand-in for `futures::future::join_all`).
-pub(crate) async fn join_all<T>(handles: Vec<tokio::task::JoinHandle<T>>) -> Vec<Result<T, tokio::task::JoinError>> {
+pub(crate) async fn join_all<T>(
+    handles: Vec<tokio::task::JoinHandle<T>>,
+) -> Vec<Result<T, tokio::task::JoinError>> {
     let mut out = Vec::with_capacity(handles.len());
     for handle in handles {
         out.push(handle.await);

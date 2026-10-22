@@ -1,7 +1,7 @@
 //! Tests for tokio spawner utilities
 
-use prometheus_parking_lot_runtime_tokio::tokio_spawner::TokioSpawner;
 use prometheus_parking_lot_core::Spawn;
+use prometheus_parking_lot_runtime_tokio::tokio_spawner::TokioSpawner;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_tokio_spawner_spawn() {

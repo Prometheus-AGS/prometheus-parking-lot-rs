@@ -1,4 +1,4 @@
-//! Integration tests for PostgresQueue implementation.
+//! Integration tests for the `PostgresQueue` implementation.
 
 use prometheus_parking_lot_core::{
     MailboxKey, Priority, ResourceCost, ResourceKind, ScheduledTask, SchedulerError, TaskMetadata,
@@ -14,7 +14,7 @@ fn make_task(id: u64, priority: Priority) -> ScheduledTask<TestPayload> {
             id,
             mailbox: Some(MailboxKey {
                 tenant: "test-tenant".into(),
-                user_id: Some(format!("user-{}", id)),
+                user_id: Some(format!("user-{id}")),
                 session_id: None,
             }),
             priority,
@@ -24,7 +24,7 @@ fn make_task(id: u64, priority: Priority) -> ScheduledTask<TestPayload> {
             idempotency_key: None,
             sequence: 0,
         },
-        payload: TestPayload::new(id, format!("test-payload-{}", id)),
+        payload: TestPayload::new(id, format!("test-payload-{id}")),
     }
 }
 
@@ -35,7 +35,7 @@ async fn test_postgres_queue_enqueue_dequeue() {
         .await
         .expect("Failed to create test fixture");
 
-    let mut queue = PostgresQueue::new(fixture.db.clone(), "test_queue".into(), 100);
+    let mut queue = PostgresQueue::new(fixture.db, "test_queue".into(), 100);
 
     // Enqueue tasks
     let task1 = make_task(1, Priority::Normal);
@@ -47,15 +47,23 @@ async fn test_postgres_queue_enqueue_dequeue() {
     assert_eq!(blocking!(queue.len()), 2);
 
     // Dequeue tasks (should maintain FIFO within same priority)
-    let dequeued1 = blocking!(queue.dequeue()).expect("Failed to dequeue").expect("Queue is empty");
+    let dequeued1 = blocking!(queue.dequeue())
+        .expect("Failed to dequeue")
+        .expect("Queue is empty");
     assert_eq!(dequeued1.meta.id, 1);
     assert_eq!(dequeued1.payload, task1.payload);
 
-    let dequeued2 = blocking!(queue.dequeue()).expect("Failed to dequeue").expect("Queue is empty");
+    let dequeued2 = blocking!(queue.dequeue())
+        .expect("Failed to dequeue")
+        .expect("Queue is empty");
     assert_eq!(dequeued2.meta.id, 2);
 
     assert_eq!(blocking!(queue.len()), 0);
-    assert!(blocking!(queue.dequeue()).expect("Failed to dequeue").is_none());
+    assert!(
+        blocking!(queue.dequeue())
+            .expect("Failed to dequeue")
+            .is_none()
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -65,7 +73,7 @@ async fn test_postgres_queue_priority_ordering() {
         .await
         .expect("Failed to create test fixture");
 
-    let mut queue = PostgresQueue::new(fixture.db.clone(), "priority_queue".into(), 100);
+    let mut queue = PostgresQueue::new(fixture.db, "priority_queue".into(), 100);
 
     // Enqueue with different priorities
     blocking!(queue.enqueue(make_task(1, Priority::Low))).expect("enqueue failed");
@@ -87,7 +95,7 @@ async fn test_postgres_queue_full() {
         .await
         .expect("Failed to create test fixture");
 
-    let mut queue = PostgresQueue::new(fixture.db.clone(), "small_queue".into(), 2);
+    let mut queue = PostgresQueue::new(fixture.db, "small_queue".into(), 2);
 
     blocking!(queue.enqueue(make_task(1, Priority::Normal))).expect("enqueue failed");
     blocking!(queue.enqueue(make_task(2, Priority::Normal))).expect("enqueue failed");
@@ -105,7 +113,7 @@ async fn test_postgres_queue_prune_expired() {
         .await
         .expect("Failed to create test fixture");
 
-    let mut queue = PostgresQueue::new(fixture.db.clone(), "expiry_queue".into(), 100);
+    let mut queue = PostgresQueue::new(fixture.db, "expiry_queue".into(), 100);
 
     let now = now_ms();
 
@@ -151,7 +159,7 @@ async fn test_postgres_queue_fifo_within_priority() {
         .await
         .expect("Failed to create test fixture");
 
-    let mut queue = PostgresQueue::new(fixture.db.clone(), "fifo_queue".into(), 100);
+    let mut queue = PostgresQueue::new(fixture.db, "fifo_queue".into(), 100);
 
     // Enqueue multiple tasks with same priority at different times
     for i in 1..=5 {
@@ -188,14 +196,15 @@ async fn test_postgres_queue_concurrent_dequeue() {
     for worker_id in 0..3 {
         let db_clone = db.clone();
         let handle = tokio::spawn(async move {
-            let mut worker_queue = PostgresQueue::<TestPayload>::new(db_clone, "concurrent_queue".into(), 100);
+            let mut worker_queue =
+                PostgresQueue::<TestPayload>::new(db_clone, "concurrent_queue".into(), 100);
             let mut dequeued = vec![];
-            
+
             while let Some(task) = blocking!(worker_queue.dequeue()).expect("dequeue failed") {
                 dequeued.push(task.meta.id);
                 tokio::time::sleep(std::time::Duration::from_millis(10)).await;
             }
-            
+
             (worker_id, dequeued)
         });
         handles.push(handle);
@@ -212,7 +221,7 @@ async fn test_postgres_queue_concurrent_dequeue() {
     }
 
     // Each task should be dequeued exactly once
-    all_ids.sort();
+    all_ids.sort_unstable();
     assert_eq!(all_ids.len(), 10);
     assert_eq!(all_ids, vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 }
@@ -224,7 +233,7 @@ async fn test_postgres_queue_persistence() {
         .await
         .expect("Failed to create test fixture");
 
-    let db = fixture.db.clone();
+    let db = fixture.db;
 
     // Enqueue tasks with first queue instance
     {
@@ -236,7 +245,7 @@ async fn test_postgres_queue_persistence() {
     // Drop queue
 
     // Create new queue instance with same DB connection
-    let mut queue2 = PostgresQueue::<TestPayload>::new(db.clone(), "persist_queue".into(), 100);
+    let mut queue2 = PostgresQueue::<TestPayload>::new(db, "persist_queue".into(), 100);
 
     // Tasks should still be there, in priority order
     assert_eq!(blocking!(queue2.len()), 3);

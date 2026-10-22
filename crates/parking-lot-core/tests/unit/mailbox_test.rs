@@ -38,7 +38,10 @@ fn later_delivery_overwrites_the_status() {
     mailbox
         .deliver(&key, TaskStatus::Queued, None)
         .expect("deliver queued");
-    assert_eq!(mailbox.peek(&key).map(|m| m.status.clone()), Some(TaskStatus::Queued));
+    assert_eq!(
+        mailbox.peek(&key).map(|m| m.status.clone()),
+        Some(TaskStatus::Queued)
+    );
 
     mailbox
         .deliver(&key, TaskStatus::Completed, Some("done".to_string()))
@@ -58,9 +61,7 @@ fn expired_messages_are_evicted() {
     mailbox
         .deliver_with_ttl(&key, TaskStatus::Completed, None, 1)
         .expect("deliver with ttl");
-    let evicted = mailbox
-        .evict_expired(u128::MAX)
-        .expect("evict");
+    let evicted = mailbox.evict_expired(u128::MAX).expect("evict");
     assert_eq!(evicted, 1);
     assert!(mailbox.is_empty());
 }

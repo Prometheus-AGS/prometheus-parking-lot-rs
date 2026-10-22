@@ -5,7 +5,10 @@ use prometheus_parking_lot_core::SchedulerError;
 #[test]
 fn queue_full_message_names_pool_and_depth() {
     let err = SchedulerError::queue_full("test_pool", 5, 5);
-    assert_eq!(err.to_string(), "queue full for pool 'test_pool': depth 5/5");
+    assert_eq!(
+        err.to_string(),
+        "queue full for pool 'test_pool': depth 5/5"
+    );
     assert!(err.is_retryable());
 }
 

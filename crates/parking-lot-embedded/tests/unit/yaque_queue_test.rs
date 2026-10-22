@@ -1,4 +1,4 @@
-//! Unit tests for YaqueQueue implementation using tempdir for isolation.
+//! Unit tests for the `YaqueQueue` implementation using tempdir for isolation.
 
 use prometheus_parking_lot_core::{
     MailboxKey, Priority, ResourceCost, ResourceKind, ScheduledTask, TaskMetadata, TaskQueue,
@@ -45,9 +45,13 @@ fn test_yaque_queue_enqueue_dequeue_persistence() {
     // Create queue and enqueue tasks
     {
         let mut queue = YaqueQueue::new(path, "test_stream", 100).expect("Failed to create queue");
-        queue.enqueue(make_task(1, Priority::Normal)).expect("enqueue failed");
-        queue.enqueue(make_task(2, Priority::High)).expect("enqueue failed");
-        
+        queue
+            .enqueue(make_task(1, Priority::Normal))
+            .expect("enqueue failed");
+        queue
+            .enqueue(make_task(2, Priority::High))
+            .expect("enqueue failed");
+
         assert_eq!(queue.len(), 2);
     }
     // Drop queue
@@ -57,14 +61,21 @@ fn test_yaque_queue_enqueue_dequeue_persistence() {
     assert!(queue_file.exists(), "Queue file should exist");
 
     // Create new queue instance and verify tasks persisted
-    let mut queue2 = YaqueQueue::<TestPayload>::new(path, "test_stream", 100).expect("Failed to create queue");
+    let mut queue2 =
+        YaqueQueue::<TestPayload>::new(path, "test_stream", 100).expect("Failed to create queue");
     assert_eq!(queue2.len(), 2);
 
     // Dequeue in priority order
-    let task1 = queue2.dequeue().expect("dequeue failed").expect("Queue is empty");
+    let task1 = queue2
+        .dequeue()
+        .expect("dequeue failed")
+        .expect("Queue is empty");
     assert_eq!(task1.meta.id, 2); // High priority first
 
-    let task2 = queue2.dequeue().expect("dequeue failed").expect("Queue is empty");
+    let task2 = queue2
+        .dequeue()
+        .expect("dequeue failed")
+        .expect("Queue is empty");
     assert_eq!(task2.meta.id, 1);
 }
 
@@ -77,17 +88,23 @@ fn test_yaque_queue_reload_from_disk() {
     {
         let mut queue = YaqueQueue::new(path, "reload_test", 100).expect("Failed to create queue");
         for i in 1..=5 {
-            queue.enqueue(make_task(i, Priority::Normal)).expect("enqueue failed");
+            queue
+                .enqueue(make_task(i, Priority::Normal))
+                .expect("enqueue failed");
         }
     }
 
     // Create new queue instance - should load all tasks from disk
-    let mut queue2 = YaqueQueue::<TestPayload>::new(path, "reload_test", 100).expect("Failed to create queue");
+    let mut queue2 =
+        YaqueQueue::<TestPayload>::new(path, "reload_test", 100).expect("Failed to create queue");
     assert_eq!(queue2.len(), 5);
 
     // Dequeue all and verify
     for expected_id in 1..=5 {
-        let task = queue2.dequeue().expect("dequeue failed").expect("Queue is empty");
+        let task = queue2
+            .dequeue()
+            .expect("dequeue failed")
+            .expect("Queue is empty");
         assert_eq!(task.meta.id, expected_id);
     }
 
@@ -102,10 +119,18 @@ fn test_yaque_queue_priority_ordering() {
     let mut queue = YaqueQueue::new(path, "priority_test", 100).expect("Failed to create queue");
 
     // Enqueue with different priorities
-    queue.enqueue(make_task(1, Priority::Low)).expect("enqueue failed");
-    queue.enqueue(make_task(2, Priority::Critical)).expect("enqueue failed");
-    queue.enqueue(make_task(3, Priority::Normal)).expect("enqueue failed");
-    queue.enqueue(make_task(4, Priority::High)).expect("enqueue failed");
+    queue
+        .enqueue(make_task(1, Priority::Low))
+        .expect("enqueue failed");
+    queue
+        .enqueue(make_task(2, Priority::Critical))
+        .expect("enqueue failed");
+    queue
+        .enqueue(make_task(3, Priority::Normal))
+        .expect("enqueue failed");
+    queue
+        .enqueue(make_task(4, Priority::High))
+        .expect("enqueue failed");
 
     // Should dequeue in priority order
     assert_eq!(queue.dequeue().unwrap().unwrap().meta.id, 2); // Critical
@@ -123,7 +148,9 @@ fn test_yaque_queue_prune_expired_rewrites_file() {
     let now = now_ms();
 
     // Task with no deadline
-    queue.enqueue(make_task(1, Priority::Normal)).expect("enqueue failed");
+    queue
+        .enqueue(make_task(1, Priority::Normal))
+        .expect("enqueue failed");
 
     // Task with expired deadline
     let mut task2 = make_task(2, Priority::Normal);
@@ -153,7 +180,10 @@ fn test_yaque_queue_prune_expired_rewrites_file() {
         .len();
 
     // File should be smaller
-    assert!(size_after < size_before, "File should be smaller after pruning");
+    assert!(
+        size_after < size_before,
+        "File should be smaller after pruning"
+    );
 
     assert_eq!(queue.len(), 2);
 }
@@ -164,8 +194,12 @@ fn test_yaque_queue_full() {
     let path = dir.path();
     let mut queue = YaqueQueue::new(path, "full_test", 2).expect("Failed to create queue");
 
-    queue.enqueue(make_task(1, Priority::Normal)).expect("enqueue failed");
-    queue.enqueue(make_task(2, Priority::Normal)).expect("enqueue failed");
+    queue
+        .enqueue(make_task(1, Priority::Normal))
+        .expect("enqueue failed");
+    queue
+        .enqueue(make_task(2, Priority::Normal))
+        .expect("enqueue failed");
 
     // Third task should fail
     let result = queue.enqueue(make_task(3, Priority::Normal));
@@ -176,8 +210,8 @@ fn test_yaque_queue_full() {
 fn test_yaque_queue_empty_dequeue() {
     let dir = tempdir().expect("Failed to create temp dir");
     let path = dir.path();
-    let mut queue = YaqueQueue::<TestPayload>::new(path, "empty_test", 100)
-        .expect("Failed to create queue");
+    let mut queue =
+        YaqueQueue::<TestPayload>::new(path, "empty_test", 100).expect("Failed to create queue");
 
     assert_eq!(queue.len(), 0);
     assert!(queue.dequeue().unwrap().is_none());
@@ -212,14 +246,20 @@ fn test_yaque_queue_persistence_across_instances() {
 
     // Instance 1: Enqueue some tasks
     {
-        let mut queue = YaqueQueue::<TestPayload>::new(path, "persist", 100).expect("Failed to create queue");
-        queue.enqueue(make_task(1, Priority::Critical)).expect("enqueue failed");
-        queue.enqueue(make_task(2, Priority::Normal)).expect("enqueue failed");
+        let mut queue =
+            YaqueQueue::<TestPayload>::new(path, "persist", 100).expect("Failed to create queue");
+        queue
+            .enqueue(make_task(1, Priority::Critical))
+            .expect("enqueue failed");
+        queue
+            .enqueue(make_task(2, Priority::Normal))
+            .expect("enqueue failed");
     }
 
     // Instance 2: Dequeue one task
     {
-        let mut queue = YaqueQueue::<TestPayload>::new(path, "persist", 100).expect("Failed to create queue");
+        let mut queue =
+            YaqueQueue::<TestPayload>::new(path, "persist", 100).expect("Failed to create queue");
         assert_eq!(queue.len(), 2);
         let task = queue.dequeue().unwrap().unwrap();
         assert_eq!(task.meta.id, 1); // Critical first
@@ -227,7 +267,8 @@ fn test_yaque_queue_persistence_across_instances() {
 
     // Instance 3: Remaining task should still be there
     {
-        let mut queue = YaqueQueue::<TestPayload>::new(path, "persist", 100).expect("Failed to create queue");
+        let mut queue =
+            YaqueQueue::<TestPayload>::new(path, "persist", 100).expect("Failed to create queue");
         assert_eq!(queue.len(), 1);
         let task = queue.dequeue().unwrap().unwrap();
         assert_eq!(task.meta.id, 2);
@@ -235,8 +276,8 @@ fn test_yaque_queue_persistence_across_instances() {
 
     // Instance 4: Queue should be empty
     {
-        let queue = YaqueQueue::<TestPayload>::new(path, "persist", 100)
-            .expect("Failed to create queue");
+        let queue =
+            YaqueQueue::<TestPayload>::new(path, "persist", 100).expect("Failed to create queue");
         assert_eq!(queue.len(), 0);
     }
 }
@@ -268,7 +309,10 @@ fn test_yaque_queue_large_payloads() {
 
     queue.enqueue(task).expect("enqueue failed");
 
-    let dequeued = queue.dequeue().expect("dequeue failed").expect("Queue is empty");
+    let dequeued = queue
+        .dequeue()
+        .expect("dequeue failed")
+        .expect("Queue is empty");
     assert_eq!(dequeued.payload.data, large_data);
 }
 
@@ -281,8 +325,12 @@ fn test_yaque_queue_multiple_streams() {
     let mut queue1 = YaqueQueue::new(path, "stream1", 100).expect("Failed to create queue");
     let mut queue2 = YaqueQueue::new(path, "stream2", 100).expect("Failed to create queue");
 
-    queue1.enqueue(make_task(1, Priority::Normal)).expect("enqueue failed");
-    queue2.enqueue(make_task(2, Priority::Normal)).expect("enqueue failed");
+    queue1
+        .enqueue(make_task(1, Priority::Normal))
+        .expect("enqueue failed");
+    queue2
+        .enqueue(make_task(2, Priority::Normal))
+        .expect("enqueue failed");
 
     // Each queue should maintain separate state
     assert_eq!(queue1.len(), 1);

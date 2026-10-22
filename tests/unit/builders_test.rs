@@ -26,7 +26,7 @@ impl TaskExecutor<String, String> for Echo {
     }
 }
 
-fn pool_config(max_units: u32) -> PoolConfig {
+const fn pool_config(max_units: u32) -> PoolConfig {
     PoolConfig {
         max_units,
         max_queue_depth: 50,
