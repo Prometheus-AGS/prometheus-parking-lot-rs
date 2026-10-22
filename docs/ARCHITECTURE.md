@@ -201,14 +201,14 @@ sequenceDiagram
 
 ## 6. Implementation Strategy: Clean Architecture
 
-The codebase is organized to ensure the `core` logic never depends on specific databases or runtimes.
+The codebase is a Cargo workspace organized so the core logic never depends on specific databases or runtimes. The crate map, dependency rules and feature mapping are recorded in [ADR 0001](adr/0001-workspace-split.md).
 
-| **Layer**       | **Directory**   | **Responsibilities**                                         | **Dependencies**           |
-| --------------- | --------------- | ------------------------------------------------------------ | -------------------------- |
-| **Domain**      | `src/core/`     | Traits (`TaskQueue`, `Mailbox`), Logic (`ResourcePool`), Types. | None (pure Rust + Serde)   |
-| **Config**      | `src/config/`   | Serializable structs for JSON/YAML configuration.            | Serde                      |
-| **Adapters**    | `src/infra/`    | Concrete implementations (`SeaOrmQueue`, `YaqueQueue`, `TokioSpawner`). | SQLx, SeaORM, Yaque, Tokio |
-| **Composition** | `src/builders/` | Factories that wire Config + Adapters into a `ResourcePool`. | Core, Config, Infra        |
+| **Layer**       | **Crate (directory)**                                       | **Responsibilities**                                         | **Dependencies**           |
+| --------------- | ----------------------------------------------------------- | ------------------------------------------------------------ | -------------------------- |
+| **Domain**      | `prometheus-parking-lot-core` (`crates/parking-lot-core`)   | Contracts (`TaskQueue`, `Mailbox`, `Spawn`, executors), task types, errors, hooks, in-memory queue and mailbox, `WorkerPoolConfig`. | No runtime, IO, DB or network crate |
+| **Runtime**     | `prometheus-parking-lot-runtime-tokio` (`crates/parking-lot-runtime-tokio`) | `ResourcePool`, native `WorkerPool`, shutdown, cancellation, `TokioSpawner`. | Core, Tokio |
+| **Adapters**    | `prometheus-parking-lot-pg`, `-embedded`, `-wasm` (`crates/`) | Postgres queue/mailbox, embedded file queue/mailbox, WASM `WorkerPool`. | Core + SeaORM/SQLx, std fs, Tokio (wasm) |
+| **Facade**      | `prometheus_parking_lot` (repository root)                  | Re-exports behind features; `config/`, `builders/`, `runtime/api`. | All of the above, by feature |
 
 ### 6.1 Configuration-Driven Design
 
