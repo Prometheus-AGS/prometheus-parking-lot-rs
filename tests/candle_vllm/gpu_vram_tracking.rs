@@ -50,7 +50,7 @@ impl WorkerExecutor<u32, String> for GpuWorkExecutor {
         self.vram_used.fetch_add(vram_mb, Ordering::SeqCst);
         tokio::time::sleep(Duration::from_millis(50)).await;
         self.vram_used.fetch_sub(vram_mb, Ordering::SeqCst);
-        format!("Processed {}MB GPU work", vram_mb)
+        format!("Processed {vram_mb}MB GPU work")
     }
 }
 
@@ -103,7 +103,7 @@ async fn test_gpu_vram_exceeds_capacity() {
     match result {
         Ok(_) => println!("Task queued (acceptable)"),
         Err(e) => {
-            println!("Task rejected: {:?}", e);
+            println!("Task rejected: {e:?}");
             // Rejection is acceptable if queue is full
         }
     }

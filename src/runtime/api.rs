@@ -54,6 +54,15 @@ pub struct Health {
 }
 
 /// Submit a task to a pool. Placeholder; caller manages pool lookup.
+///
+/// # Errors
+///
+/// Returns the scheduler error rendered as a string when the pool rejects the
+/// task (expired deadline, full queue or backend failure).
+#[expect(
+    clippy::future_not_send,
+    reason = "Send-ness depends on the pool generics; the contract rework in cr-18/cr-25 owns adding Send bounds (API change)"
+)]
 pub async fn submit_task<P, T, Q, M, E, S>(
     pool: &ResourcePool<P, T, Q, M, E, S>,
     req: TaskSubmission<P>,
@@ -84,6 +93,7 @@ where
 }
 
 /// Build pool listings from config snapshot.
+#[must_use]
 pub fn list_pools(cfg: &crate::config::SchedulerConfig) -> Vec<PoolSnapshot> {
     cfg.pools
         .iter()
@@ -96,6 +106,7 @@ pub fn list_pools(cfg: &crate::config::SchedulerConfig) -> Vec<PoolSnapshot> {
 }
 
 /// Return a health payload.
-pub fn health() -> Health {
+#[must_use]
+pub const fn health() -> Health {
     Health { ok: true }
 }

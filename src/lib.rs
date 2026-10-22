@@ -25,7 +25,7 @@
 //! - **Mailbox System**: Store results for later retrieval when clients disconnect
 //! - **Multi-Environment**: Same code runs on desktop (Tauri), cloud, and web (WASM)
 //!
-//! ## WorkerPool - Thread Pool for CPU/GPU-Bound Work
+//! ## `WorkerPool` - Thread Pool for CPU/GPU-Bound Work
 //!
 //! The `WorkerPool` manages dedicated worker threads (on native) or async tasks (on WASM)
 //! for CPU/GPU-bound work like LLM inference. This ensures heavy computation doesn't
@@ -57,7 +57,7 @@
 //! }
 //! ```
 //!
-//! ## ResourcePool - Async Scheduling
+//! ## `ResourcePool` - Async Scheduling
 //!
 //! For lighter workloads that don't require dedicated threads, use `ResourcePool`:
 //!

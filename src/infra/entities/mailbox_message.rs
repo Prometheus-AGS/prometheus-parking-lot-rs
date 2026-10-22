@@ -1,10 +1,10 @@
-//! SeaORM entity for pl_mailbox_messages table.
+//! `SeaORM` entity for `pl_mailbox_messages` table.
 
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// Entity representing a mailbox message (task result) in the database.
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "pl_mailbox_messages")]
 pub struct Model {
     /// Primary key.
@@ -36,7 +36,7 @@ pub struct Model {
     pub payload: Option<Json>,
 }
 
-/// SeaORM relation stub — the mailbox_messages table has no foreign-key relations.
+/// `SeaORM` relation stub — the `mailbox_messages` table has no foreign-key relations.
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {}
 

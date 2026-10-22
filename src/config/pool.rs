@@ -67,6 +67,11 @@ pub struct SchedulerConfig {
 
 impl PoolConfig {
     /// Validate pool configuration values.
+    ///
+    /// # Errors
+    ///
+    /// Returns a description of the first invalid field (zero units, queue
+    /// depth or timeout).
     pub fn validate(&self) -> Result<(), String> {
         if self.max_units == 0 {
             return Err("max_units must be greater than 0".into());
@@ -83,6 +88,10 @@ impl PoolConfig {
 
 impl SchedulerConfig {
     /// Validate all pools and ensure at least one pool exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns a description when no pool is defined or any pool is invalid.
     pub fn validate(&self) -> Result<(), String> {
         if self.pools.is_empty() {
             return Err("at least one pool must be defined".into());
@@ -95,9 +104,13 @@ impl SchedulerConfig {
     }
 
     /// Parse scheduler configuration from a JSON string and validate.
+    ///
+    /// # Errors
+    ///
+    /// Returns a description when the input is not valid JSON for this
+    /// schema or the parsed configuration fails validation.
     pub fn from_json_str(input: &str) -> Result<Self, String> {
-        let cfg: SchedulerConfig =
-            serde_json::from_str(input).map_err(|e| format!("parse error: {e}"))?;
+        let cfg: Self = serde_json::from_str(input).map_err(|e| format!("parse error: {e}"))?;
         cfg.validate()?;
         Ok(cfg)
     }
@@ -117,22 +130,22 @@ fn default_worker_count() -> usize {
 
 /// Default thread stack size: 2MB.
 #[cfg(not(target_arch = "wasm32"))]
-fn default_thread_stack_size() -> usize {
+const fn default_thread_stack_size() -> usize {
     2 * 1024 * 1024 // 2MB
 }
 
 /// Default maximum resource units.
-fn default_max_units() -> u32 {
+const fn default_max_units() -> u32 {
     1000
 }
 
 /// Default maximum queue depth.
-fn default_max_queue_depth() -> usize {
+const fn default_max_queue_depth() -> usize {
     1000
 }
 
 /// Default timeout in milliseconds: 2 minutes.
-fn default_timeout_ms() -> u64 {
+const fn default_timeout_ms() -> u64 {
     120_000
 }
 
@@ -211,7 +224,7 @@ impl WorkerPoolConfig {
 
     /// Set the number of worker threads/tasks.
     #[must_use]
-    pub fn with_worker_count(mut self, count: usize) -> Self {
+    pub const fn with_worker_count(mut self, count: usize) -> Self {
         self.worker_count = count;
         self
     }
@@ -219,39 +232,43 @@ impl WorkerPoolConfig {
     /// Set the thread stack size (native only, ignored on WASM).
     #[cfg(not(target_arch = "wasm32"))]
     #[must_use]
-    pub fn with_thread_stack_size(mut self, size: usize) -> Self {
+    pub const fn with_thread_stack_size(mut self, size: usize) -> Self {
         self.thread_stack_size = size;
         self
     }
 
     /// Set the maximum resource units.
     #[must_use]
-    pub fn with_max_units(mut self, units: u32) -> Self {
+    pub const fn with_max_units(mut self, units: u32) -> Self {
         self.max_units = units;
         self
     }
 
     /// Set the maximum queue depth.
     #[must_use]
-    pub fn with_max_queue_depth(mut self, depth: usize) -> Self {
+    pub const fn with_max_queue_depth(mut self, depth: usize) -> Self {
         self.max_queue_depth = depth;
         self
     }
 
     /// Set the default timeout in milliseconds.
     #[must_use]
-    pub fn with_timeout_ms(mut self, timeout_ms: u64) -> Self {
+    pub const fn with_timeout_ms(mut self, timeout_ms: u64) -> Self {
         self.default_timeout_ms = timeout_ms;
         self
     }
 
     /// Get the default timeout as a `Duration`.
     #[must_use]
-    pub fn default_timeout(&self) -> Duration {
+    pub const fn default_timeout(&self) -> Duration {
         Duration::from_millis(self.default_timeout_ms)
     }
 
     /// Validate the configuration values.
+    ///
+    /// # Errors
+    ///
+    /// Returns a description of the first invalid field.
     pub fn validate(&self) -> Result<(), String> {
         if self.worker_count == 0 {
             return Err("worker_count must be greater than 0".into());

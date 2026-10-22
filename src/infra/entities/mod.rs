@@ -1,4 +1,4 @@
-//! SeaORM entity models for Postgres backend.
+//! `SeaORM` entity models for Postgres backend.
 //!
 //! These entities map to the database tables defined in the migration scripts.
 

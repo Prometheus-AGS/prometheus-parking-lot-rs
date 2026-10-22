@@ -34,7 +34,7 @@ pub struct MailboxMessage<P> {
 
 impl<P> MailboxMessage<P> {
     fn is_expired(&self, now_ms: u128) -> bool {
-        self.expires_at_ms.map(|exp| now_ms >= exp).unwrap_or(false)
+        self.expires_at_ms.is_some_and(|exp| now_ms >= exp)
     }
 }
 
@@ -43,9 +43,9 @@ impl<P> MailboxMessage<P> {
 /// **Limitation:** no cross-restart durability. Use a persistent backend
 /// (`PostgresMailbox`, `YaqueMailbox`) for production.
 pub struct InMemoryMailbox<P> {
-    /// Keyed by MailboxKey. At most one message per key (consume-once).
+    /// Keyed by `MailboxKey`. At most one message per key (consume-once).
     messages: HashMap<MailboxKey, MailboxMessage<P>>,
-    /// Optional secondary index: idempotency_key → MailboxKey (for dedup).
+    /// Optional secondary index: `idempotency_key` → `MailboxKey` (for dedup).
     idem_index: HashMap<String, MailboxKey>,
 }
 
@@ -57,6 +57,7 @@ impl<P> Default for InMemoryMailbox<P> {
 
 impl<P> InMemoryMailbox<P> {
     /// Create a new mailbox.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             messages: HashMap::new(),
@@ -65,16 +66,19 @@ impl<P> InMemoryMailbox<P> {
     }
 
     /// Peek at the message for `key` without consuming it.
+    #[must_use]
     pub fn peek(&self, key: &MailboxKey) -> Option<&MailboxMessage<P>> {
         self.messages.get(key)
     }
 
     /// Number of messages currently stored.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.messages.len()
     }
 
     /// True if no messages are stored.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.messages.is_empty()
     }
@@ -86,12 +90,12 @@ impl<P> InMemoryMailbox<P> {
         payload: Option<P>,
         expires_at_ms: Option<u128>,
         idempotency_key: Option<String>,
-    ) -> Result<(), SchedulerError> {
+    ) {
         // D5 — first-write-wins: if an idempotency key is set and we've already
         // delivered a result for it, silently drop the duplicate.
         if let Some(ref idem) = idempotency_key {
             if self.idem_index.contains_key(idem.as_str()) {
-                return Ok(());
+                return;
             }
             self.idem_index.insert(idem.clone(), key.clone());
         }
@@ -107,7 +111,6 @@ impl<P> InMemoryMailbox<P> {
                 idempotency_key,
             },
         );
-        Ok(())
     }
 }
 
@@ -118,7 +121,8 @@ impl<P: Clone> Mailbox<P> for InMemoryMailbox<P> {
         status: TaskStatus,
         payload: Option<P>,
     ) -> Result<(), SchedulerError> {
-        self.deliver_inner(key, status, payload, None, None)
+        self.deliver_inner(key, status, payload, None, None);
+        Ok(())
     }
 
     fn deliver_with_ttl(
@@ -129,7 +133,8 @@ impl<P: Clone> Mailbox<P> for InMemoryMailbox<P> {
         ttl_ms: u64,
     ) -> Result<(), SchedulerError> {
         let expires_at = crate::util::clock::now_ms() + u128::from(ttl_ms);
-        self.deliver_inner(key, status, payload, Some(expires_at), None)
+        self.deliver_inner(key, status, payload, Some(expires_at), None);
+        Ok(())
     }
 
     fn consume(
@@ -156,10 +161,10 @@ impl<P: Clone> Mailbox<P> for InMemoryMailbox<P> {
             }
         }
         for key in &to_remove {
-            if let Some(msg) = self.messages.remove(key) {
-                if let Some(idem) = &msg.idempotency_key {
-                    self.idem_index.remove(idem.as_str());
-                }
+            if let Some(msg) = self.messages.remove(key)
+                && let Some(idem) = &msg.idempotency_key
+            {
+                self.idem_index.remove(idem.as_str());
             }
         }
         Ok(before.saturating_sub(self.messages.len()))
@@ -208,8 +213,7 @@ mod tests {
             Some("first".into()),
             None,
             Some("idem-1".into()),
-        )
-        .unwrap();
+        );
         // Duplicate with same idempotency key — must be silently dropped
         let k2 = key("t1-dup");
         mb.deliver_inner(
@@ -218,8 +222,7 @@ mod tests {
             Some("second".into()),
             None,
             Some("idem-1".into()),
-        )
-        .unwrap();
+        );
 
         // Only the first message exists
         assert_eq!(mb.len(), 1);

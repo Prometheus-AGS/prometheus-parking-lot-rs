@@ -157,7 +157,8 @@ impl SchedulerError {
 
     /// Returns `true` if this error represents a transient condition the caller
     /// may retry (queue full, capacity exceeded, timeout).
-    pub fn is_retryable(&self) -> bool {
+    #[must_use]
+    pub const fn is_retryable(&self) -> bool {
         matches!(
             self,
             Self::QueueFull { .. } | Self::CapacityExceeded { .. } | Self::Timeout { .. }
@@ -206,7 +207,7 @@ mod tests {
         };
         let s = e.to_string();
         assert!(s.contains("10"), "{s}");
-        assert!(s.contains("4"), "{s}");
+        assert!(s.contains('4'), "{s}");
     }
 
     #[test]

@@ -153,7 +153,7 @@ async fn test_resource_release_on_unload() {
 
     // Check stats - should show resources used
     let stats_after_load = pool.stats();
-    println!("Stats after load: {:?}", stats_after_load);
+    println!("Stats after load: {stats_after_load:?}");
 
     // Unload model (releases 50MB)
     let unload_key = pool
@@ -167,7 +167,7 @@ async fn test_resource_release_on_unload() {
 
     // Check stats - resources should be released
     let stats_after_unload = pool.stats();
-    println!("Stats after unload: {:?}", stats_after_unload);
+    println!("Stats after unload: {stats_after_unload:?}");
 
     assert!(stats_after_unload.used_units <= stats_after_load.used_units);
 

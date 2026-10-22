@@ -2,11 +2,16 @@
 //!
 //! Benchmarks cover:
 //! - Queue operations (enqueue/dequeue/priority sorting)
-//! - ResourcePool capacity management
+//! - `ResourcePool` capacity management
 //! - Task execution and wake-up mechanism
 //! - Mailbox delivery
 //! - End-to-end scheduling scenarios
 //! - Parking lot primitives (Mutex, atomics, Condvar)
+
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "benchmark sizes are small constants; casts cannot truncate"
+)]
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use std::hint::black_box;
@@ -85,7 +90,7 @@ fn build_task(id: u64, priority: Priority) -> ScheduledTask<BenchPayload> {
         },
         payload: BenchPayload {
             id,
-            data: format!("payload-data-{}", id),
+            data: format!("payload-data-{id}"),
         },
     }
 }
@@ -99,7 +104,7 @@ fn build_string_task(id: u64) -> ScheduledTask<String> {
                 user_id: None,
                 session_id: None,
             }),
-            priority: if id % 2 == 0 {
+            priority: if id.is_multiple_of(2) {
                 Priority::High
             } else {
                 Priority::Normal
@@ -109,10 +114,10 @@ fn build_string_task(id: u64) -> ScheduledTask<String> {
                 units: 1,
             },
             deadline_ms: None,
-            created_at_ms: id as u128, // Use id for ordering
+            created_at_ms: u128::from(id), // Use id for ordering
             idempotency_key: None,
         },
-        payload: format!("payload-{}", id),
+        payload: format!("payload-{id}"),
     }
 }
 
@@ -374,7 +379,7 @@ fn bench_mailbox_deliver(c: &mut Criterion) {
 
                 for i in 0..size {
                     mailbox
-                        .deliver(&key, TaskStatus::Completed, Some(format!("result-{}", i)))
+                        .deliver(&key, TaskStatus::Completed, Some(format!("result-{i}")))
                         .unwrap();
                 }
                 black_box(mailbox);
@@ -445,7 +450,7 @@ fn bench_pool_submit_immediate(c: &mut Criterion) {
                         Arc::new(ResourcePool::new(limits, queue, mailbox, executor, spawner));
 
                     // Submit tasks that fit within capacity
-                    for i in 0..capacity as u64 {
+                    for i in 0..u64::from(capacity) {
                         let task = build_task(i, Priority::Normal);
                         let status = pool.submit(task, now_ms()).await.unwrap();
                         black_box(status);

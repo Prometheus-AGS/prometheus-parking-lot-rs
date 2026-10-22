@@ -1,12 +1,12 @@
-//! End-to-end integration test for LLM inference with OpenAI streaming.
+//! End-to-end integration test for LLM inference with `OpenAI` streaming.
 //!
-//! NOTE: This test needs to be updated to work with the new TaskExecutor trait.
-//! See parking_lot_algorithm_test.rs for working examples of the complete implementation.
+//! NOTE: This test needs to be updated to work with the new `TaskExecutor` trait.
+//! See `parking_lot_algorithm_test.rs` for working examples of the complete implementation.
 //!
 //! This test validates the parking lot scheduler by:
-//! 1. Creating a resource pool with max_units=3 (matching 3 tokio worker threads)
+//! 1. Creating a resource pool with `max_units=3` (matching 3 tokio worker threads)
 //! 2. Flooding the pool with 15 tasks to trigger parking/queuing behavior
-//! 3. Making real OpenAI streaming API calls
+//! 3. Making real `OpenAI` streaming API calls
 //! 4. Collecting stream chunks via channels
 //! 5. Verifying all tasks complete and parking behavior works correctly
 

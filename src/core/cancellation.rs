@@ -84,7 +84,8 @@ pub enum CancelReason {
 impl CancelReason {
     /// Returns `true` for reasons that should trigger automatic requeue
     /// (D3: environmental cancellations, not inherent to the task).
-    pub fn should_auto_requeue(&self) -> bool {
+    #[must_use]
+    pub const fn should_auto_requeue(&self) -> bool {
         matches!(self, Self::QueueShutdown | Self::DrainTimeout)
     }
 }
@@ -114,7 +115,7 @@ impl<P> CancelledTask<P> {
     }
 
     /// Returns `true` if this task should be considered for automatic requeue.
-    pub fn should_auto_requeue(&self, max_attempts: u32) -> bool {
+    pub const fn should_auto_requeue(&self, max_attempts: u32) -> bool {
         self.reason.should_auto_requeue() && self.attempt < max_attempts
     }
 
@@ -229,6 +230,7 @@ impl<P> Default for RecordingCancellationSink<P> {
 
 impl<P> RecordingCancellationSink<P> {
     /// Create an empty recording sink.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             tasks: tokio::sync::Mutex::new(Vec::new()),
@@ -243,6 +245,11 @@ impl<P> RecordingCancellationSink<P> {
     /// Count of recorded cancellations.
     pub async fn len(&self) -> usize {
         self.tasks.lock().await.len()
+    }
+
+    /// True when no cancellations are recorded.
+    pub async fn is_empty(&self) -> bool {
+        self.tasks.lock().await.is_empty()
     }
 }
 
@@ -267,6 +274,10 @@ impl<P: Send + Sync + 'static> CancellationChannel<P> {
     ///
     /// The drain task runs until all senders are dropped (i.e. the pool shuts
     /// down) and has processed the remaining queue.
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "public constructor takes the config by value; changing it to a reference is an API change left to the contracts work (cr-18)"
+    )]
     pub fn new(sink: Arc<dyn CancellationSink<P>>, config: CancellationConfig) -> Self {
         let (tx, mut rx) = mpsc::channel::<CancelledTask<P>>(config.channel_capacity);
 
@@ -278,11 +289,9 @@ impl<P: Send + Sync + 'static> CancellationChannel<P> {
                     Ok(SinkOutcome::Requeue) => {
                         info!("cancellation sink requested requeue — nack on persistent backends");
                     }
-                    Ok(SinkOutcome::Recorded) => {
-                        // caller has durably recorded it
-                    }
                     Ok(_) => {
-                        // Drop or any future variant — discarded
+                        // Recorded: the caller has durably recorded it.
+                        // Drop or any future variant: discarded.
                     }
                     Err(_) => {
                         // sink overran its deadline

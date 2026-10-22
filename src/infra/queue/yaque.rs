@@ -21,6 +21,11 @@ pub struct YaqueQueue<P> {
 
 impl<P> YaqueQueue<P> {
     /// Create a new Yaque-like queue.
+    ///
+    /// # Errors
+    ///
+    /// Returns a backend error when the directory cannot be created or an
+    /// existing stream file cannot be read or parsed.
     pub fn new(
         path: impl AsRef<Path>,
         stream: impl Into<String>,
@@ -132,7 +137,7 @@ where
     fn prune_expired(&mut self, now_ms: u128) -> Result<usize, SchedulerError> {
         let before = self.tasks.len();
         self.tasks
-            .retain(|t| t.meta.deadline_ms.map(|d| d > now_ms).unwrap_or(true));
+            .retain(|t| t.meta.deadline_ms.is_none_or(|d| d > now_ms));
         let after = self.tasks.len();
         self.rewrite_disk(&self.tasks)?;
         Ok(before.saturating_sub(after))

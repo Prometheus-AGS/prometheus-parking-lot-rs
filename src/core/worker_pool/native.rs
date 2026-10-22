@@ -7,7 +7,7 @@
 //! # Design Principles
 //!
 //! - **No polling**: Uses proper signaling (Condvar for blocking, oneshot for async)
-//! - **Lock-free fast path**: Result storage uses RwLock with brief critical sections
+//! - **Lock-free fast path**: Result storage uses `RwLock` with brief critical sections
 //! - **Clean shutdown**: Dropping the sender unblocks workers naturally
 
 use std::collections::HashMap;
@@ -54,12 +54,16 @@ struct ResultEntry<R> {
 /// Result storage for the worker pool using Condvar for efficient waiting.
 ///
 /// Design:
-/// - RwLock for the entry map (read-heavy, write on create/remove)
+/// - `RwLock` for the entry map (read-heavy, write on create/remove)
 /// - Per-entry Mutex + Condvar for waiting (lock only when blocking wait needed)
 /// - Lock-free check via state atomic would be ideal but Condvar needs Mutex
 struct ResultStorage<R> {
     /// Map from mailbox key to (entry, condvar) pair.
     /// The Condvar is used for blocking wait, paired with entry's mutex.
+    #[expect(
+        clippy::type_complexity,
+        reason = "private storage map; the worker-pool rework (cr-19/cr-29) replaces it"
+    )]
     entries: RwLock<HashMap<String, Arc<(Mutex<ResultEntry<R>>, Condvar)>>>,
 }
 
@@ -85,6 +89,10 @@ impl<R> ResultStorage<R> {
 
     /// Store a result and notify any waiters.
     /// This is lock-free for the map lookup, only locks the entry briefly.
+    #[expect(
+        clippy::significant_drop_tightening,
+        reason = "narrowing lock scopes changes concurrent behaviour; the worker-pool rework (cr-19/cr-29) owns it"
+    )]
     fn store(&self, key: &MailboxKey, result: R) {
         let key_str = mailbox_key_to_string(key);
 
@@ -102,6 +110,10 @@ impl<R> ResultStorage<R> {
     }
 
     /// Try to retrieve a result immediately (non-blocking).
+    #[expect(
+        clippy::significant_drop_tightening,
+        reason = "narrowing lock scopes changes concurrent behaviour; the worker-pool rework (cr-19/cr-29) owns it"
+    )]
     fn try_retrieve(&self, key: &MailboxKey) -> Option<R> {
         let key_str = mailbox_key_to_string(key);
 
@@ -171,7 +183,7 @@ impl<R> ResultStorage<R> {
             entries.remove(&key_str)
         };
 
-        if let Some(entry_pair) = entry_pair {
+        entry_pair.and_then(|entry_pair| {
             let (entry_mutex, condvar) = entry_pair.as_ref();
             // Mutate state under the lock, then release it before notifying:
             // the state change is published under the lock (no lost wakeup),
@@ -188,9 +200,7 @@ impl<R> ResultStorage<R> {
             // Wake any waiter so it can observe the terminal state and exit.
             condvar.notify_all();
             taken
-        } else {
-            None
-        }
+        })
     }
 
     /// Get entry for async waiting (returns clone of Arc).
@@ -210,7 +220,7 @@ impl<R> ResultStorage<R> {
 ///
 /// - **No polling**: Workers block on channel recv; results use Condvar
 /// - **Clean shutdown**: Dropping sender naturally unblocks all workers
-/// - **Lock-free fast path**: Atomic counters, RwLock for read-heavy maps
+/// - **Lock-free fast path**: Atomic counters, `RwLock` for read-heavy maps
 pub struct WorkerPool<P, R, E>
 where
     P: Send + 'static,
@@ -259,6 +269,10 @@ where
     /// # Errors
     ///
     /// Returns `PoolError::InvalidConfig` if the configuration is invalid.
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "public constructor takes the config by value; changing it is an API change for the worker-pool rework (cr-19)"
+    )]
     pub fn new(config: WorkerPoolConfig, executor: E) -> Result<Self, PoolError> {
         config.validate().map_err(PoolError::InvalidConfig)?;
 
@@ -317,6 +331,11 @@ where
     ///
     /// - `PoolError::QueueFull` if the task queue is full
     /// - `PoolError::PoolShutdown` if the pool has been shut down
+    #[expect(
+        clippy::unused_async,
+        clippy::unused_async_trait_impl,
+        reason = "public async API kept for callers; enqueue is non-blocking today and cr-19 may make it await backpressure (the trait-impl variant misfires on an inherent method)"
+    )]
     pub async fn submit_async(
         &self,
         payload: P,
@@ -339,6 +358,10 @@ where
     ///
     /// - `PoolError::QueueFull` if the task queue is full
     /// - `PoolError::PoolShutdown` if the pool has been shut down
+    #[expect(
+        clippy::significant_drop_tightening,
+        reason = "narrowing lock scopes changes concurrent behaviour; the worker-pool rework (cr-19/cr-29) owns it"
+    )]
     pub fn submit(&self, payload: P, meta: TaskMetadata) -> Result<MailboxKey, PoolError> {
         if self.shutdown.load(Ordering::Acquire) {
             return Err(PoolError::PoolShutdown);
@@ -494,6 +517,10 @@ where
     /// all workers with a reasonable timeout (2 seconds per worker).
     ///
     /// Workers that don't exit within the timeout are detached to prevent hangs.
+    #[expect(
+        clippy::significant_drop_tightening,
+        reason = "narrowing lock scopes changes concurrent behaviour; the worker-pool rework (cr-19/cr-29) owns it"
+    )]
     pub fn shutdown(&self) {
         // Check if already shut down
         if self.shutdown.swap(true, Ordering::AcqRel) {
@@ -564,8 +591,7 @@ where
         // This prevents test hangs when pools are dropped with tasks still running
         if !self.shutdown.swap(true, Ordering::AcqRel) {
             // Drop the sender to unblock waiting workers
-            let mut task_tx = self.task_tx.lock();
-            *task_tx = None;
+            *self.task_tx.lock() = None;
 
             // DON'T join workers here - let OS clean up threads
             // Explicit shutdown() is required for graceful cleanup
@@ -575,6 +601,10 @@ where
 }
 
 /// Spawn a worker thread.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "private thread entry point; parameter grouping belongs to the worker-pool rework (cr-19/cr-29)"
+)]
 fn spawn_worker<P, R, E>(
     worker_id: usize,
     task_rx: Receiver<WorkerTask<P>>,
@@ -618,13 +648,10 @@ where
                 // Block waiting for a task
                 // This is efficient - thread sleeps until work arrives
                 // When sender is dropped (shutdown), recv returns Err
-                let task = match task_rx.recv() {
-                    Ok(task) => task,
-                    Err(_) => {
-                        // Channel closed (sender dropped) - clean exit
-                        debug!(worker_id = worker_id, "Worker channel closed, exiting");
-                        break;
-                    }
+                let Ok(task) = task_rx.recv() else {
+                    // Channel closed (sender dropped) - clean exit
+                    debug!(worker_id = worker_id, "Worker channel closed, exiting");
+                    break;
                 };
 
                 // Check shutdown flag (in case of shutdown during task processing)
@@ -694,7 +721,7 @@ mod tests {
             self.execution_count.fetch_add(1, Ordering::Relaxed);
             // Simulate some work
             tokio::time::sleep(Duration::from_millis(10)).await;
-            format!("Result: {}", payload)
+            format!("Result: {payload}")
         }
     }
 
@@ -763,7 +790,7 @@ mod tests {
         let mut keys = Vec::new();
         for i in 0..10 {
             let key = pool
-                .submit_async(format!("task-{}", i), make_meta(i))
+                .submit_async(format!("task-{i}"), make_meta(i))
                 .await
                 .unwrap();
             keys.push(key);
@@ -775,7 +802,7 @@ mod tests {
                 .retrieve_async(key, Duration::from_secs(10))
                 .await
                 .unwrap();
-            assert_eq!(result, format!("Result: task-{}", i));
+            assert_eq!(result, format!("Result: task-{i}"));
         }
 
         // Check execution count
@@ -829,7 +856,7 @@ mod tests {
             .with_worker_count(2)
             .with_max_queue_depth(10);
 
-        let pool = WorkerPool::new(config, executor.clone()).unwrap();
+        let pool = WorkerPool::new(config, executor).unwrap();
 
         // Submit using blocking API
         let key = pool.submit("blocking".to_string(), make_meta(1)).unwrap();

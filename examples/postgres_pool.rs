@@ -1,4 +1,4 @@
-//! Example of using PostgresQueue and PostgresMailbox for persistent task scheduling.
+//! Example of using `PostgresQueue` and `PostgresMailbox` for persistent task scheduling.
 //!
 //! This example demonstrates a cloud-deployment scenario with:
 //! - Postgres-backed persistent queue
@@ -89,7 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://testuser:testpass@localhost:5433/testdb".into());
 
-    println!("Connecting to database: {}", database_url);
+    println!("Connecting to database: {database_url}");
     let db = Database::connect(&database_url).await?;
     println!("✓ Connected to database\n");
 
@@ -127,7 +127,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 id: i,
                 mailbox: Some(MailboxKey {
                     tenant: "demo-tenant".into(),
-                    user_id: Some(format!("user-{}", i)),
+                    user_id: Some(format!("user-{i}")),
                     session_id: None,
                 }),
                 priority: if i % 2 == 0 {
@@ -145,13 +145,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             payload: DemoTask {
                 id: i,
-                operation: format!("process_{}", i),
-                data: format!("demo-data-{}", i),
+                operation: format!("process_{i}"),
+                data: format!("demo-data-{i}"),
             },
         };
 
         let status = pool.submit(task, now_ms()).await?;
-        println!("  Task {} submitted with status: {:?}", i, status);
+        println!("  Task {i} submitted with status: {status:?}");
     }
 
     println!("\n✓ All tasks submitted");

@@ -12,14 +12,19 @@ pub struct TokioSpawner {
 }
 
 impl TokioSpawner {
-    /// Create a new TokioSpawner from a tokio runtime handle.
+    /// Create a new `TokioSpawner` from a tokio runtime handle.
+    #[must_use]
     pub fn new(handle: tokio::runtime::Handle) -> Self {
         Self {
             handle: Arc::new(handle),
         }
     }
 
-    /// Create a TokioSpawner with a new multi-threaded runtime with specified worker threads.
+    /// Create a `TokioSpawner` with a new multi-threaded runtime with specified worker threads.
+    ///
+    /// # Errors
+    ///
+    /// Returns the I/O error from the tokio runtime builder.
     pub fn with_worker_threads(worker_threads: usize) -> Result<Self, std::io::Error> {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(worker_threads)

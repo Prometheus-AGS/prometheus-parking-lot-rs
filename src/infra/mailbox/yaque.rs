@@ -31,6 +31,11 @@ pub struct MailboxMessage<P> {
 
 impl<P> YaqueMailbox<P> {
     /// Create a new mailbox persisted to the given path/stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns a backend error when the directory cannot be created or an
+    /// existing stream file cannot be read or parsed.
     pub fn new(path: impl AsRef<Path>, stream: impl Into<String>) -> Result<Self, SchedulerError>
     where
         P: DeserializeOwned,
@@ -93,6 +98,7 @@ impl<P> YaqueMailbox<P> {
     }
 
     /// Fetch messages for a mailbox key, optionally since a timestamp.
+    #[must_use]
     pub fn fetch(
         &self,
         key: &MailboxKey,
@@ -106,7 +112,7 @@ impl<P> YaqueMailbox<P> {
             .get(key)
             .map(|msgs| {
                 msgs.iter()
-                    .filter(|m| since_ms.map(|s| m.created_at_ms >= s).unwrap_or(true))
+                    .filter(|m| since_ms.is_none_or(|s| m.created_at_ms >= s))
                     .take(limit)
                     .cloned()
                     .collect()

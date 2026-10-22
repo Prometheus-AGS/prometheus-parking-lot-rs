@@ -208,19 +208,19 @@ mod tests {
     #[test]
     fn test_pool_error_display() {
         let err = PoolError::QueueFull;
-        assert_eq!(format!("{}", err), "task queue is full");
+        assert_eq!(format!("{err}"), "task queue is full");
 
         let err = PoolError::InsufficientCapacity {
             requested: 100,
             available: 50,
         };
         assert_eq!(
-            format!("{}", err),
+            format!("{err}"),
             "insufficient capacity: requested 100, available 50"
         );
 
         let err = PoolError::Timeout;
-        assert_eq!(format!("{}", err), "operation timed out");
+        assert_eq!(format!("{err}"), "operation timed out");
     }
 
     #[test]

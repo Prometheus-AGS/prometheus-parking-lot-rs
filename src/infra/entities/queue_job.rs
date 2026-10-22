@@ -1,10 +1,10 @@
-//! SeaORM entity for pl_queue_jobs table.
+//! `SeaORM` entity for `pl_queue_jobs` table.
 
 use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 /// Entity representing a queued task in the database.
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "pl_queue_jobs")]
 pub struct Model {
     /// Primary key.
@@ -45,7 +45,7 @@ pub struct Model {
     pub attempts: i32,
 }
 
-/// SeaORM relation stub — the queue_jobs table has no foreign-key relations.
+/// `SeaORM` relation stub — the `queue_jobs` table has no foreign-key relations.
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {}
 

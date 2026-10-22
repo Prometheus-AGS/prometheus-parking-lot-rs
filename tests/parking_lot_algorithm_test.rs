@@ -8,6 +8,11 @@
 //! 5. Results are delivered to mailbox
 //! 6. Priority ordering is respected
 
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "small loop counters in tests; casts are bounded by the test sizes"
+)]
+
 use async_trait::async_trait;
 use prometheus_parking_lot::core::{
     PoolLimits, ResourcePool, ScheduledTask, Spawn, TaskExecutor, TaskMetadata, TaskStatus,
@@ -274,7 +279,7 @@ async fn test_wake_up_mechanism() {
                 ScheduledTask {
                     meta,
                     payload: TestJob {
-                        name: format!("task{}", i),
+                        name: format!("task{i}"),
                         value: i as u32,
                     },
                 },
@@ -420,7 +425,7 @@ async fn test_priority_ordering() {
                     mailbox: None,
                 },
                 payload: TestJob {
-                    name: format!("task_{:?}", priority),
+                    name: format!("task_{priority:?}"),
                     value: id as u32,
                 },
             },
@@ -530,7 +535,7 @@ async fn test_concurrent_submissions() {
             };
 
             let job = TestJob {
-                name: format!("concurrent_task_{}", i),
+                name: format!("concurrent_task_{i}"),
                 value: i as u32,
             };
 

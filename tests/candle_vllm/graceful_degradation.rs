@@ -74,7 +74,7 @@ async fn test_queue_full_rejection() {
             println!("Task accepted (queue had space)");
         }
         Err(e) => {
-            panic!("Unexpected error: {:?}", e);
+            panic!("Unexpected error: {e:?}");
         }
     }
 
@@ -100,11 +100,11 @@ async fn test_backpressure_handling() {
         match pool.submit_async((), make_meta(i)).await {
             Ok(_) => accepted += 1,
             Err(PoolError::QueueFull) => rejected += 1,
-            Err(e) => panic!("Unexpected error: {:?}", e),
+            Err(e) => panic!("Unexpected error: {e:?}"),
         }
     }
 
-    println!("Accepted: {}, Rejected: {}", accepted, rejected);
+    println!("Accepted: {accepted}, Rejected: {rejected}");
     assert!(rejected > 0, "Should have rejected some tasks");
     assert!(accepted <= 6, "Should accept at most 1 running + 5 queued");
 

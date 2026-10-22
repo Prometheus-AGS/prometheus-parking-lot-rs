@@ -11,7 +11,7 @@ use super::TaskMetadata;
 /// and Serialize + Deserialize for persistence in queue backends.
 pub trait TaskPayload: Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static {}
 
-/// Blanket implementation: any type meeting the requirements is a TaskPayload.
+/// Blanket implementation: any type meeting the requirements is a `TaskPayload`.
 impl<T> TaskPayload for T where T: Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static {}
 
 /// Abstraction for executing a task payload and producing a result.

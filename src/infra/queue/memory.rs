@@ -7,13 +7,13 @@ use crate::core::SchedulerError;
 use crate::core::{ScheduledTask, TaskQueue};
 use crate::util::serde::Priority;
 
-/// Wrapper to make ScheduledTask orderable by priority (highest first) and FIFO within priority.
+/// Wrapper to make `ScheduledTask` orderable by priority (highest first) and FIFO within priority.
 struct PriorityTask<P> {
     task: ScheduledTask<P>,
 }
 
 impl<P> PriorityTask<P> {
-    fn priority_value(p: Priority) -> u8 {
+    const fn priority_value(p: Priority) -> u8 {
         match p {
             Priority::Low => 0,
             Priority::Normal => 1,
@@ -67,6 +67,7 @@ pub struct InMemoryQueue<P> {
 
 impl<P> InMemoryQueue<P> {
     /// Create a new in-memory queue with a maximum depth.
+    #[must_use]
     pub fn new(max_depth: usize) -> Self {
         Self {
             max_depth,
@@ -100,7 +101,7 @@ impl<P> TaskQueue<P> for InMemoryQueue<P> {
         let tasks: Vec<_> = self.tasks.drain().collect();
         self.tasks = tasks
             .into_iter()
-            .filter(|pt| pt.task.meta.deadline_ms.map(|d| d > now_ms).unwrap_or(true))
+            .filter(|pt| pt.task.meta.deadline_ms.is_none_or(|d| d > now_ms))
             .collect();
         let after = self.tasks.len();
         Ok(before.saturating_sub(after))
@@ -134,7 +135,7 @@ mod tests {
                 created_at_ms,
                 idempotency_key: None,
             },
-            payload: format!("task-{}", id),
+            payload: format!("task-{id}"),
         }
     }
 

@@ -46,7 +46,7 @@ impl WorkerExecutor<String, StreamingResult> for StreamingExecutor {
         // Simulate token generation during execution
         for i in 0..total_tokens {
             tokio::time::sleep(Duration::from_millis(10)).await;
-            let token = format!("{}:token_{}", prompt, i);
+            let token = format!("{prompt}:token_{i}");
             let _ = tx.send(token);
         }
         drop(tx);

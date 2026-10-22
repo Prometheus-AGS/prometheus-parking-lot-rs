@@ -1,4 +1,4 @@
-//! Example of using YaqueQueue for file-backed persistent task scheduling.
+//! Example of using `YaqueQueue` for file-backed persistent task scheduling.
 //!
 //! This example demonstrates a desktop/Tauri deployment scenario with:
 //! - File-backed persistent queue (survives app restarts)
@@ -116,7 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Submit LLM inference tasks
     println!("Submitting LLM inference tasks...\n");
 
-    let prompts = vec![
+    let prompts = [
         "Explain quantum computing in simple terms",
         "Write a haiku about programming",
         "What is the meaning of life?",
@@ -131,7 +131,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 mailbox: Some(MailboxKey {
                     tenant: "desktop-app".into(),
                     user_id: Some("local-user".into()),
-                    session_id: Some(format!("session-{}", task_id)),
+                    session_id: Some(format!("session-{task_id}")),
                 }),
                 priority: Priority::Normal,
                 cost: ResourceCost {
@@ -150,8 +150,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         let status = pool.submit(task, now_ms()).await?;
-        println!("Task {}: {:?}", task_id, status);
-        println!("  Prompt: \"{}\"", prompt);
+        println!("Task {task_id}: {status:?}");
+        println!("  Prompt: \"{prompt}\"");
     }
 
     println!("\n✓ All tasks submitted");

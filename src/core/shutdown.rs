@@ -92,12 +92,14 @@ pub struct ShutdownHandle {
 impl ShutdownHandle {
     /// Create a new handle wrapping a cancellation token.
     /// Create a new handle wrapping a cancellation token.
-    pub fn new(token: CancellationToken) -> Self {
+    #[must_use]
+    pub const fn new(token: CancellationToken) -> Self {
         Self { token }
     }
 
     /// Get the underlying `CancellationToken`.
-    pub fn token(&self) -> &CancellationToken {
+    #[must_use]
+    pub const fn token(&self) -> &CancellationToken {
         &self.token
     }
 
@@ -132,6 +134,11 @@ impl ShutdownHandle {
 /// Wait for Ctrl-C or (on Unix) SIGTERM, whichever arrives first.
 ///
 /// On non-Unix platforms only Ctrl-C is handled.
+///
+/// # Panics
+///
+/// Panics if the SIGTERM handler cannot be installed (Unix only), or if
+/// called outside a tokio runtime with signal support enabled.
 pub async fn wait_for_signal() {
     #[cfg(unix)]
     {

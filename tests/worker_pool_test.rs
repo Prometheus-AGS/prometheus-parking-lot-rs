@@ -1,4 +1,4 @@
-//! Comprehensive integration tests for WorkerPool
+//! Comprehensive integration tests for `WorkerPool`
 //!
 //! These tests validate real-world functionality including:
 //! - Basic task execution with real executors
@@ -8,6 +8,11 @@
 //! - Non-serializable streaming results (candle-vllm pattern)
 //! - Timeout handling
 //! - Graceful shutdown
+
+#![expect(
+    clippy::cast_sign_loss,
+    reason = "non-negative loop counters in tests; casts are bounded by the test sizes"
+)]
 
 use async_trait::async_trait;
 use prometheus_parking_lot::config::WorkerPoolConfig;
@@ -24,26 +29,19 @@ async fn with_timeout<F, T>(name: &str, timeout_secs: u64, f: F) -> T
 where
     F: std::future::Future<Output = T>,
 {
-    eprintln!("[TEST_START] {} (timeout: {}s)", name, timeout_secs);
+    eprintln!("[TEST_START] {name} (timeout: {timeout_secs}s)");
     let start = Instant::now();
 
     // Run the test with timeout
     let result = tokio::time::timeout(Duration::from_secs(timeout_secs), f).await;
 
     let elapsed = start.elapsed();
-    match result {
-        Ok(r) => {
-            eprintln!("[TEST_END] {} completed in {:?}", name, elapsed);
-            r
-        }
-        Err(_) => {
-            eprintln!(
-                "[TEST_TIMEOUT] {} exceeded {}s - FAILING TEST",
-                name, timeout_secs
-            );
-            panic!("Test {} timed out after {:?}", name, elapsed);
-        }
-    }
+    let Ok(r) = result else {
+        eprintln!("[TEST_TIMEOUT] {name} exceeded {timeout_secs}s - FAILING TEST");
+        panic!("Test {name} timed out after {elapsed:?}");
+    };
+    eprintln!("[TEST_END] {name} completed in {elapsed:?}");
+    r
 }
 
 // ============================================================================
@@ -113,7 +111,7 @@ struct CpuWorkExecutor {
 }
 
 impl CpuWorkExecutor {
-    fn new(work_duration_ms: u64) -> Self {
+    const fn new(work_duration_ms: u64) -> Self {
         Self { work_duration_ms }
     }
 }
@@ -127,7 +125,7 @@ impl WorkerExecutor<String, String> for CpuWorkExecutor {
         let iterations = self.work_duration_ms * 1000;
         for i in 0..iterations {
             if i % 10000 == 0 {
-                result = format!("{}_{}", result, i);
+                result = format!("{result}_{i}");
             }
         }
         let elapsed = start.elapsed();
@@ -215,7 +213,7 @@ impl WorkerExecutor<String, StreamingResult> for StreamingExecutor {
         for i in 0..total_tokens {
             // Simulate token generation time
             tokio::time::sleep(Duration::from_millis(10)).await;
-            let token = format!("{}:token_{}", prompt, i);
+            let token = format!("{prompt}:token_{i}");
             let _ = tx.send(token);
         }
         // Drop sender to signal stream completion
@@ -235,7 +233,7 @@ struct SlowExecutor {
 }
 
 impl SlowExecutor {
-    fn new(delay_ms: u64) -> Self {
+    const fn new(delay_ms: u64) -> Self {
         Self { delay_ms }
     }
 }
@@ -274,7 +272,7 @@ async fn test_basic_async_api() {
             .await
             .expect("Failed to submit");
 
-        println!("Task submitted, key: {:?}", key);
+        println!("Task submitted, key: {key:?}");
 
         // Retrieve result
         let result = pool
@@ -282,12 +280,12 @@ async fn test_basic_async_api() {
             .await
             .expect("Failed to retrieve");
 
-        println!("Result: {}", result);
+        println!("Result: {result}");
         assert_eq!(result, 8);
 
         // Check stats
         let stats = pool.stats();
-        println!("Final stats: {:?}", stats);
+        println!("Final stats: {stats:?}");
         assert_eq!(stats.completed_tasks, 1);
 
         eprintln!("[CLEANUP] test_basic_async_api shutting down pool");
@@ -325,7 +323,7 @@ async fn test_blocking_api() {
             .retrieve(&key, Duration::from_secs(5))
             .expect("Failed to retrieve");
 
-        println!("Result: {}", result);
+        println!("Result: {result}");
         assert_eq!(result, 30);
 
         eprintln!("[CLEANUP] test_blocking_api shutting down pool");
@@ -370,7 +368,7 @@ async fn test_concurrent_execution() {
             keys.push(key);
         }
 
-        println!("Submitted {} tasks", num_tasks);
+        println!("Submitted {num_tasks} tasks");
 
         // Retrieve all results
         let pool_ref = pool.clone();
@@ -390,7 +388,7 @@ async fn test_concurrent_execution() {
             .map(|r| r.expect("Task panicked"))
             .collect();
 
-        println!("All results retrieved: {:?}", results);
+        println!("All results retrieved: {results:?}");
 
         // Verify all tasks executed
         assert_eq!(executor_clone.execution_count(), num_tasks as u64);
@@ -406,7 +404,7 @@ async fn test_concurrent_execution() {
         );
 
         let stats = pool.stats();
-        println!("Final stats: {:?}", stats);
+        println!("Final stats: {stats:?}");
         assert_eq!(stats.completed_tasks, num_tasks as u64);
 
         eprintln!("[CLEANUP] test_concurrent_execution shutting down pool");
@@ -452,7 +450,7 @@ async fn test_resource_limits_queueing() {
 
         // Check that some are queued
         let stats = pool.stats();
-        println!("Stats after submission: {:?}", stats);
+        println!("Stats after submission: {stats:?}");
 
         // Retrieve all results
         for key in keys {
@@ -463,7 +461,7 @@ async fn test_resource_limits_queueing() {
         }
 
         let final_stats = pool.stats();
-        println!("Final stats: {:?}", final_stats);
+        println!("Final stats: {final_stats:?}");
         assert_eq!(final_stats.completed_tasks, 10);
 
         eprintln!("[CLEANUP] test_resource_limits_queueing shutting down pool");
@@ -515,7 +513,7 @@ async fn test_streaming_non_serializable_results() {
         // Consume the stream
         let mut tokens = Vec::new();
         while let Ok(token) = result.receiver.recv_async().await {
-            println!("  Received token: {}", token);
+            println!("  Received token: {token}");
             tokens.push(token);
         }
 
@@ -559,14 +557,14 @@ async fn test_timeout_handling() {
         let result = pool.retrieve_async(&key, Duration::from_millis(100)).await;
         let elapsed = start.elapsed();
 
-        println!("Retrieve returned after {:?}", elapsed);
+        println!("Retrieve returned after {elapsed:?}");
 
         match result {
             Err(PoolError::Timeout) => {
                 println!("Correctly got Timeout error");
             }
             other => {
-                panic!("Expected Timeout error, got: {:?}", other);
+                panic!("Expected Timeout error, got: {other:?}");
             }
         }
 
@@ -636,7 +634,7 @@ async fn test_graceful_shutdown() {
         pool.shutdown();
         let shutdown_time = start.elapsed();
 
-        println!("Shutdown completed in {:?}", shutdown_time);
+        println!("Shutdown completed in {shutdown_time:?}");
 
         // Shutdown should be fast (not waiting for any timeout)
         assert!(
@@ -679,7 +677,7 @@ async fn test_submit_after_shutdown() {
                 println!("Correctly got PoolShutdown error");
             }
             other => {
-                panic!("Expected PoolShutdown error, got: {:?}", other);
+                panic!("Expected PoolShutdown error, got: {other:?}");
             }
         }
 
@@ -719,7 +717,7 @@ async fn test_cpu_work_isolation() {
         tokio::time::sleep(Duration::from_millis(10)).await;
         let async_elapsed = async_start.elapsed();
 
-        println!("Async sleep took {:?} (should be ~10ms)", async_elapsed);
+        println!("Async sleep took {async_elapsed:?} (should be ~10ms)");
 
         // If CPU work was blocking the runtime, this would take much longer
         assert!(
@@ -733,7 +731,7 @@ async fn test_cpu_work_isolation() {
             .await
             .expect("Failed to retrieve");
 
-        println!("CPU task result: {}", result);
+        println!("CPU task result: {result}");
         assert!(result.contains("Processed 'test_data'"));
 
         eprintln!("[CLEANUP] test_cpu_work_isolation shutting down pool");
@@ -768,14 +766,14 @@ async fn test_queue_depth_limit() {
             let meta = make_meta(i as u64, 10);
             match pool.submit_async((), meta).await {
                 Ok(key) => {
-                    println!("Task {} accepted", i);
+                    println!("Task {i} accepted");
                     keys.push(key);
                 }
                 Err(PoolError::QueueFull) => {
-                    println!("Task {} rejected (queue full)", i);
+                    println!("Task {i} rejected (queue full)");
                     rejected += 1;
                 }
-                Err(e) => panic!("Unexpected error: {:?}", e),
+                Err(e) => panic!("Unexpected error: {e:?}"),
             }
         }
 
@@ -829,20 +827,20 @@ async fn test_result_consumed_once() {
             .expect("Failed to retrieve");
         assert_eq!(result, 3);
 
-        println!("First retrieval succeeded: {}", result);
+        println!("First retrieval succeeded: {result}");
 
         // Second retrieval should fail (result already consumed)
         let result2 = pool.retrieve_async(&key, Duration::from_millis(100)).await;
 
         match result2 {
-            Err(PoolError::Timeout) | Err(PoolError::ResultNotFound) => {
+            Err(PoolError::Timeout | PoolError::ResultNotFound) => {
                 println!("Second retrieval correctly failed");
             }
             Ok(v) => {
-                panic!("Should not get result twice, got: {}", v);
+                panic!("Should not get result twice, got: {v}");
             }
             Err(e) => {
-                println!("Got error (acceptable): {:?}", e);
+                println!("Got error (acceptable): {e:?}");
             }
         }
 
