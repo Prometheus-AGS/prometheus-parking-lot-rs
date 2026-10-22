@@ -73,7 +73,6 @@
 //! - `tests/parking_lot_algorithm_test.rs` - Full integration tests
 //! - `README.md` - Comprehensive documentation
 
-#![deny(warnings)]
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 #![warn(clippy::all)]

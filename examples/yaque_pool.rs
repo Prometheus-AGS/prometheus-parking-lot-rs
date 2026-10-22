@@ -140,6 +140,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
                 deadline_ms: None,
                 created_at_ms: now_ms(),
+                idempotency_key: None,
             },
             payload: LlmInferenceTask {
                 model: "llama-3.1-8b".into(),

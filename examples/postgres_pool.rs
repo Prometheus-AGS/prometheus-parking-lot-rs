@@ -17,8 +17,6 @@
 //!    cargo run --example postgres_pool --features postgres
 //!    ```
 
-#![cfg(feature = "postgres")]
-
 use prometheus_parking_lot::core::{
     PoolLimits, ResourcePool, ScheduledTask, Spawn, TaskExecutor, TaskMetadata,
 };
@@ -143,6 +141,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
                 deadline_ms: None,
                 created_at_ms: now_ms(),
+                idempotency_key: None,
             },
             payload: DemoTask {
                 id: i,

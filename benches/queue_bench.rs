@@ -81,6 +81,7 @@ fn build_task(id: u64, priority: Priority) -> ScheduledTask<BenchPayload> {
             },
             deadline_ms: None,
             created_at_ms: now_ms(),
+            idempotency_key: None,
         },
         payload: BenchPayload {
             id,
@@ -109,6 +110,7 @@ fn build_string_task(id: u64) -> ScheduledTask<String> {
             },
             deadline_ms: None,
             created_at_ms: id as u128, // Use id for ordering
+            idempotency_key: None,
         },
         payload: format!("payload-{}", id),
     }
@@ -392,22 +394,27 @@ fn bench_mailbox_fetch(c: &mut Criterion) {
     for size in [100, 1_000, 5_000] {
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
             let mut mailbox = InMemoryMailbox::<String>::new();
-            let key = MailboxKey {
-                tenant: "bench-tenant".into(),
-                user_id: Some("bench-user".into()),
-                session_id: None,
-            };
-            
+            // The mailbox holds at most one message per key, so populate
+            // `size` distinct keys and look each one up.
+            let keys: Vec<MailboxKey> = (0..size)
+                .map(|i| MailboxKey {
+                    tenant: "bench-tenant".into(),
+                    user_id: Some(format!("bench-user-{i}")),
+                    session_id: None,
+                })
+                .collect();
+
             // Pre-populate mailbox
-            for i in 0..size {
+            for (i, key) in keys.iter().enumerate() {
                 mailbox
-                    .deliver(&key, TaskStatus::Completed, Some(format!("result-{}", i)))
+                    .deliver(key, TaskStatus::Completed, Some(format!("result-{i}")))
                     .unwrap();
             }
-            
+
             b.iter(|| {
-                let messages = mailbox.fetch(&key, None, size as usize);
-                black_box(messages);
+                for key in &keys {
+                    black_box(mailbox.peek(key));
+                }
             });
         });
     }
