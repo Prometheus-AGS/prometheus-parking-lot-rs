@@ -1,48 +1,42 @@
-version: '3.8'
+# Local Postgres substrate (CR-43): PostgreSQL + pgmq, tuned for queue workloads.
+#
+#   docker compose -f docker-compose.test.yml up -d --build postgres18
+#   DATABASE_URL=postgres://postgres:postgres@localhost:5433/postgres
+#
+# The Rust integration tests do not need this file: the testcontainers helper in
+# crates/parking-lot-pg/tests/support builds and starts the same images itself.
 
 services:
-  postgres:
-    image: postgres:17-alpine
-    container_name: prometheus-parking-lot-test-db
+  postgres18:
+    image: parking-lot-pg:18
+    build:
+      context: docker
+      dockerfile: postgres18/Dockerfile
+    container_name: parking-lot-pg18
     environment:
-      POSTGRES_USER: testuser
-      POSTGRES_PASSWORD: testpass
-      POSTGRES_DB: testdb
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5433:5432"
-    volumes:
-      - ./crates/parking-lot-pg/migrations/init:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U testuser -d testdb"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
-      retries: 5
-    command: 
-      - "postgres"
-      - "-c"
-      - "shared_preload_libraries=pg_stat_statements"
-      - "-c"
-      - "max_connections=200"
+      retries: 10
 
-  # Service to install pgmq extension after postgres is ready
-  pgmq-setup:
-    image: postgres:17-alpine
-    depends_on:
-      postgres:
-        condition: service_healthy
+  # PG 17 for the version matrix.
+  postgres17:
+    image: parking-lot-pg:17
+    build:
+      context: docker
+      dockerfile: postgres17/Dockerfile
+    container_name: parking-lot-pg17
+    profiles: ["matrix"]
     environment:
-      PGHOST: postgres
-      PGUSER: testuser
-      PGPASSWORD: testpass
-      PGDATABASE: testdb
-    volumes:
-      - ./crates/parking-lot-pg/migrations:/migrations
-    entrypoint: /bin/sh
-    command:
-      - -c
-      - |
-        # Wait a bit for postgres to be fully ready
-        sleep 2
-        # Install pgmq from source (as extension may not be in alpine package)
-        # For now we'll create the tables manually instead
-        echo "Postgres test database ready"
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

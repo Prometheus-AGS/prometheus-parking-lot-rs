@@ -30,6 +30,17 @@ pub mod resource_pool {
     pub use prometheus_parking_lot_runtime_tokio::resource_pool::ResourcePool;
 }
 
+/// Async backend contracts (ADR 0003): the leasing task queue, the idempotent
+/// result mailbox, notifiers and the storage-plus-notifier composition that
+/// durable backends implement.
+pub mod backend {
+    pub use prometheus_parking_lot_core::contracts::{
+        Delivery, DeliveryOutcome, Enqueued, LeaseQueue, LeaseToken, LeasedTask, MailboxEntry,
+        NackAction, NoopNotifier, Notifier, QueueDepth, QueueEntryId, ResultMailbox,
+        StorageMailbox,
+    };
+}
+
 /// `WorkerPool`: dedicated worker threads (native) or async tasks (WASM).
 pub mod worker_pool {
     pub use prometheus_parking_lot_core::contracts::PoolStats;
@@ -42,6 +53,10 @@ pub mod worker_pool {
 #[cfg(feature = "postgres")]
 pub use audit::PostgresAuditSink;
 pub use audit::{AuditEvent, AuditSink, InMemoryAuditSink, build_audit_event};
+pub use backend::{
+    Delivery, DeliveryOutcome, Enqueued, LeaseQueue, LeaseToken, LeasedTask, MailboxEntry,
+    NackAction, NoopNotifier, Notifier, QueueDepth, QueueEntryId, ResultMailbox, StorageMailbox,
+};
 #[cfg(feature = "tokio-runtime")]
 pub use cancellation::{
     CancelReason, CancellationChannel, CancellationConfig, CancellationSink, CancelledTask,

@@ -110,6 +110,63 @@ jobs:
           command: check
           arguments: --all-features --locked
 
+  supply-chain:
+    # cr-51. fetch-depth 0: gitleaks and ancestry checks need full history; a shallow
+    # clone would silently pass them. Scripts: .github/scripts/supply-chain.sh.
+    name: Supply chain
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.PINNED_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: supply-chain
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      # taiki-e/install-action has no gitleaks entry; install the pinned release
+      # binary and verify it against the release checksum file.
+      - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: "8.30.1"
+        run: |
+          set -euo pipefail
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$tarball" "$base/$tarball"
+          curl -fsSL -o "$RUNNER_TEMP/checksums.txt" "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          (cd "$RUNNER_TEMP" && grep " ${tarball}\$" checksums.txt | sha256sum -c -)
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP" gitleaks
+          sudo install -m 0755 "$RUNNER_TEMP/gitleaks" /usr/local/bin/gitleaks
+          gitleaks version
+      # --- blocking gates ---
+      - name: No tracked credential paths
+        run: .github/scripts/supply-chain.sh tracked-credentials
+      - name: Secrets in new commits (gitleaks, PR or push range)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            range="-1 $HEAD_SHA"
+          else
+            range="$BASE_SHA..$HEAD_SHA"
+          fi
+          .github/scripts/supply-chain.sh secrets-diff "$range"
+      - name: Pre-purge root set (inert while .github/pre-purge-roots.txt is empty)
+        run: .github/scripts/supply-chain.sh pre-purge
+      - name: Package allowlist (cargo package --list per crate)
+        run: .github/scripts/supply-chain.sh package-allowlist
+      # --- informational until cr-15 purges history; never fail the job ---
+      - name: "Pre-purge, informational: path history of purged credential files"
+        continue-on-error: true
+        run: .github/scripts/supply-chain.sh path-history
+      - name: "Pre-purge, informational: gitleaks over full history"
+        continue-on-error: true
+        run: .github/scripts/supply-chain.sh secrets-history
+
   coverage:
     name: Coverage
     runs-on: ubuntu-latest

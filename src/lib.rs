@@ -110,6 +110,9 @@ pub mod infra {
         pub use memory::InMemoryQueue;
         #[cfg(feature = "postgres")]
         pub use postgres::PostgresQueue;
+        pub use prometheus_parking_lot_core::contracts::memory_lease_queue::{
+            DeadLetter, InMemoryLeaseQueue,
+        };
         #[cfg(feature = "embedded")]
         pub use yaque::YaqueQueue;
     }
@@ -125,6 +128,7 @@ pub mod infra {
         pub use memory::InMemoryMailbox;
         #[cfg(feature = "postgres")]
         pub use postgres::PostgresMailbox;
+        pub use prometheus_parking_lot_core::contracts::memory_result_mailbox::InMemoryResultMailbox;
         #[cfg(feature = "embedded")]
         pub use yaque::YaqueMailbox;
     }

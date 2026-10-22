@@ -1,9 +1,12 @@
 //! # Prometheus Parking Lot - core
 //!
 //! The runtime-free core of the `prometheus_parking_lot` scheduler: scheduling
-//! contracts (task queue, mailbox, spawner, executors, task metadata, errors),
-//! lifecycle hooks and audit types, the in-memory queue and mailbox, and the
-//! worker pool configuration.
+//! contracts (the async lease queue and result mailbox backends implement, the
+//! in-process queue and mailbox, spawner, executors, task metadata, errors),
+//! lifecycle hooks and audit types, in-memory reference backends, and the
+//! worker pool configuration. With the `conformance` feature it also publishes
+//! the backend conformance suite (`conformance`, `lease_queue_conformance!`,
+//! `result_mailbox_conformance!`; ADR 0003).
 //!
 //! This crate performs no IO and depends on no async runtime, database or
 //! network crate, so it builds for every target the scheduler supports. Runtime
@@ -19,11 +22,16 @@ pub mod hooks;
 pub mod mailbox;
 pub mod semaphore;
 
+#[cfg(any(test, feature = "conformance"))]
+pub use contracts::conformance;
 pub use contracts::{
-    AppResult, Clock, InMemoryQueue, Mailbox, MailboxKey, PoolLimits, PoolStats, Priority,
-    ResourceCost, ResourceKind, ScheduledTask, SchedulerError, Spawn, SubmissionSequence,
-    SystemClock, TaskError, TaskExecutor, TaskId, TaskMetadata, TaskPayload, TaskQueue, TaskStatus,
-    TestClock, WorkerExecutor, now_ms,
+    AppResult, Clock, DeadLetter, Delivery, DeliveryOutcome, Enqueued, InMemoryLeaseQueue,
+    InMemoryQueue, InMemoryResultMailbox, LeaseQueue, LeaseToken, LeasedTask, Mailbox,
+    MailboxEntry, MailboxKey, NackAction, NoopNotifier, Notifier, PoolLimits, PoolStats, Priority,
+    QueueDepth, QueueEntryId, ResourceCost, ResourceKind, ResultMailbox, ScheduledTask,
+    SchedulerError, Spawn, StorageMailbox, SubmissionSequence, SystemClock, TaskError,
+    TaskExecutor, TaskId, TaskMetadata, TaskPayload, TaskQueue, TaskStatus, TestClock,
+    WorkerExecutor, now_ms,
 };
 pub use hooks::audit::{AuditEvent, AuditSink, InMemoryAuditSink, build_audit_event};
 pub use hooks::{

@@ -1,0 +1,9 @@
+# Per-package allowlist for `cargo package --list` (cr-51). Format: <package> <ERE>.
+# A path is allowed when it fully matches any ERE for its package. Mirrors each
+# crate's Cargo.toml `include` (ADR 0001) plus the files cargo always adds.
+prometheus-parking-lot-core .cargo_vcs_info\.json|Cargo\.lock|Cargo\.toml|Cargo\.toml\.orig|README\.md|LICENSE.*|src/.*
+prometheus_parking_lot .cargo_vcs_info\.json|Cargo\.lock|Cargo\.toml|Cargo\.toml\.orig|README\.md|LICENSE.*|src/.*|CHANGELOG\.md
+prometheus-parking-lot-embedded .cargo_vcs_info\.json|Cargo\.lock|Cargo\.toml|Cargo\.toml\.orig|README\.md|LICENSE.*|src/.*
+prometheus-parking-lot-pg .cargo_vcs_info\.json|Cargo\.lock|Cargo\.toml|Cargo\.toml\.orig|README\.md|LICENSE.*|src/.*|migrations/.*
+prometheus-parking-lot-runtime-tokio .cargo_vcs_info\.json|Cargo\.lock|Cargo\.toml|Cargo\.toml\.orig|README\.md|LICENSE.*|src/.*
+prometheus-parking-lot-wasm .cargo_vcs_info\.json|Cargo\.lock|Cargo\.toml|Cargo\.toml\.orig|README\.md|LICENSE.*|src/.*

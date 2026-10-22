@@ -206,6 +206,19 @@ pub enum SchedulerError {
         key: Option<String>,
     },
 
+    /// The caller no longer holds the lease named by a
+    /// [`LeaseToken`](crate::contracts::LeaseToken): the lease expired (and the
+    /// task may already be redelivered to another consumer), or the task was
+    /// already acked, nacked or dead-lettered.
+    ///
+    /// Not retryable: the consumer must stop working on the task. Whoever holds
+    /// the current lease owns its outcome.
+    #[error("lease on queue entry {entry} is no longer held")]
+    LeaseLost {
+        /// The queue entry the stale token named.
+        entry: u64,
+    },
+
     /// A task's execution failed; returned by APIs that hand back a task's
     /// result (for example `WorkerPool::retrieve`).
     #[error(transparent)]
