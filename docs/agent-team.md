@@ -63,7 +63,7 @@ Create worktrees with `scripts/agent-worktree.sh add <role> <CR-id>`.
 | Kimi Code | `.kimi-code/agents/*.md` | Native agents; per-role model is ignored — choose the model at invocation. |
 | MiniMax Code | `.minimax/agents/<role>/agent.md` | Read from the user data dir: launch with `MINIMAX_DATA_DIR=$PWD/.minimax` (this replaces `~/.minimax` for that session — unverified whether login/config carry over) or copy the role dirs into `~/.minimax/agents/`. `mcode exec` cannot select a custom agent. |
 | DeepSeek Harness | `.dsh/profiles/parking-lot-core-<role>/`, composition `parking-lot-core-team` | Persona profiles; experimental team package shares one process/workspace and has no per-member model or worktree isolation — use it for planning/review, not parallel builds. |
-| Zed | none (no native agent export) | Zed reads the first instruction file it finds; here that is `.cursorrules` (before `AGENTS.md`). Both carry the team pointer; follow role instructions sequentially. |
+| Zed | none (no native agent export) | Zed reads the first instruction file it finds (`.cursorrules` before `AGENTS.md`); `.cursorrules` is a symlink to `AGENTS.md`, so Zed gets the same rules and team pointer. Follow role instructions sequentially. |
 
 When a harness cannot delegate, apply one role's instructions at a time and say so.
 Review done in the builder's own context is not independent review — run the
