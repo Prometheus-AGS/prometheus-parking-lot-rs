@@ -68,6 +68,9 @@ CREATE INDEX IF NOT EXISTS idx_pl_mailbox_messages_task_id
             TaskStatus::Failed(msg) => format!("Failed: {msg}"),
             TaskStatus::Expired => "Expired".to_string(),
             TaskStatus::Dropped(msg) => format!("Dropped: {msg}"),
+            // `TaskStatus` is non-exhaustive; statuses added after 0.3.0 are
+            // stored by their debug name until cr-27 defines a schema for them.
+            other => format!("{other:?}"),
         }
     }
 

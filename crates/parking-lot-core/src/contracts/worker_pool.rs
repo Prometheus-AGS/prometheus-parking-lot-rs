@@ -1,65 +1,9 @@
 //! Worker pool contract types shared by every `WorkerPool` implementation.
 //!
 //! The native pool (`prometheus-parking-lot-runtime-tokio`) and the WASM pool
-//! (`prometheus-parking-lot-wasm`) both report errors through [`PoolError`] and
-//! statistics through [`PoolStats`].
-
-use std::fmt;
-
-/// Errors that can occur when using a `WorkerPool`.
-#[derive(Debug)]
-#[non_exhaustive]
-pub enum PoolError {
-    /// The task queue is full; no more tasks can be accepted.
-    QueueFull,
-
-    /// Insufficient resource capacity to run the task.
-    InsufficientCapacity {
-        /// Units requested by the task.
-        requested: u32,
-        /// Units currently available.
-        available: u32,
-    },
-
-    /// The operation timed out.
-    Timeout,
-
-    /// The requested result was not found in the mailbox.
-    ResultNotFound,
-
-    /// The pool has been shut down.
-    PoolShutdown,
-
-    /// Configuration validation failed.
-    InvalidConfig(String),
-
-    /// Internal error (worker thread panic, channel closed, etc.).
-    Internal(String),
-}
-
-impl fmt::Display for PoolError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::QueueFull => write!(f, "task queue is full"),
-            Self::InsufficientCapacity {
-                requested,
-                available,
-            } => {
-                write!(
-                    f,
-                    "insufficient capacity: requested {requested}, available {available}"
-                )
-            }
-            Self::Timeout => write!(f, "operation timed out"),
-            Self::ResultNotFound => write!(f, "result not found in mailbox"),
-            Self::PoolShutdown => write!(f, "pool has been shut down"),
-            Self::InvalidConfig(msg) => write!(f, "invalid configuration: {msg}"),
-            Self::Internal(msg) => write!(f, "internal error: {msg}"),
-        }
-    }
-}
-
-impl std::error::Error for PoolError {}
+//! (`prometheus-parking-lot-wasm`) report statistics through [`PoolStats`] and
+//! errors through [`SchedulerError`](crate::contracts::SchedulerError) (the 0.2
+//! `PoolError` enum was folded into it in 0.3.0).
 
 /// Statistics about pool utilization and performance.
 #[derive(Debug, Clone, Default)]
@@ -93,22 +37,23 @@ pub struct PoolStats {
 mod tests {
     use super::*;
 
+    /// The 0.2 `PoolError` variants now surface as these `SchedulerError`
+    /// variants (the 0.3.0 mapping); their messages stay actionable.
     #[test]
     fn test_pool_error_display() {
-        let err = PoolError::QueueFull;
-        assert_eq!(format!("{err}"), "task queue is full");
+        use crate::contracts::{SchedulerError, TaskError};
 
-        let err = PoolError::InsufficientCapacity {
-            requested: 100,
-            available: 50,
-        };
+        let err = SchedulerError::queue_full("worker_pool", 10, 10);
         assert_eq!(
-            format!("{err}"),
-            "insufficient capacity: requested 100, available 50"
+            err.to_string(),
+            "queue full for pool 'worker_pool': depth 10/10"
         );
 
-        let err = PoolError::Timeout;
-        assert_eq!(format!("{err}"), "operation timed out");
+        let err = SchedulerError::Timeout { task_id: None };
+        assert_eq!(err.to_string(), "operation timed out");
+
+        let err = SchedulerError::from(TaskError::executor("bad prompt"));
+        assert_eq!(err.to_string(), "executor error: bad prompt");
     }
 
     #[test]

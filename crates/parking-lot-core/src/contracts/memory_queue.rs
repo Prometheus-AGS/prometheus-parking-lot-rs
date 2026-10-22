@@ -1,31 +1,38 @@
 //! In-memory queue with priority and deadline awareness.
 
-use std::cmp::Ordering;
+use std::cmp::{Ordering, Reverse};
 use std::collections::BinaryHeap;
 
 use crate::contracts::SchedulerError;
 use crate::contracts::types::Priority;
 use crate::contracts::{ScheduledTask, TaskQueue};
 
-/// Wrapper to make `ScheduledTask` orderable by priority (highest first) and FIFO within priority.
+/// Heap entry ordering a task by priority (highest first), then by
+/// submission sequence, creation time and id (lowest first).
+///
+/// `Eq` compares exactly the keys `Ord` compares, so the two agree (two
+/// entries are equal only when every ordering key is equal).
 struct PriorityTask<P> {
     task: ScheduledTask<P>,
 }
 
 impl<P> PriorityTask<P> {
-    const fn priority_value(p: Priority) -> u8 {
-        match p {
-            Priority::Low => 0,
-            Priority::Normal => 1,
-            Priority::High => 2,
-            Priority::Critical => 3,
-        }
+    /// The ordering key. Earlier sequence, creation time and id must sort
+    /// *greater* for the max-heap, hence the `Reverse`s.
+    const fn key(&self) -> (Priority, Reverse<u64>, Reverse<u128>, Reverse<u64>) {
+        let meta = &self.task.meta;
+        (
+            meta.priority,
+            Reverse(meta.sequence),
+            Reverse(meta.created_at_ms),
+            Reverse(meta.id),
+        )
     }
 }
 
 impl<P> PartialEq for PriorityTask<P> {
     fn eq(&self, other: &Self) -> bool {
-        self.task.meta.id == other.task.meta.id
+        self.key() == other.key()
     }
 }
 
@@ -39,26 +46,16 @@ impl<P> PartialOrd for PriorityTask<P> {
 
 impl<P> Ord for PriorityTask<P> {
     fn cmp(&self, other: &Self) -> Ordering {
-        let self_priority = Self::priority_value(self.task.meta.priority);
-        let other_priority = Self::priority_value(other.task.meta.priority);
-
-        // Higher priority first
-        match self_priority.cmp(&other_priority) {
-            Ordering::Equal => {
-                // FIFO within same priority: earlier created_at wins (reversed for max-heap)
-                other
-                    .task
-                    .meta
-                    .created_at_ms
-                    .cmp(&self.task.meta.created_at_ms)
-            }
-            other => other,
-        }
+        self.key().cmp(&other.key())
     }
 }
 
 /// In-memory queue storing scheduled tasks using a priority heap.
-/// This provides O(log n) enqueue and O(log n) dequeue operations.
+///
+/// Dequeues by priority (highest first), then FIFO by
+/// [`TaskMetadata::sequence`](crate::contracts::TaskMetadata), with creation
+/// time and id as tie-breakers for unsequenced tasks. Enqueue and dequeue are
+/// O(log n).
 pub struct InMemoryQueue<P> {
     max_depth: usize,
     /// Binary heap for O(log n) priority-based operations.
@@ -127,13 +124,11 @@ mod tests {
                 id,
                 mailbox: None,
                 priority,
-                cost: ResourceCost {
-                    kind: ResourceKind::Cpu,
-                    units: 1,
-                },
+                cost: ResourceCost::new(ResourceKind::Cpu, 1),
                 deadline_ms: None,
                 created_at_ms,
                 idempotency_key: None,
+                sequence: 0,
             },
             payload: format!("task-{id}"),
         }
@@ -169,6 +164,40 @@ mod tests {
         assert_eq!(q.dequeue().unwrap().unwrap().meta.id, 2); // created_at=100
         assert_eq!(q.dequeue().unwrap().unwrap().meta.id, 3); // created_at=200
         assert_eq!(q.dequeue().unwrap().unwrap().meta.id, 1); // created_at=300
+    }
+
+    #[test]
+    fn sequence_orders_fifo_within_priority_regardless_of_timestamp() {
+        let mut q = InMemoryQueue::new(2_000);
+        // Every task shares one timestamp and the ids run backwards, so only
+        // the sequence can produce submission order.
+        for seq in 1..=1_000_u64 {
+            let mut task = make_task(10_000 - seq, Priority::Normal, 42);
+            task.meta.sequence = seq;
+            q.enqueue(task).unwrap();
+        }
+        let mut high = make_task(1, Priority::High, 42);
+        high.meta.sequence = 1_001;
+        q.enqueue(high).unwrap();
+
+        assert_eq!(q.dequeue().unwrap().unwrap().meta.sequence, 1_001);
+        for expected in 1..=1_000_u64 {
+            assert_eq!(q.dequeue().unwrap().unwrap().meta.sequence, expected);
+        }
+    }
+
+    #[test]
+    fn requeued_task_keeps_its_place() {
+        let mut q = InMemoryQueue::new(10);
+        for seq in 1..=3_u64 {
+            let mut task = make_task(seq, Priority::Normal, 0);
+            task.meta.sequence = seq;
+            q.enqueue(task).unwrap();
+        }
+        let head = q.dequeue().unwrap().unwrap();
+        assert_eq!(head.meta.sequence, 1);
+        q.enqueue(head).unwrap();
+        assert_eq!(q.dequeue().unwrap().unwrap().meta.sequence, 1);
     }
 
     #[test]

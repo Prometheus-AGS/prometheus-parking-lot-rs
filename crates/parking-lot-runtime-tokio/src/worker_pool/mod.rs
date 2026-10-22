@@ -32,4 +32,4 @@
 mod native;
 
 pub use native::WorkerPool;
-pub use prometheus_parking_lot_core::{PoolError, PoolStats};
+pub use prometheus_parking_lot_core::PoolStats;

@@ -83,13 +83,13 @@ pub struct WorkerPoolConfig {
 
     /// Maximum number of tasks that can be queued before rejection.
     ///
-    /// When the queue is full, new submissions return `PoolError::QueueFull`.
+    /// When the queue is full, new submissions return `SchedulerError::QueueFull`.
     #[serde(default = "default_max_queue_depth")]
     pub max_queue_depth: usize,
 
     /// Default timeout for `retrieve` operations in milliseconds.
     ///
-    /// If a result is not available within this time, `PoolError::Timeout` is returned.
+    /// If a result is not available within this time, `SchedulerError::Timeout` is returned.
     #[serde(default = "default_timeout_ms")]
     pub default_timeout_ms: u64,
 }

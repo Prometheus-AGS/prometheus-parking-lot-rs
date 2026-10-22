@@ -22,7 +22,29 @@ use prometheus_parking_lot_core::config::WorkerPoolConfig;
 use prometheus_parking_lot_core::dispatch::{
     PoolCounters, generate_mailbox_key, mailbox_key_to_string,
 };
-use prometheus_parking_lot_core::{MailboxKey, PoolError, PoolStats, TaskMetadata, WorkerExecutor};
+use prometheus_parking_lot_core::{
+    MailboxKey, PoolStats, SchedulerError, TaskError, TaskMetadata, WorkerExecutor,
+};
+
+/// Pool name used in errors (pools are not named yet).
+const POOL_NAME: &str = "worker_pool";
+
+/// What a worker stores for one task: the executor's value or its error.
+type TaskOutcome<R> = Result<R, TaskError>;
+
+/// The error for a result slot that does not exist.
+fn result_not_found(key: &MailboxKey) -> SchedulerError {
+    SchedulerError::ResultNotFound {
+        key: Some(mailbox_key_to_string(key)),
+    }
+}
+
+/// The error for a submission to a pool that is shutting down.
+fn pool_shutdown() -> SchedulerError {
+    SchedulerError::PoolShutdown {
+        pool: POOL_NAME.into(),
+    }
+}
 
 /// Result entry state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -155,7 +177,7 @@ where
     semaphore: Arc<Semaphore>,
 
     /// Result storage with notification support.
-    results: Arc<ResultStorage<R>>,
+    results: Arc<ResultStorage<TaskOutcome<R>>>,
 
     /// Pool statistics counters (lock-free).
     counters: Arc<PoolCounters>,
@@ -185,9 +207,9 @@ where
     ///
     /// # Errors
     ///
-    /// Returns `PoolError::InvalidConfig` if the configuration is invalid.
-    pub fn new(config: WorkerPoolConfig, executor: E) -> Result<Self, PoolError> {
-        config.validate().map_err(PoolError::InvalidConfig)?;
+    /// Returns [`SchedulerError::InvalidConfig`] if the configuration is invalid.
+    pub fn new(config: WorkerPoolConfig, executor: E) -> Result<Self, SchedulerError> {
+        config.validate().map_err(SchedulerError::invalid_config)?;
 
         let semaphore = Arc::new(Semaphore::new(config.worker_count));
         let results = Arc::new(ResultStorage::new());
@@ -223,22 +245,26 @@ where
     ///
     /// # Errors
     ///
-    /// - `PoolError::QueueFull` if the task queue is full
-    /// - `PoolError::PoolShutdown` if the pool has been shut down
+    /// - [`SchedulerError::QueueFull`] if the task queue is full
+    /// - [`SchedulerError::PoolShutdown`] if the pool has been shut down
     pub async fn submit_async(
         &self,
         payload: P,
         meta: TaskMetadata,
-    ) -> Result<MailboxKey, PoolError> {
+    ) -> Result<MailboxKey, SchedulerError> {
         if self.shutdown.load(Ordering::Acquire) {
-            return Err(PoolError::PoolShutdown);
+            return Err(pool_shutdown());
         }
 
         // Check queue depth
         let current_queued = self.counters.queued_tasks.load(Ordering::Relaxed);
         if current_queued >= self.config.max_queue_depth as u64 {
             warn!("Worker pool queue is full");
-            return Err(PoolError::QueueFull);
+            return Err(SchedulerError::queue_full(
+                POOL_NAME,
+                usize::try_from(current_queued).unwrap_or(usize::MAX),
+                self.config.max_queue_depth,
+            ));
         }
 
         // Generate unique task ID and mailbox key
@@ -261,7 +287,7 @@ where
         let active_units = Arc::clone(&self.active_units);
         let shutdown = Arc::clone(&self.shutdown);
         let executor = self.executor.clone();
-        let task_cost = meta.cost.units;
+        let task_cost = meta.cost.total_units();
         let key_clone = mailbox_key.clone();
 
         // Spawn async task
@@ -294,13 +320,19 @@ where
 
             debug!(task_id = task_id, "WASM worker completed task");
 
+            let finished = if result.is_ok() {
+                &counters.completed_tasks
+            } else {
+                &counters.failed_tasks
+            };
+
             // Store result and notify waiters
             results.store(&key_clone, result);
 
             // Update counters
             counters.active_tasks.fetch_sub(1, Ordering::Relaxed);
             active_units.fetch_sub(task_cost, Ordering::Relaxed);
-            counters.completed_tasks.fetch_add(1, Ordering::Relaxed);
+            finished.fetch_add(1, Ordering::Relaxed);
         });
 
         debug!(task_id = task_id, "Task submitted to WASM worker pool");
@@ -314,17 +346,20 @@ where
     ///
     /// # Errors
     ///
-    /// - `PoolError::Timeout` if the result is not available within the timeout
-    /// - `PoolError::ResultNotFound` if the mailbox key is invalid
+    /// - [`SchedulerError::Task`] carrying the [`TaskError`] when the executor
+    ///   failed
+    /// - [`SchedulerError::Timeout`] if the result is not available within the
+    ///   timeout
+    /// - [`SchedulerError::ResultNotFound`] if the mailbox key is invalid
     pub async fn retrieve_async(
         &self,
         key: &MailboxKey,
         timeout: Duration,
-    ) -> Result<R, PoolError> {
+    ) -> Result<R, SchedulerError> {
         // First, try immediate retrieval (fast path)
-        if let Some(result) = self.results.try_retrieve(key) {
+        if let Some(outcome) = self.results.try_retrieve(key) {
             self.results.remove(key);
-            return Ok(result);
+            return outcome.map_err(SchedulerError::Task);
         }
 
         // Get notification receiver
@@ -332,31 +367,34 @@ where
 
         let Some(notify_rx) = notify_rx else {
             // No entry or already ready - try again
-            if let Some(result) = self.results.try_retrieve(key) {
+            if let Some(outcome) = self.results.try_retrieve(key) {
                 self.results.remove(key);
-                return Ok(result);
+                return outcome.map_err(SchedulerError::Task);
             }
-            return Err(PoolError::ResultNotFound);
+            return Err(result_not_found(key));
         };
 
         // Wait for notification with timeout (NO POLLING)
         match tokio::time::timeout(timeout, notify_rx).await {
             Ok(Ok(())) => {
                 // Notified - result should be available
-                let result = self.results.remove(key).ok_or(PoolError::ResultNotFound)?;
-                Ok(result)
+                let outcome = self
+                    .results
+                    .remove(key)
+                    .ok_or_else(|| result_not_found(key))?;
+                outcome.map_err(SchedulerError::Task)
             }
             Ok(Err(_)) => {
                 // Channel closed without result
                 self.results.remove(key);
-                Err(PoolError::Internal(
-                    "result notification channel closed".into(),
+                Err(SchedulerError::internal(
+                    "result notification channel closed",
                 ))
             }
             Err(_) => {
                 // Timeout
                 self.results.remove(key);
-                Err(PoolError::Timeout)
+                Err(SchedulerError::Timeout { task_id: None })
             }
         }
     }
@@ -413,10 +451,10 @@ mod tests {
 
     #[async_trait]
     impl WorkerExecutor<String, String> for TestExecutor {
-        async fn execute(&self, payload: String, _meta: TaskMetadata) -> String {
+        async fn execute(&self, payload: String, _meta: TaskMetadata) -> Result<String, TaskError> {
             self.execution_count.fetch_add(1, Ordering::Relaxed);
             tokio::time::sleep(Duration::from_millis(10)).await;
-            format!("Result: {}", payload)
+            Ok(format!("Result: {}", payload))
         }
     }
 
@@ -425,14 +463,12 @@ mod tests {
             id,
             mailbox: None,
             priority: prometheus_parking_lot_core::Priority::Normal,
-            cost: ResourceCost {
-                kind: ResourceKind::Cpu,
-                units: 1,
-            },
+            cost: ResourceCost::new(ResourceKind::Cpu, 1),
             deadline_ms: None,
             created_at_ms: 0,
 
             idempotency_key: None,
+            sequence: 0,
         }
     }
 

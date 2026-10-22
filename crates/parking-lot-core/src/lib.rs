@@ -20,9 +20,10 @@ pub mod mailbox;
 pub mod semaphore;
 
 pub use contracts::{
-    AppResult, InMemoryQueue, Mailbox, MailboxKey, PoolError, PoolLimits, PoolStats, Priority,
-    ResourceCost, ResourceKind, ScheduledTask, SchedulerError, Spawn, TaskExecutor, TaskId,
-    TaskMetadata, TaskPayload, TaskQueue, TaskStatus, WorkerExecutor, now_ms,
+    AppResult, Clock, InMemoryQueue, Mailbox, MailboxKey, PoolLimits, PoolStats, Priority,
+    ResourceCost, ResourceKind, ScheduledTask, SchedulerError, Spawn, SubmissionSequence,
+    SystemClock, TaskError, TaskExecutor, TaskId, TaskMetadata, TaskPayload, TaskQueue, TaskStatus,
+    TestClock, WorkerExecutor, now_ms,
 };
 pub use hooks::audit::{AuditEvent, AuditSink, InMemoryAuditSink, build_audit_event};
 pub use hooks::{
