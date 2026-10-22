@@ -1,13 +1,23 @@
-//! Dispatch: pure scheduling helpers shared by the pool implementations.
+//! Dispatch: the priority dispatcher shared by every pool, plus the counters
+//! and task envelope the worker pools share.
 //!
-//! The priority dispatcher of cr-19 is implemented here. Today the module holds
-//! the counters and task envelope that both worker pools already shared.
+//! [`Dispatcher`] owns the parked queue and a unit-weighted
+//! [`UnitSemaphore`](crate::semaphore::UnitSemaphore): submission does the
+//! depth check and the enqueue atomically, and dispatch peeks at the head and
+//! pops it only when it fits. `ResourcePool` and the native `WorkerPool`
+//! (`prometheus-parking-lot-runtime-tokio`) are built on it; the WASM pool is
+//! ported in cr-38.
 //!
-//! These items were `pub(crate)` inside the single crate and are public now only
-//! so the native (`prometheus-parking-lot-runtime-tokio`) and WASM
-//! (`prometheus-parking-lot-wasm`) worker pools can share them. They are hidden
-//! from the documentation and are not a stable API; the priority dispatcher of
-//! cr-19 replaces them.
+//! `PoolCounters`, `WorkerTask` and the mailbox-key helpers were
+//! `pub(crate)` inside the single crate and are public only so the native and
+//! WASM worker pools can share them. They are hidden from the documentation and
+//! are not a stable API.
+
+mod dispatcher;
+mod parked;
+
+pub use dispatcher::{Admission, Dispatched, Dispatcher, Grant};
+pub use parked::{Parkable, ParkedQueue, PriorityQueue, TaskQueueAdapter, Ticket};
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
