@@ -2,25 +2,25 @@
   "schemaVersion": "2",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 223,
-  "derivedRevision": 223,
+  "sourceRevision": 380,
+  "derivedRevision": 380,
   "frontier": {
-    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 223
+    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 380
   },
   "conflictCount": 0,
   "phase": "phase-correctness-and-durability",
   "phaseId": "phase-correctness-and-durability",
   "parentPhase": null,
-  "last_updated": "2026-10-22T14:05:39.420701Z",
+  "last_updated": "2026-10-22T20:47:09.078073Z",
   "last_updated_by": "kbd-runtime",
   "changes_total": 37,
-  "changes_completed": 1,
+  "changes_completed": 6,
   "implementation_total": 37,
-  "implementation_completed": 1,
+  "implementation_completed": 6,
   "completion": {
     "primaryCounter": "implementation",
     "implementation": {
-      "completed": 1,
+      "completed": 6,
       "total": 37,
       "status": "BLOCKED"
     },
@@ -49,7 +49,7 @@
     "runId": "phase-certification-remediation-20261022T103344Z",
     "primaryCounter": "implementation",
     "implementation": {
-      "completed": 15,
+      "completed": 20,
       "total": 51,
       "status": "BLOCKED"
     },
@@ -84,12 +84,12 @@
     {
       "id": "cr-41-toolchain-baseline",
       "title": "Rust 1.99.1 / MSRV 1.95 / edition 2024 build baseline where every target compiles",
-      "status": "IN_PROGRESS",
-      "implementation_status": "IN_PROGRESS",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
       "tasks_total": 5,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Pin rust-toolchain.toml to 1.99.1, set rust-version = \"1.95\" and edition = \"2024\", run cargo fix --edition, and commit Cargo.lock (remove it from .gitignore)",
+      "tasks_done": 4,
+      "last_task_completed": "Single rustfmt pass, then resolve clippy -D warnings findings (fix; #[expect(..., reason)] only where a lint is wrong for this crate)",
+      "next_task_pending": "Independent review at the merge gate (MSRV correctness, no behaviour change hidden in lint fixes)",
       "blockers": []
     },
     {
@@ -106,45 +106,45 @@
     {
       "id": "cr-48-workspace-split",
       "title": "Split into a Cargo workspace with a wasm-safe core and per-backend crates",
-      "status": "PENDING",
-      "implementation_status": "PENDING",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
       "tasks_total": 4,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Write docs/adr/0001-workspace-split.md (crate map, dependency rules, feature mapping, MSRV per crate)",
+      "tasks_done": 3,
+      "last_task_completed": "Rewrite constraints.md checks for the workspace (core boundary via cargo tree, unsafe grep over crates/** with the FFI exemption) as an operator-adopted amendment",
+      "next_task_pending": "Independent review at the merge gate (dependency boundaries, no behaviour drift)",
       "blockers": []
     },
     {
       "id": "cr-42-ci-rebuild",
       "title": "Green, cached, locked CI on stable and MSRV",
-      "status": "PENDING",
-      "implementation_status": "PENDING",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
       "tasks_total": 4,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Rewrite .github/workflows/ci.yml: rust-cache, --locked, nextest, toolchain matrix 1.99.1 + 1.95",
+      "tasks_done": 3,
+      "last_task_completed": "Update .cargo/config.toml aliases and docs/build-performance.md for the workspace",
+      "next_task_pending": "Independent review at the merge gate (CI covers every required job; no job silently skipped)",
       "blockers": []
     },
     {
       "id": "cr-45-docs-site",
       "title": "Branded Docusaurus documentation site (know-me brand, Flat 2.0)",
-      "status": "PENDING",
-      "implementation_status": "PENDING",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
       "tasks_total": 6,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Scaffold website/ with build-branded-docusaurus; pin versions; map know-me dark/light tokens, typography and logo",
+      "tasks_done": 5,
+      "last_task_completed": "Enable GitHub Pages with source \"GitHub Actions\" (gh api repos/Prometheus-AGS/prometheus-parking-lot-rs/pages); after the first successful deploy returns HTTP 200, set the repository About homepage to the docs URL (gh repo edit --homepage) and record both in execution.md",
+      "next_task_pending": "Independent review at the merge gate (brand fidelity, a11y, sanitizer)",
       "blockers": []
     },
     {
       "id": "cr-18-core-contracts",
       "title": "Core contracts: Arc<Inner>, Clock, Result executors, error taxonomy",
-      "status": "PENDING",
-      "implementation_status": "PENDING",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
       "tasks_total": 4,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Arc<Inner> refactor of ResourcePool; delete sync_wake_worker_loop; Clock trait + TestClock",
+      "tasks_done": 3,
+      "last_task_completed": "Migrate existing tests and examples to the new contracts; CHANGELOG 0.3.0 entry",
+      "next_task_pending": "Independent review at the merge gate (API soundness, Send/Sync bounds, semver notes)",
       "blockers": []
     },
     {
@@ -153,9 +153,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Add CI jobs (fetch-depth 0): gitleaks full history, path-history emptiness assertion, pre-purge root-set ancestry rejection, per-crate cargo package --list allowlist check",
+      "tasks_done": 2,
+      "last_task_completed": "Prove each gate with a negative-control scratch branch and record the failing run URLs",
+      "next_task_pending": "Independent review at the merge gate (gate completeness, shallow-clone pitfalls)",
       "blockers": []
     },
     {
@@ -164,9 +164,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 4,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Write docker/postgres18/Dockerfile (+ pg17 variant) modelled on flint-forge images/postgres18: PGDG base, pgmq from pinned tag, tuned conf, init scripts; no Flint-specific extensions",
+      "tasks_done": 3,
+      "last_task_completed": "Hand platform-engineer the CI image-build step with layer caching",
+      "next_task_pending": "Independent review at the merge gate (image pinning, extension availability)",
       "blockers": []
     },
     {
@@ -175,9 +175,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 4,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Define async TaskQueue (lease/ack/nack/extend), async Mailbox (deliver/consume-once/TTL) and Notifier traits",
+      "tasks_done": 3,
+      "last_task_completed": "Backend conformance test suite (generic over backend) published for backend crates",
+      "next_task_pending": "Independent review at the merge gate (contract completeness, cancellation safety of async fns)",
       "blockers": []
     },
     {
@@ -186,9 +186,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 4,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Implement the dispatcher + unit-weighted semaphore; atomic depth-check/enqueue; peek-then-pop",
+      "tasks_done": 3,
+      "last_task_completed": "loom models (loom_capacity, loom_wakeup) on parking-lot-core under --cfg parking_lot_loom with negative controls under --cfg parking_lot_negative_control; proptest suites for the tokio pools; budget_ tests (wedged executor, cancel witness) for ResourcePool and the native WorkerPool; miri on atomics paths",
+      "next_task_pending": "Independent review at the merge gate (memory ordering, lost-wakeup proof, negative control)",
       "blockers": []
     },
     {
@@ -197,9 +197,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Research and outline concept chapters with primary sources (deep-research skill)",
+      "tasks_done": 2,
+      "last_task_completed": "Write concept chapters with Mermaid diagrams",
+      "next_task_pending": "Independent review at the merge gate (factual accuracy and citations)",
       "blockers": []
     },
     {
