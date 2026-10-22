@@ -11,7 +11,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - ./migrations/init:/docker-entrypoint-initdb.d
+      - ./crates/parking-lot-pg/migrations/init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U testuser -d testdb"]
       interval: 5s
@@ -36,7 +36,7 @@ services:
       PGPASSWORD: testpass
       PGDATABASE: testdb
     volumes:
-      - ./migrations:/migrations
+      - ./crates/parking-lot-pg/migrations:/migrations
     entrypoint: /bin/sh
     command:
       - -c

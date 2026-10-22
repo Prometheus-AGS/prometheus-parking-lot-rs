@@ -1,26 +1,88 @@
-[package]
-name = "prometheus_parking_lot"
+# Workspace layout and dependency rules: docs/adr/0001-workspace-split.md.
+#
+# The repository root is both the workspace and the published facade crate
+# `prometheus_parking_lot`; the layered crates live under crates/.
+
+[workspace]
+resolver = "3"
+members = [
+    "crates/parking-lot-core",
+    "crates/parking-lot-runtime-tokio",
+    "crates/parking-lot-pg",
+    "crates/parking-lot-embedded",
+    "crates/parking-lot-wasm",
+]
+
+[workspace.package]
 version = "0.2.0"
 edition = "2024"
 rust-version = "1.95"
 authors = ["Prometheus AI Team"]
-description = "Runtime-agnostic, resource-aware parking-lot scheduler for AI agent and inference workloads."
-documentation = "https://docs.rs/prometheus_parking_lot"
 repository = "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs"
 homepage = "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs"
-readme = "README.md"
 license = "MIT"
+
+[workspace.dependencies]
+# Workspace crates: path for development, version for publishing.
+prometheus-parking-lot-core = { path = "crates/parking-lot-core", version = "0.2.0" }
+prometheus-parking-lot-runtime-tokio = { path = "crates/parking-lot-runtime-tokio", version = "0.2.0" }
+prometheus-parking-lot-pg = { path = "crates/parking-lot-pg", version = "0.2.0" }
+prometheus-parking-lot-embedded = { path = "crates/parking-lot-embedded", version = "0.2.0" }
+prometheus-parking-lot-wasm = { path = "crates/parking-lot-wasm", version = "0.2.0" }
+
+# Third-party version requirements are pinned once, here; crates add features.
+anyhow = "1"
+async-trait = "0.1"
+chrono = "0.4"
+crossbeam-channel = "0.5"
+num_cpus = "1.16"
+parking_lot = "0.12"
+sea-orm = "1.1.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = "0.8.2"
+thiserror = "2.0.17"
+tokio = "1"
+tokio-util = "0.7"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# Test and benchmark tooling.
+criterion = "0.8.1"
+flume = "0.11"
+futures = "0.3"
+reqwest = "0.12"
+tempfile = "3.14"
+testcontainers = "0.23"
+testcontainers-modules = "0.11"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_docs = "deny"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(parking_lot_loom)', 'cfg(parking_lot_negative_control, values(any()))'] }
+
+[workspace.lints.clippy]
+all = "warn"
+pedantic = "warn"
+nursery = "warn"
+
+# ── Facade package ───────────────────────────────────────────────────────────
+
+[package]
+name = "prometheus_parking_lot"
+description = "Runtime-agnostic, resource-aware parking-lot scheduler for AI agent and inference workloads."
+documentation = "https://docs.rs/prometheus_parking_lot"
+readme = "README.md"
 keywords = ["scheduler", "queue", "tokio", "gpu", "ai"]
 categories = ["asynchronous", "concurrency"]
-exclude = [
-    ".kbd-orchestrator/",
-    ".firecrawl/",
-    ".e2b-template/",
-    ".github/",
-    "reports/",
-    "docs/DISCUSSION.md",
-    "docs/Comprehensive Architectural Report Distributed Parking Management Systems and High-Performance Rust Audit Infrastructur.md",
-]
+include = ["/src/**", "/Cargo.toml", "/README.md", "/LICENSE*", "/CHANGELOG.md"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
@@ -28,46 +90,34 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [features]
 default = ["tokio-runtime"]
-tokio-runtime = ["tokio", "tokio-util"]
-postgres = ["sea-orm", "sqlx", "chrono"]
+# Async ResourcePool, native WorkerPool, shutdown, cancellation, TokioSpawner.
+tokio-runtime = ["dep:prometheus-parking-lot-runtime-tokio"]
+# Postgres queue, mailbox, entities and audit schema. `sea-orm` stays a direct
+# optional dependency so applications (and examples/postgres_pool.rs) can open
+# the connection the backends take.
+postgres = ["dep:prometheus-parking-lot-pg", "dep:sea-orm"]
+# Embedded file-backed queue and mailbox (the yaque-named stores; redb in cr-28).
+embedded = ["dep:prometheus-parking-lot-embedded"]
 
 [dependencies]
-lock_api = "0.4"
-parking_lot_core = "0.9"
-parking_lot = "0.12"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-thiserror = "2.0.17"
-anyhow = "1"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
-dotenvy = "0.15.7"
-async-trait = "0.1"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "signal"], optional = true }
-tokio-util = { version = "0.7", features = ["rt"], optional = true }
-num_cpus = "1.16"
-uuid = { version = "1", features = ["v4"] }
+prometheus-parking-lot-core.workspace = true
+prometheus-parking-lot-runtime-tokio = { workspace = true, optional = true }
+prometheus-parking-lot-pg = { workspace = true, optional = true }
+prometheus-parking-lot-embedded = { workspace = true, optional = true }
+sea-orm = { workspace = true, optional = true, features = ["runtime-tokio-rustls", "sqlx-postgres", "macros"] }
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
 
-# Postgres backend dependencies
-sea-orm = { version = "1.1.2", features = ["runtime-tokio-rustls", "sqlx-postgres", "macros"], optional = true }
-sqlx = { version = "0.8.2", features = ["postgres", "runtime-tokio-rustls", "macros"], optional = true }
-chrono = { version = "0.4", optional = true }
-
-# Native-only dependencies for worker thread pool
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-crossbeam-channel = "0.5"
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+prometheus-parking-lot-wasm.workspace = true
 
 [dev-dependencies]
-criterion = { version = "0.8.1", features = ["async_tokio"] }
-rand = "0.9.2"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
-reqwest = { version = "0.12", features = ["json", "stream"] }
-serde_json = "1"
-futures = "0.3"
-flume = "0.11"  # For testing non-serializable streaming results (candle-vllm pattern)
-tempfile = "3.14"
-testcontainers = "0.23"
-testcontainers-modules = { version = "0.11", features = ["postgres"] }
+async-trait.workspace = true
+criterion = { workspace = true, features = ["async_tokio"] }
+parking_lot.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time"] }
 
 [[bench]]
 name = "queue_bench"
@@ -77,15 +127,12 @@ harness = false
 name = "postgres_pool"
 required-features = ["postgres"]
 
-[lints.rust]
-unsafe_code = "deny"
-missing_docs = "deny"
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(parking_lot_loom)', 'cfg(parking_lot_negative_control, values(any()))'] }
+[[example]]
+name = "yaque_pool"
+required-features = ["embedded"]
 
-[lints.clippy]
-all = "warn"
-pedantic = "warn"
-nursery = "warn"
+[lints]
+workspace = true
 
 # Coverage profile for cargo-tarpaulin and cargo-llvm-cov
 [profile.coverage]

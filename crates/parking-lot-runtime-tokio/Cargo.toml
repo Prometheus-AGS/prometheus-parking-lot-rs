@@ -1,0 +1,41 @@
+[package]
+name = "prometheus-parking-lot-runtime-tokio"
+description = "Tokio runtime layer of prometheus_parking_lot: ResourcePool, native WorkerPool, shutdown and cancellation."
+documentation = "https://docs.rs/prometheus-parking-lot-runtime-tokio"
+keywords = ["scheduler", "queue", "tokio", "gpu", "ai"]
+categories = ["asynchronous", "concurrency"]
+include = ["/src/**", "/Cargo.toml", "/README.md", "/LICENSE*"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+prometheus-parking-lot-core.workspace = true
+async-trait.workspace = true
+parking_lot.workspace = true
+serde.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "signal"] }
+tokio-util = { workspace = true, features = ["rt"] }
+tracing.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+crossbeam-channel.workspace = true
+
+[dev-dependencies]
+flume.workspace = true
+futures.workspace = true
+reqwest = { workspace = true, features = ["json", "stream"] }
+serde_json.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time"] }
+tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
+
+[lints]
+workspace = true

@@ -1,9 +1,8 @@
-//! Unit tests for individual components
+//! Unit tests for facade components (configuration and builders).
+//!
+//! Not yet a registered test target; cr-35 registers and ports these suites.
+//! The suites for code that moved into the workspace crates live next to that
+//! code under `crates/*/tests/unit/` (ADR 0001).
 
-mod error_test;
-mod audit_test;
 mod config_test;
-mod util_test;
 mod builders_test;
-mod runtime_test;
-mod mailbox_test;
