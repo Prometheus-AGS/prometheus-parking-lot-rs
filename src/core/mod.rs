@@ -12,7 +12,7 @@ pub mod audit {
     pub use prometheus_parking_lot_pg::audit::PostgresAuditSink;
 }
 
-pub use prometheus_parking_lot_core::contracts::{error, executor};
+pub use prometheus_parking_lot_core::contracts::{clock, error, executor};
 pub use prometheus_parking_lot_core::hooks;
 #[cfg(feature = "tokio-runtime")]
 pub use prometheus_parking_lot_runtime_tokio::cancellation;
@@ -23,17 +23,16 @@ pub use prometheus_parking_lot_runtime_tokio::shutdown;
 /// `ResourcePool`.
 pub mod resource_pool {
     pub use prometheus_parking_lot_core::contracts::{
-        Mailbox, PoolLimits, ScheduledTask, Spawn, TaskMetadata, TaskQueue, TaskStatus,
+        Mailbox, PoolLimits, ScheduledTask, Spawn, SubmissionSequence, TaskMetadata, TaskQueue,
+        TaskStatus,
     };
     #[cfg(feature = "tokio-runtime")]
-    pub use prometheus_parking_lot_runtime_tokio::resource_pool::{
-        ResourcePool, WakeState, sync_wake_worker_loop,
-    };
+    pub use prometheus_parking_lot_runtime_tokio::resource_pool::ResourcePool;
 }
 
 /// `WorkerPool`: dedicated worker threads (native) or async tasks (WASM).
 pub mod worker_pool {
-    pub use prometheus_parking_lot_core::contracts::{PoolError, PoolStats};
+    pub use prometheus_parking_lot_core::contracts::PoolStats;
     #[cfg(all(feature = "tokio-runtime", not(target_arch = "wasm32")))]
     pub use prometheus_parking_lot_runtime_tokio::worker_pool::WorkerPool;
     #[cfg(target_arch = "wasm32")]
@@ -48,22 +47,24 @@ pub use cancellation::{
     CancelReason, CancellationChannel, CancellationConfig, CancellationSink, CancelledTask,
     LoggingCancellationSink, RecordingCancellationSink, SinkOutcome,
 };
-pub use error::{AppResult, SchedulerError};
+pub use clock::{Clock, SystemClock, TestClock};
+pub use error::{AppResult, SchedulerError, TaskError};
 pub use executor::{TaskExecutor, TaskPayload, WorkerExecutor};
 pub use hooks::{
     AuditHookAdapter, CancelledReason, Hook, HookBus, LifecycleEvent, RecordingHook,
     RejectionReason, TracingHook, emit_cancelled, emit_completed, emit_rejected, emit_submitted,
 };
+#[cfg(feature = "tokio-runtime")]
+pub use resource_pool::ResourcePool;
 pub use resource_pool::{
-    Mailbox, PoolLimits, ScheduledTask, Spawn, TaskMetadata, TaskQueue, TaskStatus,
+    Mailbox, PoolLimits, ScheduledTask, Spawn, SubmissionSequence, TaskMetadata, TaskQueue,
+    TaskStatus,
 };
 #[cfg(feature = "tokio-runtime")]
-pub use resource_pool::{ResourcePool, WakeState, sync_wake_worker_loop};
-#[cfg(feature = "tokio-runtime")]
 pub use shutdown::{ShutdownHandle, ShutdownPolicy, wait_for_signal};
+pub use worker_pool::PoolStats;
 #[cfg(any(
     all(feature = "tokio-runtime", not(target_arch = "wasm32")),
     target_arch = "wasm32"
 ))]
 pub use worker_pool::WorkerPool;
-pub use worker_pool::{PoolError, PoolStats};

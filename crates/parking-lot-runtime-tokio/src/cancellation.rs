@@ -329,13 +329,11 @@ mod tests {
             id,
             mailbox: None,
             priority: Priority::Normal,
-            cost: ResourceCost {
-                kind: ResourceKind::Cpu,
-                units: 1,
-            },
+            cost: ResourceCost::new(ResourceKind::Cpu, 1),
             deadline_ms: None,
             created_at_ms: 0,
             idempotency_key: None,
+            sequence: 0,
         }
     }
 

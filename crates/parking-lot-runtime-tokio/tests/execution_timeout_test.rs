@@ -20,6 +20,7 @@ use prometheus_parking_lot_core::{PoolLimits, ScheduledTask, Spawn, TaskExecutor
 use prometheus_parking_lot_runtime_tokio::ResourcePool;
 
 use async_trait::async_trait;
+use prometheus_parking_lot_core::TaskError;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -73,7 +74,7 @@ impl Drop for CancelWitness {
 
 #[async_trait]
 impl TaskExecutor<SleepJob, String> for SleepExecutor {
-    async fn execute(&self, payload: SleepJob, _meta: TaskMetadata) -> String {
+    async fn execute(&self, payload: SleepJob, _meta: TaskMetadata) -> Result<String, TaskError> {
         self.started.fetch_add(1, Ordering::SeqCst);
         let mut witness = CancelWitness {
             dropped: Arc::clone(&self.dropped),
@@ -83,7 +84,7 @@ impl TaskExecutor<SleepJob, String> for SleepExecutor {
         // Reached only if the future was never cancelled mid-await.
         witness.armed = false;
         self.finished.fetch_add(1, Ordering::SeqCst);
-        format!("slept {}ms", payload.sleep_ms)
+        Ok(format!("slept {}ms", payload.sleep_ms))
     }
 }
 
@@ -91,10 +92,7 @@ fn meta(id: u64, units: u32) -> TaskMetadata {
     TaskMetadata {
         id,
         priority: Priority::Normal,
-        cost: ResourceCost {
-            kind: ResourceKind::Cpu,
-            units,
-        },
+        cost: ResourceCost::new(ResourceKind::Cpu, units),
         created_at_ms: now_ms(),
         idempotency_key: None,
         deadline_ms: None,
@@ -103,6 +101,7 @@ fn meta(id: u64, units: u32) -> TaskMetadata {
             user_id: Some("user-1".to_string()),
             session_id: None,
         }),
+        sequence: 0,
     }
 }
 
@@ -143,13 +142,10 @@ async fn work_exceeding_the_budget_is_cancelled() {
     let ex = executor();
     let p = pool(4, Duration::from_millis(100), ex.clone());
 
-    p.submit(
-        ScheduledTask {
-            meta: meta(1, 1),
-            payload: SleepJob { sleep_ms: 5_000 },
-        },
-        now_ms(),
-    )
+    p.submit(ScheduledTask {
+        meta: meta(1, 1),
+        payload: SleepJob { sleep_ms: 5_000 },
+    })
     .await
     .expect("submit");
 
@@ -181,25 +177,19 @@ async fn a_wedged_task_releases_capacity_for_the_next_task() {
     // One unit total: the wedged task must free it or the next task starves.
     let p = pool(1, Duration::from_millis(150), ex.clone());
 
-    p.submit(
-        ScheduledTask {
-            meta: meta(1, 1),
-            payload: SleepJob { sleep_ms: 30_000 },
-        },
-        now_ms(),
-    )
+    p.submit(ScheduledTask {
+        meta: meta(1, 1),
+        payload: SleepJob { sleep_ms: 30_000 },
+    })
     .await
     .expect("submit wedged");
 
     tokio::time::sleep(Duration::from_millis(400)).await;
 
-    p.submit(
-        ScheduledTask {
-            meta: meta(2, 1),
-            payload: SleepJob { sleep_ms: 10 },
-        },
-        now_ms(),
-    )
+    p.submit(ScheduledTask {
+        meta: meta(2, 1),
+        payload: SleepJob { sleep_ms: 10 },
+    })
     .await
     .expect("submit fast");
 
@@ -223,13 +213,10 @@ async fn work_within_the_budget_completes_normally() {
     let ex = executor();
     let p = pool(4, Duration::from_secs(5), ex.clone());
 
-    p.submit(
-        ScheduledTask {
-            meta: meta(1, 1),
-            payload: SleepJob { sleep_ms: 20 },
-        },
-        now_ms(),
-    )
+    p.submit(ScheduledTask {
+        meta: meta(1, 1),
+        payload: SleepJob { sleep_ms: 20 },
+    })
     .await
     .expect("submit");
 
@@ -258,13 +245,10 @@ async fn a_nearer_per_task_deadline_overrides_the_pool_default() {
     let mut m = meta(1, 1);
     m.deadline_ms = Some(now_ms() + 120);
 
-    p.submit(
-        ScheduledTask {
-            meta: m,
-            payload: SleepJob { sleep_ms: 5_000 },
-        },
-        now_ms(),
-    )
+    p.submit(ScheduledTask {
+        meta: m,
+        payload: SleepJob { sleep_ms: 5_000 },
+    })
     .await
     .expect("submit");
 

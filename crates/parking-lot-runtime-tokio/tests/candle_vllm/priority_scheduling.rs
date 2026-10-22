@@ -1,6 +1,7 @@
 //! Tests for priority-based scheduling
 
 use async_trait::async_trait;
+use prometheus_parking_lot_core::TaskError;
 use prometheus_parking_lot_core::config::WorkerPoolConfig;
 use prometheus_parking_lot_core::{Priority, ResourceCost, ResourceKind};
 use prometheus_parking_lot_core::{TaskMetadata, WorkerExecutor};
@@ -21,14 +22,12 @@ fn make_meta(task_id: u64, priority: Priority) -> TaskMetadata {
         id: task_id,
         mailbox: None,
         priority,
-        cost: ResourceCost {
-            kind: ResourceKind::Cpu,
-            units: 10,
-        },
+        cost: ResourceCost::new(ResourceKind::Cpu, 10),
         deadline_ms: None,
         created_at_ms: now_ms(),
 
         idempotency_key: None,
+        sequence: 0,
     }
 }
 
@@ -47,10 +46,10 @@ impl PriorityTestExecutor {
 
 #[async_trait]
 impl WorkerExecutor<Priority, u64> for PriorityTestExecutor {
-    async fn execute(&self, _priority: Priority, meta: TaskMetadata) -> u64 {
+    async fn execute(&self, _priority: Priority, meta: TaskMetadata) -> Result<u64, TaskError> {
         let _order = self.execution_order.fetch_add(1, Ordering::SeqCst);
         tokio::time::sleep(Duration::from_millis(10)).await;
-        meta.id
+        Ok(meta.id)
     }
 }
 

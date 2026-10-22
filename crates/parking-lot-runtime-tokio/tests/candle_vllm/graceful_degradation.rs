@@ -2,8 +2,8 @@
 
 use async_trait::async_trait;
 use prometheus_parking_lot_core::config::WorkerPoolConfig;
-use prometheus_parking_lot_core::{PoolError, TaskMetadata, WorkerExecutor};
 use prometheus_parking_lot_core::{Priority, ResourceCost, ResourceKind};
+use prometheus_parking_lot_core::{SchedulerError, TaskError, TaskMetadata, WorkerExecutor};
 use prometheus_parking_lot_runtime_tokio::WorkerPool;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -20,14 +20,12 @@ fn make_meta(task_id: u64) -> TaskMetadata {
         id: task_id,
         mailbox: None,
         priority: Priority::Normal,
-        cost: ResourceCost {
-            kind: ResourceKind::Cpu,
-            units: 10,
-        },
+        cost: ResourceCost::new(ResourceKind::Cpu, 10),
         deadline_ms: None,
         created_at_ms: now_ms(),
 
         idempotency_key: None,
+        sequence: 0,
     }
 }
 
@@ -36,9 +34,9 @@ struct SlowExecutor;
 
 #[async_trait]
 impl WorkerExecutor<(), String> for SlowExecutor {
-    async fn execute(&self, _: (), _meta: TaskMetadata) -> String {
+    async fn execute(&self, _: (), _meta: TaskMetadata) -> Result<String, TaskError> {
         tokio::time::sleep(Duration::from_millis(100)).await;
-        "completed".to_string()
+        Ok("completed".to_string())
     }
 }
 
@@ -68,7 +66,7 @@ async fn test_queue_full_rejection() {
     let result = pool.submit_async((), make_meta(4)).await;
 
     match result {
-        Err(PoolError::QueueFull) => {
+        Err(SchedulerError::QueueFull { .. }) => {
             println!("Correctly rejected with QueueFull");
         }
         Ok(_) => {
@@ -100,7 +98,7 @@ async fn test_backpressure_handling() {
     for i in 0..20 {
         match pool.submit_async((), make_meta(i)).await {
             Ok(_) => accepted += 1,
-            Err(PoolError::QueueFull) => rejected += 1,
+            Err(SchedulerError::QueueFull { .. }) => rejected += 1,
             Err(e) => panic!("Unexpected error: {e:?}"),
         }
     }

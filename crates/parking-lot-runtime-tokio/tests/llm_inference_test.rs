@@ -127,13 +127,11 @@ async fn test_llm_inference_with_parking() {
                         session_id: Some(format!("session-{}", task_id)),
                     }),
                     priority: if i < 3 { Priority::High } else { Priority::Normal },
-                    cost: ResourceCost {
-                        kind: ResourceKind::Cpu,
-                        units: 1,
-                    },
+                    cost: ResourceCost::new(ResourceKind::Cpu, 1),
                     deadline_ms: None,
                     created_at_ms: now_ms(),
                     idempotency_key: None,
+                    sequence: 0,
                 },
                 payload: LLMTaskPayload {
                     prompt: prompts[i % prompts.len()].to_string(),
@@ -149,7 +147,7 @@ async fn test_llm_inference_with_parking() {
 
             // Submit to pool
             let mut pool_guard = pool_clone.lock().await;
-            let status = pool_guard.submit(task, now_ms())
+            let status = pool_guard.submit(task)
                 .expect("Failed to submit task");
 
             match status {

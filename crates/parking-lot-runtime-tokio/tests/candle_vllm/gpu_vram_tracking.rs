@@ -1,6 +1,7 @@
 //! Tests for GPU VRAM resource tracking and limits
 
 use async_trait::async_trait;
+use prometheus_parking_lot_core::TaskError;
 use prometheus_parking_lot_core::config::WorkerPoolConfig;
 use prometheus_parking_lot_core::{Priority, ResourceCost, ResourceKind};
 use prometheus_parking_lot_core::{TaskMetadata, WorkerExecutor};
@@ -21,14 +22,12 @@ fn make_gpu_meta(task_id: u64, units: u32) -> TaskMetadata {
         id: task_id,
         mailbox: None,
         priority: Priority::Normal,
-        cost: ResourceCost {
-            kind: ResourceKind::GpuVram,
-            units,
-        },
+        cost: ResourceCost::new(ResourceKind::GpuVram, units),
         deadline_ms: None,
         created_at_ms: now_ms(),
 
         idempotency_key: None,
+        sequence: 0,
     }
 }
 
@@ -47,11 +46,11 @@ impl GpuWorkExecutor {
 
 #[async_trait]
 impl WorkerExecutor<u32, String> for GpuWorkExecutor {
-    async fn execute(&self, vram_mb: u32, _meta: TaskMetadata) -> String {
+    async fn execute(&self, vram_mb: u32, _meta: TaskMetadata) -> Result<String, TaskError> {
         self.vram_used.fetch_add(vram_mb, Ordering::SeqCst);
         tokio::time::sleep(Duration::from_millis(50)).await;
         self.vram_used.fetch_sub(vram_mb, Ordering::SeqCst);
-        format!("Processed {vram_mb}MB GPU work")
+        Ok(format!("Processed {vram_mb}MB GPU work"))
     }
 }
 

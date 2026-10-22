@@ -24,7 +24,35 @@ use prometheus_parking_lot_core::config::WorkerPoolConfig;
 use prometheus_parking_lot_core::dispatch::{
     PoolCounters, WorkerTask, generate_mailbox_key, mailbox_key_to_string,
 };
-use prometheus_parking_lot_core::{MailboxKey, PoolError, PoolStats, TaskMetadata, WorkerExecutor};
+use prometheus_parking_lot_core::{
+    MailboxKey, PoolStats, SchedulerError, TaskError, TaskMetadata, WorkerExecutor,
+};
+
+/// Pool name used in errors (pools are not named yet).
+const POOL_NAME: &str = "worker_pool";
+
+/// What a worker stores for one task: the executor's value or its error.
+type TaskOutcome<R> = Result<R, TaskError>;
+
+/// The error for a result slot that does not exist (never created, already
+/// retrieved, or removed after a timeout).
+fn result_not_found(key: &MailboxKey) -> SchedulerError {
+    SchedulerError::ResultNotFound {
+        key: Some(mailbox_key_to_string(key)),
+    }
+}
+
+/// The error for a submission to a pool that is shutting down.
+fn pool_shutdown() -> SchedulerError {
+    SchedulerError::PoolShutdown {
+        pool: POOL_NAME.into(),
+    }
+}
+
+/// The error for a result that did not arrive within the caller's wait.
+const fn wait_timed_out() -> SchedulerError {
+    SchedulerError::Timeout { task_id: None }
+}
 
 /// Result entry state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -127,7 +155,7 @@ impl<R> ResultStorage<R> {
 
     /// Wait for a result with timeout (blocking).
     /// Uses Condvar for efficient waiting - NO POLLING.
-    fn wait_for_result(&self, key: &MailboxKey, timeout: Duration) -> Result<R, PoolError> {
+    fn wait_for_result(&self, key: &MailboxKey, timeout: Duration) -> Result<R, SchedulerError> {
         // Fix the deadline before touching any lock so lock contention counts
         // against the caller's budget rather than extending it.
         let deadline = Instant::now() + timeout;
@@ -139,7 +167,7 @@ impl<R> ResultStorage<R> {
         };
 
         let Some(entry_pair) = entry_pair else {
-            return Err(PoolError::ResultNotFound);
+            return Err(result_not_found(key));
         };
 
         wait_on_entry(&entry_pair, deadline)
@@ -198,9 +226,12 @@ impl<R> ResultStorage<R> {
 ///
 /// - `Ready` with a value → `Ok(result)`.
 /// - `Ready` but the value was already taken (a concurrent retriever consumed
-///   it) → `PoolError::ResultNotFound`.
+///   it) → `SchedulerError::ResultNotFound`.
 /// - still `Pending` at the deadline, or `Cancelled` (the slot was reclaimed
-///   before a result arrived) → `PoolError::Timeout`.
+///   before a result arrived) → `SchedulerError::Timeout`.
+///
+/// The slot value is the task's outcome (`Result<_, TaskError>`); callers map
+/// an executor error to `SchedulerError::Task`.
 ///
 /// The wait loops on the slot state against an absolute deadline, so a spurious
 /// Condvar wakeup neither returns early nor restarts the full timeout. A result
@@ -209,7 +240,7 @@ impl<R> ResultStorage<R> {
 fn wait_on_entry<R>(
     entry_pair: &(Mutex<ResultEntry<R>>, Condvar),
     deadline: Instant,
-) -> Result<R, PoolError> {
+) -> Result<R, SchedulerError> {
     let (entry_mutex, condvar) = entry_pair;
     let mut entry = entry_mutex.lock();
     while entry.state == ResultState::Pending {
@@ -218,8 +249,11 @@ fn wait_on_entry<R>(
         }
     }
     match entry.state {
-        ResultState::Ready => entry.result.take().ok_or(PoolError::ResultNotFound),
-        ResultState::Pending | ResultState::Cancelled => Err(PoolError::Timeout),
+        ResultState::Ready => entry
+            .result
+            .take()
+            .ok_or(SchedulerError::ResultNotFound { key: None }),
+        ResultState::Pending | ResultState::Cancelled => Err(wait_timed_out()),
     }
 }
 
@@ -246,7 +280,7 @@ where
     task_tx: Mutex<Option<Sender<WorkerTask<P>>>>,
 
     /// Result storage with Condvar-based notification.
-    results: Arc<ResultStorage<R>>,
+    results: Arc<ResultStorage<TaskOutcome<R>>>,
 
     /// Pool statistics counters (lock-free atomics).
     counters: Arc<PoolCounters>,
@@ -280,13 +314,13 @@ where
     ///
     /// # Errors
     ///
-    /// Returns `PoolError::InvalidConfig` if the configuration is invalid.
+    /// Returns [`SchedulerError::InvalidConfig`] if the configuration is invalid.
     #[expect(
         clippy::needless_pass_by_value,
         reason = "public constructor takes the config by value; changing it is an API change for the worker-pool rework (cr-19)"
     )]
-    pub fn new(config: WorkerPoolConfig, executor: E) -> Result<Self, PoolError> {
-        config.validate().map_err(PoolError::InvalidConfig)?;
+    pub fn new(config: WorkerPoolConfig, executor: E) -> Result<Self, SchedulerError> {
+        config.validate().map_err(SchedulerError::invalid_config)?;
 
         let (task_tx, task_rx) = bounded::<WorkerTask<P>>(config.max_queue_depth);
         let results = Arc::new(ResultStorage::new());
@@ -341,8 +375,8 @@ where
     ///
     /// # Errors
     ///
-    /// - `PoolError::QueueFull` if the task queue is full
-    /// - `PoolError::PoolShutdown` if the pool has been shut down
+    /// - [`SchedulerError::QueueFull`] if the task queue is full
+    /// - [`SchedulerError::PoolShutdown`] if the pool has been shut down
     #[expect(
         clippy::unused_async,
         clippy::unused_async_trait_impl,
@@ -352,7 +386,7 @@ where
         &self,
         payload: P,
         meta: TaskMetadata,
-    ) -> Result<MailboxKey, PoolError> {
+    ) -> Result<MailboxKey, SchedulerError> {
         // Use the sync submit internally - it's non-blocking for enqueue
         self.submit(payload, meta)
     }
@@ -368,15 +402,15 @@ where
     ///
     /// # Errors
     ///
-    /// - `PoolError::QueueFull` if the task queue is full
-    /// - `PoolError::PoolShutdown` if the pool has been shut down
+    /// - [`SchedulerError::QueueFull`] if the task queue is full
+    /// - [`SchedulerError::PoolShutdown`] if the pool has been shut down
     #[expect(
         clippy::significant_drop_tightening,
         reason = "narrowing lock scopes changes concurrent behaviour; the worker-pool rework (cr-19/cr-29) owns it"
     )]
-    pub fn submit(&self, payload: P, meta: TaskMetadata) -> Result<MailboxKey, PoolError> {
+    pub fn submit(&self, payload: P, meta: TaskMetadata) -> Result<MailboxKey, SchedulerError> {
         if self.shutdown.load(Ordering::Acquire) {
-            return Err(PoolError::PoolShutdown);
+            return Err(pool_shutdown());
         }
 
         // Generate unique task ID and mailbox key
@@ -398,7 +432,7 @@ where
         let Some(task_tx) = task_tx_guard.as_ref() else {
             // Pool is shutting down
             self.results.remove(&mailbox_key);
-            return Err(PoolError::PoolShutdown);
+            return Err(pool_shutdown());
         };
 
         // Try to enqueue (non-blocking)
@@ -415,11 +449,16 @@ where
                 // Remove the result slot we created
                 self.results.remove(&mailbox_key);
                 warn!("Worker pool queue is full");
-                Err(PoolError::QueueFull)
+                // The bounded channel is full, so the depth is its capacity.
+                Err(SchedulerError::queue_full(
+                    POOL_NAME,
+                    self.config.max_queue_depth,
+                    self.config.max_queue_depth,
+                ))
             }
             Err(crossbeam_channel::TrySendError::Disconnected(_)) => {
                 self.results.remove(&mailbox_key);
-                Err(PoolError::PoolShutdown)
+                Err(pool_shutdown())
             }
         }
     }
@@ -431,31 +470,34 @@ where
     ///
     /// # Errors
     ///
-    /// - `PoolError::Timeout` if the result is not available within the timeout
-    /// - `PoolError::ResultNotFound` if the mailbox key is invalid
+    /// - [`SchedulerError::Task`] carrying the [`TaskError`] when the executor
+    ///   failed
+    /// - [`SchedulerError::Timeout`] if the result is not available within the
+    ///   timeout
+    /// - [`SchedulerError::ResultNotFound`] if the mailbox key is invalid
     pub async fn retrieve_async(
         &self,
         key: &MailboxKey,
         timeout: Duration,
-    ) -> Result<R, PoolError> {
+    ) -> Result<R, SchedulerError> {
         // First, try immediate retrieval (fast path)
-        if let Some(result) = self.results.try_retrieve(key) {
+        if let Some(outcome) = self.results.try_retrieve(key) {
             self.results.remove(key);
-            return Ok(result);
+            return outcome.map_err(SchedulerError::Task);
         }
 
         // Get entry for waiting
         let entry_pair = self
             .results
             .get_entry(key)
-            .ok_or(PoolError::ResultNotFound)?;
+            .ok_or_else(|| result_not_found(key))?;
 
         // One absolute deadline shared by both waits below. The blocking wait
         // is bounded by it (so the `spawn_blocking` thread cannot park forever
         // and wedge runtime shutdown if `store` never fires), and the outer
         // tokio timeout covers the case where the blocking pool is saturated
         // and the closure has not started yet. Whichever of the two fires
-        // first, an elapsed deadline is reported as `PoolError::Timeout`:
+        // first, an elapsed deadline is reported as `SchedulerError::Timeout`:
         // `wait_on_entry` maps a still-pending slot to `Timeout`, never to
         // `ResultNotFound`.
         let deadline = Instant::now() + timeout;
@@ -470,11 +512,11 @@ where
         self.results.remove(key);
 
         match waited {
-            Ok(Ok(outcome)) => outcome,
-            Ok(Err(join_error)) => Err(PoolError::Internal(format!(
+            Ok(Ok(outcome)) => outcome?.map_err(SchedulerError::Task),
+            Ok(Err(join_error)) => Err(SchedulerError::internal(format!(
                 "result wait task failed: {join_error}"
             ))),
-            Err(_elapsed) => Err(PoolError::Timeout),
+            Err(_elapsed) => Err(wait_timed_out()),
         }
     }
 
@@ -485,13 +527,16 @@ where
     ///
     /// # Errors
     ///
-    /// - `PoolError::Timeout` if the result is not available within the timeout
-    /// - `PoolError::ResultNotFound` if the mailbox key is invalid
-    pub fn retrieve(&self, key: &MailboxKey, timeout: Duration) -> Result<R, PoolError> {
-        let result = self.results.wait_for_result(key, timeout);
+    /// - [`SchedulerError::Task`] carrying the [`TaskError`] when the executor
+    ///   failed
+    /// - [`SchedulerError::Timeout`] if the result is not available within the
+    ///   timeout
+    /// - [`SchedulerError::ResultNotFound`] if the mailbox key is invalid
+    pub fn retrieve(&self, key: &MailboxKey, timeout: Duration) -> Result<R, SchedulerError> {
+        let outcome = self.results.wait_for_result(key, timeout);
         // Clean up entry on any outcome
         self.results.remove(key);
-        result
+        outcome?.map_err(SchedulerError::Task)
     }
 
     /// Get current pool statistics.
@@ -601,7 +646,7 @@ where
 fn spawn_worker<P, R, E>(
     worker_id: usize,
     task_rx: Receiver<WorkerTask<P>>,
-    results: Arc<ResultStorage<R>>,
+    results: Arc<ResultStorage<TaskOutcome<R>>>,
     counters: Arc<PoolCounters>,
     active_units: Arc<AtomicU32>,
     shutdown: Arc<AtomicBool>,
@@ -659,10 +704,9 @@ where
                 // Update counters (lock-free atomics)
                 counters.queued_tasks.fetch_sub(1, Ordering::Relaxed);
                 counters.active_tasks.fetch_add(1, Ordering::Relaxed);
-                active_units.fetch_add(task.meta.cost.units, Ordering::Relaxed);
-
                 let task_id = task.meta.id;
-                let task_cost = task.meta.cost.units;
+                let task_cost = task.meta.cost.total_units();
+                active_units.fetch_add(task_cost, Ordering::Relaxed);
                 let mailbox_key = task.mailbox_key.clone();
 
                 debug!(
@@ -681,13 +725,19 @@ where
                     "Worker completed task"
                 );
 
+                let finished = if result.is_ok() {
+                    &counters.completed_tasks
+                } else {
+                    &counters.failed_tasks
+                };
+
                 // Store result and notify waiters (via Condvar)
                 results.store(&mailbox_key, result);
 
                 // Update counters (lock-free atomics)
                 counters.active_tasks.fetch_sub(1, Ordering::Relaxed);
                 active_units.fetch_sub(task_cost, Ordering::Relaxed);
-                counters.completed_tasks.fetch_add(1, Ordering::Relaxed);
+                finished.fetch_add(1, Ordering::Relaxed);
             }
 
             debug!(worker_id = worker_id, "Worker thread exiting");
@@ -710,11 +760,11 @@ mod tests {
 
     #[async_trait]
     impl WorkerExecutor<String, String> for TestExecutor {
-        async fn execute(&self, payload: String, _meta: TaskMetadata) -> String {
+        async fn execute(&self, payload: String, _meta: TaskMetadata) -> Result<String, TaskError> {
             self.execution_count.fetch_add(1, Ordering::Relaxed);
             // Simulate some work
             tokio::time::sleep(Duration::from_millis(10)).await;
-            format!("Result: {payload}")
+            Ok(format!("Result: {payload}"))
         }
     }
 
@@ -723,13 +773,11 @@ mod tests {
             id,
             mailbox: None,
             priority: prometheus_parking_lot_core::Priority::Normal,
-            cost: ResourceCost {
-                kind: ResourceKind::Cpu,
-                units: 1,
-            },
+            cost: ResourceCost::new(ResourceKind::Cpu, 1),
             deadline_ms: None,
             created_at_ms: 0,
             idempotency_key: None,
+            sequence: 0,
         }
     }
 
@@ -809,10 +857,14 @@ mod tests {
 
     #[async_trait]
     impl WorkerExecutor<String, String> for WedgedExecutor {
-        async fn execute(&self, _payload: String, _meta: TaskMetadata) -> String {
+        async fn execute(
+            &self,
+            _payload: String,
+            _meta: TaskMetadata,
+        ) -> Result<String, TaskError> {
             // Much longer than shutdown's 2s-per-worker join bound.
             tokio::time::sleep(Duration::from_secs(30)).await;
-            "unreachable".to_string()
+            Ok("unreachable".to_string())
         }
     }
 

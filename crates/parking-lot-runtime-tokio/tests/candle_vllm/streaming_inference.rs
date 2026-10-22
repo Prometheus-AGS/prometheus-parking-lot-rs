@@ -1,6 +1,7 @@
 //! Tests for streaming inference (non-serializable results)
 
 use async_trait::async_trait;
+use prometheus_parking_lot_core::TaskError;
 use prometheus_parking_lot_core::config::WorkerPoolConfig;
 use prometheus_parking_lot_core::{Priority, ResourceCost, ResourceKind};
 use prometheus_parking_lot_core::{TaskMetadata, WorkerExecutor};
@@ -19,14 +20,12 @@ fn make_gpu_meta(task_id: u64, units: u32) -> TaskMetadata {
         id: task_id,
         mailbox: None,
         priority: Priority::Normal,
-        cost: ResourceCost {
-            kind: ResourceKind::GpuVram,
-            units,
-        },
+        cost: ResourceCost::new(ResourceKind::GpuVram, units),
         deadline_ms: None,
         created_at_ms: now_ms(),
 
         idempotency_key: None,
+        sequence: 0,
     }
 }
 
@@ -40,7 +39,11 @@ struct StreamingResult {
 
 #[async_trait]
 impl WorkerExecutor<String, StreamingResult> for StreamingExecutor {
-    async fn execute(&self, prompt: String, _meta: TaskMetadata) -> StreamingResult {
+    async fn execute(
+        &self,
+        prompt: String,
+        _meta: TaskMetadata,
+    ) -> Result<StreamingResult, TaskError> {
         let (tx, rx) = flume::unbounded();
         let total_tokens = 5;
 
@@ -52,10 +55,10 @@ impl WorkerExecutor<String, StreamingResult> for StreamingExecutor {
         }
         drop(tx);
 
-        StreamingResult {
+        Ok(StreamingResult {
             receiver: rx,
             total_tokens,
-        }
+        })
     }
 }
 

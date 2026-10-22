@@ -21,7 +21,7 @@ pub use cancellation::{
     CancelReason, CancellationChannel, CancellationConfig, CancellationSink, CancelledTask,
     LoggingCancellationSink, RecordingCancellationSink, SinkOutcome,
 };
-pub use resource_pool::{ResourcePool, WakeState, sync_wake_worker_loop};
+pub use resource_pool::ResourcePool;
 pub use shutdown::{ShutdownHandle, ShutdownPolicy, wait_for_signal};
 pub use tokio_spawner::TokioSpawner;
 #[cfg(not(target_arch = "wasm32"))]

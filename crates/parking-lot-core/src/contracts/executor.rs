@@ -3,6 +3,7 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
+use crate::contracts::error::TaskError;
 use crate::contracts::task::TaskMetadata;
 
 /// Marker trait for serializable task payloads.
@@ -17,13 +18,16 @@ impl<T> TaskPayload for T where T: Send + Sync + Serialize + for<'de> Deserializ
 /// Abstraction for executing a task payload and producing a result.
 ///
 /// The executor is responsible for the actual business logic of running a task.
-/// It receives the payload `P` and metadata, then returns a result `T`.
+/// It receives the payload `P` and metadata, then returns `Ok(T)` or a
+/// [`TaskError`] describing the failure. Either way the pool releases the
+/// task's capacity and records the outcome in the mailbox: `Completed` with
+/// the value, or `Failed` carrying the error.
 ///
 /// # Example
 ///
 /// ```rust,ignore
 /// use async_trait::async_trait;
-/// use prometheus_parking_lot::core::{TaskExecutor, TaskMetadata};
+/// use prometheus_parking_lot::core::{TaskError, TaskExecutor, TaskMetadata};
 ///
 /// #[derive(Clone)]
 /// struct LlmExecutor;
@@ -36,8 +40,11 @@ impl<T> TaskPayload for T where T: Send + Sync + Serialize + for<'de> Deserializ
 ///
 /// #[async_trait]
 /// impl TaskExecutor<LlmJob, String> for LlmExecutor {
-///     async fn execute(&self, payload: LlmJob, _meta: TaskMetadata) -> String {
-///         format!("Result from {}: {}", payload.model, payload.prompt)
+///     async fn execute(&self, payload: LlmJob, _meta: TaskMetadata) -> Result<String, TaskError> {
+///         if payload.prompt.is_empty() {
+///             return Err(TaskError::executor("empty prompt"));
+///         }
+///         Ok(format!("Result from {}: {}", payload.model, payload.prompt))
 ///     }
 /// }
 /// ```
@@ -54,11 +61,13 @@ where
     /// * `payload` - The task payload to execute
     /// * `meta` - Task metadata including ID, priority, cost, etc.
     ///
-    /// # Returns
+    /// # Errors
     ///
-    /// The result of task execution. This will be delivered to the mailbox
-    /// if a mailbox key is present in the task metadata.
-    async fn execute(&self, payload: P, meta: TaskMetadata) -> T;
+    /// Returns a [`TaskError`] (normally [`TaskError::executor`] or
+    /// [`TaskError::transient`]) when the task fails. The outcome, success or
+    /// failure, is delivered to the mailbox when the task metadata has a
+    /// mailbox key.
+    async fn execute(&self, payload: P, meta: TaskMetadata) -> Result<T, TaskError>;
 }
 
 /// Executor trait for worker pools that does NOT require serialization on results.
@@ -73,7 +82,7 @@ where
 ///
 /// ```rust,ignore
 /// use async_trait::async_trait;
-/// use prometheus_parking_lot::core::{WorkerExecutor, TaskMetadata};
+/// use prometheus_parking_lot::core::{TaskError, TaskMetadata, WorkerExecutor};
 ///
 /// #[derive(Clone)]
 /// struct LlmExecutor;
@@ -90,13 +99,17 @@ where
 ///
 /// #[async_trait]
 /// impl WorkerExecutor<InferenceJob, InferenceResult> for LlmExecutor {
-///     async fn execute(&self, job: InferenceJob, _meta: TaskMetadata) -> InferenceResult {
+///     async fn execute(
+///         &self,
+///         job: InferenceJob,
+///         _meta: TaskMetadata,
+///     ) -> Result<InferenceResult, TaskError> {
 ///         if job.is_streaming {
 ///             let (tx, rx) = flume::unbounded();
 ///             // Spawn streaming task...
-///             InferenceResult::Streaming { rx }
+///             Ok(InferenceResult::Streaming { rx })
 ///         } else {
-///             InferenceResult::Completion { text: "Hello".into() }
+///             Ok(InferenceResult::Completion { text: "Hello".into() })
 ///         }
 ///     }
 /// }
@@ -114,15 +127,19 @@ where
     /// * `payload` - The task payload to execute
     /// * `meta` - Task metadata including ID, priority, cost, etc.
     ///
-    /// # Returns
+    /// The success value does NOT need to be serializable, allowing for
+    /// streaming channels and other non-serializable types.
     ///
-    /// The result of task execution. This result does NOT need to be serializable,
-    /// allowing for streaming channels and other non-serializable types.
+    /// # Errors
+    ///
+    /// Returns a [`TaskError`] when the task fails; the pool stores it in the
+    /// task's result slot and `retrieve` returns it as
+    /// [`SchedulerError::Task`](crate::contracts::SchedulerError::Task).
     ///
     /// # Threading
     ///
     /// On native platforms, this method is called from a dedicated worker thread
     /// with its own single-threaded tokio runtime. This ensures CPU/GPU-bound
     /// work does not block the main async runtime.
-    async fn execute(&self, payload: P, meta: TaskMetadata) -> R;
+    async fn execute(&self, payload: P, meta: TaskMetadata) -> Result<R, TaskError>;
 }

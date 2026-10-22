@@ -15,4 +15,4 @@ mod pool;
 #[cfg(target_arch = "wasm32")]
 pub use pool::WorkerPool;
 #[cfg(target_arch = "wasm32")]
-pub use prometheus_parking_lot_core::{PoolError, PoolStats};
+pub use prometheus_parking_lot_core::{PoolStats, SchedulerError};

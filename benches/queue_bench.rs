@@ -31,6 +31,7 @@ use prometheus_parking_lot::util::clock::now_ms;
 use prometheus_parking_lot::util::serde::{MailboxKey, Priority, ResourceCost, ResourceKind};
 
 use async_trait::async_trait;
+use prometheus_parking_lot::core::TaskError;
 use tokio::runtime::Runtime;
 
 // ============================================================================
@@ -48,9 +49,13 @@ struct BenchExecutor;
 
 #[async_trait]
 impl TaskExecutor<BenchPayload, String> for BenchExecutor {
-    async fn execute(&self, payload: BenchPayload, _meta: TaskMetadata) -> String {
+    async fn execute(
+        &self,
+        payload: BenchPayload,
+        _meta: TaskMetadata,
+    ) -> Result<String, TaskError> {
         // Simulate minimal work
-        format!("result-{}", payload.id)
+        Ok(format!("result-{}", payload.id))
     }
 }
 
@@ -80,13 +85,11 @@ fn build_task(id: u64, priority: Priority) -> ScheduledTask<BenchPayload> {
                 session_id: None,
             }),
             priority,
-            cost: ResourceCost {
-                kind: ResourceKind::Cpu,
-                units: 1,
-            },
+            cost: ResourceCost::new(ResourceKind::Cpu, 1),
             deadline_ms: None,
             created_at_ms: now_ms(),
             idempotency_key: None,
+            sequence: 0,
         },
         payload: BenchPayload {
             id,
@@ -109,13 +112,11 @@ fn build_string_task(id: u64) -> ScheduledTask<String> {
             } else {
                 Priority::Normal
             },
-            cost: ResourceCost {
-                kind: ResourceKind::Cpu,
-                units: 1,
-            },
+            cost: ResourceCost::new(ResourceKind::Cpu, 1),
             deadline_ms: None,
             created_at_ms: u128::from(id), // Use id for ordering
             idempotency_key: None,
+            sequence: 0,
         },
         payload: format!("payload-{id}"),
     }
@@ -452,7 +453,7 @@ fn bench_pool_submit_immediate(c: &mut Criterion) {
                     // Submit tasks that fit within capacity
                     for i in 0..u64::from(capacity) {
                         let task = build_task(i, Priority::Normal);
-                        let status = pool.submit(task, now_ms()).await.unwrap();
+                        let status = pool.submit(task).await.unwrap();
                         black_box(status);
                     }
 
@@ -492,7 +493,7 @@ fn bench_pool_submit_with_queueing(c: &mut Criterion) {
                     // Submit more tasks than capacity
                     for i in 0..task_count {
                         let task = build_task(i, Priority::Normal);
-                        let status = pool.submit(task, now_ms()).await.unwrap();
+                        let status = pool.submit(task).await.unwrap();
                         black_box(status);
                     }
                 });
@@ -529,7 +530,7 @@ fn bench_pool_mixed_priorities(c: &mut Criterion) {
                     _ => Priority::Low,
                 };
                 let task = build_task(i, priority);
-                let status = pool.submit(task, now_ms()).await.unwrap();
+                let status = pool.submit(task).await.unwrap();
                 black_box(status);
             }
 
@@ -564,7 +565,7 @@ fn bench_pool_deadline_checking(c: &mut Criterion) {
             for i in 0..50u64 {
                 let mut task = build_task(i, Priority::Normal);
                 task.meta.deadline_ms = Some(now - 1000); // Already expired
-                let result = pool.submit(task, now).await;
+                let result = pool.submit(task).await;
                 let _ = black_box(result);
             }
         });
@@ -613,7 +614,7 @@ fn bench_end_to_end_scenario(c: &mut Criterion) {
                     task.meta.deadline_ms = Some(now_ms() + 5000);
                 }
 
-                let status = pool.submit(task, now_ms()).await.unwrap();
+                let status = pool.submit(task).await.unwrap();
                 black_box(status);
             }
 

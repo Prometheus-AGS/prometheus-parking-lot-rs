@@ -32,7 +32,7 @@
 //! block your main async runtime.
 //!
 //! ```rust,ignore
-//! use prometheus_parking_lot::core::{WorkerPool, WorkerExecutor, TaskMetadata, PoolError};
+//! use prometheus_parking_lot::core::{WorkerPool, WorkerExecutor, TaskMetadata, SchedulerError};
 //! use prometheus_parking_lot::config::WorkerPoolConfig;
 //! use std::time::Duration;
 //!
@@ -152,10 +152,11 @@ pub use crate::core::cancellation::{
     CancelReason, CancellationChannel, CancellationConfig, CancellationSink, CancelledTask,
     LoggingCancellationSink, RecordingCancellationSink, SinkOutcome,
 };
-pub use crate::core::error::{AppResult, SchedulerError};
+pub use crate::core::clock::{Clock, SystemClock, TestClock};
+pub use crate::core::error::{AppResult, SchedulerError, TaskError};
 pub use crate::core::hooks::{
     CancelledReason, Hook, HookBus, LifecycleEvent, RecordingHook, RejectionReason, TracingHook,
 };
 #[cfg(feature = "tokio-runtime")]
 pub use crate::core::shutdown::{ShutdownHandle, ShutdownPolicy, wait_for_signal};
-pub use crate::core::{PoolError, PoolStats, TaskMetadata};
+pub use crate::core::{PoolStats, TaskMetadata};

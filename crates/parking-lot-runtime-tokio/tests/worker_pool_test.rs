@@ -15,9 +15,10 @@
 )]
 
 use async_trait::async_trait;
+use prometheus_parking_lot_core::TaskError;
 use prometheus_parking_lot_core::config::WorkerPoolConfig;
-use prometheus_parking_lot_core::{PoolError, TaskMetadata, WorkerExecutor};
 use prometheus_parking_lot_core::{Priority, ResourceCost, ResourceKind};
+use prometheus_parking_lot_core::{SchedulerError, TaskMetadata, WorkerExecutor};
 use prometheus_parking_lot_runtime_tokio::WorkerPool;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -61,14 +62,12 @@ fn make_meta(task_id: u64, units: u32) -> TaskMetadata {
         id: task_id,
         mailbox: None,
         priority: Priority::Normal,
-        cost: ResourceCost {
-            kind: ResourceKind::Cpu,
-            units,
-        },
+        cost: ResourceCost::new(ResourceKind::Cpu, units),
         deadline_ms: None,
         created_at_ms: now_ms(),
 
         idempotency_key: None,
+        sequence: 0,
     }
 }
 
@@ -77,14 +76,12 @@ fn make_gpu_meta(task_id: u64, units: u32) -> TaskMetadata {
         id: task_id,
         mailbox: None,
         priority: Priority::Normal,
-        cost: ResourceCost {
-            kind: ResourceKind::GpuVram,
-            units,
-        },
+        cost: ResourceCost::new(ResourceKind::GpuVram, units),
         deadline_ms: None,
         created_at_ms: now_ms(),
 
         idempotency_key: None,
+        sequence: 0,
     }
 }
 
@@ -98,10 +95,10 @@ struct AddExecutor;
 
 #[async_trait]
 impl WorkerExecutor<(i32, i32), i32> for AddExecutor {
-    async fn execute(&self, payload: (i32, i32), _meta: TaskMetadata) -> i32 {
+    async fn execute(&self, payload: (i32, i32), _meta: TaskMetadata) -> Result<i32, TaskError> {
         // Simulate some work
         tokio::time::sleep(Duration::from_millis(10)).await;
-        payload.0 + payload.1
+        Ok(payload.0 + payload.1)
     }
 }
 
@@ -119,7 +116,7 @@ impl CpuWorkExecutor {
 
 #[async_trait]
 impl WorkerExecutor<String, String> for CpuWorkExecutor {
-    async fn execute(&self, payload: String, meta: TaskMetadata) -> String {
+    async fn execute(&self, payload: String, meta: TaskMetadata) -> Result<String, TaskError> {
         let start = Instant::now();
         // Simulate CPU work (not just sleeping)
         let mut result = payload.clone();
@@ -130,10 +127,10 @@ impl WorkerExecutor<String, String> for CpuWorkExecutor {
             }
         }
         let elapsed = start.elapsed();
-        format!(
+        Ok(format!(
             "Processed '{}' in {:?}, task_id={}",
             payload, elapsed, meta.id
-        )
+        ))
     }
 }
 
@@ -165,7 +162,7 @@ impl CountingExecutor {
 
 #[async_trait]
 impl WorkerExecutor<u64, u64> for CountingExecutor {
-    async fn execute(&self, payload: u64, _meta: TaskMetadata) -> u64 {
+    async fn execute(&self, payload: u64, _meta: TaskMetadata) -> Result<u64, TaskError> {
         // Track concurrent executions
         let current = self.concurrent_count.fetch_add(1, Ordering::SeqCst) + 1;
 
@@ -189,7 +186,7 @@ impl WorkerExecutor<u64, u64> for CountingExecutor {
         self.concurrent_count.fetch_sub(1, Ordering::SeqCst);
         self.execution_count.fetch_add(1, Ordering::SeqCst);
 
-        payload * 2
+        Ok(payload * 2)
     }
 }
 
@@ -205,7 +202,11 @@ struct StreamingResult {
 
 #[async_trait]
 impl WorkerExecutor<String, StreamingResult> for StreamingExecutor {
-    async fn execute(&self, prompt: String, _meta: TaskMetadata) -> StreamingResult {
+    async fn execute(
+        &self,
+        prompt: String,
+        _meta: TaskMetadata,
+    ) -> Result<StreamingResult, TaskError> {
         let (tx, rx) = flume::unbounded();
         let total_tokens = 5;
 
@@ -220,10 +221,10 @@ impl WorkerExecutor<String, StreamingResult> for StreamingExecutor {
         // Drop sender to signal stream completion
         drop(tx);
 
-        StreamingResult {
+        Ok(StreamingResult {
             receiver: rx,
             total_tokens,
-        }
+        })
     }
 }
 
@@ -241,9 +242,9 @@ impl SlowExecutor {
 
 #[async_trait]
 impl WorkerExecutor<(), String> for SlowExecutor {
-    async fn execute(&self, _payload: (), _meta: TaskMetadata) -> String {
+    async fn execute(&self, _payload: (), _meta: TaskMetadata) -> Result<String, TaskError> {
         tokio::time::sleep(Duration::from_millis(self.delay_ms)).await;
-        "completed".to_string()
+        Ok("completed".to_string())
     }
 }
 
@@ -258,9 +259,9 @@ struct GatedExecutor {
 
 #[async_trait]
 impl WorkerExecutor<(), String> for GatedExecutor {
-    async fn execute(&self, _payload: (), _meta: TaskMetadata) -> String {
+    async fn execute(&self, _payload: (), _meta: TaskMetadata) -> Result<String, TaskError> {
         drop(self.gate.acquire().await);
-        "completed".to_string()
+        Ok("completed".to_string())
     }
 }
 
@@ -578,7 +579,7 @@ async fn test_timeout_handling() {
         println!("Retrieve returned after {elapsed:?}");
 
         match result {
-            Err(PoolError::Timeout) => {
+            Err(SchedulerError::Timeout { .. }) => {
                 println!("Correctly got Timeout error");
             }
             other => {
@@ -647,7 +648,7 @@ async fn test_retrieve_async_timeout_is_always_timeout() {
             let elapsed = start.elapsed();
 
             assert!(
-                matches!(result, Err(PoolError::Timeout)),
+                matches!(result, Err(SchedulerError::Timeout { .. })),
                 "iteration {i} (timeout {timeout:?}): expected Timeout, got {result:?}"
             );
             assert!(
@@ -748,7 +749,7 @@ async fn test_submit_after_shutdown() {
         let result = pool.submit_async((1, 2), meta).await;
 
         match result {
-            Err(PoolError::PoolShutdown) => {
+            Err(SchedulerError::PoolShutdown { .. }) => {
                 println!("Correctly got PoolShutdown error");
             }
             other => {
@@ -844,7 +845,7 @@ async fn test_queue_depth_limit() {
                     println!("Task {i} accepted");
                     keys.push(key);
                 }
-                Err(PoolError::QueueFull) => {
+                Err(SchedulerError::QueueFull { .. }) => {
                     println!("Task {i} rejected (queue full)");
                     rejected += 1;
                 }
@@ -908,7 +909,7 @@ async fn test_result_consumed_once() {
         let result2 = pool.retrieve_async(&key, Duration::from_millis(100)).await;
 
         match result2 {
-            Err(PoolError::Timeout | PoolError::ResultNotFound) => {
+            Err(SchedulerError::Timeout { .. } | SchedulerError::ResultNotFound { .. }) => {
                 println!("Second retrieval correctly failed");
             }
             Ok(v) => {
