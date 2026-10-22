@@ -1,6 +1,6 @@
 //! Resource pool: the async parking-lot scheduler built on the core contracts.
 //!
-//! All shared state lives in one [`Inner`] behind one `Arc`. A running task's
+//! All shared state lives in one `Inner` behind one `Arc`. A running task's
 //! future owns a clone of that `Arc`, so completing a task (release capacity,
 //! deliver the outcome, start the next queued task) needs no per-field `Arc`s
 //! threaded through boxed futures.
