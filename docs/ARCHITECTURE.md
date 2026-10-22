@@ -130,6 +130,7 @@ classDiagram
    - `SeaOrmQueue`: Durable Postgres table.
    - `YaqueQueue`: Durable local file-based queue (for Desktop).
 3. **Mailbox (Trait):** Abstraction for result storage. It handles the "late pickup" pattern where a mobile client might disconnect before an LLM finishes generation.
+   - **Durable backend contracts (ADR 0003):** `LeaseQueue` (async enqueue with idempotent acceptance, `lease` with fenced `LeaseToken`s, `ack`, `nack` requeue/dead-letter, `extend` heartbeat, redelivery on lease expiry) and `ResultMailbox` (async, first-write-wins on the idempotency key remembered past consume, consume-once, TTL), with `Notifier` and the `StorageMailbox<S, N>` composition. Every backend passes the conformance suite published by the core crate's `conformance` feature; `InMemoryLeaseQueue` and `InMemoryResultMailbox` are the reference implementations. The synchronous `TaskQueue`/`Mailbox` above remain the in-process contracts of `ResourcePool` until durable dispatch (cr-49) moves it onto these. See [ADR 0003](adr/0003-backend-contracts.md).
 4. **TaskExecutor (Trait):** The user-supplied logic. This is where the actual Agent code (e.g., "Run Llama-3 inference") lives. It returns `Result<T, TaskError>`; a failure is recorded, never mistaken for a result.
 
 ------
@@ -206,7 +207,7 @@ The codebase is a Cargo workspace organized so the core logic never depends on s
 
 | **Layer**       | **Crate (directory)**                                       | **Responsibilities**                                         | **Dependencies**           |
 | --------------- | ----------------------------------------------------------- | ------------------------------------------------------------ | -------------------------- |
-| **Domain**      | `prometheus-parking-lot-core` (`crates/parking-lot-core`)   | Contracts (`TaskQueue`, `Mailbox`, `Spawn`, executors), task types, errors, hooks, in-memory queue and mailbox, `WorkerPoolConfig`. | No runtime, IO, DB or network crate |
+| **Domain**      | `prometheus-parking-lot-core` (`crates/parking-lot-core`)   | Contracts (`LeaseQueue`, `ResultMailbox`, `Notifier`, `TaskQueue`, `Mailbox`, `Spawn`, executors), task types, errors, hooks, in-memory reference backends, the backend conformance suite (feature `conformance`), `WorkerPoolConfig`. | No runtime, IO, DB or network crate |
 | **Runtime**     | `prometheus-parking-lot-runtime-tokio` (`crates/parking-lot-runtime-tokio`) | `ResourcePool`, native `WorkerPool`, shutdown, cancellation, `TokioSpawner`. | Core, Tokio |
 | **Adapters**    | `prometheus-parking-lot-pg`, `-embedded`, `-wasm` (`crates/`) | Postgres queue/mailbox, embedded file queue/mailbox, WASM `WorkerPool`. | Core + SeaORM/SQLx, std fs, Tokio (wasm) |
 | **Facade**      | `prometheus_parking_lot` (repository root)                  | Re-exports behind features; `config/`, `builders/`, `runtime/api`. | All of the above, by feature |
