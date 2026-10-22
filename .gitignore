@@ -29,3 +29,8 @@ Thumbs.db
 .prometheus/.writer.lock
 .prometheus/.review-pending
 .claude/settings.json.bak.*
+
+# agent team local state and recovery snapshots (not shared)
+.agent-team/state.json
+.agent-team/recovery/
+.prometheus/recovery/
