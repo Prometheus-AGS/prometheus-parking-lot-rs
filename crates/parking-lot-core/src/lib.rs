@@ -1,8 +1,9 @@
 //! # Prometheus Parking Lot - core
 //!
 //! The runtime-free core of the `prometheus_parking_lot` scheduler: scheduling
-//! contracts (task queue, mailbox, spawner, executors, task metadata, errors),
-//! lifecycle hooks and audit types, the in-memory queue and mailbox, and the
+//! contracts (the async lease queue and result mailbox backends implement, the
+//! in-process queue and mailbox, spawner, executors, task metadata, errors),
+//! lifecycle hooks and audit types, in-memory reference backends, and the
 //! worker pool configuration.
 //!
 //! This crate performs no IO and depends on no async runtime, database or
@@ -20,10 +21,13 @@ pub mod mailbox;
 pub mod semaphore;
 
 pub use contracts::{
-    AppResult, Clock, InMemoryQueue, Mailbox, MailboxKey, PoolLimits, PoolStats, Priority,
-    ResourceCost, ResourceKind, ScheduledTask, SchedulerError, Spawn, SubmissionSequence,
-    SystemClock, TaskError, TaskExecutor, TaskId, TaskMetadata, TaskPayload, TaskQueue, TaskStatus,
-    TestClock, WorkerExecutor, now_ms,
+    AppResult, Clock, DeadLetter, Delivery, DeliveryOutcome, Enqueued, InMemoryLeaseQueue,
+    InMemoryQueue, InMemoryResultMailbox, LeaseQueue, LeaseToken, LeasedTask, Mailbox,
+    MailboxEntry, MailboxKey, NackAction, NoopNotifier, Notifier, PoolLimits, PoolStats, Priority,
+    QueueDepth, QueueEntryId, ResourceCost, ResourceKind, ResultMailbox, ScheduledTask,
+    SchedulerError, Spawn, StorageMailbox, SubmissionSequence, SystemClock, TaskError,
+    TaskExecutor, TaskId, TaskMetadata, TaskPayload, TaskQueue, TaskStatus, TestClock,
+    WorkerExecutor, now_ms,
 };
 pub use hooks::audit::{AuditEvent, AuditSink, InMemoryAuditSink, build_audit_event};
 pub use hooks::{
