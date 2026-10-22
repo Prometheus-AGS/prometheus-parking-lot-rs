@@ -2311,6 +2311,7 @@ dependencies = [
  "prometheus-parking-lot-core",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
