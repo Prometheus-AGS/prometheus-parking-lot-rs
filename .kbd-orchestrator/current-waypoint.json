@@ -2,10 +2,10 @@
   "schemaVersion": "5",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 190,
-  "derivedRevision": 190,
+  "sourceRevision": 224,
+  "derivedRevision": 224,
   "frontier": {
-    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 190
+    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 224
   },
   "conflictCount": 0,
   "projectId": "f6c384db-6ee1-4f1b-9bab-0e1602ec2615",
@@ -21,19 +21,19 @@
   "phase": "phase-correctness-and-durability",
   "parentPhase": null,
   "childPointer": null,
-  "change": "cr-15-containment",
+  "change": "cr-41-toolchain-baseline",
   "currentTask": "1",
   "status": "ready",
   "lifecycle": "ready",
-  "stageId": "plan",
-  "stageStatus": "COMPLETE",
+  "stageId": "execute",
+  "stageStatus": "IN_PROGRESS",
   "completionMetric": "implementation",
-  "implementationCompleted": 14,
+  "implementationCompleted": 15,
   "implementationTotal": 51,
   "planRevision": 1,
-  "revision": 190,
+  "revision": 224,
   "exactNextCommand": "/kbd-assess phase-correctness-and-durability",
-  "nextChange": "cr-15-containment",
+  "nextChange": "cr-41-toolchain-baseline",
   "nextTask": "1",
-  "updatedAt": "2026-10-22T12:45:45.677282Z"
+  "updatedAt": "2026-10-22T14:05:40.221587Z"
 }

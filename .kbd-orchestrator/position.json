@@ -2,17 +2,17 @@
   "schemaVersion": "1",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 190,
-  "derivedRevision": 190,
+  "sourceRevision": 224,
+  "derivedRevision": 224,
   "frontier": {
-    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 190
+    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 224
   },
   "conflictCount": 0,
-  "updatedAt": "2026-10-22T12:45:45.677282Z",
+  "updatedAt": "2026-10-22T14:05:40.221587Z",
   "cursor": [
     "phase-correctness-and-durability",
-    "plan",
-    "cr-15-containment",
+    "execute",
+    "cr-41-toolchain-baseline",
     "1"
   ],
   "root": {
@@ -20,7 +20,7 @@
     "id": "f6c384db-6ee1-4f1b-9bab-0e1602ec2615",
     "status": "ready",
     "progress": {
-      "done": 14,
+      "done": 15,
       "total": 51
     },
     "children": [
@@ -169,14 +169,14 @@
         "canonicalId": "phase-correctness-and-durability",
         "status": "IN_PROGRESS",
         "progress": {
-          "done": 0,
+          "done": 1,
           "total": 37
         },
         "children": [
           {
             "type": "change",
             "id": "cr-15-containment",
-            "status": "PENDING",
+            "status": "BLOCKED",
             "progress": {
               "done": 0,
               "total": 4
@@ -185,7 +185,7 @@
           {
             "type": "change",
             "id": "cr-41-toolchain-baseline",
-            "status": "PENDING",
+            "status": "IN_PROGRESS",
             "progress": {
               "done": 0,
               "total": 5
@@ -194,9 +194,9 @@
           {
             "type": "change",
             "id": "cr-17-kbd-correction",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -224,7 +224,7 @@
             "status": "PENDING",
             "progress": {
               "done": 0,
-              "total": 4
+              "total": 6
             }
           },
           {

@@ -203,12 +203,19 @@ export const CHANGES = [
         sc('Brand fidelity', 'light and dark screenshots of the home and a docs page are taken', 'canvas, surface, text, Ember and Cyan values match the know-me token table; no borders, gradients or decorative shadows'),
         sc('Accessibility', 'an automated accessibility check runs on representative routes', 'no serious or critical violations; keyboard focus is visible'),
       ]),
+      req('Published on GitHub Pages and linked from the repository', 'A GitHub Actions workflow SHALL build the site on every pull request and deploy it to GitHub Pages from main, and the repository About section SHALL link to the published site (operator request 2026-10-22).', [
+        sc('PR build', 'a pull request changes website/', 'the docs workflow builds the site and fails the check on a build or link error, without deploying'),
+        sc('Deploy from main', 'a commit lands on main', 'the workflow deploys with actions/upload-pages-artifact and actions/deploy-pages, and https://prometheus-ags.github.io/prometheus-parking-lot-rs/ serves the new build (HTTP 200, expected title)'),
+        sc('About link', 'the repository page is viewed', 'the About homepage is https://prometheus-ags.github.io/prometheus-parking-lot-rs/'),
+      ]),
     ],
     tasks: [
       t('Scaffold website/ with build-branded-docusaurus; pin versions; map know-me dark/light tokens, typography and logo', 'product-manager', 'frontend scaffolding; design tokens'),
       t('Add Mermaid, local search, sanitizer (no private paths/secrets/raw wiki), SITE_URL/BASE_URL, container', 'product-manager', 'site config'),
       t('Vendor the build-branded-docusaurus verify script as `npm run verify` (build, links, light/dark screenshots, a11y) and hand platform-engineer the GitHub Pages workflow and verify job', 'product-manager', 'site tooling + cross-owner handoff'),
       review('brand fidelity, a11y, sanitizer'),
+      t('Add .github/workflows/docs.yml: build website/ on pull requests (no deploy); on main build with SITE_URL=https://prometheus-ags.github.io BASE_URL=/prometheus-parking-lot-rs/ and deploy via actions/upload-pages-artifact + actions/deploy-pages (permissions pages: write, id-token: write; concurrency group pages)', 'platform-engineer', 'CI YAML; GitHub Pages deployment'),
+      t('Enable GitHub Pages with source "GitHub Actions" (gh api repos/Prometheus-AGS/prometheus-parking-lot-rs/pages); after the first successful deploy returns HTTP 200, set the repository About homepage to the docs URL (gh repo edit --homepage) and record both in execution.md', 'operator', 'repository settings; outward-facing; authorized by the operator request 2026-10-22'),
     ],
   },
 
