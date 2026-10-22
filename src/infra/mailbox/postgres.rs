@@ -1,13 +1,25 @@
-//! Postgres-backed mailbox adapter using SeaORM.
+//! Postgres-backed mailbox adapter using `SeaORM`.
 //!
 //! This implementation provides persistent result storage with tenant isolation
 //! and optional HTTP webhook notifications.
 
-#[cfg(feature = "postgres")]
-use sea_orm::{ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
+#![cfg_attr(
+    feature = "postgres",
+    expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "u128 epoch-ms and u64 limits fit i64/usize in practice; this SeaORM backend is replaced by the raw-sqlx lease queue and mailbox in cr-26/cr-27, which own checked conversions"
+    )
+)]
 
 #[cfg(feature = "postgres")]
-use serde::{de::DeserializeOwned, Serialize};
+use sea_orm::{
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect,
+};
+
+#[cfg(feature = "postgres")]
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::core::{Mailbox, SchedulerError, TaskStatus};
 use crate::util::serde::MailboxKey;
@@ -25,7 +37,8 @@ pub struct PostgresMailbox<P> {
 impl<P> PostgresMailbox<P> {
     /// Create a new adapter with database connection.
     #[cfg(feature = "postgres")]
-    pub fn new(db: DatabaseConnection) -> Self {
+    #[must_use]
+    pub const fn new(db: DatabaseConnection) -> Self {
         Self {
             db,
             _marker: std::marker::PhantomData,
@@ -34,16 +47,21 @@ impl<P> PostgresMailbox<P> {
 
     /// Create a new adapter without database connection (stub for non-postgres builds).
     #[cfg(not(feature = "postgres"))]
-    pub fn new() -> Self {
+    #[must_use]
+    #[expect(
+        clippy::new_without_default,
+        reason = "stub constructor exists only in non-postgres builds; the backend is rewritten in cr-27"
+    )]
+    pub const fn new() -> Self {
         Self {
             _marker: std::marker::PhantomData,
         }
     }
 
     /// Migration statements for mailbox storage.
-    pub fn migrations() -> &'static [&'static str] {
-        &[
-            r#"
+    #[must_use]
+    pub const fn migrations() -> &'static [&'static str] {
+        &[r"
 CREATE TABLE IF NOT EXISTS pl_mailbox_messages (
     id BIGSERIAL PRIMARY KEY,
     tenant TEXT NOT NULL,
@@ -60,25 +78,33 @@ CREATE INDEX IF NOT EXISTS idx_pl_mailbox_messages_lookup
 CREATE INDEX IF NOT EXISTS idx_pl_mailbox_messages_task_id
     ON pl_mailbox_messages (task_id)
     WHERE task_id IS NOT NULL;
-"#,
-        ]
+"]
     }
 
-    /// Convert TaskStatus to string representation.
+    /// Convert `TaskStatus` to string representation.
     #[cfg(feature = "postgres")]
     fn status_to_string(status: &TaskStatus) -> String {
         match status {
             TaskStatus::Queued => "Queued".to_string(),
             TaskStatus::Running => "Running".to_string(),
             TaskStatus::Completed => "Completed".to_string(),
-            TaskStatus::Failed(msg) => format!("Failed: {}", msg),
+            TaskStatus::Failed(msg) => format!("Failed: {msg}"),
             TaskStatus::Expired => "Expired".to_string(),
-            TaskStatus::Dropped(msg) => format!("Dropped: {}", msg),
+            TaskStatus::Dropped(msg) => format!("Dropped: {msg}"),
         }
     }
 
     /// Fetch messages from mailbox.
+    ///
+    /// # Errors
+    ///
+    /// Returns a backend error when the query fails or a stored payload cannot
+    /// be deserialized.
     #[cfg(feature = "postgres")]
+    #[expect(
+        clippy::future_not_send,
+        reason = "Send-ness depends on P; the async lease contract (cr-25) and cr-27 rewrite own the bounds"
+    )]
     pub async fn fetch(
         &self,
         key: &MailboxKey,
@@ -88,8 +114,8 @@ CREATE INDEX IF NOT EXISTS idx_pl_mailbox_messages_task_id
     where
         P: DeserializeOwned,
     {
-        let mut query = MailboxMessage::find()
-            .filter(mailbox_message::Column::Tenant.eq(&key.tenant));
+        let mut query =
+            MailboxMessage::find().filter(mailbox_message::Column::Tenant.eq(&key.tenant));
 
         if let Some(user_id) = &key.user_id {
             query = query.filter(mailbox_message::Column::UserId.eq(user_id));
@@ -116,14 +142,14 @@ CREATE INDEX IF NOT EXISTS idx_pl_mailbox_messages_task_id
 
         let mut results = Vec::new();
         for msg in messages {
-            let payload = if let Some(payload_json) = msg.payload {
-                Some(
-                    serde_json::from_value(payload_json)
-                        .map_err(|e| SchedulerError::backend("payload deserialization failed", e))?,
-                )
-            } else {
-                None
-            };
+            let payload =
+                if let Some(payload_json) = msg.payload {
+                    Some(serde_json::from_value(payload_json).map_err(|e| {
+                        SchedulerError::backend("payload deserialization failed", e)
+                    })?)
+                } else {
+                    None
+                };
 
             results.push(MailboxMessageDto {
                 id: msg.id,
@@ -138,7 +164,15 @@ CREATE INDEX IF NOT EXISTS idx_pl_mailbox_messages_task_id
     }
 
     /// Prune old messages based on retention period.
+    ///
+    /// # Errors
+    ///
+    /// Returns a backend error when the delete fails.
     #[cfg(feature = "postgres")]
+    #[expect(
+        clippy::future_not_send,
+        reason = "Send-ness depends on P; the async lease contract (cr-25) and cr-27 rewrite own the bounds"
+    )]
     pub async fn prune_old(&self, older_than_ms: u128) -> Result<usize, SchedulerError> {
         let result = MailboxMessage::delete_many()
             .filter(mailbox_message::Column::CreatedAtMs.lt(older_than_ms as i64))

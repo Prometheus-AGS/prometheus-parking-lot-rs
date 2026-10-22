@@ -1,4 +1,4 @@
-//! Comprehensive integration tests for WorkerPool
+//! Comprehensive integration tests for `WorkerPool`
 //!
 //! These tests validate real-world functionality including:
 //! - Basic task execution with real executors
@@ -9,12 +9,17 @@
 //! - Timeout handling
 //! - Graceful shutdown
 
+#![expect(
+    clippy::cast_sign_loss,
+    reason = "non-negative loop counters in tests; casts are bounded by the test sizes"
+)]
+
 use async_trait::async_trait;
 use prometheus_parking_lot::config::WorkerPoolConfig;
 use prometheus_parking_lot::core::{PoolError, TaskMetadata, WorkerExecutor, WorkerPool};
 use prometheus_parking_lot::util::{Priority, ResourceCost, ResourceKind};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 // Test wrapper with explicit timeout enforcement
@@ -24,23 +29,19 @@ async fn with_timeout<F, T>(name: &str, timeout_secs: u64, f: F) -> T
 where
     F: std::future::Future<Output = T>,
 {
-    eprintln!("[TEST_START] {} (timeout: {}s)", name, timeout_secs);
+    eprintln!("[TEST_START] {name} (timeout: {timeout_secs}s)");
     let start = Instant::now();
-    
+
     // Run the test with timeout
     let result = tokio::time::timeout(Duration::from_secs(timeout_secs), f).await;
-    
+
     let elapsed = start.elapsed();
-    match result {
-        Ok(r) => {
-            eprintln!("[TEST_END] {} completed in {:?}", name, elapsed);
-            r
-        }
-        Err(_) => {
-            eprintln!("[TEST_TIMEOUT] {} exceeded {}s - FAILING TEST", name, timeout_secs);
-            panic!("Test {} timed out after {:?}", name, elapsed);
-        }
-    }
+    let Ok(r) = result else {
+        eprintln!("[TEST_TIMEOUT] {name} exceeded {timeout_secs}s - FAILING TEST");
+        panic!("Test {name} timed out after {elapsed:?}");
+    };
+    eprintln!("[TEST_END] {name} completed in {elapsed:?}");
+    r
 }
 
 // ============================================================================
@@ -66,8 +67,8 @@ fn make_meta(task_id: u64, units: u32) -> TaskMetadata {
         deadline_ms: None,
         created_at_ms: now_ms(),
 
-            idempotency_key: None,
-        }
+        idempotency_key: None,
+    }
 }
 
 fn make_gpu_meta(task_id: u64, units: u32) -> TaskMetadata {
@@ -82,8 +83,8 @@ fn make_gpu_meta(task_id: u64, units: u32) -> TaskMetadata {
         deadline_ms: None,
         created_at_ms: now_ms(),
 
-            idempotency_key: None,
-        }
+        idempotency_key: None,
+    }
 }
 
 // ============================================================================
@@ -110,7 +111,7 @@ struct CpuWorkExecutor {
 }
 
 impl CpuWorkExecutor {
-    fn new(work_duration_ms: u64) -> Self {
+    const fn new(work_duration_ms: u64) -> Self {
         Self { work_duration_ms }
     }
 }
@@ -124,7 +125,7 @@ impl WorkerExecutor<String, String> for CpuWorkExecutor {
         let iterations = self.work_duration_ms * 1000;
         for i in 0..iterations {
             if i % 10000 == 0 {
-                result = format!("{}_{}", result, i);
+                result = format!("{result}_{i}");
             }
         }
         let elapsed = start.elapsed();
@@ -212,7 +213,7 @@ impl WorkerExecutor<String, StreamingResult> for StreamingExecutor {
         for i in 0..total_tokens {
             // Simulate token generation time
             tokio::time::sleep(Duration::from_millis(10)).await;
-            let token = format!("{}:token_{}", prompt, i);
+            let token = format!("{prompt}:token_{i}");
             let _ = tx.send(token);
         }
         // Drop sender to signal stream completion
@@ -232,7 +233,7 @@ struct SlowExecutor {
 }
 
 impl SlowExecutor {
-    fn new(delay_ms: u64) -> Self {
+    const fn new(delay_ms: u64) -> Self {
         Self { delay_ms }
     }
 }
@@ -253,589 +254,600 @@ impl WorkerExecutor<(), String> for SlowExecutor {
 #[tokio::test]
 async fn test_basic_async_api() {
     with_timeout("test_basic_async_api", 10, async {
-    println!("\n=== test_basic_async_api ===");
+        println!("\n=== test_basic_async_api ===");
 
-    let config = WorkerPoolConfig::new()
-        .with_worker_count(2)
-        .with_max_units(100)
-        .with_max_queue_depth(10);
+        let config = WorkerPoolConfig::new()
+            .with_worker_count(2)
+            .with_max_units(100)
+            .with_max_queue_depth(10);
 
-    let pool = WorkerPool::new(config, AddExecutor).expect("Failed to create pool");
+        let pool = WorkerPool::new(config, AddExecutor).expect("Failed to create pool");
 
-    println!("Pool created with 2 workers");
+        println!("Pool created with 2 workers");
 
-    // Submit a task
-    let meta = make_meta(1, 10);
-    let key = pool
-        .submit_async((5, 3), meta)
-        .await
-        .expect("Failed to submit");
+        // Submit a task
+        let meta = make_meta(1, 10);
+        let key = pool
+            .submit_async((5, 3), meta)
+            .await
+            .expect("Failed to submit");
 
-    println!("Task submitted, key: {:?}", key);
+        println!("Task submitted, key: {key:?}");
 
-    // Retrieve result
-    let result = pool
-        .retrieve_async(&key, Duration::from_secs(5))
-        .await
-        .expect("Failed to retrieve");
+        // Retrieve result
+        let result = pool
+            .retrieve_async(&key, Duration::from_secs(5))
+            .await
+            .expect("Failed to retrieve");
 
-    println!("Result: {}", result);
-    assert_eq!(result, 8);
+        println!("Result: {result}");
+        assert_eq!(result, 8);
 
-    // Check stats
-    let stats = pool.stats();
-    println!("Final stats: {:?}", stats);
-    assert_eq!(stats.completed_tasks, 1);
+        // Check stats
+        let stats = pool.stats();
+        println!("Final stats: {stats:?}");
+        assert_eq!(stats.completed_tasks, 1);
 
-    eprintln!("[CLEANUP] test_basic_async_api shutting down pool");
-    pool.shutdown();
-    drop(pool);
-    tokio::time::sleep(Duration::from_millis(50)).await;
-    eprintln!("[CLEANUP] test_basic_async_api shutdown complete");
-    println!("=== test_basic_async_api PASSED ===\n");
-    }).await;
+        eprintln!("[CLEANUP] test_basic_async_api shutting down pool");
+        pool.shutdown();
+        drop(pool);
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        eprintln!("[CLEANUP] test_basic_async_api shutdown complete");
+        println!("=== test_basic_async_api PASSED ===\n");
+    })
+    .await;
 }
 
 /// Test blocking API (native only)
 #[tokio::test]
 async fn test_blocking_api() {
     with_timeout("test_blocking_api", 10, async {
-    println!("\n=== test_blocking_api ===");
+        println!("\n=== test_blocking_api ===");
 
-    let config = WorkerPoolConfig::new()
-        .with_worker_count(2)
-        .with_max_units(100)
-        .with_max_queue_depth(10);
+        let config = WorkerPoolConfig::new()
+            .with_worker_count(2)
+            .with_max_units(100)
+            .with_max_queue_depth(10);
 
-    let pool = WorkerPool::new(config, AddExecutor).expect("Failed to create pool");
+        let pool = WorkerPool::new(config, AddExecutor).expect("Failed to create pool");
 
-    println!("Pool created, testing blocking API");
+        println!("Pool created, testing blocking API");
 
-    // Use blocking API
-    let meta = make_meta(2, 10);
-    let key = pool.submit((10, 20), meta).expect("Failed to submit");
+        // Use blocking API
+        let meta = make_meta(2, 10);
+        let key = pool.submit((10, 20), meta).expect("Failed to submit");
 
-    println!("Task submitted via blocking API");
+        println!("Task submitted via blocking API");
 
-    let result = pool
-        .retrieve(&key, Duration::from_secs(5))
-        .expect("Failed to retrieve");
+        let result = pool
+            .retrieve(&key, Duration::from_secs(5))
+            .expect("Failed to retrieve");
 
-    println!("Result: {}", result);
-    assert_eq!(result, 30);
+        println!("Result: {result}");
+        assert_eq!(result, 30);
 
-    eprintln!("[CLEANUP] test_blocking_api shutting down pool");
-    pool.shutdown();
-    drop(pool);
-    tokio::time::sleep(Duration::from_millis(50)).await;
-    eprintln!("[CLEANUP] test_blocking_api shutdown complete");
-    println!("=== test_blocking_api PASSED ===\n");
-    }).await;
+        eprintln!("[CLEANUP] test_blocking_api shutting down pool");
+        pool.shutdown();
+        drop(pool);
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        eprintln!("[CLEANUP] test_blocking_api shutdown complete");
+        println!("=== test_blocking_api PASSED ===\n");
+    })
+    .await;
 }
 
 /// Test concurrent task submission and execution
 #[tokio::test]
 async fn test_concurrent_execution() {
     with_timeout("test_concurrent_execution", 20, async {
-    println!("\n=== test_concurrent_execution ===");
+        println!("\n=== test_concurrent_execution ===");
 
-    let executor = CountingExecutor::new();
-    let executor_clone = executor.clone();
+        let executor = CountingExecutor::new();
+        let executor_clone = executor.clone();
 
-    let config = WorkerPoolConfig::new()
-        .with_worker_count(4)
-        .with_max_units(1000)
-        .with_max_queue_depth(100);
+        let config = WorkerPoolConfig::new()
+            .with_worker_count(4)
+            .with_max_units(1000)
+            .with_max_queue_depth(100);
 
-    let pool = Arc::new(WorkerPool::new(config, executor).expect("Failed to create pool"));
+        let pool = Arc::new(WorkerPool::new(config, executor).expect("Failed to create pool"));
 
-    println!("Pool created with 4 workers");
+        println!("Pool created with 4 workers");
 
-    // Submit 20 tasks concurrently
-    let num_tasks = 20;
-    let mut handles = Vec::new();
-    let mut keys = Vec::new();
+        // Submit 20 tasks concurrently
+        let num_tasks = 20;
+        let mut handles = Vec::new();
+        let mut keys = Vec::new();
 
-    for i in 0..num_tasks {
-        let meta = make_meta(i as u64, 10);
-        let key = pool
-            .submit_async(i as u64, meta)
-            .await
-            .expect("Failed to submit");
-        keys.push(key);
-    }
-
-    println!("Submitted {} tasks", num_tasks);
-
-    // Retrieve all results
-    let pool_ref = pool.clone();
-    for key in keys {
-        let pool_clone = pool_ref.clone();
-        handles.push(tokio::spawn(async move {
-            pool_clone
-                .retrieve_async(&key, Duration::from_secs(10))
+        for i in 0..num_tasks {
+            let meta = make_meta(i as u64, 10);
+            let key = pool
+                .submit_async(i as u64, meta)
                 .await
-                .expect("Failed to retrieve")
-        }));
-    }
+                .expect("Failed to submit");
+            keys.push(key);
+        }
 
-    let results: Vec<u64> = futures::future::join_all(handles)
-        .await
-        .into_iter()
-        .map(|r| r.expect("Task panicked"))
-        .collect();
+        println!("Submitted {num_tasks} tasks");
 
-    println!("All results retrieved: {:?}", results);
+        // Retrieve all results
+        let pool_ref = pool.clone();
+        for key in keys {
+            let pool_clone = pool_ref.clone();
+            handles.push(tokio::spawn(async move {
+                pool_clone
+                    .retrieve_async(&key, Duration::from_secs(10))
+                    .await
+                    .expect("Failed to retrieve")
+            }));
+        }
 
-    // Verify all tasks executed
-    assert_eq!(executor_clone.execution_count(), num_tasks as u64);
-    println!(
-        "Max concurrent executions observed: {}",
-        executor_clone.max_concurrent()
-    );
+        let results: Vec<u64> = futures::future::join_all(handles)
+            .await
+            .into_iter()
+            .map(|r| r.expect("Task panicked"))
+            .collect();
 
-    // With 4 workers and 50ms tasks, we should see some concurrency
-    assert!(
-        executor_clone.max_concurrent() > 1,
-        "Expected concurrent execution"
-    );
+        println!("All results retrieved: {results:?}");
 
-    let stats = pool.stats();
-    println!("Final stats: {:?}", stats);
-    assert_eq!(stats.completed_tasks, num_tasks as u64);
+        // Verify all tasks executed
+        assert_eq!(executor_clone.execution_count(), num_tasks as u64);
+        println!(
+            "Max concurrent executions observed: {}",
+            executor_clone.max_concurrent()
+        );
 
-    eprintln!("[CLEANUP] test_concurrent_execution shutting down pool");
-    pool.shutdown();
-    drop(pool);
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    eprintln!("[CLEANUP] test_concurrent_execution shutdown complete");
-    println!("=== test_concurrent_execution PASSED ===\n");
-    }).await;
+        // With 4 workers and 50ms tasks, we should see some concurrency
+        assert!(
+            executor_clone.max_concurrent() > 1,
+            "Expected concurrent execution"
+        );
+
+        let stats = pool.stats();
+        println!("Final stats: {stats:?}");
+        assert_eq!(stats.completed_tasks, num_tasks as u64);
+
+        eprintln!("[CLEANUP] test_concurrent_execution shutting down pool");
+        pool.shutdown();
+        drop(pool);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        eprintln!("[CLEANUP] test_concurrent_execution shutdown complete");
+        println!("=== test_concurrent_execution PASSED ===\n");
+    })
+    .await;
 }
 
 /// Test resource limits cause queueing
 #[tokio::test]
 async fn test_resource_limits_queueing() {
     with_timeout("test_resource_limits_queueing", 15, async {
-    println!("\n=== test_resource_limits_queueing ===");
+        println!("\n=== test_resource_limits_queueing ===");
 
-    let executor = CountingExecutor::new();
+        let executor = CountingExecutor::new();
 
-    // Low max_units to force queueing
-    let config = WorkerPoolConfig::new()
-        .with_worker_count(4)
-        .with_max_units(30) // Only allow 3 tasks of cost 10 at a time
-        .with_max_queue_depth(50);
+        // Low max_units to force queueing
+        let config = WorkerPoolConfig::new()
+            .with_worker_count(4)
+            .with_max_units(30) // Only allow 3 tasks of cost 10 at a time
+            .with_max_queue_depth(50);
 
-    let pool = Arc::new(WorkerPool::new(config, executor).expect("Failed to create pool"));
+        let pool = Arc::new(WorkerPool::new(config, executor).expect("Failed to create pool"));
 
-    println!("Pool created with max_units=30 (only 3 concurrent tasks of cost 10)");
+        println!("Pool created with max_units=30 (only 3 concurrent tasks of cost 10)");
 
-    // Submit 10 tasks, each requiring 10 units
-    let mut keys = Vec::new();
-    for i in 0..10 {
-        let meta = make_meta(i as u64, 10);
-        let key = pool
-            .submit_async(i as u64, meta)
-            .await
-            .expect("Failed to submit");
-        keys.push(key);
-    }
+        // Submit 10 tasks, each requiring 10 units
+        let mut keys = Vec::new();
+        for i in 0..10 {
+            let meta = make_meta(i as u64, 10);
+            let key = pool
+                .submit_async(i as u64, meta)
+                .await
+                .expect("Failed to submit");
+            keys.push(key);
+        }
 
-    println!("Submitted 10 tasks");
+        println!("Submitted 10 tasks");
 
-    // Check that some are queued
-    let stats = pool.stats();
-    println!("Stats after submission: {:?}", stats);
+        // Check that some are queued
+        let stats = pool.stats();
+        println!("Stats after submission: {stats:?}");
 
-    // Retrieve all results
-    for key in keys {
-        let _ = pool
-            .retrieve_async(&key, Duration::from_secs(10))
-            .await
-            .expect("Failed to retrieve");
-    }
+        // Retrieve all results
+        for key in keys {
+            let _ = pool
+                .retrieve_async(&key, Duration::from_secs(10))
+                .await
+                .expect("Failed to retrieve");
+        }
 
-    let final_stats = pool.stats();
-    println!("Final stats: {:?}", final_stats);
-    assert_eq!(final_stats.completed_tasks, 10);
+        let final_stats = pool.stats();
+        println!("Final stats: {final_stats:?}");
+        assert_eq!(final_stats.completed_tasks, 10);
 
-    eprintln!("[CLEANUP] test_resource_limits_queueing shutting down pool");
-    pool.shutdown();
-    drop(pool);
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    eprintln!("[CLEANUP] test_resource_limits_queueing shutdown complete");
-    println!("=== test_resource_limits_queueing PASSED ===\n");
-    }).await;
+        eprintln!("[CLEANUP] test_resource_limits_queueing shutting down pool");
+        pool.shutdown();
+        drop(pool);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        eprintln!("[CLEANUP] test_resource_limits_queueing shutdown complete");
+        println!("=== test_resource_limits_queueing PASSED ===\n");
+    })
+    .await;
 }
 
 /// Test non-serializable streaming results (THE KEY CANDLE-VLLM PATTERN)
 #[tokio::test]
 async fn test_streaming_non_serializable_results() {
     with_timeout("test_streaming_non_serializable_results", 10, async {
-    println!("\n=== test_streaming_non_serializable_results ===");
-    println!("This tests the candle-vllm streaming pattern with flume channels");
+        println!("\n=== test_streaming_non_serializable_results ===");
+        println!("This tests the candle-vllm streaming pattern with flume channels");
 
-    let config = WorkerPoolConfig::new()
-        .with_worker_count(2)
-        .with_max_units(100)
-        .with_max_queue_depth(10);
+        let config = WorkerPoolConfig::new()
+            .with_worker_count(2)
+            .with_max_units(100)
+            .with_max_queue_depth(10);
 
-    let pool = WorkerPool::new(config, StreamingExecutor).expect("Failed to create pool");
+        let pool = WorkerPool::new(config, StreamingExecutor).expect("Failed to create pool");
 
-    println!("Pool created with StreamingExecutor");
+        println!("Pool created with StreamingExecutor");
 
-    // Submit a streaming task
-    let meta = make_gpu_meta(1, 50);
-    let key = pool
-        .submit_async("hello".to_string(), meta)
-        .await
-        .expect("Failed to submit");
+        // Submit a streaming task
+        let meta = make_gpu_meta(1, 50);
+        let key = pool
+            .submit_async("hello".to_string(), meta)
+            .await
+            .expect("Failed to submit");
 
-    println!("Streaming task submitted");
+        println!("Streaming task submitted");
 
-    // Retrieve the streaming result (contains a channel!)
-    let result = pool
-        .retrieve_async(&key, Duration::from_secs(5))
-        .await
-        .expect("Failed to retrieve");
+        // Retrieve the streaming result (contains a channel!)
+        let result = pool
+            .retrieve_async(&key, Duration::from_secs(5))
+            .await
+            .expect("Failed to retrieve");
 
-    println!(
-        "Got StreamingResult with {} expected tokens",
-        result.total_tokens
-    );
+        println!(
+            "Got StreamingResult with {} expected tokens",
+            result.total_tokens
+        );
 
-    // Consume the stream
-    let mut tokens = Vec::new();
-    while let Ok(token) = result.receiver.recv_async().await {
-        println!("  Received token: {}", token);
-        tokens.push(token);
-    }
+        // Consume the stream
+        let mut tokens = Vec::new();
+        while let Ok(token) = result.receiver.recv_async().await {
+            println!("  Received token: {token}");
+            tokens.push(token);
+        }
 
-    println!("Received {} tokens total", tokens.len());
-    assert_eq!(tokens.len(), 5);
-    assert!(tokens[0].contains("hello:token_0"));
-    assert!(tokens[4].contains("hello:token_4"));
+        println!("Received {} tokens total", tokens.len());
+        assert_eq!(tokens.len(), 5);
+        assert!(tokens[0].contains("hello:token_0"));
+        assert!(tokens[4].contains("hello:token_4"));
 
-    eprintln!("[CLEANUP] test_streaming_non_serializable_results shutting down pool");
-    pool.shutdown();
-    eprintln!("[CLEANUP] test_streaming_non_serializable_results shutdown complete");
-    println!("=== test_streaming_non_serializable_results PASSED ===\n");
-    }).await;
+        eprintln!("[CLEANUP] test_streaming_non_serializable_results shutting down pool");
+        pool.shutdown();
+        eprintln!("[CLEANUP] test_streaming_non_serializable_results shutdown complete");
+        println!("=== test_streaming_non_serializable_results PASSED ===\n");
+    })
+    .await;
 }
 
 /// Test timeout on slow tasks
 #[tokio::test]
 async fn test_timeout_handling() {
     with_timeout("test_timeout_handling", 10, async {
-    println!("\n=== test_timeout_handling ===");
+        println!("\n=== test_timeout_handling ===");
 
-    // Executor that takes 500ms
-    let config = WorkerPoolConfig::new()
-        .with_worker_count(1)
-        .with_max_units(100)
-        .with_max_queue_depth(10);
+        // Executor that takes 500ms
+        let config = WorkerPoolConfig::new()
+            .with_worker_count(1)
+            .with_max_units(100)
+            .with_max_queue_depth(10);
 
-    let pool = WorkerPool::new(config, SlowExecutor::new(500)).expect("Failed to create pool");
+        let pool = WorkerPool::new(config, SlowExecutor::new(500)).expect("Failed to create pool");
 
-    println!("Pool created with slow executor (500ms delay)");
+        println!("Pool created with slow executor (500ms delay)");
 
-    // Submit task
-    let meta = make_meta(1, 10);
-    let key = pool
-        .submit_async((), meta)
-        .await
-        .expect("Failed to submit");
+        // Submit task
+        let meta = make_meta(1, 10);
+        let key = pool.submit_async((), meta).await.expect("Failed to submit");
 
-    println!("Task submitted, attempting retrieve with 100ms timeout...");
+        println!("Task submitted, attempting retrieve with 100ms timeout...");
 
-    // Try to retrieve with short timeout - should fail
-    let start = Instant::now();
-    let result = pool.retrieve_async(&key, Duration::from_millis(100)).await;
-    let elapsed = start.elapsed();
+        // Try to retrieve with short timeout - should fail
+        let start = Instant::now();
+        let result = pool.retrieve_async(&key, Duration::from_millis(100)).await;
+        let elapsed = start.elapsed();
 
-    println!("Retrieve returned after {:?}", elapsed);
+        println!("Retrieve returned after {elapsed:?}");
 
-    match result {
-        Err(PoolError::Timeout) => {
-            println!("Correctly got Timeout error");
+        match result {
+            Err(PoolError::Timeout) => {
+                println!("Correctly got Timeout error");
+            }
+            other => {
+                panic!("Expected Timeout error, got: {other:?}");
+            }
         }
-        other => {
-            panic!("Expected Timeout error, got: {:?}", other);
-        }
-    }
 
-    // Verify timeout was respected (should be ~100ms, not 500ms)
-    assert!(elapsed < Duration::from_millis(200), "Timeout took too long");
+        // Verify timeout was respected (should be ~100ms, not 500ms)
+        assert!(
+            elapsed < Duration::from_millis(200),
+            "Timeout took too long"
+        );
 
-    eprintln!("[CLEANUP] test_timeout_handling shutting down pool");
-    pool.shutdown();
-    eprintln!("[CLEANUP] test_timeout_handling shutdown complete");
-    
-    // Explicitly drop pool and wait for detached workers to exit
-    drop(pool);
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    eprintln!("[CLEANUP] test_timeout_handling workers detached, test exiting");
-    
-    println!("=== test_timeout_handling PASSED ===\n");
-    }).await;
+        eprintln!("[CLEANUP] test_timeout_handling shutting down pool");
+        pool.shutdown();
+        eprintln!("[CLEANUP] test_timeout_handling shutdown complete");
+
+        // Explicitly drop pool and wait for detached workers to exit
+        drop(pool);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        eprintln!("[CLEANUP] test_timeout_handling workers detached, test exiting");
+
+        println!("=== test_timeout_handling PASSED ===\n");
+    })
+    .await;
 }
 
 /// Test graceful shutdown
 #[tokio::test]
 async fn test_graceful_shutdown() {
     with_timeout("test_graceful_shutdown", 10, async {
-    println!("\n=== test_graceful_shutdown ===");
+        println!("\n=== test_graceful_shutdown ===");
 
-    let executor = CountingExecutor::new();
-    let executor_clone = executor.clone();
+        let executor = CountingExecutor::new();
+        let executor_clone = executor.clone();
 
-    let config = WorkerPoolConfig::new()
-        .with_worker_count(2)
-        .with_max_units(100)
-        .with_max_queue_depth(10);
+        let config = WorkerPoolConfig::new()
+            .with_worker_count(2)
+            .with_max_units(100)
+            .with_max_queue_depth(10);
 
-    let pool = WorkerPool::new(config, executor).expect("Failed to create pool");
+        let pool = WorkerPool::new(config, executor).expect("Failed to create pool");
 
-    println!("Pool created");
+        println!("Pool created");
 
-    // Submit a few tasks
-    let mut keys = Vec::new();
-    for i in 0..3 {
-        let meta = make_meta(i as u64, 10);
-        let key = pool
-            .submit_async(i as u64, meta)
-            .await
-            .expect("Failed to submit");
-        keys.push(key);
-    }
+        // Submit a few tasks
+        let mut keys = Vec::new();
+        for i in 0..3 {
+            let meta = make_meta(i as u64, 10);
+            let key = pool
+                .submit_async(i as u64, meta)
+                .await
+                .expect("Failed to submit");
+            keys.push(key);
+        }
 
-    println!("Submitted 3 tasks");
+        println!("Submitted 3 tasks");
 
-    // Retrieve them
-    for key in keys {
-        let _ = pool
-            .retrieve_async(&key, Duration::from_secs(5))
-            .await
-            .expect("Failed to retrieve");
-    }
+        // Retrieve them
+        for key in keys {
+            let _ = pool
+                .retrieve_async(&key, Duration::from_secs(5))
+                .await
+                .expect("Failed to retrieve");
+        }
 
-    println!("All tasks completed");
+        println!("All tasks completed");
 
-    // Explicit shutdown
-    let start = Instant::now();
-    pool.shutdown();
-    let shutdown_time = start.elapsed();
+        // Explicit shutdown
+        let start = Instant::now();
+        pool.shutdown();
+        let shutdown_time = start.elapsed();
 
-    println!("Shutdown completed in {:?}", shutdown_time);
+        println!("Shutdown completed in {shutdown_time:?}");
 
-    // Shutdown should be fast (not waiting for any timeout)
-    assert!(
-        shutdown_time < Duration::from_millis(500),
-        "Shutdown took too long"
-    );
+        // Shutdown should be fast (not waiting for any timeout)
+        assert!(
+            shutdown_time < Duration::from_millis(500),
+            "Shutdown took too long"
+        );
 
-    // Verify all tasks completed
-    assert_eq!(executor_clone.execution_count(), 3);
+        // Verify all tasks completed
+        assert_eq!(executor_clone.execution_count(), 3);
 
-    eprintln!("[CLEANUP] test_graceful_shutdown complete");
-    println!("=== test_graceful_shutdown PASSED ===\n");
-    }).await;
+        eprintln!("[CLEANUP] test_graceful_shutdown complete");
+        println!("=== test_graceful_shutdown PASSED ===\n");
+    })
+    .await;
 }
 
 /// Test submitting after shutdown fails gracefully
 #[tokio::test]
 async fn test_submit_after_shutdown() {
     with_timeout("test_submit_after_shutdown", 10, async {
-    println!("\n=== test_submit_after_shutdown ===");
+        println!("\n=== test_submit_after_shutdown ===");
 
-    let config = WorkerPoolConfig::new()
-        .with_worker_count(1)
-        .with_max_units(100)
-        .with_max_queue_depth(10);
+        let config = WorkerPoolConfig::new()
+            .with_worker_count(1)
+            .with_max_units(100)
+            .with_max_queue_depth(10);
 
-    let pool = WorkerPool::new(config, AddExecutor).expect("Failed to create pool");
+        let pool = WorkerPool::new(config, AddExecutor).expect("Failed to create pool");
 
-    println!("Pool created, shutting down...");
-    pool.shutdown();
-    println!("Pool shut down");
+        println!("Pool created, shutting down...");
+        pool.shutdown();
+        println!("Pool shut down");
 
-    // Try to submit - should fail
-    let meta = make_meta(1, 10);
-    let result = pool.submit_async((1, 2), meta).await;
+        // Try to submit - should fail
+        let meta = make_meta(1, 10);
+        let result = pool.submit_async((1, 2), meta).await;
 
-    match result {
-        Err(PoolError::PoolShutdown) => {
-            println!("Correctly got PoolShutdown error");
+        match result {
+            Err(PoolError::PoolShutdown) => {
+                println!("Correctly got PoolShutdown error");
+            }
+            other => {
+                panic!("Expected PoolShutdown error, got: {other:?}");
+            }
         }
-        other => {
-            panic!("Expected PoolShutdown error, got: {:?}", other);
-        }
-    }
 
-    eprintln!("[CLEANUP] test_submit_after_shutdown complete");
-    println!("=== test_submit_after_shutdown PASSED ===\n");
-    }).await;
+        eprintln!("[CLEANUP] test_submit_after_shutdown complete");
+        println!("=== test_submit_after_shutdown PASSED ===\n");
+    })
+    .await;
 }
 
 /// Test CPU-bound work doesn't block the async runtime
 #[tokio::test]
 async fn test_cpu_work_isolation() {
     with_timeout("test_cpu_work_isolation", 10, async {
-    println!("\n=== test_cpu_work_isolation ===");
+        println!("\n=== test_cpu_work_isolation ===");
 
-    let config = WorkerPoolConfig::new()
-        .with_worker_count(2)
-        .with_max_units(100)
-        .with_max_queue_depth(10);
+        let config = WorkerPoolConfig::new()
+            .with_worker_count(2)
+            .with_max_units(100)
+            .with_max_queue_depth(10);
 
-    // Executor that does actual CPU work
-    let pool = WorkerPool::new(config, CpuWorkExecutor::new(5)).expect("Failed to create pool");
+        // Executor that does actual CPU work
+        let pool = WorkerPool::new(config, CpuWorkExecutor::new(5)).expect("Failed to create pool");
 
-    println!("Pool created with CPU-intensive executor");
+        println!("Pool created with CPU-intensive executor");
 
-    // Submit CPU-intensive task
-    let meta = make_meta(1, 10);
-    let key = pool
-        .submit_async("test_data".to_string(), meta)
-        .await
-        .expect("Failed to submit");
+        // Submit CPU-intensive task
+        let meta = make_meta(1, 10);
+        let key = pool
+            .submit_async("test_data".to_string(), meta)
+            .await
+            .expect("Failed to submit");
 
-    println!("CPU task submitted");
+        println!("CPU task submitted");
 
-    // Meanwhile, async runtime should remain responsive
-    let async_start = Instant::now();
-    tokio::time::sleep(Duration::from_millis(10)).await;
-    let async_elapsed = async_start.elapsed();
+        // Meanwhile, async runtime should remain responsive
+        let async_start = Instant::now();
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        let async_elapsed = async_start.elapsed();
 
-    println!("Async sleep took {:?} (should be ~10ms)", async_elapsed);
+        println!("Async sleep took {async_elapsed:?} (should be ~10ms)");
 
-    // If CPU work was blocking the runtime, this would take much longer
-    assert!(
-        async_elapsed < Duration::from_millis(50),
-        "Async runtime was blocked!"
-    );
+        // If CPU work was blocking the runtime, this would take much longer
+        assert!(
+            async_elapsed < Duration::from_millis(50),
+            "Async runtime was blocked!"
+        );
 
-    // Get the result
-    let result = pool
-        .retrieve_async(&key, Duration::from_secs(5))
-        .await
-        .expect("Failed to retrieve");
+        // Get the result
+        let result = pool
+            .retrieve_async(&key, Duration::from_secs(5))
+            .await
+            .expect("Failed to retrieve");
 
-    println!("CPU task result: {}", result);
-    assert!(result.contains("Processed 'test_data'"));
+        println!("CPU task result: {result}");
+        assert!(result.contains("Processed 'test_data'"));
 
-    eprintln!("[CLEANUP] test_cpu_work_isolation shutting down pool");
-    pool.shutdown();
-    eprintln!("[CLEANUP] test_cpu_work_isolation shutdown complete");
-    println!("=== test_cpu_work_isolation PASSED ===\n");
-    }).await;
+        eprintln!("[CLEANUP] test_cpu_work_isolation shutting down pool");
+        pool.shutdown();
+        eprintln!("[CLEANUP] test_cpu_work_isolation shutdown complete");
+        println!("=== test_cpu_work_isolation PASSED ===\n");
+    })
+    .await;
 }
 
 /// Test queue depth limit
 #[tokio::test]
 async fn test_queue_depth_limit() {
     with_timeout("test_queue_depth_limit", 15, async {
-    eprintln!("[SETUP] Creating pool with queue_depth=3");
-    println!("\n=== test_queue_depth_limit ===");
+        eprintln!("[SETUP] Creating pool with queue_depth=3");
+        println!("\n=== test_queue_depth_limit ===");
 
-    let config = WorkerPoolConfig::new()
-        .with_worker_count(1)
-        .with_max_units(10) // Only 1 task at a time
-        .with_max_queue_depth(3); // Only 3 can queue
+        let config = WorkerPoolConfig::new()
+            .with_worker_count(1)
+            .with_max_units(10) // Only 1 task at a time
+            .with_max_queue_depth(3); // Only 3 can queue
 
-    let pool = WorkerPool::new(config, SlowExecutor::new(200)).expect("Failed to create pool");
+        let pool = WorkerPool::new(config, SlowExecutor::new(200)).expect("Failed to create pool");
 
-    println!("Pool created with queue_depth=3, 1 worker, slow tasks");
+        println!("Pool created with queue_depth=3, 1 worker, slow tasks");
 
-    // Submit tasks until queue is full
-    let mut keys = Vec::new();
-    let mut rejected = 0;
+        // Submit tasks until queue is full
+        let mut keys = Vec::new();
+        let mut rejected = 0;
 
-    for i in 0..10 {
-        let meta = make_meta(i as u64, 10);
-        match pool.submit_async((), meta).await {
-            Ok(key) => {
-                println!("Task {} accepted", i);
-                keys.push(key);
+        for i in 0..10 {
+            let meta = make_meta(i as u64, 10);
+            match pool.submit_async((), meta).await {
+                Ok(key) => {
+                    println!("Task {i} accepted");
+                    keys.push(key);
+                }
+                Err(PoolError::QueueFull) => {
+                    println!("Task {i} rejected (queue full)");
+                    rejected += 1;
+                }
+                Err(e) => panic!("Unexpected error: {e:?}"),
             }
-            Err(PoolError::QueueFull) => {
-                println!("Task {} rejected (queue full)", i);
-                rejected += 1;
-            }
-            Err(e) => panic!("Unexpected error: {:?}", e),
         }
-    }
 
-    println!(
-        "Accepted {} tasks, rejected {} due to queue full",
-        keys.len(),
-        rejected
-    );
+        println!(
+            "Accepted {} tasks, rejected {} due to queue full",
+            keys.len(),
+            rejected
+        );
 
-    // Should have rejected some due to queue limit
-    assert!(rejected > 0, "Expected some rejections");
-    // Max should be 1 running + 3 queued = 4 accepted
-    assert!(keys.len() <= 4, "Too many tasks accepted");
+        // Should have rejected some due to queue limit
+        assert!(rejected > 0, "Expected some rejections");
+        // Max should be 1 running + 3 queued = 4 accepted
+        assert!(keys.len() <= 4, "Too many tasks accepted");
 
-    // Clean up - retrieve what we can
-    for key in keys {
-        let _ = pool.retrieve_async(&key, Duration::from_secs(5)).await;
-    }
+        // Clean up - retrieve what we can
+        for key in keys {
+            let _ = pool.retrieve_async(&key, Duration::from_secs(5)).await;
+        }
 
-    eprintln!("[CLEANUP] test_queue_depth_limit shutting down pool");
-    pool.shutdown();
-    eprintln!("[CLEANUP] test_queue_depth_limit shutdown complete");
-    println!("=== test_queue_depth_limit PASSED ===\n");
-    }).await;
+        eprintln!("[CLEANUP] test_queue_depth_limit shutting down pool");
+        pool.shutdown();
+        eprintln!("[CLEANUP] test_queue_depth_limit shutdown complete");
+        println!("=== test_queue_depth_limit PASSED ===\n");
+    })
+    .await;
 }
 
 /// Test multiple result retrievals for same key
 #[tokio::test]
 async fn test_result_consumed_once() {
     with_timeout("test_result_consumed_once", 10, async {
-    println!("\n=== test_result_consumed_once ===");
+        println!("\n=== test_result_consumed_once ===");
 
-    let config = WorkerPoolConfig::new()
-        .with_worker_count(1)
-        .with_max_units(100)
-        .with_max_queue_depth(10);
+        let config = WorkerPoolConfig::new()
+            .with_worker_count(1)
+            .with_max_units(100)
+            .with_max_queue_depth(10);
 
-    let pool = WorkerPool::new(config, AddExecutor).expect("Failed to create pool");
+        let pool = WorkerPool::new(config, AddExecutor).expect("Failed to create pool");
 
-    // Submit and retrieve
-    let meta = make_meta(1, 10);
-    let key = pool
-        .submit_async((1, 2), meta)
-        .await
-        .expect("Failed to submit");
+        // Submit and retrieve
+        let meta = make_meta(1, 10);
+        let key = pool
+            .submit_async((1, 2), meta)
+            .await
+            .expect("Failed to submit");
 
-    let result = pool
-        .retrieve_async(&key, Duration::from_secs(5))
-        .await
-        .expect("Failed to retrieve");
-    assert_eq!(result, 3);
+        let result = pool
+            .retrieve_async(&key, Duration::from_secs(5))
+            .await
+            .expect("Failed to retrieve");
+        assert_eq!(result, 3);
 
-    println!("First retrieval succeeded: {}", result);
+        println!("First retrieval succeeded: {result}");
 
-    // Second retrieval should fail (result already consumed)
-    let result2 = pool.retrieve_async(&key, Duration::from_millis(100)).await;
+        // Second retrieval should fail (result already consumed)
+        let result2 = pool.retrieve_async(&key, Duration::from_millis(100)).await;
 
-    match result2 {
-        Err(PoolError::Timeout) | Err(PoolError::ResultNotFound) => {
-            println!("Second retrieval correctly failed");
+        match result2 {
+            Err(PoolError::Timeout | PoolError::ResultNotFound) => {
+                println!("Second retrieval correctly failed");
+            }
+            Ok(v) => {
+                panic!("Should not get result twice, got: {v}");
+            }
+            Err(e) => {
+                println!("Got error (acceptable): {e:?}");
+            }
         }
-        Ok(v) => {
-            panic!("Should not get result twice, got: {}", v);
-        }
-        Err(e) => {
-            println!("Got error (acceptable): {:?}", e);
-        }
-    }
 
-    eprintln!("[CLEANUP] test_result_consumed_once shutting down pool");
-    pool.shutdown();
-    eprintln!("[CLEANUP] test_result_consumed_once shutdown complete");
-    println!("=== test_result_consumed_once PASSED ===\n");
-    }).await;
+        eprintln!("[CLEANUP] test_result_consumed_once shutting down pool");
+        pool.shutdown();
+        eprintln!("[CLEANUP] test_result_consumed_once shutdown complete");
+        println!("=== test_result_consumed_once PASSED ===\n");
+    })
+    .await;
 }

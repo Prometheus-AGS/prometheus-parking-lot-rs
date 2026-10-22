@@ -1,11 +1,11 @@
 //! File-backed mailbox adapter inspired by Yaque.
 
 use std::collections::HashMap;
-use std::fs::{create_dir_all, OpenOptions};
+use std::fs::{OpenOptions, create_dir_all};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::core::{Mailbox, SchedulerError, TaskStatus};
 use crate::util::clock::now_ms;
@@ -31,6 +31,11 @@ pub struct MailboxMessage<P> {
 
 impl<P> YaqueMailbox<P> {
     /// Create a new mailbox persisted to the given path/stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns a backend error when the directory cannot be created or an
+    /// existing stream file cannot be read or parsed.
     pub fn new(path: impl AsRef<Path>, stream: impl Into<String>) -> Result<Self, SchedulerError>
     where
         P: DeserializeOwned,
@@ -66,14 +71,18 @@ impl<P> YaqueMailbox<P> {
         let reader = BufReader::new(file);
         for line in reader.lines() {
             let line = line.map_err(|e| SchedulerError::backend("yaque_mailbox", e))?;
-            let (key, msg): (MailboxKey, MailboxMessage<P>) =
-                serde_json::from_str(&line).map_err(|e| SchedulerError::backend("yaque_mailbox", e))?;
+            let (key, msg): (MailboxKey, MailboxMessage<P>) = serde_json::from_str(&line)
+                .map_err(|e| SchedulerError::backend("yaque_mailbox", e))?;
             self.messages.entry(key).or_default().push(msg);
         }
         Ok(())
     }
 
-    fn append_to_disk(&self, key: &MailboxKey, msg: &MailboxMessage<P>) -> Result<(), SchedulerError>
+    fn append_to_disk(
+        &self,
+        key: &MailboxKey,
+        msg: &MailboxMessage<P>,
+    ) -> Result<(), SchedulerError>
     where
         P: Serialize,
     {
@@ -89,6 +98,7 @@ impl<P> YaqueMailbox<P> {
     }
 
     /// Fetch messages for a mailbox key, optionally since a timestamp.
+    #[must_use]
     pub fn fetch(
         &self,
         key: &MailboxKey,
@@ -102,7 +112,7 @@ impl<P> YaqueMailbox<P> {
             .get(key)
             .map(|msgs| {
                 msgs.iter()
-                    .filter(|m| since_ms.map(|s| m.created_at_ms >= s).unwrap_or(true))
+                    .filter(|m| since_ms.is_none_or(|s| m.created_at_ms >= s))
                     .take(limit)
                     .cloned()
                     .collect()
@@ -126,7 +136,10 @@ where
             payload,
             created_at_ms: now_ms(),
         };
-        self.messages.entry(key.clone()).or_default().push(msg.clone());
+        self.messages
+            .entry(key.clone())
+            .or_default()
+            .push(msg.clone());
         self.append_to_disk(key, &msg)
     }
 }

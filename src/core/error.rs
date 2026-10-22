@@ -157,7 +157,8 @@ impl SchedulerError {
 
     /// Returns `true` if this error represents a transient condition the caller
     /// may retry (queue full, capacity exceeded, timeout).
-    pub fn is_retryable(&self) -> bool {
+    #[must_use]
+    pub const fn is_retryable(&self) -> bool {
         matches!(
             self,
             Self::QueueFull { .. } | Self::CapacityExceeded { .. } | Self::Timeout { .. }
@@ -206,7 +207,7 @@ mod tests {
         };
         let s = e.to_string();
         assert!(s.contains("10"), "{s}");
-        assert!(s.contains("4"), "{s}");
+        assert!(s.contains('4'), "{s}");
     }
 
     #[test]
@@ -223,7 +224,14 @@ mod tests {
     #[test]
     fn is_retryable_classification() {
         assert!(SchedulerError::queue_full("p", 1, 1).is_retryable());
-        assert!(SchedulerError::CapacityExceeded { pool: "p".into(), requested: 1, available: 0 }.is_retryable());
+        assert!(
+            SchedulerError::CapacityExceeded {
+                pool: "p".into(),
+                requested: 1,
+                available: 0
+            }
+            .is_retryable()
+        );
         assert!(SchedulerError::Timeout { task_id: None }.is_retryable());
         assert!(!SchedulerError::DeadlineExpired { task_id: 1 }.is_retryable());
         assert!(!SchedulerError::PoolShutdown { pool: "p".into() }.is_retryable());

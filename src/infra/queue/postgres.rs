@@ -1,8 +1,16 @@
-//! Postgres-backed queue adapter using SeaORM.
+//! Postgres-backed queue adapter using `SeaORM`.
 //!
 //! This implementation provides persistent task queuing with priority ordering
 //! and deadline support. It uses SELECT FOR UPDATE SKIP LOCKED for concurrent
 //! dequeue operations without contention.
+
+#![cfg_attr(
+    feature = "postgres",
+    expect(
+        clippy::cast_possible_truncation,
+        reason = "u128 epoch-ms and u64 limits fit i64/usize in practice; this SeaORM backend is replaced by the raw-sqlx lease queue and mailbox in cr-26/cr-27, which own checked conversions"
+    )
+)]
 
 #[cfg(feature = "postgres")]
 use sea_orm::{
@@ -11,7 +19,7 @@ use sea_orm::{
 };
 
 #[cfg(feature = "postgres")]
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 
 use crate::core::{ScheduledTask, SchedulerError, TaskQueue};
 #[cfg(feature = "postgres")]
@@ -24,7 +32,8 @@ use crate::infra::entities::queue_job::{self, Entity as QueueJob};
 pub struct PostgresQueue<P> {
     #[cfg(feature = "postgres")]
     db: DatabaseConnection,
-    #[cfg_attr(not(feature = "postgres"), allow(dead_code))] // only read by postgres-enabled query paths
+    #[cfg_attr(not(feature = "postgres"), allow(dead_code))]
+    // only read by postgres-enabled query paths
     queue_name: String,
     max_depth: usize,
     _marker: std::marker::PhantomData<P>,
@@ -33,7 +42,8 @@ pub struct PostgresQueue<P> {
 impl<P> PostgresQueue<P> {
     /// Create a new adapter with database connection.
     #[cfg(feature = "postgres")]
-    pub fn new(db: DatabaseConnection, queue_name: String, max_depth: usize) -> Self {
+    #[must_use]
+    pub const fn new(db: DatabaseConnection, queue_name: String, max_depth: usize) -> Self {
         Self {
             db,
             queue_name,
@@ -44,18 +54,19 @@ impl<P> PostgresQueue<P> {
 
     /// Create a new adapter without database connection (stub for non-postgres builds).
     #[cfg(not(feature = "postgres"))]
-    pub fn new(_queue_name: String, max_depth: usize) -> Self {
+    #[must_use]
+    pub const fn new(queue_name: String, max_depth: usize) -> Self {
         Self {
-            queue_name: _queue_name,
+            queue_name,
             max_depth,
             _marker: std::marker::PhantomData,
         }
     }
 
     /// Migration statements for custom queue table.
-    pub fn migrations() -> &'static [&'static str] {
-        &[
-            r#"
+    #[must_use]
+    pub const fn migrations() -> &'static [&'static str] {
+        &[r"
 CREATE TABLE IF NOT EXISTS pl_queue_jobs (
     id BIGSERIAL PRIMARY KEY,
     queue_name TEXT NOT NULL,
@@ -75,13 +86,12 @@ CREATE INDEX IF NOT EXISTS idx_pl_queue_jobs_dequeue
 CREATE INDEX IF NOT EXISTS idx_pl_queue_jobs_deadline 
     ON pl_queue_jobs (deadline_ms) 
     WHERE deadline_ms IS NOT NULL;
-"#,
-        ]
+"]
     }
 
     /// Convert Priority enum to database SMALLINT.
     #[cfg(feature = "postgres")]
-    fn priority_to_i16(priority: Priority) -> i16 {
+    const fn priority_to_i16(priority: Priority) -> i16 {
         match priority {
             Priority::Low => 0,
             Priority::Normal => 1,
@@ -93,13 +103,12 @@ CREATE INDEX IF NOT EXISTS idx_pl_queue_jobs_deadline
     /// Convert database SMALLINT to Priority enum.
     #[cfg(feature = "postgres")]
     #[allow(dead_code)] // kept for direct column reads; dequeue currently restores priority from metadata JSON
-    fn i16_to_priority(value: i16) -> Priority {
+    const fn i16_to_priority(value: i16) -> Priority {
         match value {
             0 => Priority::Low,
-            1 => Priority::Normal,
             2 => Priority::High,
             3 => Priority::Critical,
-            _ => Priority::Normal, // Default fallback
+            _ => Priority::Normal, // 1, and default fallback for unknown values
         }
     }
 }
@@ -113,7 +122,7 @@ where
         // Use tokio runtime to execute async operation synchronously
         let rt = tokio::runtime::Handle::try_current()
             .map_err(|_| SchedulerError::internal("no tokio runtime available"))?;
-        
+
         rt.block_on(async {
             // Check queue depth
             let count = QueueJob::find()
@@ -133,20 +142,23 @@ where
             // Serialize metadata and payload
             let metadata_json = serde_json::to_value(&task.meta)
                 .map_err(|e| SchedulerError::backend("metadata serialization failed", e))?;
-            
+
             let payload_json = serde_json::to_value(&task.payload)
                 .map_err(|e| SchedulerError::backend("payload serialization failed", e))?;
 
             // Convert deadline_ms to i64 and chrono timestamp
             let deadline_at = task.meta.deadline_ms.map(|ms| {
-                chrono::DateTime::from_timestamp((ms / 1000) as i64, ((ms % 1000) * 1_000_000) as u32)
-                    .unwrap_or_else(chrono::Utc::now)
-                    .into()
+                chrono::DateTime::from_timestamp(
+                    (ms / 1000) as i64,
+                    ((ms % 1000) * 1_000_000) as u32,
+                )
+                .unwrap_or_else(chrono::Utc::now)
+                .into()
             });
 
             let created_at = chrono::DateTime::from_timestamp(
-                (task.meta.created_at_ms / 1000) as i64, 
-                ((task.meta.created_at_ms % 1000) * 1_000_000) as u32
+                (task.meta.created_at_ms / 1000) as i64,
+                ((task.meta.created_at_ms % 1000) * 1_000_000) as u32,
             )
             .unwrap_or_else(chrono::Utc::now)
             .into();
@@ -179,10 +191,13 @@ where
     fn dequeue(&mut self) -> Result<Option<ScheduledTask<P>>, SchedulerError> {
         let rt = tokio::runtime::Handle::try_current()
             .map_err(|_| SchedulerError::internal("no tokio runtime available"))?;
-        
+
         rt.block_on(async {
             // Use transaction for atomic dequeue
-            let txn = self.db.begin().await
+            let txn = self
+                .db
+                .begin()
+                .await
                 .map_err(|e| SchedulerError::backend("transaction start failed", e))?;
 
             // Find and lock the highest priority task (SKIP LOCKED for concurrency)
@@ -196,7 +211,8 @@ where
                 .map_err(|e| SchedulerError::backend("dequeue query failed", e))?;
 
             let Some(model) = task_model else {
-                txn.commit().await
+                txn.commit()
+                    .await
                     .map_err(|e| SchedulerError::backend("transaction commit failed", e))?;
                 return Ok(None);
             };
@@ -204,7 +220,7 @@ where
             // Deserialize metadata and payload
             let meta = serde_json::from_value(model.metadata.clone())
                 .map_err(|e| SchedulerError::backend("metadata deserialization failed", e))?;
-            
+
             let payload = serde_json::from_value(model.payload.clone())
                 .map_err(|e| SchedulerError::backend("payload deserialization failed", e))?;
 
@@ -214,7 +230,8 @@ where
                 .await
                 .map_err(|e| SchedulerError::backend("task deletion failed", e))?;
 
-            txn.commit().await
+            txn.commit()
+                .await
                 .map_err(|e| SchedulerError::backend("transaction commit failed", e))?;
 
             Ok(Some(ScheduledTask { meta, payload }))
@@ -224,7 +241,7 @@ where
     fn prune_expired(&mut self, now_ms: u128) -> Result<usize, SchedulerError> {
         let rt = tokio::runtime::Handle::try_current()
             .map_err(|_| SchedulerError::internal("no tokio runtime available"))?;
-        
+
         rt.block_on(async {
             let result = QueueJob::delete_many()
                 .filter(queue_job::Column::QueueName.eq(&self.queue_name))
@@ -242,6 +259,13 @@ where
         self.max_depth
     }
 
+    #[cfg_attr(
+        feature = "postgres",
+        expect(
+            clippy::option_if_let_else,
+            reason = "block_on bridge is removed with the raw-sqlx queue in cr-26; not worth reshaping here"
+        )
+    )]
     fn len(&self) -> usize {
         #[cfg(feature = "postgres")]
         {

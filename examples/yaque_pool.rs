@@ -1,4 +1,4 @@
-//! Example of using YaqueQueue for file-backed persistent task scheduling.
+//! Example of using `YaqueQueue` for file-backed persistent task scheduling.
 //!
 //! This example demonstrates a desktop/Tauri deployment scenario with:
 //! - File-backed persistent queue (survives app restarts)
@@ -14,8 +14,8 @@
 use prometheus_parking_lot::core::{
     PoolLimits, ResourcePool, ScheduledTask, Spawn, TaskExecutor, TaskMetadata,
 };
-use prometheus_parking_lot::infra::queue::yaque::YaqueQueue;
 use prometheus_parking_lot::infra::mailbox::memory::InMemoryMailbox;
+use prometheus_parking_lot::infra::queue::yaque::YaqueQueue;
 use prometheus_parking_lot::util::clock::now_ms;
 use prometheus_parking_lot::util::serde::{MailboxKey, Priority, ResourceCost, ResourceKind};
 
@@ -50,7 +50,7 @@ impl TaskExecutor<LlmInferenceTask, LlmResult> for LocalLlmExecutor {
         // Simulate LLM inference
         println!("  🤖 Processing: {}", payload.prompt);
         tokio::time::sleep(Duration::from_millis(500)).await;
-        
+
         LlmResult {
             text: format!(
                 "Generated response for '{}' using model {}",
@@ -93,7 +93,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Configure pool
     let limits = PoolLimits {
-        max_units: 8,  // Simulating 8GB VRAM limit
+        max_units: 8, // Simulating 8GB VRAM limit
         max_queue_depth: 100,
         default_timeout: Duration::from_secs(120),
     };
@@ -115,8 +115,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Submit LLM inference tasks
     println!("Submitting LLM inference tasks...\n");
-    
-    let prompts = vec![
+
+    let prompts = [
         "Explain quantum computing in simple terms",
         "Write a haiku about programming",
         "What is the meaning of life?",
@@ -124,22 +124,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for (i, prompt) in prompts.iter().enumerate() {
         let task_id = (i + 1) as u64;
-        
+
         let task = ScheduledTask {
             meta: TaskMetadata {
                 id: task_id,
                 mailbox: Some(MailboxKey {
                     tenant: "desktop-app".into(),
                     user_id: Some("local-user".into()),
-                    session_id: Some(format!("session-{}", task_id)),
+                    session_id: Some(format!("session-{task_id}")),
                 }),
                 priority: Priority::Normal,
                 cost: ResourceCost {
                     kind: ResourceKind::GpuVram,
-                    units: 4,  // 4GB VRAM per task
+                    units: 4, // 4GB VRAM per task
                 },
                 deadline_ms: None,
                 created_at_ms: now_ms(),
+                idempotency_key: None,
             },
             payload: LlmInferenceTask {
                 model: "llama-3.1-8b".into(),
@@ -149,18 +150,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         let status = pool.submit(task, now_ms()).await?;
-        println!("Task {}: {:?}", task_id, status);
-        println!("  Prompt: \"{}\"", prompt);
+        println!("Task {task_id}: {status:?}");
+        println!("  Prompt: \"{prompt}\"");
     }
 
     println!("\n✓ All tasks submitted");
     println!("\n⏳ Waiting for tasks to process...\n");
-    
+
     // Wait for tasks to complete
     tokio::time::sleep(Duration::from_secs(3)).await;
 
     println!("\n✓ All tasks processed");
-    
+
     // Show persistence
     println!("\n📝 Queue File Status:");
     let queue_file = data_dir.join("llm_tasks.jsonl");

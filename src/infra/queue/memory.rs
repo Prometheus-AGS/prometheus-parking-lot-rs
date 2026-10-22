@@ -7,13 +7,13 @@ use crate::core::SchedulerError;
 use crate::core::{ScheduledTask, TaskQueue};
 use crate::util::serde::Priority;
 
-/// Wrapper to make ScheduledTask orderable by priority (highest first) and FIFO within priority.
+/// Wrapper to make `ScheduledTask` orderable by priority (highest first) and FIFO within priority.
 struct PriorityTask<P> {
     task: ScheduledTask<P>,
 }
 
 impl<P> PriorityTask<P> {
-    fn priority_value(p: Priority) -> u8 {
+    const fn priority_value(p: Priority) -> u8 {
         match p {
             Priority::Low => 0,
             Priority::Normal => 1,
@@ -41,12 +41,16 @@ impl<P> Ord for PriorityTask<P> {
     fn cmp(&self, other: &Self) -> Ordering {
         let self_priority = Self::priority_value(self.task.meta.priority);
         let other_priority = Self::priority_value(other.task.meta.priority);
-        
+
         // Higher priority first
         match self_priority.cmp(&other_priority) {
             Ordering::Equal => {
                 // FIFO within same priority: earlier created_at wins (reversed for max-heap)
-                other.task.meta.created_at_ms.cmp(&self.task.meta.created_at_ms)
+                other
+                    .task
+                    .meta
+                    .created_at_ms
+                    .cmp(&self.task.meta.created_at_ms)
             }
             other => other,
         }
@@ -63,6 +67,7 @@ pub struct InMemoryQueue<P> {
 
 impl<P> InMemoryQueue<P> {
     /// Create a new in-memory queue with a maximum depth.
+    #[must_use]
     pub fn new(max_depth: usize) -> Self {
         Self {
             max_depth,
@@ -74,7 +79,11 @@ impl<P> InMemoryQueue<P> {
 impl<P> TaskQueue<P> for InMemoryQueue<P> {
     fn enqueue(&mut self, task: ScheduledTask<P>) -> Result<(), SchedulerError> {
         if self.len() >= self.max_depth() {
-            return Err(SchedulerError::queue_full("in-memory", self.len(), self.max_depth));
+            return Err(SchedulerError::queue_full(
+                "in-memory",
+                self.len(),
+                self.max_depth,
+            ));
         }
         // O(log n) insertion
         self.tasks.push(PriorityTask { task });
@@ -92,7 +101,7 @@ impl<P> TaskQueue<P> for InMemoryQueue<P> {
         let tasks: Vec<_> = self.tasks.drain().collect();
         self.tasks = tasks
             .into_iter()
-            .filter(|pt| pt.task.meta.deadline_ms.map(|d| d > now_ms).unwrap_or(true))
+            .filter(|pt| pt.task.meta.deadline_ms.is_none_or(|d| d > now_ms))
             .collect();
         let after = self.tasks.len();
         Ok(before.saturating_sub(after))
@@ -126,20 +135,20 @@ mod tests {
                 created_at_ms,
                 idempotency_key: None,
             },
-            payload: format!("task-{}", id),
+            payload: format!("task-{id}"),
         }
     }
 
     #[test]
     fn test_priority_ordering() {
         let mut q = InMemoryQueue::new(100);
-        
+
         // Enqueue in mixed order
         q.enqueue(make_task(1, Priority::Low, 100)).unwrap();
         q.enqueue(make_task(2, Priority::Critical, 200)).unwrap();
         q.enqueue(make_task(3, Priority::Normal, 300)).unwrap();
         q.enqueue(make_task(4, Priority::High, 400)).unwrap();
-        
+
         // Should dequeue in priority order
         assert_eq!(q.dequeue().unwrap().unwrap().meta.id, 2); // Critical
         assert_eq!(q.dequeue().unwrap().unwrap().meta.id, 4); // High
@@ -150,12 +159,12 @@ mod tests {
     #[test]
     fn test_fifo_within_priority() {
         let mut q = InMemoryQueue::new(100);
-        
+
         // Enqueue same priority, different times
         q.enqueue(make_task(1, Priority::Normal, 300)).unwrap();
         q.enqueue(make_task(2, Priority::Normal, 100)).unwrap();
         q.enqueue(make_task(3, Priority::Normal, 200)).unwrap();
-        
+
         // Should dequeue FIFO within same priority
         assert_eq!(q.dequeue().unwrap().unwrap().meta.id, 2); // created_at=100
         assert_eq!(q.dequeue().unwrap().unwrap().meta.id, 3); // created_at=200
@@ -167,7 +176,7 @@ mod tests {
         let mut q = InMemoryQueue::new(2);
         q.enqueue(make_task(1, Priority::Normal, 100)).unwrap();
         q.enqueue(make_task(2, Priority::Normal, 200)).unwrap();
-        
+
         let result = q.enqueue(make_task(3, Priority::Normal, 300));
         assert!(result.is_err());
     }
@@ -175,32 +184,32 @@ mod tests {
     #[test]
     fn test_prune_expired() {
         let mut q = InMemoryQueue::new(100);
-        
+
         // Task 1: no deadline (should remain)
         q.enqueue(make_task(1, Priority::Normal, 100)).unwrap();
-        
+
         // Task 2: deadline in past (should be pruned)
         let mut task2 = make_task(2, Priority::High, 200);
         task2.meta.deadline_ms = Some(500);
         q.enqueue(task2).unwrap();
-        
+
         // Task 3: deadline in future (should remain)
         let mut task3 = make_task(3, Priority::Low, 300);
         task3.meta.deadline_ms = Some(2000);
         q.enqueue(task3).unwrap();
-        
+
         // Task 4: deadline in past (should be pruned)
         let mut task4 = make_task(4, Priority::Critical, 400);
         task4.meta.deadline_ms = Some(800);
         q.enqueue(task4).unwrap();
-        
+
         assert_eq!(q.len(), 4);
-        
+
         // Prune at time 1000
         let pruned = q.prune_expired(1000).unwrap();
         assert_eq!(pruned, 2); // Tasks 2 and 4 expired
         assert_eq!(q.len(), 2);
-        
+
         // Remaining tasks should be 3 (low, deadline 2000) and 1 (normal, no deadline)
         // Task 1 has Normal priority, Task 3 has Low priority
         // So Task 1 should come out first

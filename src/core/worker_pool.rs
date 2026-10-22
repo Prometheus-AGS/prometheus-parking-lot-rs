@@ -48,7 +48,7 @@ use crate::util::serde::MailboxKey;
 pub enum PoolError {
     /// The task queue is full; no more tasks can be accepted.
     QueueFull,
-    
+
     /// Insufficient resource capacity to run the task.
     InsufficientCapacity {
         /// Units requested by the task.
@@ -56,19 +56,19 @@ pub enum PoolError {
         /// Units currently available.
         available: u32,
     },
-    
+
     /// The operation timed out.
     Timeout,
-    
+
     /// The requested result was not found in the mailbox.
     ResultNotFound,
-    
+
     /// The pool has been shut down.
     PoolShutdown,
-    
+
     /// Configuration validation failed.
     InvalidConfig(String),
-    
+
     /// Internal error (worker thread panic, channel closed, etc.).
     Internal(String),
 }
@@ -77,8 +77,14 @@ impl fmt::Display for PoolError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::QueueFull => write!(f, "task queue is full"),
-            Self::InsufficientCapacity { requested, available } => {
-                write!(f, "insufficient capacity: requested {requested}, available {available}")
+            Self::InsufficientCapacity {
+                requested,
+                available,
+            } => {
+                write!(
+                    f,
+                    "insufficient capacity: requested {requested}, available {available}"
+                )
             }
             Self::Timeout => write!(f, "operation timed out"),
             Self::ResultNotFound => write!(f, "result not found in mailbox"),
@@ -96,25 +102,25 @@ impl std::error::Error for PoolError {}
 pub struct PoolStats {
     /// Number of worker threads/tasks.
     pub worker_count: usize,
-    
+
     /// Currently executing tasks.
     pub active_tasks: u64,
-    
+
     /// Tasks waiting in the queue.
     pub queued_tasks: u64,
-    
+
     /// Resource units currently in use.
     pub used_units: u32,
-    
+
     /// Total resource units available.
     pub total_units: u32,
-    
+
     /// Total tasks completed successfully.
     pub completed_tasks: u64,
-    
+
     /// Total tasks that failed.
     pub failed_tasks: u64,
-    
+
     /// Total tasks submitted.
     pub submitted_tasks: u64,
 }
@@ -181,7 +187,11 @@ pub(crate) fn generate_mailbox_key(task_id: u64) -> MailboxKey {
 
 /// Get the key string for a mailbox key (used for internal storage).
 pub(crate) fn mailbox_key_to_string(key: &MailboxKey) -> String {
-    format!("{}:{}", key.tenant, key.session_id.as_deref().unwrap_or("unknown"))
+    format!(
+        "{}:{}",
+        key.tenant,
+        key.session_id.as_deref().unwrap_or("unknown")
+    )
 }
 
 // Re-export the platform-specific WorkerPool implementation
@@ -194,19 +204,25 @@ pub use wasm::WorkerPool;
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_pool_error_display() {
         let err = PoolError::QueueFull;
-        assert_eq!(format!("{}", err), "task queue is full");
-        
-        let err = PoolError::InsufficientCapacity { requested: 100, available: 50 };
-        assert_eq!(format!("{}", err), "insufficient capacity: requested 100, available 50");
-        
+        assert_eq!(format!("{err}"), "task queue is full");
+
+        let err = PoolError::InsufficientCapacity {
+            requested: 100,
+            available: 50,
+        };
+        assert_eq!(
+            format!("{err}"),
+            "insufficient capacity: requested 100, available 50"
+        );
+
         let err = PoolError::Timeout;
-        assert_eq!(format!("{}", err), "operation timed out");
+        assert_eq!(format!("{err}"), "operation timed out");
     }
-    
+
     #[test]
     fn test_pool_stats_default() {
         let stats = PoolStats::default();
@@ -214,14 +230,14 @@ mod tests {
         assert_eq!(stats.active_tasks, 0);
         assert_eq!(stats.completed_tasks, 0);
     }
-    
+
     #[test]
     fn test_pool_counters_snapshot() {
         let counters = PoolCounters::default();
         counters.submitted_tasks.fetch_add(10, Ordering::Relaxed);
         counters.completed_tasks.fetch_add(5, Ordering::Relaxed);
         counters.used_units.fetch_add(100, Ordering::Relaxed);
-        
+
         let stats = counters.snapshot(4, 1000);
         assert_eq!(stats.worker_count, 4);
         assert_eq!(stats.submitted_tasks, 10);

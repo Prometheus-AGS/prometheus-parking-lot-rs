@@ -8,5 +8,5 @@ pub mod entities;
 
 pub use mailbox::InMemoryMailbox;
 pub use mailbox::YaqueMailbox;
-pub use queue::YaqueQueue;
 pub use queue::InMemoryQueue;
+pub use queue::YaqueQueue;

@@ -7,6 +7,15 @@ use crate::config::{PoolConfig, SchedulerConfig};
 use crate::core::{PoolLimits, ResourcePool, SchedulerError, TaskExecutor, TaskPayload};
 
 /// Build resource pools from scheduler configuration using provided factories.
+///
+/// # Errors
+///
+/// Returns [`SchedulerError`] when the configuration fails validation or any
+/// queue, mailbox or executor factory returns an error.
+#[expect(
+    clippy::type_complexity,
+    reason = "the generic pool map is part of the public builder signature; the builder API is reshaped with the contracts in cr-18"
+)]
 pub fn build_pools<P, T, Q, M, E, S, FQ, FM, FE>(
     cfg: &SchedulerConfig,
     mut queue_factory: FQ,
@@ -37,7 +46,13 @@ where
         let queue = queue_factory(name, pool_cfg)?;
         let mailbox = mailbox_factory(name, pool_cfg)?;
         let executor = executor_factory(name, pool_cfg)?;
-        let pool = ResourcePool::<P, T, Q, M, E, S>::new(limits, queue, mailbox, executor, spawner.clone());
+        let pool = ResourcePool::<P, T, Q, M, E, S>::new(
+            limits,
+            queue,
+            mailbox,
+            executor,
+            spawner.clone(),
+        );
         pools.insert(name.clone(), pool);
     }
 

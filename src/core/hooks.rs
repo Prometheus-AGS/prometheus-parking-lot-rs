@@ -17,7 +17,7 @@
 //! `HookBus::emit` is a no-op when no hooks are registered. The check is a
 //! single slice-empty test — no allocation, no virtual dispatch.
 //!
-//! ## AuditSink backward-compatibility
+//! ## `AuditSink` backward-compatibility
 //!
 //! The existing [`AuditSink`] trait is kept for compatibility. Use
 //! [`AuditHookAdapter`] to register any `AuditSink` implementation as a
@@ -189,7 +189,8 @@ pub enum LifecycleEvent {
 
 impl LifecycleEvent {
     /// Convenience: event kind as a static string (useful for metrics labels).
-    pub fn kind(&self) -> &'static str {
+    #[must_use]
+    pub const fn kind(&self) -> &'static str {
         match self {
             Self::Submitted { .. } => "submitted",
             Self::Queued { .. } => "queued",
@@ -203,7 +204,8 @@ impl LifecycleEvent {
     }
 
     /// Task ID of the event, for correlation.
-    pub fn task_id(&self) -> u64 {
+    #[must_use]
+    pub const fn task_id(&self) -> u64 {
         match self {
             Self::Submitted { task_id, .. }
             | Self::Queued { task_id, .. }
@@ -238,6 +240,7 @@ pub struct HookBus {
 
 impl HookBus {
     /// Create an empty bus.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -257,6 +260,7 @@ impl HookBus {
     }
 
     /// Returns `true` if at least one hook is registered.
+    #[must_use]
     pub fn is_active(&self) -> bool {
         !self.hooks.is_empty()
     }
@@ -327,19 +331,32 @@ impl Hook for TracingHook {
             LifecycleEvent::Submitted { task_id, .. } => {
                 tracing::debug!(pool = %self.pool, task_id, "task submitted");
             }
-            LifecycleEvent::Started { task_id, worker_id, .. } => {
+            LifecycleEvent::Started {
+                task_id, worker_id, ..
+            } => {
                 tracing::debug!(pool = %self.pool, task_id, worker_id, "task started");
             }
-            LifecycleEvent::Completed { task_id, duration_ms, .. } => {
+            LifecycleEvent::Completed {
+                task_id,
+                duration_ms,
+                ..
+            } => {
                 tracing::info!(pool = %self.pool, task_id, duration_ms, "task completed");
             }
             LifecycleEvent::Failed { task_id, error, .. } => {
                 tracing::warn!(pool = %self.pool, task_id, %error, "task failed");
             }
-            LifecycleEvent::Rejected { task_id, reason, .. } => {
+            LifecycleEvent::Rejected {
+                task_id, reason, ..
+            } => {
                 tracing::warn!(pool = %self.pool, task_id, ?reason, "task rejected");
             }
-            LifecycleEvent::Cancelled { task_id, reason, attempt, .. } => {
+            LifecycleEvent::Cancelled {
+                task_id,
+                reason,
+                attempt,
+                ..
+            } => {
                 tracing::warn!(pool = %self.pool, task_id, ?reason, attempt, "task cancelled");
             }
             _ => {}
@@ -355,6 +372,7 @@ pub struct RecordingHook {
 
 impl RecordingHook {
     /// Create a recording hook with a bounded buffer.
+    #[must_use]
     pub fn new(max_events: usize) -> Self {
         Self {
             events: parking_lot::Mutex::new(std::collections::VecDeque::with_capacity(max_events)),
@@ -406,7 +424,12 @@ pub fn emit_submitted(
 }
 
 /// Convenience: emit a `Rejected` event.
-pub fn emit_rejected(bus: &HookBus, task_id: u64, pool: impl Into<String>, reason: RejectionReason) {
+pub fn emit_rejected(
+    bus: &HookBus,
+    task_id: u64,
+    pool: impl Into<String>,
+    reason: RejectionReason,
+) {
     if bus.is_active() {
         bus.emit(&LifecycleEvent::Rejected {
             task_id,

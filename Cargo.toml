@@ -1,13 +1,13 @@
 [package]
 name = "prometheus_parking_lot"
 version = "0.2.0"
-edition = "2021"
-rust-version = "1.91.1"
+edition = "2024"
+rust-version = "1.95"
 authors = ["Prometheus AI Team"]
 description = "Runtime-agnostic, resource-aware parking-lot scheduler for AI agent and inference workloads."
 documentation = "https://docs.rs/prometheus_parking_lot"
-repository = "https://github.com/prometheus-ai/prometheus-parking-lot"
-homepage = "https://github.com/prometheus-ai/prometheus-parking-lot"
+repository = "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs"
+homepage = "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs"
 readme = "README.md"
 license = "MIT"
 keywords = ["scheduler", "queue", "tokio", "gpu", "ai"]
@@ -30,7 +30,6 @@ rustdoc-args = ["--cfg", "docsrs"]
 default = ["tokio-runtime"]
 tokio-runtime = ["tokio", "tokio-util"]
 postgres = ["sea-orm", "sqlx", "chrono"]
-pgmq-ext = ["postgres", "pgmq"]
 
 [dependencies]
 lock_api = "0.4"
@@ -53,7 +52,6 @@ uuid = { version = "1", features = ["v4"] }
 sea-orm = { version = "1.1.2", features = ["runtime-tokio-rustls", "sqlx-postgres", "macros"], optional = true }
 sqlx = { version = "0.8.2", features = ["postgres", "runtime-tokio-rustls", "macros"], optional = true }
 chrono = { version = "0.4", optional = true }
-pgmq = { version = "0.34.0-alpha.5", optional = true }
 
 # Native-only dependencies for worker thread pool
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -75,9 +73,14 @@ testcontainers-modules = { version = "0.11", features = ["postgres"] }
 name = "queue_bench"
 harness = false
 
+[[example]]
+name = "postgres_pool"
+required-features = ["postgres"]
+
 [lints.rust]
 unsafe_code = "deny"
 missing_docs = "deny"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(parking_lot_loom)', 'cfg(parking_lot_negative_control, values(any()))'] }
 
 [lints.clippy]
 all = "warn"

@@ -2,8 +2,8 @@
 
 use std::future::Future;
 use std::marker::PhantomData;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
 
 use parking_lot::{Condvar, Mutex};
@@ -73,15 +73,32 @@ pub struct ScheduledTask<P> {
 /// Abstraction for queue backends.
 pub trait TaskQueue<P> {
     /// Enqueue a task if space permits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the queue is full or the backend fails to store
+    /// the task.
     fn enqueue(&mut self, task: ScheduledTask<P>) -> Result<(), SchedulerError>;
     /// Dequeue the next ready task, honoring priority and deadlines.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the backend fails to read or remove the task.
     fn dequeue(&mut self) -> Result<Option<ScheduledTask<P>>, SchedulerError>;
     /// Remove expired tasks and return count.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the backend fails to remove expired tasks.
     fn prune_expired(&mut self, now_ms: u128) -> Result<usize, SchedulerError>;
     /// Maximum depth allowed for this queue.
     fn max_depth(&self) -> usize;
     /// Current depth.
     fn len(&self) -> usize;
+    /// True when the queue holds no tasks. Defaults to `len() == 0`.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 /// Abstraction for mailbox backends.
@@ -105,6 +122,10 @@ pub trait TaskQueue<P> {
 /// older than their TTL may be evicted during `evict_expired`.
 pub trait Mailbox<T> {
     /// Deliver a task outcome to the mailbox.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the backend fails to store the outcome.
     fn deliver(
         &mut self,
         key: &MailboxKey,
@@ -115,6 +136,10 @@ pub trait Mailbox<T> {
     /// Deliver with an explicit TTL in milliseconds.
     ///
     /// The default implementation ignores the TTL and delegates to `deliver`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the backend fails to store the outcome.
     fn deliver_with_ttl(
         &mut self,
         key: &MailboxKey,
@@ -131,6 +156,10 @@ pub trait Mailbox<T> {
     /// message is removed (consume-once semantics).
     ///
     /// The default implementation returns `None` (not supported by backend).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the backend fails to read or remove the message.
     fn consume(
         &mut self,
         _key: &MailboxKey,
@@ -141,6 +170,10 @@ pub trait Mailbox<T> {
     /// Evict messages whose TTL has expired.
     ///
     /// Returns the number of messages evicted. The default is a no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the backend fails to remove expired messages.
     fn evict_expired(&mut self, _now_ms: u128) -> Result<usize, SchedulerError> {
         Ok(0)
     }
@@ -232,6 +265,7 @@ where
     }
 
     /// Attach an audit sink.
+    #[must_use]
     pub fn with_audit(mut self, audit: Box<dyn AuditSink>) -> Self {
         self.audit = Some(Arc::new(Mutex::new(audit)));
         self
@@ -284,19 +318,34 @@ where
 {
     /// Submit a task, enforcing capacity, deadlines, and queue depth.
     /// Executes immediately if capacity available, otherwise enqueues.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SchedulerError::DeadlineExpired`] when the task's deadline has
+    /// already passed, a queue-full error when the parking lot is at its depth
+    /// limit, or the queue backend's error when enqueueing fails.
+    #[expect(
+        clippy::future_not_send,
+        reason = "Send-ness depends on P/Q/M/E bounds; the contract rework in cr-18/cr-25 owns adding Send bounds (API change)"
+    )]
+    #[expect(
+        clippy::unused_async,
+        clippy::unused_async_trait_impl,
+        reason = "public async API; dispatch becomes awaited with the durable dispatcher (cr-18/cr-49), so the signature stays async (the trait-impl variant misfires on an inherent method)"
+    )]
     pub async fn submit(
         &self,
         task: ScheduledTask<P>,
         now_ms: u128,
     ) -> Result<TaskStatus, SchedulerError> {
         // Check deadline before any processing
-        if let Some(deadline) = task.meta.deadline_ms {
-            if now_ms > deadline {
-                tracing::warn!("task {} expired before enqueue", task.meta.id);
-                return Err(SchedulerError::DeadlineExpired {
-                    task_id: task.meta.id,
-                });
-            }
+        if let Some(deadline) = task.meta.deadline_ms
+            && now_ms > deadline
+        {
+            tracing::warn!("task {} expired before enqueue", task.meta.id);
+            return Err(SchedulerError::DeadlineExpired {
+                task_id: task.meta.id,
+            });
         }
 
         // Lock-free capacity check and reservation using CAS
@@ -308,7 +357,7 @@ where
             tracing::info!("task {} started immediately", task.meta.id);
 
             // Spawn execution
-            self.spawn_task(task).await;
+            self.spawn_task(task);
 
             return Ok(TaskStatus::Running);
         }
@@ -362,7 +411,7 @@ where
     }
 
     /// Spawn a task execution asynchronously.
-    async fn spawn_task(&self, task: ScheduledTask<P>) {
+    fn spawn_task(&self, task: ScheduledTask<P>) {
         let executor = self.executor.clone();
         let queue = Arc::clone(&self.queue);
         let mailbox = Arc::clone(&self.mailbox);
@@ -395,20 +444,20 @@ where
             // the child reaped as part of that drop.
             let outcome = tokio::time::timeout(budget, executor.execute(payload, meta)).await;
 
-            let result = match outcome {
-                Ok(value) => {
-                    tracing::info!("task {} completed", task_id);
-                    Some(value)
-                }
-                Err(_) => {
+            let result = outcome.map_or_else(
+                |_| {
                     tracing::warn!(
                         "task {} exceeded its {:?} budget and was cancelled",
                         task_id,
                         budget
                     );
                     None
-                }
-            };
+                },
+                |value| {
+                    tracing::info!("task {} completed", task_id);
+                    Some(value)
+                },
+            );
 
             // Handle task completion
             Self::on_task_finished_static(
@@ -433,6 +482,10 @@ where
 
     /// Static helper for task completion handling (callable from spawned task).
     #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::significant_drop_tightening,
+        reason = "narrowing lock scopes changes concurrent behaviour; the dispatcher rewrite (cr-18/cr-19) owns it"
+    )]
     fn on_task_finished_static(
         queue: Arc<Mutex<Q>>,
         mailbox: Arc<Mutex<M>>,
@@ -487,8 +540,7 @@ where
                 let mut sink = audit_sink.lock();
                 let tenant = mailbox_key
                     .as_ref()
-                    .map(|m| m.tenant.clone())
-                    .unwrap_or_else(|| "unknown".into());
+                    .map_or_else(|| "unknown".into(), |m| m.tenant.clone());
                 let action = if result_was_some {
                     "complete"
                 } else {
@@ -527,6 +579,14 @@ where
 
     /// Try to wake and start the next queued task if capacity available.
     #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::significant_drop_tightening,
+        reason = "narrowing lock scopes changes concurrent behaviour; the dispatcher rewrite (cr-18/cr-19) owns it"
+    )]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "split belongs to the dispatcher rewrite (cr-18/cr-19), not a lint pass"
+    )]
     fn try_wake_next_static(
         queue: Arc<Mutex<Q>>,
         mailbox: Arc<Mutex<M>>,
@@ -553,12 +613,9 @@ where
                     }
                 };
 
-                let task = match task_opt {
-                    Some(t) => t,
-                    None => {
-                        tracing::debug!("queue empty, no tasks to wake");
-                        break;
-                    }
+                let Some(task) = task_opt else {
+                    tracing::debug!("queue empty, no tasks to wake");
+                    break;
                 };
 
                 // Check if we can start this task (lock-free)
@@ -611,8 +668,7 @@ where
                         .meta
                         .mailbox
                         .as_ref()
-                        .map(|m| m.tenant.clone())
-                        .unwrap_or_else(|| "unknown".into());
+                        .map_or_else(|| "unknown".into(), |m| m.tenant.clone());
                     sink.record(crate::core::build_audit_event(
                         format!("{}-wake-{}", task.meta.id, crate::util::clock::now_ms()),
                         task.meta.id.to_string(),
@@ -647,22 +703,22 @@ where
                 spawner.spawn(async move {
                     tracing::debug!("executing woken task {} (budget {:?})", task_id, budget);
                     let result =
-                        match tokio::time::timeout(budget, executor_clone.execute(payload, meta))
+                        tokio::time::timeout(budget, executor_clone.execute(payload, meta))
                             .await
-                        {
-                            Ok(value) => {
-                                tracing::info!("woken task {} completed", task_id);
-                                Some(value)
-                            }
-                            Err(_) => {
-                                tracing::warn!(
-                                    "woken task {} exceeded its {:?} budget and was cancelled",
-                                    task_id,
-                                    budget
-                                );
-                                None
-                            }
-                        };
+                            .map_or_else(
+                                |_| {
+                                    tracing::warn!(
+                                        "woken task {} exceeded its {:?} budget and was cancelled",
+                                        task_id,
+                                        budget
+                                    );
+                                    None
+                                },
+                                |value| {
+                                    tracing::info!("woken task {} completed", task_id);
+                                    Some(value)
+                                },
+                            );
 
                     Self::on_task_finished_static(
                         queue_clone,
@@ -687,6 +743,23 @@ where
     }
 
     /// Prune expired tasks from the queue based on current time.
+    ///
+    /// # Errors
+    ///
+    /// Returns the queue backend's error when pruning fails.
+    #[expect(
+        clippy::future_not_send,
+        reason = "Send-ness depends on P/Q/M/E bounds; the contract rework in cr-18/cr-25 owns adding Send bounds (API change)"
+    )]
+    #[expect(
+        clippy::significant_drop_tightening,
+        reason = "narrowing lock scopes changes concurrent behaviour; the dispatcher rewrite (cr-18/cr-19) owns it"
+    )]
+    #[expect(
+        clippy::unused_async,
+        clippy::unused_async_trait_impl,
+        reason = "public async API; async queue backends (cr-25) make pruning awaited, so the signature stays async (the trait-impl variant misfires on an inherent method)"
+    )]
     pub async fn prune_expired(&self, now_ms: u128) -> Result<usize, SchedulerError> {
         let removed = {
             let mut queue = self.queue.lock();
@@ -711,7 +784,11 @@ where
         Ok(removed)
     }
 
-    /// Record an audit event (sync operation with parking_lot mutex).
+    /// Record an audit event (sync operation with `parking_lot` mutex).
+    #[expect(
+        clippy::significant_drop_tightening,
+        reason = "narrowing lock scopes changes concurrent behaviour; the dispatcher rewrite (cr-18/cr-19) owns it"
+    )]
     fn record_audit(&self, task: &ScheduledTask<P>, action: &str) {
         if let Some(audit_sink) = &self.audit {
             let mut sink = audit_sink.lock();
@@ -719,8 +796,7 @@ where
                 .meta
                 .mailbox
                 .as_ref()
-                .map(|m| m.tenant.clone())
-                .unwrap_or_else(|| "unknown".into());
+                .map_or_else(|| "unknown".into(), |m| m.tenant.clone());
             sink.record(crate::core::build_audit_event(
                 format!("{}-{}-{}", task.meta.id, action, task.meta.created_at_ms),
                 task.meta.id.to_string(),
@@ -759,6 +835,14 @@ where
 /// });
 /// ```
 #[allow(dead_code)]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "a long-running worker loop owns its Arcs and limits by design; changing the public signature is an API change for cr-18"
+)]
+#[expect(
+    clippy::significant_drop_tightening,
+    reason = "narrowing lock scopes changes concurrent behaviour; the dispatcher rewrite (cr-18/cr-19) owns it"
+)]
 pub fn sync_wake_worker_loop<P, Q>(
     queue: Arc<Mutex<Q>>,
     active_units: Arc<AtomicU32>,
@@ -798,12 +882,9 @@ pub fn sync_wake_worker_loop<P, Q>(
                 }
             };
 
-            let task = match task_opt {
-                Some(t) => t,
-                None => {
-                    tracing::debug!("sync wake worker: queue empty");
-                    break;
-                }
+            let Some(task) = task_opt else {
+                tracing::debug!("sync wake worker: queue empty");
+                break;
             };
 
             // Try to reserve capacity

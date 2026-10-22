@@ -8,6 +8,11 @@
 //! 5. Results are delivered to mailbox
 //! 6. Priority ordering is respected
 
+#![expect(
+    clippy::cast_possible_truncation,
+    reason = "small loop counters in tests; casts are bounded by the test sizes"
+)]
+
 use async_trait::async_trait;
 use prometheus_parking_lot::core::{
     PoolLimits, ResourcePool, ScheduledTask, Spawn, TaskExecutor, TaskMetadata, TaskStatus,
@@ -51,12 +56,12 @@ impl TaskExecutor<TestJob, String> for TestExecutor {
     async fn execute(&self, payload: TestJob, meta: TaskMetadata) -> String {
         // Simulate some work
         tokio::time::sleep(Duration::from_millis(10)).await;
-        
+
         let result = format!("Task {}: {} = {}", meta.id, payload.name, payload.value * 2);
-        
+
         // Record execution order
         self.results.lock().await.push(result.clone());
-        
+
         result
     }
 }
@@ -98,7 +103,7 @@ async fn test_immediate_execution() {
             units: 5,
         },
         created_at_ms: now_ms(),
-            idempotency_key: None,
+        idempotency_key: None,
         deadline_ms: None,
         mailbox: None,
     };
@@ -108,8 +113,11 @@ async fn test_immediate_execution() {
         value: 42,
     };
 
-    let status = pool.submit(ScheduledTask { meta, payload: job }, now_ms()).await.unwrap();
-    
+    let status = pool
+        .submit(ScheduledTask { meta, payload: job }, now_ms())
+        .await
+        .unwrap();
+
     assert!(matches!(status, TaskStatus::Running));
 
     // Wait for task to complete
@@ -147,7 +155,7 @@ async fn test_capacity_enforcement_and_queueing() {
             units: 10,
         },
         created_at_ms: now_ms(),
-            idempotency_key: None,
+        idempotency_key: None,
         deadline_ms: None,
         mailbox: None,
     };
@@ -157,7 +165,16 @@ async fn test_capacity_enforcement_and_queueing() {
         value: 1,
     };
 
-    let status1 = pool.submit(ScheduledTask { meta: meta1, payload: job1 }, now_ms()).await.unwrap();
+    let status1 = pool
+        .submit(
+            ScheduledTask {
+                meta: meta1,
+                payload: job1,
+            },
+            now_ms(),
+        )
+        .await
+        .unwrap();
     assert!(matches!(status1, TaskStatus::Running));
 
     // Submit second task - should be queued
@@ -169,7 +186,7 @@ async fn test_capacity_enforcement_and_queueing() {
             units: 5,
         },
         created_at_ms: now_ms(),
-            idempotency_key: None,
+        idempotency_key: None,
         deadline_ms: None,
         mailbox: None,
     };
@@ -179,7 +196,16 @@ async fn test_capacity_enforcement_and_queueing() {
         value: 2,
     };
 
-    let status2 = pool.submit(ScheduledTask { meta: meta2, payload: job2 }, now_ms()).await.unwrap();
+    let status2 = pool
+        .submit(
+            ScheduledTask {
+                meta: meta2,
+                payload: job2,
+            },
+            now_ms(),
+        )
+        .await
+        .unwrap();
     assert!(matches!(status2, TaskStatus::Queued));
 
     // Wait for tasks to complete
@@ -215,15 +241,23 @@ async fn test_wake_up_mechanism() {
             units: 10,
         },
         created_at_ms: now_ms(),
-            idempotency_key: None,
+        idempotency_key: None,
         deadline_ms: None,
         mailbox: None,
     };
 
-    pool.submit(ScheduledTask { 
-        meta: meta1.clone(), 
-        payload: TestJob { name: "task1".to_string(), value: 1 } 
-    }, now_ms()).await.unwrap();
+    pool.submit(
+        ScheduledTask {
+            meta: meta1.clone(),
+            payload: TestJob {
+                name: "task1".to_string(),
+                value: 1,
+            },
+        },
+        now_ms(),
+    )
+    .await
+    .unwrap();
 
     // Queue several more tasks
     for i in 2..=5 {
@@ -240,11 +274,20 @@ async fn test_wake_up_mechanism() {
             mailbox: None,
         };
 
-        let status = pool.submit(ScheduledTask { 
-            meta, 
-            payload: TestJob { name: format!("task{}", i), value: i as u32 } 
-        }, now_ms()).await.unwrap();
-        
+        let status = pool
+            .submit(
+                ScheduledTask {
+                    meta,
+                    payload: TestJob {
+                        name: format!("task{i}"),
+                        value: i as u32,
+                    },
+                },
+                now_ms(),
+            )
+            .await
+            .unwrap();
+
         assert!(matches!(status, TaskStatus::Queued));
     }
 
@@ -271,11 +314,11 @@ async fn test_mailbox_delivery() {
     let spawner = TestSpawner;
 
     let pool = Arc::new(ResourcePool::new(
-        limits, 
-        queue, 
-        mailbox, 
-        executor.clone(), 
-        spawner
+        limits,
+        queue,
+        mailbox,
+        executor.clone(),
+        spawner,
     ));
 
     let mailbox_key = MailboxKey {
@@ -292,7 +335,7 @@ async fn test_mailbox_delivery() {
             units: 5,
         },
         created_at_ms: now_ms(),
-            idempotency_key: None,
+        idempotency_key: None,
         deadline_ms: None,
         mailbox: Some(mailbox_key.clone()),
     };
@@ -302,7 +345,9 @@ async fn test_mailbox_delivery() {
         value: 100,
     };
 
-    pool.submit(ScheduledTask { meta, payload: job }, now_ms()).await.unwrap();
+    pool.submit(ScheduledTask { meta, payload: job }, now_ms())
+        .await
+        .unwrap();
 
     // Wait for task to complete
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -332,18 +377,29 @@ async fn test_priority_ordering() {
     let pool = ResourcePool::new(limits, queue, mailbox, executor.clone(), spawner);
 
     // Fill capacity
-    pool.submit(ScheduledTask {
-        meta: TaskMetadata {
-            id: 1,
-            priority: Priority::Normal,
-            cost: ResourceCost { kind: ResourceKind::Cpu, units: 10 },
-            created_at_ms: now_ms(),
-            idempotency_key: None,
-            deadline_ms: None,
-            mailbox: None,
+    pool.submit(
+        ScheduledTask {
+            meta: TaskMetadata {
+                id: 1,
+                priority: Priority::Normal,
+                cost: ResourceCost {
+                    kind: ResourceKind::Cpu,
+                    units: 10,
+                },
+                created_at_ms: now_ms(),
+                idempotency_key: None,
+                deadline_ms: None,
+                mailbox: None,
+            },
+            payload: TestJob {
+                name: "blocker".to_string(),
+                value: 0,
+            },
         },
-        payload: TestJob { name: "blocker".to_string(), value: 0 },
-    }, now_ms()).await.unwrap();
+        now_ms(),
+    )
+    .await
+    .unwrap();
 
     // Queue tasks with different priorities
     let priorities = vec![
@@ -354,25 +410,36 @@ async fn test_priority_ordering() {
     ];
 
     for (id, priority) in priorities {
-        pool.submit(ScheduledTask {
-            meta: TaskMetadata {
-                id,
-                priority,
-                cost: ResourceCost { kind: ResourceKind::Cpu, units: 3 },
-                created_at_ms: now_ms(),
-            idempotency_key: None,
-                deadline_ms: None,
-                mailbox: None,
+        pool.submit(
+            ScheduledTask {
+                meta: TaskMetadata {
+                    id,
+                    priority,
+                    cost: ResourceCost {
+                        kind: ResourceKind::Cpu,
+                        units: 3,
+                    },
+                    created_at_ms: now_ms(),
+                    idempotency_key: None,
+                    deadline_ms: None,
+                    mailbox: None,
+                },
+                payload: TestJob {
+                    name: format!("task_{priority:?}"),
+                    value: id as u32,
+                },
             },
-            payload: TestJob { name: format!("task_{:?}", priority), value: id as u32 },
-        }, now_ms()).await.unwrap();
+            now_ms(),
+        )
+        .await
+        .unwrap();
     }
 
     // Wait for execution
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     let results = executor.get_results().await;
-    
+
     // First should be the blocker, then Critical, High, Normal, Low
     assert!(results.len() >= 3);
     assert!(results[1].contains("Critical"));
@@ -404,15 +471,23 @@ async fn test_deadline_rejection() {
             units: 5,
         },
         created_at_ms: now_ms(),
-            idempotency_key: None,
+        idempotency_key: None,
         deadline_ms: Some(past_time),
         mailbox: None,
     };
 
-    let result = pool.submit(ScheduledTask {
-        meta,
-        payload: TestJob { name: "expired".to_string(), value: 1 },
-    }, now_ms()).await;
+    let result = pool
+        .submit(
+            ScheduledTask {
+                meta,
+                payload: TestJob {
+                    name: "expired".to_string(),
+                    value: 1,
+                },
+            },
+            now_ms(),
+        )
+        .await;
 
     assert!(result.is_err());
 }
@@ -431,7 +506,13 @@ async fn test_concurrent_submissions() {
     let executor = TestExecutor::new();
     let spawner = TestSpawner;
 
-    let pool = Arc::new(ResourcePool::new(limits, queue, mailbox, executor.clone(), spawner));
+    let pool = Arc::new(ResourcePool::new(
+        limits,
+        queue,
+        mailbox,
+        executor.clone(),
+        spawner,
+    ));
 
     // Submit many tasks concurrently
     let num_tasks = 50;
@@ -448,17 +529,18 @@ async fn test_concurrent_submissions() {
                     units: 2, // Each task uses 2 units
                 },
                 created_at_ms: now_ms(),
-            idempotency_key: None,
+                idempotency_key: None,
                 deadline_ms: None,
                 mailbox: None,
             };
 
             let job = TestJob {
-                name: format!("concurrent_task_{}", i),
+                name: format!("concurrent_task_{i}"),
                 value: i as u32,
             };
 
-            pool.submit(ScheduledTask { meta, payload: job }, now_ms()).await
+            pool.submit(ScheduledTask { meta, payload: job }, now_ms())
+                .await
         });
         handles.push(handle);
     }
@@ -502,7 +584,7 @@ async fn test_shutdown() {
             units: 5,
         },
         created_at_ms: now_ms(),
-            idempotency_key: None,
+        idempotency_key: None,
         deadline_ms: None,
         mailbox: None,
     };
@@ -512,7 +594,9 @@ async fn test_shutdown() {
         value: 42,
     };
 
-    pool.submit(ScheduledTask { meta, payload: job }, now_ms()).await.unwrap();
+    pool.submit(ScheduledTask { meta, payload: job }, now_ms())
+        .await
+        .unwrap();
 
     // Wait for task to complete
     tokio::time::sleep(Duration::from_millis(100)).await;

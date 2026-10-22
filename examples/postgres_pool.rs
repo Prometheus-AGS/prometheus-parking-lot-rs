@@ -1,4 +1,4 @@
-//! Example of using PostgresQueue and PostgresMailbox for persistent task scheduling.
+//! Example of using `PostgresQueue` and `PostgresMailbox` for persistent task scheduling.
 //!
 //! This example demonstrates a cloud-deployment scenario with:
 //! - Postgres-backed persistent queue
@@ -17,13 +17,11 @@
 //!    cargo run --example postgres_pool --features postgres
 //!    ```
 
-#![cfg(feature = "postgres")]
-
 use prometheus_parking_lot::core::{
     PoolLimits, ResourcePool, ScheduledTask, Spawn, TaskExecutor, TaskMetadata,
 };
-use prometheus_parking_lot::infra::queue::postgres::PostgresQueue;
 use prometheus_parking_lot::infra::mailbox::postgres::PostgresMailbox;
+use prometheus_parking_lot::infra::queue::postgres::PostgresQueue;
 use prometheus_parking_lot::util::clock::now_ms;
 use prometheus_parking_lot::util::serde::{MailboxKey, Priority, ResourceCost, ResourceKind};
 
@@ -58,7 +56,7 @@ impl TaskExecutor<DemoTask, DemoResult> for DemoExecutor {
     async fn execute(&self, payload: DemoTask, meta: TaskMetadata) -> DemoResult {
         // Simulate some work
         tokio::time::sleep(Duration::from_millis(100)).await;
-        
+
         DemoResult {
             task_id: meta.id,
             output: format!("Processed {}: {}", payload.operation, payload.data),
@@ -90,8 +88,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Connect to database
     let database_url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgresql://testuser:testpass@localhost:5433/testdb".into());
-    
-    println!("Connecting to database: {}", database_url);
+
+    println!("Connecting to database: {database_url}");
     let db = Database::connect(&database_url).await?;
     println!("✓ Connected to database\n");
 
@@ -129,7 +127,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 id: i,
                 mailbox: Some(MailboxKey {
                     tenant: "demo-tenant".into(),
-                    user_id: Some(format!("user-{}", i)),
+                    user_id: Some(format!("user-{i}")),
                     session_id: None,
                 }),
                 priority: if i % 2 == 0 {
@@ -143,21 +141,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 },
                 deadline_ms: None,
                 created_at_ms: now_ms(),
+                idempotency_key: None,
             },
             payload: DemoTask {
                 id: i,
-                operation: format!("process_{}", i),
-                data: format!("demo-data-{}", i),
+                operation: format!("process_{i}"),
+                data: format!("demo-data-{i}"),
             },
         };
 
         let status = pool.submit(task, now_ms()).await?;
-        println!("  Task {} submitted with status: {:?}", i, status);
+        println!("  Task {i} submitted with status: {status:?}");
     }
 
     println!("\n✓ All tasks submitted");
     println!("\nWaiting for tasks to complete...");
-    
+
     // Wait a bit for tasks to process
     tokio::time::sleep(Duration::from_secs(2)).await;
 
