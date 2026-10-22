@@ -2,7 +2,7 @@ Model and worker assignments for these tasks: `.kbd-orchestrator/phases/phase-co
 
 ## 1. Core contracts: Arc<Inner>, Clock, Result executors, error taxonomy
 
-- [ ] 1.1 Arc<Inner> refactor of ResourcePool; delete sync_wake_worker_loop; Clock trait + TestClock
-- [ ] 1.2 Result-returning TaskExecutor contract and error taxonomy; monotonic FIFO sequence with consistent Eq/Ord; resource-vector cost type (serde, one-dimension default)
-- [ ] 1.3 Migrate existing tests and examples to the new contracts; CHANGELOG 0.3.0 entry
+- [x] 1.1 Arc<Inner> refactor of ResourcePool; delete sync_wake_worker_loop; Clock trait + TestClock
+- [x] 1.2 Result-returning TaskExecutor contract and error taxonomy; monotonic FIFO sequence with consistent Eq/Ord; resource-vector cost type (serde, one-dimension default)
+- [x] 1.3 Migrate existing tests and examples to the new contracts; CHANGELOG 0.3.0 entry
 - [ ] 1.4 Independent review at the merge gate (API soundness, Send/Sync bounds, semver notes)

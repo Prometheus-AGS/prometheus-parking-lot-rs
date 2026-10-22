@@ -2,6 +2,6 @@ Model and worker assignments for these tasks: `.kbd-orchestrator/phases/phase-co
 
 ## 1. Concepts: theory and history of parking lots, admission, mailboxes and worker pools
 
-- [ ] 1.1 Research and outline concept chapters with primary sources (deep-research skill)
-- [ ] 1.2 Write concept chapters with Mermaid diagrams
+- [x] 1.1 Research and outline concept chapters with primary sources (deep-research skill)
+- [x] 1.2 Write concept chapters with Mermaid diagrams
 - [ ] 1.3 Independent review at the merge gate (factual accuracy and citations)
