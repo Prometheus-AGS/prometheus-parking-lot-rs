@@ -192,6 +192,16 @@ async fn worker_pool_shutdown_cancels_waiting_tasks() {
         .submit("waiting", meta(Priority::Normal, 1))
         .expect("ok");
 
+    // Wait until the worker has started "running": shutting down before that
+    // would leave both tasks parked, and both would correctly be cancelled.
+    tokio::time::timeout(WAIT, async {
+        while executor.order.lock().is_empty() {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+    })
+    .await
+    .expect("running task started");
+
     // Shut down while "running" is still blocked on the gate, so "waiting"
     // is certainly still parked when shutdown empties the queue.
     let shutdown = {

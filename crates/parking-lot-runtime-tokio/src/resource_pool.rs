@@ -8,10 +8,10 @@
 //! ## Admission and ordering
 //!
 //! Admission, parking and waking go through the core
-//! [`Dispatcher`](prometheus_parking_lot_core::dispatch::Dispatcher), which
+//! [`Dispatcher`], which
 //! owns the unit-weighted semaphore and the parked queue (the configured
 //! [`TaskQueue`] backend behind a
-//! [`TaskQueueAdapter`](prometheus_parking_lot_core::dispatch::TaskQueueAdapter)).
+//! [`TaskQueueAdapter`]).
 //! A submission starts immediately only when nothing is parked and its cost
 //! fits; parked tasks start strictly in queue order — highest priority first,
 //! FIFO within a priority by the submission sequence the dispatcher stamps —
