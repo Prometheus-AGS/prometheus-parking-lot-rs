@@ -6,85 +6,131 @@ on:
   pull_request:
     branches: ["main"]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
   RUST_BACKTRACE: 1
+  # rust-toolchain.toml pins the same version; keep both in step (cr-41).
+  PINNED_TOOLCHAIN: "1.99.1"
+
+# Every cargo invocation is --locked (Cargo.lock is committed) and --workspace
+# (the repository root is both the facade package and the workspace root).
+# Postgres/Docker suites are not registered yet (cr-35), so no service container here.
 
 jobs:
   fmt:
     name: Format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ env.PINNED_TOOLCHAIN }}
           components: rustfmt
       - run: cargo fmt --all -- --check
 
   clippy:
+    # Pinned toolchain only: clippy on the MSRV (1.95) would warn about lints that
+    # exist only on 1.99 (unused_async_trait_impl), so MSRV is covered by `test`.
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo clippy --all-targets --all-features -- -D warnings
-
-  test:
-    name: Test (${{ matrix.rust }})
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        rust:
-          - stable
-          - "1.91.1"  # MSRV
-    steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: ${{ env.PINNED_TOOLCHAIN }}
+          components: clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Run tests (with suite-level watchdog — 300s)
+        with:
+          shared-key: clippy
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+  test:
+    name: Test (${{ matrix.toolchain }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain:
+          - "1.99.1" # pinned (rust-toolchain.toml)
+          - "1.95"   # MSRV (workspace.package.rust-version)
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test-${{ matrix.toolchain }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+      # Build first so the watchdog below bounds test execution, not a cold compile.
+      - name: Build tests
+        run: cargo +${{ matrix.toolchain }} nextest run --workspace --all-features --locked --no-run
+      - name: Run tests (suite-level watchdog, 5 minutes)
         timeout-minutes: 5
-        run: cargo test --all-features
+        run: cargo +${{ matrix.toolchain }} nextest run --workspace --all-features --locked --no-fail-fast
+      - name: Run doctests (nextest does not run them)
+        timeout-minutes: 5
+        run: cargo +${{ matrix.toolchain }} test --workspace --all-features --locked --doc
 
   docs:
     name: Docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.PINNED_TOOLCHAIN }}
       - uses: Swatinem/rust-cache@v2
-      - run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
+        with:
+          shared-key: docs
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo doc --workspace --no-deps --all-features --locked
+        env:
+          RUSTDOCFLAGS: "-D warnings"
 
   deny:
     name: Deny (licenses / advisories)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check
-          arguments: --all-features
+          arguments: --all-features --locked
 
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ env.PINNED_TOOLCHAIN }}
           components: llvm-tools-preview
       - uses: Swatinem/rust-cache@v2
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
+        with:
+          shared-key: coverage
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
       - name: Generate coverage
-        timeout-minutes: 10
-        run: cargo llvm-cov --all-features --lcov --output-path lcov.info
+        timeout-minutes: 15
+        run: cargo llvm-cov --workspace --all-features --locked --lcov --output-path lcov.info
       - name: Upload to Codecov (optional)
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v7
         continue-on-error: true
         with:
           files: lcov.info
