@@ -87,6 +87,7 @@ classDiagram
         +TaskId id
         +Priority priority
         +ResourceCost cost
+        +u64 sequence
         +MailboxKey mailbox_ref
     }
 
@@ -110,7 +111,7 @@ classDiagram
 
     class TaskExecutor~P,T~ {
         <<interface>>
-        +execute(payload) Result~T~
+        +execute(payload, meta) Result~T, TaskError~
     }
 
     ResourcePool --> PoolConfig
@@ -123,13 +124,13 @@ classDiagram
 
 ### 4.2 Component Descriptions
 
-1. **ResourcePool:** The brain of the system. It tracks `active_units` using lock-free `AtomicU32` with CAS (Compare-And-Swap) operations for high-performance capacity management. When a job arrives, it calculates `cost`. If `active + cost > max`, the job is sent to the `TaskQueue`. When a job finishes, it signals via `parking_lot::Condvar` and pulls from the queue.
+1. **ResourcePool:** The brain of the system. All shared state sits in one `Arc<Inner>`; `active_units` is an `AtomicU32` claimed by CAS while the queue lock is held. When a job arrives the pool stamps its submission sequence and computes its cost: it starts immediately only if the queue is empty and the cost fits, otherwise it is parked in the `TaskQueue`. When a job finishes (value or `TaskError`), the pool releases its units, delivers `Completed` or `Failed(TaskError)` to the mailbox, and starts queued jobs in priority-then-FIFO order while the head fits. Time is read through a `Clock`. The contracts (error taxonomy, fallible executors, clock, sequence, cost vector) are recorded in [ADR 0002](adr/0002-core-contracts.md).
 2. **TaskQueue (Trait):** Abstraction for ordered job storage. Implementations include:
    - `InMemoryQueue`: High-performance non-durable `BinaryHeap` with O(log n) enqueue/dequeue operations.
    - `SeaOrmQueue`: Durable Postgres table.
    - `YaqueQueue`: Durable local file-based queue (for Desktop).
 3. **Mailbox (Trait):** Abstraction for result storage. It handles the "late pickup" pattern where a mobile client might disconnect before an LLM finishes generation.
-4. **TaskExecutor (Trait):** The user-supplied logic. This is where the actual Agent code (e.g., "Run Llama-3 inference") lives.
+4. **TaskExecutor (Trait):** The user-supplied logic. This is where the actual Agent code (e.g., "Run Llama-3 inference") lives. It returns `Result<T, TaskError>`; a failure is recorded, never mistaken for a result.
 
 ------
 
