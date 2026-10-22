@@ -212,5 +212,12 @@ The two-round review cap is reached (round 1 BLOCK 3/14/1, round 2 BLOCK 1/15/2;
 PLAN COMPLETE
 `);
 
+// tasks.json: scenario-coverage index for kbd-phase-readiness-check (ids = <change>#<ordinal>).
+writeFileSync(join(phaseDir, 'tasks.json'), JSON.stringify({
+  phase: PHASE,
+  generatedBy: 'plan-generate.mjs',
+  tasks: order.flatMap((c) => c.tasks.map((tk, i) => ({ id: `${c.id}#${i + 1}`, change: c.id, ordinal: i + 1, title: tk.title, role: tk.role }))),
+}, null, 2) + '\n');
+
 writeFileSync(join(phaseDir, 'plan-index.json'), JSON.stringify(order.map((c, i) => ({ seq: i + 1, id: c.id, title: c.title, round: finalRound.get(c.id), owner: c.owner, tasks: c.tasks.map((t) => t.title) })), null, 2));
 console.log(JSON.stringify({ changes: CHANGES.length, tasks: totalTasks, rounds: Math.max(...finalRound.values()) }));

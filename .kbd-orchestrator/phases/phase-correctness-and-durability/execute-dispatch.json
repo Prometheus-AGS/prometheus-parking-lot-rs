@@ -1,0 +1,52 @@
+{
+  "phase": "phase-correctness-and-durability",
+  "dispatchedAt": "2026-10-22T14:08:53.169Z",
+  "backend": "openspec",
+  "driver": "Claude Code session (KBD driver)",
+  "dispatched": [
+    {
+      "change": "cr-41-toolchain-baseline",
+      "role": "tech-lead"
+    }
+  ],
+  "deferred": [
+    "cr-15-containment"
+  ],
+  "pending": [
+    "cr-17-kbd-correction",
+    "cr-51-supply-chain-gates",
+    "cr-48-workspace-split",
+    "cr-42-ci-rebuild",
+    "cr-43-postgres18-image",
+    "cr-35-test-targets",
+    "cr-16-docs-truth",
+    "cr-45-docs-site",
+    "cr-18-core-contracts",
+    "cr-25-backend-contracts",
+    "cr-19-dispatcher-semaphore",
+    "cr-21-panic-containment",
+    "cr-22-result-slots",
+    "cr-20-skip-ahead",
+    "cr-23-multi-resource",
+    "cr-26-pg-lease-queue",
+    "cr-27-pg-mailbox",
+    "cr-30-pgmq-sql-backend",
+    "cr-28-embedded-redb-queue",
+    "cr-49-durable-dispatch",
+    "cr-29-shutdown-cancellation",
+    "cr-31-hook-emission",
+    "cr-34-mailbox-composition",
+    "cr-32-iggy-events",
+    "cr-33-stream-replay",
+    "cr-36-pg-matrix",
+    "cr-37-config-schema",
+    "cr-38-wasm-target",
+    "cr-44-mobile-desktop-bindings",
+    "cr-39-dependency-hygiene",
+    "cr-40-benchmarks",
+    "cr-46-docs-theory",
+    "cr-47-docs-guides",
+    "cr-53-wasm-parity",
+    "cr-52-release"
+  ]
+}

@@ -10,7 +10,7 @@ Scaffold website/ with the build-branded-docusaurus skill: pinned Docusaurus, kn
 
 ### New Capabilities
 
-- `documentation-site`: Branded, verified documentation site
+- `documentation-site`: Branded, verified documentation site; Published on GitHub Pages and linked from the repository
 
 ### Modified Capabilities
 

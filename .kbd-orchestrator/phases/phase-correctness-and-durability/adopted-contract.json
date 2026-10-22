@@ -6,7 +6,7 @@
     "runId": "phase-certification-remediation-20261022T103344Z",
     "phaseId": "phase-correctness-and-durability",
     "planRevision": 1,
-    "contractDigest": "bb9c2939a6b56c58200dd816e14bf6ddae93c2ed8c38ec41a478520e69604b17"
+    "contractDigest": "85a213663b58ffc06110ec309b9273c6abb6fa0c5414400ae1580c96a0ebb453"
   },
   "digestNormalization": {
     "algorithm": "sha256",
@@ -248,18 +248,20 @@
     },
     {
       "id": "S-15",
-      "name": "Branded documentation site with compiled examples",
-      "ownerTask": "cr-45-docs-site#3+cr-47-docs-guides#3",
-      "productionEntry": "npm --prefix website ci && npm --prefix website run build && npm --prefix website run verify",
+      "name": "Branded documentation site with compiled examples, published on GitHub Pages",
+      "ownerTask": "cr-45-docs-site#3+cr-45-docs-site#5+cr-45-docs-site#6+cr-47-docs-guides#3",
+      "productionEntry": "npm --prefix website ci && npm --prefix website run build && npm --prefix website run verify; curl -fsS https://prometheus-ags.github.io/prometheus-parking-lot-rs/; gh repo view Prometheus-AGS/prometheus-parking-lot-rs --json homepageUrl",
       "realCollaborators": [
         "Docusaurus",
         "headless browser",
-        "examples/ sources"
+        "examples/ sources",
+        "GitHub Actions docs workflow",
+        "GitHub Pages"
       ],
-      "oracle": "Build and link check pass; light/dark screenshots match know-me tokens; no serious a11y violations; every guide example compiles",
-      "negativeControl": "A scratch page with a bordered card or a broken link fails verify",
-      "fixtures": "Frozen lockfile; screenshot digests",
-      "evidence": "build log, link report, a11y report, screenshot paths",
+      "oracle": "Build and link check pass; light/dark screenshots match know-me tokens; no serious a11y violations; every guide example compiles; the Pages URL returns HTTP 200 with the site title; the repository homepageUrl equals the Pages URL",
+      "negativeControl": "A scratch page with a bordered card or a broken link fails verify and fails the PR docs check",
+      "fixtures": "Frozen lockfile; screenshot digests; deploy run ID",
+      "evidence": "build log, link report, a11y report, screenshot paths, docs workflow run URL, curl status, homepageUrl",
       "classification": "delivery"
     },
     {

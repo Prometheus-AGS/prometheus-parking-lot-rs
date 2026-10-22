@@ -18,3 +18,22 @@ The project SHALL publish a Docusaurus site whose theme uses the know-me brand t
 
 - **WHEN** an automated accessibility check runs on representative routes
 - **THEN** no serious or critical violations; keyboard focus is visible
+
+### Requirement: Published on GitHub Pages and linked from the repository
+
+A GitHub Actions workflow SHALL build the site on every pull request and deploy it to GitHub Pages from main, and the repository About section SHALL link to the published site (operator request 2026-10-22).
+
+#### Scenario: PR build
+
+- **WHEN** a pull request changes website/
+- **THEN** the docs workflow builds the site and fails the check on a build or link error, without deploying
+
+#### Scenario: Deploy from main
+
+- **WHEN** a commit lands on main
+- **THEN** the workflow deploys with actions/upload-pages-artifact and actions/deploy-pages, and https://prometheus-ags.github.io/prometheus-parking-lot-rs/ serves the new build (HTTP 200, expected title)
+
+#### Scenario: About link
+
+- **WHEN** the repository page is viewed
+- **THEN** the About homepage is https://prometheus-ags.github.io/prometheus-parking-lot-rs/
