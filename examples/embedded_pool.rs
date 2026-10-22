@@ -88,7 +88,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(key) = &meta.idempotency_key {
             delivery = delivery.with_idempotency_key(key.clone());
         }
-        mailbox.deliver(delivery).await?;
+        let _ = mailbox.deliver(delivery).await?;
         queue.ack(leased.token).await?;
     }
 

@@ -8,7 +8,7 @@
 //! | table | key | value | holds |
 //! |---|---|---|---|
 //! | `q_tasks` | entry id | task JSON | every live task, immutable after enqueue |
-//! | `q_state` | entry id | [`StateRow`] | lifecycle state, fence, attempts |
+//! | `q_state` | entry id | state row (kind, priority, time, fence, attempts) | lifecycle state, fence, attempts |
 //! | `q_avail` | (inverted priority, entry id) | | entries a lease may take now |
 //! | `q_delayed` | (not-before ms, entry id) | | requeued with a delay |
 //! | `q_leased` | (lease expiry ms, entry id) | | entries under a lease |
