@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "activeTeam": "parking-lot-core",
+  "manifest": ".agent-team/parking-lot-core/team.json",
+  "target": "deepseek",
+  "nativeDefinitions": [
+    ".dsh/profiles/parking-lot-core-product-manager/cordis.patch.yml",
+    ".dsh/profiles/parking-lot-core-tech-lead/cordis.patch.yml",
+    ".dsh/profiles/parking-lot-core-scheduler-engineer/cordis.patch.yml",
+    ".dsh/profiles/parking-lot-core-postgres-engineer/cordis.patch.yml",
+    ".dsh/profiles/parking-lot-core-events-engineer/cordis.patch.yml",
+    ".dsh/profiles/parking-lot-core-platform-engineer/cordis.patch.yml",
+    ".dsh/profiles/parking-lot-core-reviewer/cordis.patch.yml",
+    ".dsh/profiles/parking-lot-core-team/cordis.patch.yml"
+  ],
+  "instructionFiles": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    ".cursorrules"
+  ],
+  "delegation": "native-definitions",
+  "limitations": [
+    "Native definition presence is not live invocation evidence. The active harness owns permissions, models, concurrency and delegation.",
+    "When delegation is unavailable, use selected role instructions sequentially and report it; builder-context review is not independent.",
+    "Zed external ACP agents use their native configuration; Zed parallel threads are not an automatic delegation API."
+  ]
+}
