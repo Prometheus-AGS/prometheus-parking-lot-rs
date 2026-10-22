@@ -40,8 +40,8 @@ constraints:
 
   - id: no-unsafe-code
     severity: blocking
-    description: 'unsafe_code = "deny" in Cargo.toml; no unsafe blocks in src/'
-    check: "grep -rn 'unsafe ' src/ --include='*.rs'"
+    description: 'unsafe_code = "deny" in [workspace.lints] (every crate inherits it); no unsafe blocks in the facade (src/) or any workspace crate (crates/). No exemption exists today; when crates/parking-lot-ffi lands, its generated UniFFI glue is the only exempt path and the check gains an exclusion for it (amended for the workspace split, cr-48 / ADR 0001)'
+    check: "grep -rn 'unsafe ' src/ crates/ --include='*.rs'"
 
   - id: no-hardcoded-secrets
     severity: blocking
@@ -65,8 +65,8 @@ constraints:
 
   - id: core-has-no-infra-deps
     severity: blocking
-    description: 'src/core stays pure: no sea_orm/sqlx/pgmq/reqwest imports (clean architecture boundary, CLAUDE.md)'
-    check: "grep -rnE 'use (sea_orm|sqlx|pgmq|reqwest)' src/core/"
+    description: 'prometheus-parking-lot-core stays runtime- and IO-free: its normal dependency tree lists no tokio, sqlx, sea-orm, iggy, redb or reqwest (clean architecture boundary, CLAUDE.md; crate-aware since the workspace split, cr-48 / ADR 0001). Passes when the grep prints nothing (grep exit 1)'
+    check: "cargo tree -p prometheus-parking-lot-core -e normal --locked | grep -E ' (tokio|sqlx|sea-orm|iggy|redb|reqwest) v'"
 ```
 
 ---
