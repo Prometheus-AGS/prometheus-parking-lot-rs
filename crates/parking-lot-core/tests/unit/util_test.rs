@@ -11,12 +11,9 @@ fn test_priority_ordering() {
 
 #[test]
 fn test_resource_cost() {
-    let cost = ResourceCost {
-        kind: ResourceKind::GpuVram,
-        units: 100,
-    };
-    assert_eq!(cost.kind, ResourceKind::GpuVram);
-    assert_eq!(cost.units, 100);
+    let cost = ResourceCost::new(ResourceKind::GpuVram, 100);
+    assert_eq!(cost.units_of(ResourceKind::GpuVram), 100);
+    assert_eq!(cost.total_units(), 100);
 }
 
 #[test]

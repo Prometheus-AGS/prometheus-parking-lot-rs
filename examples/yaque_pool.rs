@@ -20,6 +20,7 @@ use prometheus_parking_lot::util::clock::now_ms;
 use prometheus_parking_lot::util::serde::{MailboxKey, Priority, ResourceCost, ResourceKind};
 
 use async_trait::async_trait;
+use prometheus_parking_lot::core::TaskError;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
@@ -46,19 +47,23 @@ struct LocalLlmExecutor;
 
 #[async_trait]
 impl TaskExecutor<LlmInferenceTask, LlmResult> for LocalLlmExecutor {
-    async fn execute(&self, payload: LlmInferenceTask, _meta: TaskMetadata) -> LlmResult {
+    async fn execute(
+        &self,
+        payload: LlmInferenceTask,
+        _meta: TaskMetadata,
+    ) -> Result<LlmResult, TaskError> {
         // Simulate LLM inference
         println!("  🤖 Processing: {}", payload.prompt);
         tokio::time::sleep(Duration::from_millis(500)).await;
 
-        LlmResult {
+        Ok(LlmResult {
             text: format!(
                 "Generated response for '{}' using model {}",
                 payload.prompt, payload.model
             ),
             tokens_used: 128,
             inference_time_ms: 500,
-        }
+        })
     }
 }
 
@@ -134,13 +139,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     session_id: Some(format!("session-{task_id}")),
                 }),
                 priority: Priority::Normal,
-                cost: ResourceCost {
-                    kind: ResourceKind::GpuVram,
-                    units: 4, // 4GB VRAM per task
-                },
+                cost: ResourceCost::new(ResourceKind::GpuVram, 4), // 4GB VRAM per task
                 deadline_ms: None,
                 created_at_ms: now_ms(),
                 idempotency_key: None,
+                sequence: 0,
             },
             payload: LlmInferenceTask {
                 model: "llama-3.1-8b".into(),
@@ -149,7 +152,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         };
 
-        let status = pool.submit(task, now_ms()).await?;
+        let status = pool.submit(task).await?;
         println!("Task {task_id}: {status:?}");
         println!("  Prompt: \"{prompt}\"");
     }

@@ -20,10 +20,7 @@ fn make_task(id: u64, priority: Priority) -> ScheduledTask<TestPayload> {
                 session_id: None,
             }),
             priority,
-            cost: ResourceCost {
-                kind: ResourceKind::Cpu,
-                units: 1,
-            },
+            cost: ResourceCost::new(ResourceKind::Cpu, 1),
             deadline_ms: None,
             created_at_ms: now_ms(),
         },

@@ -26,6 +26,7 @@ use prometheus_parking_lot::util::clock::now_ms;
 use prometheus_parking_lot::util::serde::{MailboxKey, Priority, ResourceCost, ResourceKind};
 
 use async_trait::async_trait;
+use prometheus_parking_lot::core::TaskError;
 use sea_orm::Database;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -53,15 +54,19 @@ struct DemoExecutor;
 
 #[async_trait]
 impl TaskExecutor<DemoTask, DemoResult> for DemoExecutor {
-    async fn execute(&self, payload: DemoTask, meta: TaskMetadata) -> DemoResult {
+    async fn execute(
+        &self,
+        payload: DemoTask,
+        meta: TaskMetadata,
+    ) -> Result<DemoResult, TaskError> {
         // Simulate some work
         tokio::time::sleep(Duration::from_millis(100)).await;
 
-        DemoResult {
+        Ok(DemoResult {
             task_id: meta.id,
             output: format!("Processed {}: {}", payload.operation, payload.data),
             processed_at: now_ms(),
-        }
+        })
     }
 }
 
@@ -135,13 +140,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 } else {
                     Priority::Normal
                 },
-                cost: ResourceCost {
-                    kind: ResourceKind::Cpu,
-                    units: 1,
-                },
+                cost: ResourceCost::new(ResourceKind::Cpu, 1),
                 deadline_ms: None,
                 created_at_ms: now_ms(),
                 idempotency_key: None,
+                sequence: 0,
             },
             payload: DemoTask {
                 id: i,
@@ -150,7 +153,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         };
 
-        let status = pool.submit(task, now_ms()).await?;
+        let status = pool.submit(task).await?;
         println!("  Task {i} submitted with status: {status:?}");
     }
 

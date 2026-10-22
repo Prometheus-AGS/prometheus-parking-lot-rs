@@ -1,6 +1,7 @@
 //! Tests for model loading/unloading lifecycle
 
 use async_trait::async_trait;
+use prometheus_parking_lot_core::TaskError;
 use prometheus_parking_lot_core::config::WorkerPoolConfig;
 use prometheus_parking_lot_core::{Priority, ResourceCost, ResourceKind};
 use prometheus_parking_lot_core::{TaskMetadata, WorkerExecutor};
@@ -21,14 +22,12 @@ fn make_gpu_meta(task_id: u64, units: u32) -> TaskMetadata {
         id: task_id,
         mailbox: None,
         priority: Priority::Normal,
-        cost: ResourceCost {
-            kind: ResourceKind::GpuVram,
-            units,
-        },
+        cost: ResourceCost::new(ResourceKind::GpuVram, units),
         deadline_ms: None,
         created_at_ms: now_ms(),
 
         idempotency_key: None,
+        sequence: 0,
     }
 }
 
@@ -49,8 +48,8 @@ impl ModelLifecycleExecutor {
 
 #[async_trait]
 impl WorkerExecutor<String, String> for ModelLifecycleExecutor {
-    async fn execute(&self, action: String, _meta: TaskMetadata) -> String {
-        match action.as_str() {
+    async fn execute(&self, action: String, _meta: TaskMetadata) -> Result<String, TaskError> {
+        Ok(match action.as_str() {
             "load" => {
                 self.is_loaded.store(true, Ordering::SeqCst);
                 self.loaded_models.fetch_add(1, Ordering::SeqCst);
@@ -72,7 +71,7 @@ impl WorkerExecutor<String, String> for ModelLifecycleExecutor {
                 "inference_complete".to_string()
             }
             _ => "unknown_action".to_string(),
-        }
+        })
     }
 }
 

@@ -208,7 +208,7 @@ async fn test_postgres_mailbox_different_statuses() {
     mailbox.deliver(&key, TaskStatus::Queued, None::<TestPayload>).expect("deliver failed");
     mailbox.deliver(&key, TaskStatus::Running, None::<TestPayload>).expect("deliver failed");
     mailbox.deliver(&key, TaskStatus::Completed, Some(TestPayload::new(1, "result"))).expect("deliver failed");
-    mailbox.deliver(&key, TaskStatus::Failed("error".into()), None::<TestPayload>).expect("deliver failed");
+    mailbox.deliver(&key, TaskStatus::Failed(prometheus_parking_lot::core::TaskError::executor("error")), None::<TestPayload>).expect("deliver failed");
     mailbox.deliver(&key, TaskStatus::Expired, None::<TestPayload>).expect("deliver failed");
 
     let messages = mailbox.fetch(&key, None, 10).await.expect("fetch failed");

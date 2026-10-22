@@ -16,6 +16,7 @@
 use async_trait::async_trait;
 use prometheus_parking_lot_core::InMemoryMailbox;
 use prometheus_parking_lot_core::InMemoryQueue;
+use prometheus_parking_lot_core::TaskError;
 use prometheus_parking_lot_core::now_ms;
 use prometheus_parking_lot_core::{MailboxKey, Priority, ResourceCost, ResourceKind};
 use prometheus_parking_lot_core::{
@@ -54,7 +55,7 @@ impl TestExecutor {
 
 #[async_trait]
 impl TaskExecutor<TestJob, String> for TestExecutor {
-    async fn execute(&self, payload: TestJob, meta: TaskMetadata) -> String {
+    async fn execute(&self, payload: TestJob, meta: TaskMetadata) -> Result<String, TaskError> {
         // Simulate some work
         tokio::time::sleep(Duration::from_millis(10)).await;
 
@@ -63,7 +64,7 @@ impl TaskExecutor<TestJob, String> for TestExecutor {
         // Record execution order
         self.results.lock().await.push(result.clone());
 
-        result
+        Ok(result)
     }
 }
 
@@ -99,14 +100,12 @@ async fn test_immediate_execution() {
     let meta = TaskMetadata {
         id: 1,
         priority: Priority::Normal,
-        cost: ResourceCost {
-            kind: ResourceKind::Cpu,
-            units: 5,
-        },
+        cost: ResourceCost::new(ResourceKind::Cpu, 5),
         created_at_ms: now_ms(),
         idempotency_key: None,
         deadline_ms: None,
         mailbox: None,
+        sequence: 0,
     };
 
     let job = TestJob {
@@ -115,7 +114,7 @@ async fn test_immediate_execution() {
     };
 
     let status = pool
-        .submit(ScheduledTask { meta, payload: job }, now_ms())
+        .submit(ScheduledTask { meta, payload: job })
         .await
         .unwrap();
 
@@ -151,14 +150,12 @@ async fn test_capacity_enforcement_and_queueing() {
     let meta1 = TaskMetadata {
         id: 1,
         priority: Priority::Normal,
-        cost: ResourceCost {
-            kind: ResourceKind::Cpu,
-            units: 10,
-        },
+        cost: ResourceCost::new(ResourceKind::Cpu, 10),
         created_at_ms: now_ms(),
         idempotency_key: None,
         deadline_ms: None,
         mailbox: None,
+        sequence: 0,
     };
 
     let job1 = TestJob {
@@ -167,13 +164,10 @@ async fn test_capacity_enforcement_and_queueing() {
     };
 
     let status1 = pool
-        .submit(
-            ScheduledTask {
-                meta: meta1,
-                payload: job1,
-            },
-            now_ms(),
-        )
+        .submit(ScheduledTask {
+            meta: meta1,
+            payload: job1,
+        })
         .await
         .unwrap();
     assert!(matches!(status1, TaskStatus::Running));
@@ -182,14 +176,12 @@ async fn test_capacity_enforcement_and_queueing() {
     let meta2 = TaskMetadata {
         id: 2,
         priority: Priority::Normal,
-        cost: ResourceCost {
-            kind: ResourceKind::Cpu,
-            units: 5,
-        },
+        cost: ResourceCost::new(ResourceKind::Cpu, 5),
         created_at_ms: now_ms(),
         idempotency_key: None,
         deadline_ms: None,
         mailbox: None,
+        sequence: 0,
     };
 
     let job2 = TestJob {
@@ -198,13 +190,10 @@ async fn test_capacity_enforcement_and_queueing() {
     };
 
     let status2 = pool
-        .submit(
-            ScheduledTask {
-                meta: meta2,
-                payload: job2,
-            },
-            now_ms(),
-        )
+        .submit(ScheduledTask {
+            meta: meta2,
+            payload: job2,
+        })
         .await
         .unwrap();
     assert!(matches!(status2, TaskStatus::Queued));
@@ -237,26 +226,21 @@ async fn test_wake_up_mechanism() {
     let meta1 = TaskMetadata {
         id: 1,
         priority: Priority::Normal,
-        cost: ResourceCost {
-            kind: ResourceKind::Cpu,
-            units: 10,
-        },
+        cost: ResourceCost::new(ResourceKind::Cpu, 10),
         created_at_ms: now_ms(),
         idempotency_key: None,
         deadline_ms: None,
         mailbox: None,
+        sequence: 0,
     };
 
-    pool.submit(
-        ScheduledTask {
-            meta: meta1.clone(),
-            payload: TestJob {
-                name: "task1".to_string(),
-                value: 1,
-            },
+    pool.submit(ScheduledTask {
+        meta: meta1.clone(),
+        payload: TestJob {
+            name: "task1".to_string(),
+            value: 1,
         },
-        now_ms(),
-    )
+    })
     .await
     .unwrap();
 
@@ -265,27 +249,22 @@ async fn test_wake_up_mechanism() {
         let meta = TaskMetadata {
             id: i,
             priority: Priority::Normal,
-            cost: ResourceCost {
-                kind: ResourceKind::Cpu,
-                units: 3,
-            },
+            cost: ResourceCost::new(ResourceKind::Cpu, 3),
             created_at_ms: now_ms(),
             idempotency_key: None,
             deadline_ms: None,
             mailbox: None,
+            sequence: 0,
         };
 
         let status = pool
-            .submit(
-                ScheduledTask {
-                    meta,
-                    payload: TestJob {
-                        name: format!("task{i}"),
-                        value: i as u32,
-                    },
+            .submit(ScheduledTask {
+                meta,
+                payload: TestJob {
+                    name: format!("task{i}"),
+                    value: i as u32,
                 },
-                now_ms(),
-            )
+            })
             .await
             .unwrap();
 
@@ -331,14 +310,12 @@ async fn test_mailbox_delivery() {
     let meta = TaskMetadata {
         id: 1,
         priority: Priority::Normal,
-        cost: ResourceCost {
-            kind: ResourceKind::Cpu,
-            units: 5,
-        },
+        cost: ResourceCost::new(ResourceKind::Cpu, 5),
         created_at_ms: now_ms(),
         idempotency_key: None,
         deadline_ms: None,
         mailbox: Some(mailbox_key.clone()),
+        sequence: 0,
     };
 
     let job = TestJob {
@@ -346,7 +323,7 @@ async fn test_mailbox_delivery() {
         value: 100,
     };
 
-    pool.submit(ScheduledTask { meta, payload: job }, now_ms())
+    pool.submit(ScheduledTask { meta, payload: job })
         .await
         .unwrap();
 
@@ -378,27 +355,22 @@ async fn test_priority_ordering() {
     let pool = ResourcePool::new(limits, queue, mailbox, executor.clone(), spawner);
 
     // Fill capacity
-    pool.submit(
-        ScheduledTask {
-            meta: TaskMetadata {
-                id: 1,
-                priority: Priority::Normal,
-                cost: ResourceCost {
-                    kind: ResourceKind::Cpu,
-                    units: 10,
-                },
-                created_at_ms: now_ms(),
-                idempotency_key: None,
-                deadline_ms: None,
-                mailbox: None,
-            },
-            payload: TestJob {
-                name: "blocker".to_string(),
-                value: 0,
-            },
+    pool.submit(ScheduledTask {
+        meta: TaskMetadata {
+            id: 1,
+            priority: Priority::Normal,
+            cost: ResourceCost::new(ResourceKind::Cpu, 10),
+            created_at_ms: now_ms(),
+            idempotency_key: None,
+            deadline_ms: None,
+            mailbox: None,
+            sequence: 0,
         },
-        now_ms(),
-    )
+        payload: TestJob {
+            name: "blocker".to_string(),
+            value: 0,
+        },
+    })
     .await
     .unwrap();
 
@@ -411,27 +383,22 @@ async fn test_priority_ordering() {
     ];
 
     for (id, priority) in priorities {
-        pool.submit(
-            ScheduledTask {
-                meta: TaskMetadata {
-                    id,
-                    priority,
-                    cost: ResourceCost {
-                        kind: ResourceKind::Cpu,
-                        units: 3,
-                    },
-                    created_at_ms: now_ms(),
-                    idempotency_key: None,
-                    deadline_ms: None,
-                    mailbox: None,
-                },
-                payload: TestJob {
-                    name: format!("task_{priority:?}"),
-                    value: id as u32,
-                },
+        pool.submit(ScheduledTask {
+            meta: TaskMetadata {
+                id,
+                priority,
+                cost: ResourceCost::new(ResourceKind::Cpu, 3),
+                created_at_ms: now_ms(),
+                idempotency_key: None,
+                deadline_ms: None,
+                mailbox: None,
+                sequence: 0,
             },
-            now_ms(),
-        )
+            payload: TestJob {
+                name: format!("task_{priority:?}"),
+                value: id as u32,
+            },
+        })
         .await
         .unwrap();
     }
@@ -467,27 +434,22 @@ async fn test_deadline_rejection() {
     let meta = TaskMetadata {
         id: 1,
         priority: Priority::Normal,
-        cost: ResourceCost {
-            kind: ResourceKind::Cpu,
-            units: 5,
-        },
+        cost: ResourceCost::new(ResourceKind::Cpu, 5),
         created_at_ms: now_ms(),
         idempotency_key: None,
         deadline_ms: Some(past_time),
         mailbox: None,
+        sequence: 0,
     };
 
     let result = pool
-        .submit(
-            ScheduledTask {
-                meta,
-                payload: TestJob {
-                    name: "expired".to_string(),
-                    value: 1,
-                },
+        .submit(ScheduledTask {
+            meta,
+            payload: TestJob {
+                name: "expired".to_string(),
+                value: 1,
             },
-            now_ms(),
-        )
+        })
         .await;
 
     assert!(result.is_err());
@@ -525,14 +487,12 @@ async fn test_concurrent_submissions() {
             let meta = TaskMetadata {
                 id: i,
                 priority: Priority::Normal,
-                cost: ResourceCost {
-                    kind: ResourceKind::Cpu,
-                    units: 2, // Each task uses 2 units
-                },
+                cost: ResourceCost::new(ResourceKind::Cpu, 2), // Each task uses 2 units
                 created_at_ms: now_ms(),
                 idempotency_key: None,
                 deadline_ms: None,
                 mailbox: None,
+                sequence: 0,
             };
 
             let job = TestJob {
@@ -540,8 +500,7 @@ async fn test_concurrent_submissions() {
                 value: i as u32,
             };
 
-            pool.submit(ScheduledTask { meta, payload: job }, now_ms())
-                .await
+            pool.submit(ScheduledTask { meta, payload: job }).await
         });
         handles.push(handle);
     }
@@ -580,14 +539,12 @@ async fn test_shutdown() {
     let meta = TaskMetadata {
         id: 1,
         priority: Priority::Normal,
-        cost: ResourceCost {
-            kind: ResourceKind::Cpu,
-            units: 5,
-        },
+        cost: ResourceCost::new(ResourceKind::Cpu, 5),
         created_at_ms: now_ms(),
         idempotency_key: None,
         deadline_ms: None,
         mailbox: None,
+        sequence: 0,
     };
 
     let job = TestJob {
@@ -595,7 +552,7 @@ async fn test_shutdown() {
         value: 42,
     };
 
-    pool.submit(ScheduledTask { meta, payload: job }, now_ms())
+    pool.submit(ScheduledTask { meta, payload: job })
         .await
         .unwrap();
 
