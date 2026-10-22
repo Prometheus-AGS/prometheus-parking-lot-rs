@@ -2,17 +2,17 @@
   "schemaVersion": "1",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 224,
-  "derivedRevision": 224,
+  "sourceRevision": 380,
+  "derivedRevision": 380,
   "frontier": {
-    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 224
+    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 380
   },
   "conflictCount": 0,
-  "updatedAt": "2026-10-22T14:05:40.221587Z",
+  "updatedAt": "2026-10-22T20:47:09.078073Z",
   "cursor": [
     "phase-correctness-and-durability",
     "execute",
-    "cr-41-toolchain-baseline",
+    "cr-15-containment",
     "1"
   ],
   "root": {
@@ -20,7 +20,7 @@
     "id": "f6c384db-6ee1-4f1b-9bab-0e1602ec2615",
     "status": "ready",
     "progress": {
-      "done": 15,
+      "done": 20,
       "total": 51
     },
     "children": [
@@ -169,7 +169,7 @@
         "canonicalId": "phase-correctness-and-durability",
         "status": "IN_PROGRESS",
         "progress": {
-          "done": 1,
+          "done": 6,
           "total": 37
         },
         "children": [
@@ -185,9 +185,9 @@
           {
             "type": "change",
             "id": "cr-41-toolchain-baseline",
-            "status": "IN_PROGRESS",
+            "status": "COMPLETE",
             "progress": {
-              "done": 0,
+              "done": 4,
               "total": 5
             }
           },
@@ -203,36 +203,36 @@
           {
             "type": "change",
             "id": "cr-48-workspace-split",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 0,
+              "done": 3,
               "total": 4
             }
           },
           {
             "type": "change",
             "id": "cr-42-ci-rebuild",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 0,
+              "done": 3,
               "total": 4
             }
           },
           {
             "type": "change",
             "id": "cr-45-docs-site",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 0,
+              "done": 5,
               "total": 6
             }
           },
           {
             "type": "change",
             "id": "cr-18-core-contracts",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 0,
+              "done": 3,
               "total": 4
             }
           },
@@ -241,7 +241,7 @@
             "id": "cr-51-supply-chain-gates",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -250,7 +250,7 @@
             "id": "cr-43-postgres18-image",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 3,
               "total": 4
             }
           },
@@ -259,7 +259,7 @@
             "id": "cr-25-backend-contracts",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 3,
               "total": 4
             }
           },
@@ -268,7 +268,7 @@
             "id": "cr-19-dispatcher-semaphore",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 3,
               "total": 4
             }
           },
@@ -277,7 +277,7 @@
             "id": "cr-46-docs-theory",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
