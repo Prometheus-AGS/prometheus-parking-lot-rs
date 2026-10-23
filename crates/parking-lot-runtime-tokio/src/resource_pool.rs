@@ -657,9 +657,8 @@ where
     /// so the freed units are handed to parked work with
     /// [`Dispatcher::poke`]. A task whose outcome was not recorded yet is
     /// reported as panicked; one whose completion had started is not reported
-    /// twice. If the panic struck after the completion took woken tasks off
-    /// the queue but before they were started, those tasks are lost with it;
-    /// that needs a panicking `Mailbox` or `AuditSink`.
+    /// twice. The completion starts the tasks it wakes before it calls the
+    /// `Mailbox` or `AuditSink`, so a panic there loses none of them.
     async fn supervise(self: Arc<Self>, task: ScheduledTask<P>, permit: Permit) {
         // Settles the task however `run` ends, unwinding included.
         let _settle = SettleOnDrop(&self.ledger);
@@ -762,10 +761,10 @@ where
     /// Release a finished task's capacity, deliver its outcome, audit it and
     /// start whatever queued work now fits.
     ///
-    /// The permit is returned (and the woken tasks taken off the queue) before
-    /// the outcome is delivered, so a caller that reads the outcome from the
-    /// mailbox already sees the units released. The woken tasks are spawned
-    /// after delivery, outside the dispatch lock.
+    /// The permit is returned, and the woken tasks taken off the queue and
+    /// started, before the outcome is delivered: a caller that reads the
+    /// outcome from the mailbox already sees the units released, and a panic
+    /// in the user's `Mailbox` or `AuditSink` cannot lose the woken tasks.
     fn finish(
         self: &Arc<Self>,
         task_id: TaskId,
@@ -774,6 +773,7 @@ where
         outcome: Result<T, TaskError>,
     ) {
         let woken = self.dispatcher.complete(permit, self.now_ms());
+        self.launch(woken, None);
         let counter = if outcome.is_ok() {
             &self.completed
         } else {
@@ -812,7 +812,6 @@ where
 
         let tenant = mailbox_key.map_or("unknown", |key| key.tenant.as_str());
         self.record_event(task_id, tenant, action);
-        self.launch(woken, None);
     }
 
     /// Record a queued task that reached the head after its deadline.

@@ -433,6 +433,25 @@ pub async fn idempotent_enqueue<H: QueueHarness>(h: &H) {
     );
 }
 
+/// [`LeaseQueue::identity`] is non-empty, the same on every call and while
+/// the queue is used, and differs between two distinct queues (whose entry
+/// ids repeat: both start empty).
+pub async fn identity_is_stable_and_distinct<H: QueueHarness>(h: &H) {
+    let first = h.queue(ROOMY).await;
+    let second = h.queue(ROOMY).await;
+    let identity = first.identity().to_owned();
+    assert!(!identity.trim().is_empty(), "empty queue identity");
+    let _ = enqueue(&first, task(Priority::Normal, "job")).await;
+    let leased = lease_one(&first, h.lease_duration()).await;
+    first.ack(leased.token).await.expect("ack");
+    assert_eq!(first.identity(), identity, "the identity changed with use");
+    assert_ne!(
+        second.identity(),
+        identity,
+        "two distinct queues share an identity, so their entry ids collide"
+    );
+}
+
 /// Run every queue case in sequence, each on a fresh queue.
 pub async fn run_all<H: QueueHarness>(h: &H) {
     enqueue_and_lease_round_trip(h).await;
@@ -449,4 +468,5 @@ pub async fn run_all<H: QueueHarness>(h: &H) {
     lease_arguments(h).await;
     max_depth_counts_live_entries(h).await;
     idempotent_enqueue(h).await;
+    identity_is_stable_and_distinct(h).await;
 }

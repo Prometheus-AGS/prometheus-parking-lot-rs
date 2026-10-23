@@ -12,7 +12,11 @@
 
 use std::cmp::Reverse;
 use std::collections::HashMap;
+use std::collections::hash_map::RandomState;
 use std::future::Future;
+use std::hash::{BuildHasher, Hasher};
+use std::sync::OnceLock;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use parking_lot::Mutex;
@@ -246,6 +250,8 @@ impl<P> State<P> {
 #[derive(Debug)]
 pub struct InMemoryLeaseQueue<P, C = SystemClock> {
     max_depth: usize,
+    /// [`LeaseQueue::identity`]: unique to this value.
+    identity: String,
     clock: C,
     state: Mutex<State<P>>,
 }
@@ -265,6 +271,7 @@ impl<P, C: Clock> InMemoryLeaseQueue<P, C> {
     pub fn with_clock(max_depth: usize, clock: C) -> Self {
         Self {
             max_depth,
+            identity: fresh_identity(),
             clock,
             state: Mutex::new(State {
                 entries: HashMap::new(),
@@ -289,6 +296,22 @@ impl<P, C: Clock> InMemoryLeaseQueue<P, C> {
     fn now(&self) -> Duration {
         self.clock.monotonic()
     }
+}
+
+/// A queue identity no other `InMemoryLeaseQueue` has: a per-process random
+/// nonce (so a restarted process does not reuse its predecessor's identities
+/// against a mailbox that outlived it) and a per-process counter.
+///
+/// The nonce comes from the standard library's per-process hash keys; on
+/// targets without OS randomness (`wasm32-unknown-unknown`) those keys are
+/// fixed, so identities there are unique within one instance only.
+fn fresh_identity() -> String {
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    static NONCE: OnceLock<u64> = OnceLock::new();
+    let nonce = *NONCE.get_or_init(|| RandomState::new().build_hasher().finish());
+    // Relaxed: only uniqueness matters, which the RMW gives on its own.
+    let instance = NEXT.fetch_add(1, Ordering::Relaxed);
+    format!("in-memory:{nonce:016x}:{instance}")
 }
 
 fn require_positive(lease_for: Duration) -> Result<(), SchedulerError> {
@@ -366,5 +389,9 @@ where
 
     fn max_depth(&self) -> usize {
         self.max_depth
+    }
+
+    fn identity(&self) -> &str {
+        &self.identity
     }
 }

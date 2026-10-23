@@ -109,6 +109,8 @@ const MAX_NAME_LEN: usize = 38;
 pub struct PgmqLeaseQueue<P> {
     pool: PgPool,
     queue_name: Arc<str>,
+    /// [`LeaseQueue::identity`]: `pgmq:<queue name>`.
+    identity: Arc<str>,
     /// pgmq queue names, indexed by lane.
     lanes: Arc<[String; LANES]>,
     dead_queue: Arc<str>,
@@ -123,6 +125,7 @@ impl<P> Clone for PgmqLeaseQueue<P> {
         Self {
             pool: self.pool.clone(),
             queue_name: Arc::clone(&self.queue_name),
+            identity: Arc::clone(&self.identity),
             lanes: Arc::clone(&self.lanes),
             dead_queue: Arc::clone(&self.dead_queue),
             statements: Arc::clone(&self.statements),
@@ -180,6 +183,7 @@ impl<P> PgmqLeaseQueue<P> {
             dead_queue: Arc::from(format!("pl_{name}_dead")),
             statements: Arc::new(sql::build(&tables)),
             lanes: Arc::new(lanes),
+            identity: Arc::from(format!("pgmq:{name}")),
             queue_name: Arc::from(name),
             max_depth,
             max_attempts: None,
@@ -498,6 +502,13 @@ where
 
     fn max_depth(&self) -> usize {
         self.max_depth
+    }
+
+    /// `pgmq:<queue name>`: message ids are per pgmq queue. Two databases
+    /// with a queue of the same name have the same identity, so do not
+    /// deliver both into one mailbox without task idempotency keys.
+    fn identity(&self) -> &str {
+        &self.identity
     }
 }
 

@@ -256,7 +256,11 @@ async fn sink_captures(sink: &RecordingCancellationSink<Job>) -> Vec<(u64, Cance
 
 type Pool = ResourcePool<Job, String, InMemoryQueue<Job>, SharedMailbox, Sleeper, TokioSpawner>;
 
-fn resource_pool(mailbox: &SharedMailbox, sink: &Arc<RecordingCancellationSink<Job>>) -> Pool {
+fn resource_pool(
+    mailbox: &SharedMailbox,
+    sink: &Arc<RecordingCancellationSink<Job>>,
+    executor: Sleeper,
+) -> Pool {
     ResourcePool::new(
         PoolLimits {
             max_units: 3,
@@ -265,7 +269,7 @@ fn resource_pool(mailbox: &SharedMailbox, sink: &Arc<RecordingCancellationSink<J
         },
         InMemoryQueue::new(64),
         mailbox.clone(),
-        Sleeper::default(),
+        executor,
         TokioSpawner,
     )
     .with_cancellation_sink(Arc::clone(sink) as Arc<dyn CancellationSink<Job>>)
@@ -279,7 +283,8 @@ async fn resource_pool_scenario(
 ) -> (Accounting, ShutdownReport, Duration) {
     let mailbox = SharedMailbox::default();
     let sink = Arc::new(RecordingCancellationSink::new());
-    let pool = resource_pool(&mailbox, &sink);
+    let executor = Sleeper::default();
+    let pool = resource_pool(&mailbox, &sink, executor.clone());
     let jobs = jobs(long_ms);
     for job in &jobs {
         pool.submit(ScheduledTask {
@@ -290,6 +295,12 @@ async fn resource_pool_scenario(
         .expect("accepted");
     }
     assert_eq!(pool.running_tasks(), 3);
+    // `running_tasks` counts granted units; wait until the three executions
+    // have actually begun, or a task whose spawned run has not been polled yet
+    // when the cancel fires is captured as never started (`QueueShutdown`)
+    // instead of as a running straggler (`DrainTimeout`), which is correct
+    // pool behaviour but not this scenario.
+    executor.wait_started(3).await;
 
     let started = Instant::now();
     let report = pool.shutdown_with(policy).await;
@@ -394,13 +405,10 @@ async fn shutdown_resource_pool_cancel_immediately_accounts_for_every_task() {
     accounting.assert_nothing_lost(LONGS + SHORTS, &report);
     assert_eq!(report.unsettled, 0, "{report:?}");
     assert!(took < Duration::from_secs(2), "took {took:?}");
-    let mut stragglers = accounting.captures_with(&CancelReason::DrainTimeout);
-    stragglers.sort_unstable();
-    assert_eq!(
-        stragglers.iter().map(|(id, _)| *id).collect::<Vec<_>>(),
-        vec![0, 1, 2],
-        "the three running tasks are cancelled: {accounting:?}"
-    );
+    // The three running tasks are cancelled as stragglers: both long ones
+    // and whichever short one held the third unit (task 2, unless it had
+    // already finished under load and a later one took its unit).
+    assert_stragglers(&accounting, true);
 }
 
 /// A sink that never answers within `delta` cannot hold the shutdown: the
@@ -460,7 +468,7 @@ async fn shutdown_resource_pool_counts_a_sink_that_does_not_answer() {
 async fn shutdown_resource_pool_idle_returns_at_once() {
     let mailbox = SharedMailbox::default();
     let sink = Arc::new(RecordingCancellationSink::new());
-    let pool = resource_pool(&mailbox, &sink);
+    let pool = resource_pool(&mailbox, &sink, Sleeper::default());
     let started = Instant::now();
     let report = pool.shutdown_with(ShutdownPolicy::default()).await;
     assert!(started.elapsed() < Duration::from_secs(1));

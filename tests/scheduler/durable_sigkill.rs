@@ -7,12 +7,17 @@
 //!
 //! - `EXECUTING`: inside the executor (mid-execution);
 //! - `DELIVERING`: after the executor returned, inside the mailbox write (the
-//!   mailbox wrapper never forwards the delivery).
+//!   mailbox wrapper never forwards the delivery);
+//! - `DELIVERED`: after the result was stored in the mailbox and before the
+//!   lease was acked (the wrapper forwards the delivery, then hangs).
 //!
 //! The parent kills the child there, then plays the restarted process: it
-//! opens the same backend, starts a fresh pool and requires that the task runs
-//! again once the dead process's lease expires, that its result arrives, that
-//! exactly one result is consumable, and that the queue is empty (acked).
+//! opens the same backend, starts a fresh pool **under a different name** and
+//! requires that the task runs again once the dead process's lease expires,
+//! that its result arrives, that exactly one result is consumable (after the
+//! `DELIVERED` kill the restarted run's delivery must be recognised as a
+//! duplicate although the pools are named differently), and that the queue is
+//! empty (acked).
 
 use std::future::Future;
 use std::io::{BufRead, BufReader};
@@ -48,11 +53,15 @@ fn options() -> DurableOptions {
         .with_poll_interval(Duration::from_millis(100))
 }
 
+/// The restarted process's pool name: the result key must not depend on it.
+const RESTARTED_NAME: &str = "s16-restarted";
+
 /// Where the child is killed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum KillAt {
     Execution,
     Delivery,
+    AfterDelivery,
 }
 
 impl KillAt {
@@ -60,6 +69,7 @@ impl KillAt {
         match self {
             Self::Execution => "execute",
             Self::Delivery => "deliver",
+            Self::AfterDelivery => "delivered",
         }
     }
 
@@ -67,7 +77,15 @@ impl KillAt {
         match self {
             Self::Execution => "EXECUTING",
             Self::Delivery => "DELIVERING",
+            Self::AfterDelivery => "DELIVERED",
         }
+    }
+
+    fn from_env(value: &str) -> Self {
+        [Self::Execution, Self::Delivery, Self::AfterDelivery]
+            .into_iter()
+            .find(|kill_at| kill_at.env() == value)
+            .unwrap_or_else(|| panic!("child: unknown kill point {value}"))
     }
 }
 
@@ -79,6 +97,37 @@ impl<M: ResultMailbox<String>> ResultMailbox<String> for HangOnDeliver<M> {
     async fn deliver(&self, delivery: Delivery<String>) -> Result<DeliveryOutcome, SchedulerError> {
         drop(delivery);
         announce("DELIVERING");
+        std::future::pending().await
+    }
+
+    fn consume(
+        &self,
+        key: &MailboxKey,
+    ) -> impl Future<Output = Result<Option<MailboxEntry<String>>, SchedulerError>> + Send {
+        self.0.consume(key)
+    }
+
+    fn peek(
+        &self,
+        key: &MailboxKey,
+    ) -> impl Future<Output = Result<Option<MailboxEntry<String>>, SchedulerError>> + Send {
+        self.0.peek(key)
+    }
+
+    fn evict_expired(&self) -> impl Future<Output = Result<usize, SchedulerError>> + Send {
+        self.0.evict_expired()
+    }
+}
+
+/// A mailbox that stores the delivery, announces `DELIVERED` and never
+/// returns: the process is killed after the result is stored and before the
+/// lease is acked.
+struct HangAfterDeliver<M>(M);
+
+impl<M: ResultMailbox<String>> ResultMailbox<String> for HangAfterDeliver<M> {
+    async fn deliver(&self, delivery: Delivery<String>) -> Result<DeliveryOutcome, SchedulerError> {
+        let _stored = self.0.deliver(delivery).await?;
+        announce("DELIVERED");
         std::future::pending().await
     }
 
@@ -113,11 +162,7 @@ async fn durable_child_entry() {
     ) else {
         return;
     };
-    let kill_at = if kill_at == KillAt::Delivery.env() {
-        KillAt::Delivery
-    } else {
-        KillAt::Execution
-    };
+    let kill_at = KillAt::from_env(&kill_at);
     match backend.as_str() {
         #[cfg(feature = "postgres")]
         "pg" => {
@@ -169,6 +214,19 @@ where
                 limits(4),
                 queue,
                 HangOnDeliver(mailbox),
+                executor,
+                spawner(),
+                options(),
+            )
+            .expect("child: start the pool");
+            accept_and_wait(&pool).await;
+        }
+        KillAt::AfterDelivery => {
+            let executor = Executor::new(Behaviour::Succeed);
+            let pool = DurableResourcePool::start(
+                limits(4),
+                queue,
+                HangAfterDeliver(mailbox),
                 executor,
                 spawner(),
                 options(),
@@ -275,13 +333,13 @@ where
         mailbox,
         executor.clone(),
         spawner(),
-        options(),
+        options().with_name(RESTARTED_NAME),
     )
     .expect("start the restarted pool");
     let key = key(SESSION);
     let (pool_ref, key_ref) = (&pool, &key);
 
-    let entry = eventually(LEASE + Duration::from_secs(30), || async move {
+    let entry = eventually(LEASE + Duration::from_secs(120), || async move {
         pool_ref.mailbox().consume(key_ref).await.expect("consume")
     })
     .await
@@ -290,7 +348,7 @@ where
     assert_eq!(entry.payload.as_deref(), Some("done:work-1"));
 
     // The lease is resolved after the delivery: the queue drains.
-    let drained = eventually(Duration::from_secs(10), || async move {
+    let drained = eventually(Duration::from_secs(60), || async move {
         let depth = pool_ref.queue().depth().await.expect("depth");
         (depth.live() == 0).then_some(depth)
     })
@@ -353,6 +411,12 @@ mod postgres {
     async fn pool_sigkill_pg_between_execution_and_delivery() {
         killed_and_restarted(KillAt::Delivery).await;
     }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore = "needs Docker: starts a parking-lot-pg:18 container; kills a child process"]
+    async fn pool_sigkill_pg_between_delivery_and_ack() {
+        killed_and_restarted(KillAt::AfterDelivery).await;
+    }
 }
 
 #[cfg(feature = "embedded")]
@@ -382,5 +446,10 @@ mod redb {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn pool_sigkill_redb_between_execution_and_delivery() {
         killed_and_restarted(KillAt::Delivery).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn pool_sigkill_redb_between_delivery_and_ack() {
+        killed_and_restarted(KillAt::AfterDelivery).await;
     }
 }

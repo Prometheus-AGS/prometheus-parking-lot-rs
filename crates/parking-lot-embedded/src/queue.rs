@@ -14,7 +14,7 @@
 //! | `q_leased` | (lease expiry ms, entry id) | | entries under a lease |
 //! | `q_idem` / `q_idem_rev` | idempotency key / entry id | entry id / key | live keys |
 //! | `q_dead` | entry id | dead-letter JSON | given-up tasks |
-//! | `q_meta` | name | counter | next entry id, next fence |
+//! | `q_meta` | name | counter | next entry id, next fence, layout version, store id (the queue's identity) |
 //!
 //! Entry ids come from a counter that only grows, so id order is enqueue order
 //! and the `q_avail` key `(255 - priority, id)` is exactly "highest priority
@@ -696,5 +696,12 @@ where
 
     fn max_depth(&self) -> usize {
         self.max_depth
+    }
+
+    /// `redb:<store id>`: a random id generated when the database file is
+    /// first opened and kept in it, so it survives restarts and moving the
+    /// file, and a recreated file gets a new one.
+    fn identity(&self) -> &str {
+        &self.store.identity
     }
 }

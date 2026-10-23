@@ -115,15 +115,18 @@ pub struct ShutdownReport {
     /// failed or expired.
     pub completed: u64,
     /// Tasks cancelled: queued tasks left at the drain deadline, running
-    /// stragglers, and (durable pool) leased tasks handed back.
+    /// stragglers, and (durable pool) leased tasks handed back for any
+    /// reason.
     pub cancelled: u64,
     /// Cancelled tasks the sink answered [`SinkOutcome::Recorded`] for.
     ///
     /// [`SinkOutcome::Recorded`]: crate::SinkOutcome::Recorded
     pub recorded: u64,
-    /// Cancelled tasks handed back to the durable queue (`nack(Requeue)`);
-    /// they run again on the next start of a pool on that queue. Always zero
-    /// for the in-memory pools, which have no queue that outlives them.
+    /// Tasks handed back to the durable queue (`nack(Requeue)`, or a lease
+    /// left to expire): cancelled at shutdown, or (durable pool) leased tasks
+    /// whose outcome could not be stored. They run again on the next start of
+    /// a pool on that queue, and count in `cancelled` too. Always zero for the
+    /// in-memory pools, which have no queue that outlives them.
     pub requeued: u64,
     /// Cancelled tasks the sink answered `Drop` for — including the default
     /// sink, which logs them — or `Requeue`, which an in-memory pool cannot

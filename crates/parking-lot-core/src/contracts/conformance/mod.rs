@@ -216,6 +216,7 @@ macro_rules! lease_queue_conformance {
                 lease_arguments,
                 max_depth_counts_live_entries,
                 idempotent_enqueue,
+                identity_is_stable_and_distinct,
             ],
             $($args)*
         );
