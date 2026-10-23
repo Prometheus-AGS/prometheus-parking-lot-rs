@@ -1,0 +1,222 @@
+//! Scenario S-33 (cr-33): a client that disconnects mid-stream resumes from the
+//! last sequence number it saw and receives every remaining chunk exactly once,
+//! then the end marker; a retried or re-published chunk reaches the consumer
+//! once.
+//!
+//! Every test starts a pinned `apache/iggy` container, so each is `#[ignore]`d
+//! and compiles in CI without Docker. Run them with:
+//!
+//! ```text
+//! cargo nextest run -p prometheus-parking-lot-iggy --locked --run-ignored all -E "test(iggy_)"
+//! ```
+//!
+//! With `--cfg parking_lot_negative_control="s-33"` the cursor forgets where
+//! the client was and tracks no sequence numbers; the reconnect and duplicate
+//! tests below must then fail.
+
+mod support;
+
+use std::time::Duration;
+
+use prometheus_parking_lot_iggy::{
+    IggyOptions, IggyStreamReader, IggyStreamSink, ResumePoint, StreamCursor, StreamError,
+    StreamItem, StreamOutcome,
+};
+use support::{IggyServer, TestResult, read_topic};
+
+const FLUSH: Duration = Duration::from_secs(30);
+const STEP: Duration = Duration::from_secs(30);
+
+fn options(server: &IggyServer, stream: &str, partitions: u32) -> IggyOptions {
+    IggyOptions::new(server.connection_string.clone())
+        .with_stream(stream)
+        .with_partitions(partitions)
+}
+
+/// Read up to `limit` items (or to the end marker).
+async fn take(cursor: &mut StreamCursor<'_>, limit: usize) -> TestResult<Vec<StreamItem>> {
+    let mut out = Vec::new();
+    while out.len() < limit {
+        match tokio::time::timeout(STEP, cursor.next()).await? {
+            Ok(Some(item)) => out.push(item),
+            Ok(None) => break,
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(out)
+}
+
+fn seqs(items: &[StreamItem]) -> Vec<u64> {
+    items
+        .iter()
+        .map(|item| match item {
+            StreamItem::Chunk(c) => c.seq,
+            StreamItem::End(e) => e.seq,
+        })
+        .collect()
+}
+
+fn token(seq: u64) -> String {
+    format!("tok-{seq}")
+}
+
+/// 200 tokens are streamed while the client reads; it disconnects after token
+/// 50, reconnects with a fresh client and its last `(seq, offset)`, and gets
+/// tokens 51-200 and the end marker, each once. The same holds without the
+/// offset hint, and another stream sharing the partition does not leak in.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "needs Docker: starts a pinned apache/iggy container"]
+async fn iggy_stream_reconnect_midstream_receives_remaining_chunks_once() -> TestResult<()> {
+    const TOKENS: u64 = 200;
+    let server = IggyServer::start().await?;
+    // One partition: both streams share it, so the key filter and the offset
+    // hint are both exercised.
+    let options = options(&server, "resume", 1);
+    let sink = IggyStreamSink::start(&options)?;
+
+    let producer = {
+        let sink = sink.clone();
+        tokio::spawn(async move {
+            let mut writer = sink.writer("job-llm");
+            let mut other = sink.writer("job-other");
+            for seq in 1..=TOKENS {
+                writer.send(token(seq)).await?;
+                other.send(format!("other-{seq}")).await?;
+                if seq % 20 == 0 {
+                    tokio::task::yield_now().await;
+                }
+            }
+            writer.finish(StreamOutcome::Completed).await?;
+            other.finish(StreamOutcome::Cancelled).await?;
+            Ok::<_, StreamError>(())
+        })
+    };
+
+    // First connection: tokens 1-50, then it goes away.
+    let first = IggyStreamReader::connect(&options).await?;
+    let mut cursor = first.open("job-llm");
+    let head = take(&mut cursor, 50).await?;
+    assert_eq!(seqs(&head), (1..=50).collect::<Vec<_>>());
+    let last_seen = head
+        .last()
+        .map(StreamItem::resume_point)
+        .unwrap_or_default();
+    assert_eq!(last_seen.after_seq, 50);
+    drop(cursor);
+    drop(first);
+
+    producer.await??;
+    assert!(sink.flush(FLUSH).await, "sink drained");
+
+    // Reconnect with the offset hint, and again with the sequence number alone.
+    for point in [
+        last_seen,
+        ResumePoint {
+            after_seq: 50,
+            offset: None,
+        },
+    ] {
+        let second = IggyStreamReader::connect(&options).await?;
+        let mut cursor = second.resume("job-llm", point);
+        let tail = take(&mut cursor, usize::MAX).await?;
+        assert_eq!(
+            seqs(&tail),
+            (51..=TOKENS + 1).collect::<Vec<_>>(),
+            "tokens 51-200 then the end marker, no gap, no duplicate"
+        );
+        for item in &tail[..tail.len() - 1] {
+            let StreamItem::Chunk(chunk) = item else {
+                return Err("an end marker before the last chunk".into());
+            };
+            assert_eq!(chunk.data, token(chunk.seq));
+        }
+        let Some(StreamItem::End(end)) = tail.last() else {
+            return Err("no end marker".into());
+        };
+        assert_eq!(end.outcome, StreamOutcome::Completed);
+        assert!(
+            tokio::time::timeout(STEP, cursor.next()).await??.is_none(),
+            "nothing after the end marker"
+        );
+    }
+    Ok(())
+}
+
+/// A chunk published twice reaches the consumer once: a repeat from the same
+/// sink is skipped by the publisher's window, and a repeat from a restarted
+/// sink lands in the log but the cursor skips it by sequence number.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "needs Docker: starts a pinned apache/iggy container"]
+async fn iggy_stream_retried_chunk_is_delivered_once() -> TestResult<()> {
+    let server = IggyServer::start().await?;
+    let options = options(&server, "retried", 2);
+    let sink = IggyStreamSink::start(&options)?;
+
+    let mut writer = sink.writer("job-retry");
+    for seq in 1..=5 {
+        writer.send(token(seq)).await?;
+    }
+    // The same sink re-sends 4 and 5 (a retried publish): same ids, skipped.
+    let mut again = sink.writer_from("job-retry", 4);
+    again.send(token(4)).await?;
+    again.send(token(5)).await?;
+    assert!(sink.flush(FLUSH).await);
+    assert_eq!(sink.stats().deduplicated, 2, "{:?}", sink.stats());
+
+    // A restarted executor has a fresh sink with no memory: 3-5 land twice.
+    let restarted = IggyStreamSink::start(&options)?;
+    let mut redo = restarted.writer_from("job-retry", 3);
+    for seq in 3..=5 {
+        redo.send(token(seq)).await?;
+    }
+    redo.send(token(6)).await?;
+    redo.finish(StreamOutcome::Completed).await?;
+    assert!(restarted.flush(FLUSH).await);
+
+    // The log really holds the repeats ...
+    let client = server.client().await?;
+    let raw = read_topic(&client, "retried", "stream.chunks", 2, 0).await?;
+    let in_log = raw
+        .iter()
+        .filter(|m| m.body["key"] == "job-retry" && m.body["seq"] == 3)
+        .count();
+    assert_eq!(in_log, 2, "seq 3 is in the log twice");
+
+    // ... and the consumer sees each message once.
+    let reader = IggyStreamReader::connect(&options).await?;
+    let mut cursor = reader.open("job-retry");
+    let items = take(&mut cursor, usize::MAX).await?;
+    assert_eq!(seqs(&items), (1..=7).collect::<Vec<_>>());
+    assert_eq!(cursor.duplicates_skipped(), 3);
+    Ok(())
+}
+
+/// A missing chunk is an error, never a silent hole: a wrong offset hint or a
+/// lost publish cannot make the reader skip data.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "needs Docker: starts a pinned apache/iggy container"]
+async fn iggy_stream_missing_chunk_is_reported_as_a_gap() -> TestResult<()> {
+    let server = IggyServer::start().await?;
+    let options = options(&server, "gap", 1);
+    let sink = IggyStreamSink::start(&options)?;
+    let mut head = sink.writer("job-gap");
+    head.send(token(1)).await?;
+    head.send(token(2)).await?;
+    // seq 3 never published.
+    let mut tail = sink.writer_from("job-gap", 4);
+    tail.send(token(4)).await?;
+    assert!(sink.flush(FLUSH).await);
+
+    let reader = IggyStreamReader::connect(&options).await?;
+    let mut cursor = reader.open("job-gap");
+    assert_eq!(seqs(&take(&mut cursor, 2).await?), [1, 2]);
+    let error = tokio::time::timeout(STEP, cursor.next()).await?;
+    assert_eq!(
+        error.err(),
+        Some(StreamError::Gap {
+            expected: 3,
+            got: 4
+        })
+    );
+    Ok(())
+}

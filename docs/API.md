@@ -131,6 +131,17 @@ queue stays in Postgres or redb.
 | `IggyNotifier::start(&options)` | A `Notifier<T>`: wrap in `BackgroundNotifier::new(notifier, TokioHandleSpawner::current(), TokioSleeper)` and pass to `StorageMailbox::new(storage, ..)`. Publishes `mailbox.ready` (mailbox key, task id, status, `result_ref`) after the result is stored, partitioned by tenant. |
 | `ids::message_id`, `ids::mailbox_ready_id` | UUIDv5 message ids (as `u128`) from the idempotency key, or from the mailbox address and task id when there is none. |
 | `Publisher`, `PublisherStats` (`hook.stats()`, `notifier.stats()`) | `enqueued`, `published`, `dropped` (queue full), `deduplicated`, `retried`, `failed`. `flush(timeout)` waits for the queue to drain. |
+| `IggyStreamSink::start(&options)` | Publishes task output streams to `stream.chunks` (cr-33). `writer(key)` (key = the idempotency key) gives a `StreamWriter`: `send(text)` returns the chunk's sequence number (from 1), `finish(StreamOutcome)` writes the end marker. `writer_from(key, next_seq)` continues after an executor restart. All messages of a stream go to one partition (`partition_for(key, partitions)`). |
+| `IggyStreamReader::connect(&options)` | `open(key)` or `resume(key, ResumePoint { after_seq, offset })` returns a `StreamCursor`; `next().await` yields `StreamItem::Chunk` / `StreamItem::End` in order, waiting for live chunks, then `None`. `item.resume_point()` is what a client stores. |
+
+Stream replay: the sequence number is the cursor, the offset is only a hint to
+avoid re-reading the partition. The cursor delivers `last + 1` only: a lower
+sequence number is a duplicate (retried or re-published chunk) and is skipped,
+a higher one is `StreamError::Gap`. A chunk is never dropped on a full queue:
+`send` waits for room, slowing the executor to the publisher's pace, and a
+chunk abandoned after its retries poisons the writer (`StreamError::Poisoned`)
+so the stream never continues past a hole. Wrap `next()` in a timeout: a
+poisoned stream never gets an end marker.
 
 Publishing is off the dispatch path: `Hook::on_event` only serializes and does
 a non-blocking enqueue. While the server is slow or down the queue (default

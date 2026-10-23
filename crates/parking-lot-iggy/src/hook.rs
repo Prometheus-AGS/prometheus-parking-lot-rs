@@ -67,7 +67,7 @@ impl Hook for IggyHook {
             .unwrap_or_else(|| event.pool().to_owned());
         let payload = serde_json::to_vec(&body).unwrap_or_default();
         // A full queue is counted by the publisher; nothing else to do here.
-        let _ = self.publisher.enqueue(Envelope { id, key, payload });
+        let _ = self.publisher.enqueue(Envelope::new(id, key, payload));
     }
 }
 
