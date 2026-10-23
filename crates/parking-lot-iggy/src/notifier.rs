@@ -94,11 +94,11 @@ impl<T: Sync> Notifier<T> for IggyNotifier {
             "result_ref": reference,
             "delivered_at_ms": entry.delivered_at_ms.to_string(),
         });
-        let envelope = Envelope {
-            id: mailbox_ready_id(&stable_key),
-            key: key.tenant.clone(),
-            payload: serde_json::to_vec(&body).unwrap_or_default(),
-        };
+        let envelope = Envelope::new(
+            mailbox_ready_id(&stable_key),
+            key.tenant.clone(),
+            serde_json::to_vec(&body).unwrap_or_default(),
+        );
         let queued = self.publisher.enqueue(envelope).map_err(|_| {
             SchedulerError::backend(
                 "iggy notifier",

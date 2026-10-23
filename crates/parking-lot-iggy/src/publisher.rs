@@ -9,7 +9,7 @@
 
 use std::collections::{HashSet, VecDeque};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 use iggy::prelude::{
@@ -33,6 +33,24 @@ pub struct Envelope {
     pub(crate) key: String,
     /// JSON payload.
     pub(crate) payload: Vec<u8>,
+    /// Explicit partition; when set it overrides the key hash (stream replay
+    /// needs a reader to know which partition holds a stream).
+    pub(crate) partition: Option<u32>,
+    /// Set by the worker when the message is abandoned; a message whose flag is
+    /// already set is skipped, so a stream never publishes past a gap.
+    pub(crate) poison: Option<Arc<AtomicBool>>,
+}
+
+impl Envelope {
+    pub(crate) const fn new(id: u128, key: String, payload: Vec<u8>) -> Self {
+        Self {
+            id,
+            key,
+            payload,
+            partition: None,
+            poison: None,
+        }
+    }
 }
 
 enum Command {
@@ -148,6 +166,25 @@ impl Publisher {
         Ok(())
     }
 
+    /// Queue `envelope`, waiting for room when the queue is full.
+    ///
+    /// For ordered streams where a drop would leave a gap: the producer is
+    /// slowed to the publisher's pace (backpressure) instead of losing data.
+    /// Returns `Rejected` only when the publisher has stopped.
+    pub(crate) async fn enqueue_wait(&self, envelope: Envelope) -> Result<(), EnqueueError> {
+        let command = Command::Publish {
+            envelope,
+            done: None,
+        };
+        if self.sender.send(command).await.is_ok() {
+            self.counters.enqueued.fetch_add(1, Ordering::Relaxed);
+            Ok(())
+        } else {
+            self.counters.dropped.fetch_add(1, Ordering::Relaxed);
+            Err(EnqueueError::Rejected)
+        }
+    }
+
     /// The counters now.
     #[must_use]
     pub fn stats(&self) -> PublisherStats {
@@ -211,6 +248,14 @@ impl Worker {
     }
 
     async fn publish(&mut self, envelope: &Envelope) {
+        if envelope
+            .poison
+            .as_ref()
+            .is_some_and(|flag| flag.load(Ordering::Acquire))
+        {
+            self.counters.failed.fetch_add(1, Ordering::Relaxed);
+            return;
+        }
         if self.recent.contains(envelope.id) {
             self.counters.deduplicated.fetch_add(1, Ordering::Relaxed);
             return;
@@ -237,6 +282,9 @@ impl Worker {
                 attempt += 1;
             } else {
                 self.counters.failed.fetch_add(1, Ordering::Relaxed);
+                if let Some(flag) = &envelope.poison {
+                    flag.store(true, Ordering::Release);
+                }
                 tracing::error!(topic = %self.topic, attempt, %error, "iggy publish abandoned after the retry budget");
                 return;
             }
@@ -255,9 +303,13 @@ impl Worker {
             .payload(envelope.payload.clone().into())
             .build()
             .map_err(|e| e.to_string())?;
-        let mut key = envelope.key.as_bytes();
-        key = &key[..key.len().min(MAX_KEY_LEN)];
-        let partitioning = Partitioning::messages_key(key).map_err(|e| e.to_string())?;
+        let partitioning = if let Some(partition) = envelope.partition {
+            Partitioning::partition_id(partition)
+        } else {
+            let mut key = envelope.key.as_bytes();
+            key = &key[..key.len().min(MAX_KEY_LEN)];
+            Partitioning::messages_key(key).map_err(|e| e.to_string())?
+        };
         connection
             .producer
             .send_with_partitioning(vec![message], Some(Arc::new(partitioning)))

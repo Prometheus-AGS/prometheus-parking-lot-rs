@@ -134,10 +134,15 @@ sequenceDiagram
   so the publisher also skips ids it published recently and consumers
   de-duplicate on the id across restarts.
 
-### Planned
-
-- `cr-33-stream-replay (stretch): streaming-token replay for clients that
-  disconnect mid-stream.
+- `cr-33-stream-replay` (stretch): `IggyStreamSink` publishes a task's streamed
+  output (for example LLM tokens) as numbered chunks plus an end marker to the
+  `stream.chunks` topic, keyed by the idempotency key. A client that
+  disconnects mid-stream resumes with `IggyStreamReader::resume` from the last
+  sequence number it saw and receives the remaining chunks in order, then live
+  ones until the end marker. The sequence number, not the Iggy offset, is the
+  cursor: repeats (a retried publish) are skipped and a missing chunk is an
+  error, so a resume has no gap and no duplicate. A full publisher queue slows
+  the executor instead of dropping chunks.
 
 Iggy is used for events and notifications only, not as mailbox storage and
 not as the work queue.
