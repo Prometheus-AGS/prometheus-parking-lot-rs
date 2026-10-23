@@ -91,8 +91,8 @@ fn wait_completed<E: WorkerExecutor<u64, u64>>(pool: &WorkerPool<u64, u64, E>, n
     }
 }
 
-fn is_expired(error: &SchedulerError) -> bool {
-    matches!(error, SchedulerError::ResultNotFound { key: Some(key) } if key.ends_with("(expired)"))
+const fn is_expired(error: &SchedulerError) -> bool {
+    matches!(error, SchedulerError::ResultExpired { key: Some(_) })
 }
 
 #[test]
@@ -198,7 +198,7 @@ fn waiters_no_blocking_threads_unretrieved_result_expires_after_ttl() {
     );
     let gone = pool.retrieve(&dropped, WAIT).expect_err("forgotten");
     assert!(
-        matches!(gone, SchedulerError::ResultNotFound { .. }) && !is_expired(&gone),
+        matches!(gone, SchedulerError::ResultNotFound { .. }),
         "expected a plain ResultNotFound, got {gone:?}"
     );
     pool.shutdown();

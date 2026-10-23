@@ -82,13 +82,9 @@ const fn wait_timed_out() -> SchedulerError {
 }
 
 /// The error for a result evicted unread after its TTL.
-///
-/// Interim: the contracts have no "result expired" error yet, so this is
-/// `ResultNotFound` with the key marked `(expired)`. A dedicated
-/// `SchedulerError` variant is a tech-lead contract change (cr-22 handoff).
 fn result_expired(key: &MailboxKey) -> SchedulerError {
-    SchedulerError::ResultNotFound {
-        key: Some(format!("{} (expired)", mailbox_key_to_string(key))),
+    SchedulerError::ResultExpired {
+        key: Some(mailbox_key_to_string(key)),
     }
 }
 
@@ -504,8 +500,8 @@ where
     ///
     /// The TTL is measured on the pool clock's monotonic reading (see
     /// [`with_clock`](Self::with_clock)) and applies to results stored from
-    /// now on. A `retrieve` of an evicted result fails with
-    /// [`SchedulerError::ResultNotFound`] whose key ends in `(expired)`.
+    /// now on. A `retrieve` of an evicted result fails once with
+    /// [`SchedulerError::ResultExpired`], then with `ResultNotFound`.
     /// Eviction happens on the next pool operation after the TTL, or within
     /// one sweep interval (the TTL, at least 50 ms) on an idle pool.
     #[must_use]
@@ -621,9 +617,11 @@ where
     ///   queued or was cancelled at shutdown
     /// - [`SchedulerError::Timeout`] if the result is not available within the
     ///   timeout
+    /// - [`SchedulerError::ResultExpired`] if the result was evicted unread
+    ///   after the result TTL (reported once)
     /// - [`SchedulerError::ResultNotFound`] if the key was not issued by this
-    ///   pool or its result was already taken; the key ends in `(expired)`
-    ///   when the result was evicted unread after the result TTL
+    ///   pool, its result was already taken, or its expiry was already
+    ///   reported
     pub async fn retrieve_async(
         &self,
         key: &MailboxKey,
