@@ -2186,6 +2186,8 @@ dependencies = [
  "prometheus-parking-lot-wasm",
  "serde",
  "serde_json",
+ "tempfile",
+ "testcontainers",
  "tokio",
  "tracing",
  "tracing-subscriber",

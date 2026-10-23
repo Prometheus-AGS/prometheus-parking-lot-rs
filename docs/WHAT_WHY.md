@@ -48,8 +48,8 @@ You have moved through several iterations to arrive at a **Feature-Based Clean A
     *   **SeaORM:** Used to interact with custom tables for the "Mailbox" (storage of results).
 
 *   **Builders & Config:**
-    *   You designed a system where a single `scheduler-config.json` file determines which adapters are used.
-    *   This allows you to change a deployment from "In-Memory" to "Postgres" just by changing a text file, not code.
+    *   A single scheduler configuration file (`config::SchedulerConfig`, examples in `examples/configs/`) declares the pools and opens the durable backends.
+    *   Today pools still park and deliver in memory: the Postgres and redb backends are opened from the configuration and used directly through `LeaseQueue` and `ResultMailbox`. Moving a pool from in-memory to a durable backend by changing the configuration alone becomes possible only with durable dispatch (cr-49).
 
 ### Summary
 You are professionalizing your AI Agent infrastructure. Instead of ad-hoc task spawning, you are creating a **dedicated scheduling engine** that treats GPU/CPU availability as a hard constraint, ensures tasks are never lost (persistence), and guarantees results are delivered even if the user goes offline (mailbox).

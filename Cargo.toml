@@ -124,11 +124,14 @@ prometheus-parking-lot-wasm.workspace = true
 async-trait.workspace = true
 criterion = { workspace = true, features = ["async_tokio"] }
 parking_lot.workspace = true
+tempfile.workspace = true
+testcontainers.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time"] }
 
 [[bench]]
 name = "queue_bench"
 harness = false
+required-features = ["tokio-runtime"]
 
 [[example]]
 name = "postgres_pool"

@@ -80,8 +80,30 @@ entry names the OpenSpec change that made it.
 - **A timed-out retrieve keeps the result (cr-22).** A `retrieve` or
   `retrieve_async` that times out leaves the result in its slot, so a later
   call can still take it until the result TTL evicts it.
+- **Strict scheduler configuration (cr-37).** Every config struct, including
+  `WorkerPoolConfig`, rejects unknown fields, and the error names the field.
+  `SchedulerConfig` gains named `backends` (`"type": "postgres"` or `"redb"`,
+  with their parameters) and `pools` is a `BTreeMap`. `PoolConfig.queue` and
+  `.mailbox` are `"in_memory"` or `{ "backend": name }`; naming a backend is
+  rejected until durable dispatch (cr-49). The ignored `runtime` field and
+  `RuntimeConfig`, `QueueBackendConfig` and `MailboxBackendConfig` are
+  removed. `validate` and `from_json_str` return `ConfigError` (`Parse` names
+  an unknown or missing field; `Invalid` names the field by dotted path, e.g.
+  `pools.inference.max_units`) instead of `String`; `build_pools` returns a
+  `BTreeMap`. `WorkerPoolConfig::thread_stack_size` exists on every target
+  (ignored on WASM), and `default_timeout_ms` is documented as the execution
+  budget (and the native default result TTL), not a `retrieve` timeout.
 
 ### Added
+- **Pools and backends from configuration (cr-37).**
+  `builders::build_pools_from_scheduler_config` validates a `SchedulerConfig`,
+  opens every backend (Postgres: connect, optional migration of the queue and
+  mailbox schemas, `PgLeaseQueue`, `PgResultMailbox` and an optional
+  `QueueListener`; redb: `EmbeddedStore`, `RedbLeaseQueue`,
+  `RedbResultMailbox`) and builds every pool with an in-memory queue and a
+  readable `SharedInMemoryMailbox`. One example per backend is in
+  `examples/configs/`, and the test suite loads and builds each of them, plus
+  every JSON config block in the README and docs.
 
 - **Dispatcher and unit-weighted semaphore (cr-19).** Both pools now admit
   through one `Dispatcher` that owns a `UnitSemaphore` and the parked queue, so
