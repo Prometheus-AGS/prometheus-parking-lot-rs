@@ -96,5 +96,5 @@ events and Iggy publishing ([Iggy events](./iggy-events.md)), stream replay
 - Durable execution is at-least-once; results are exactly-once.
 - A durable pool dispatches strictly in order, holds at most one leased task
   waiting for capacity, and polls for work other processes enqueue.
-- Lifecycle events are dropped (and counted) under backpressure. The WASM pool
-  does not emit them yet.
+- Lifecycle events are dropped (and counted) under backpressure on the native
+  pools. The WASM pool calls its hooks inline (there are no threads there).

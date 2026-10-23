@@ -25,9 +25,25 @@
 //!   `Send` future, and JS timer futures are not `Send`; await `sleep`
 //!   instead.
 //! - **No durable backend in the browser.** Parked tasks live in memory and
-//!   are lost with the page.
+//!   are lost with the page. Durable dispatch (`DurableResourcePool`, the
+//!   lease queue and result mailbox of the native runtime) does not apply on
+//!   the web target: there is nothing in the browser to make a queue durable
+//!   against, and none is offered.
 //! - **Clock.** `std::time::Instant` and `SystemTime` panic on this target;
 //!   the pool reads `WasmClock` (`Date.now()`).
+//!
+//! # Parity with the native pools (cr-53)
+//!
+//! The pool runs the same core dispatcher as the native `WorkerPool`, so the
+//! admission rules are the same: weighted units per dimension
+//! (`resource_limits`, rejected at submit when any dimension can never fit),
+//! priority then FIFO order, bounded skip-ahead with the starvation guard
+//! (`WorkerPoolConfig::max_head_skips`; `0` is strict head-of-line), and the
+//! same lifecycle events through the core `HookBus` (`with_hook`, `hooks`):
+//! `Submitted`, `Queued` if it parks, `Started`, exactly one terminal event.
+//! There are no threads, so hooks run inline on the call that causes the
+//! transition. What is different is the runtime, not the semantics: no
+//! blocking `retrieve`, no panic containment, no durable dispatch.
 //!
 //! # Building and testing
 //!
@@ -52,6 +68,8 @@
 #[cfg(target_arch = "wasm32")]
 mod clock;
 #[cfg(target_arch = "wasm32")]
+mod events;
+#[cfg(target_arch = "wasm32")]
 mod pool;
 #[cfg(target_arch = "wasm32")]
 mod results;
@@ -63,6 +81,6 @@ pub use clock::WasmClock;
 #[cfg(target_arch = "wasm32")]
 pub use pool::WorkerPool;
 #[cfg(target_arch = "wasm32")]
-pub use prometheus_parking_lot_core::{PoolStats, SchedulerError};
+pub use prometheus_parking_lot_core::{Hook, HookBus, LifecycleEvent, PoolStats, SchedulerError};
 #[cfg(target_arch = "wasm32")]
 pub use time::sleep;

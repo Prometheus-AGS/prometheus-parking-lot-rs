@@ -115,7 +115,7 @@ sequenceDiagram
   queue, so a slow or panicking hook never stalls dispatch; when the queue is
   full, events are dropped and counted (`HookBus::dropped_events`). With no
   hook registered, emission is one atomic load and a branch. The WASM pool
-  does not emit yet (cr-53).
+  emits the same events (cr-53), calling its hooks inline.
 - The place a notifier plugs in exists: `StorageMailbox<S, N>` (cr-34) stores a
   result first and then hands it to a `Notifier` off the delivery path, with
   bounded retries. `NoopNotifier` sends nothing; `IggyNotifier` (below) is

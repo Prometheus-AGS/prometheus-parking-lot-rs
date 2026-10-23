@@ -115,8 +115,10 @@ on the durable pool, or `builders::build_pools_from_scheduler_config_with_hooks`
 Hooks run on the bus's own thread, in emission order; emission never blocks a
 pool (a full queue drops the event and counts it in
 `HookBus::dropped_events`), and a pool with no hook pays one atomic load per
-transition. `HookBus::flush` waits for delivery. The WASM pool does not emit
-yet.
+transition. `HookBus::flush` waits for delivery. The WASM pool (`prometheus-parking-lot-wasm`)
+emits the same events (cr-53) through `WorkerPool::with_hook` / `hooks()`; it has
+no threads, so its hooks run inline on the emitting call, and `worker_id` is
+always 0. Durable dispatch does not apply on the web target.
 
 ## Iggy events and notifications (feature `iggy`)
 

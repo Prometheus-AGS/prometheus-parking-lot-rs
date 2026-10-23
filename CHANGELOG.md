@@ -406,6 +406,15 @@ entry names the OpenSpec change that made it.
   (`mailbox::RetryPolicy`, a `mailbox::Sleeper` for the wait). A notifier failure is
   logged and counted (`NotifyStats`), never fails or undoes a stored result. Core
   stays runtime-free.
+- **WASM pool parity (cr-53).** The WASM `WorkerPool` emits the lifecycle
+  events of the native pools (`Submitted`, `Queued`, `Started`, exactly one
+  terminal event) through the core `HookBus` (`with_hook`, `hooks`; inline
+  delivery, timestamps from the pool's clock), exposes `skip_ahead_stats`, and
+  is covered by `wasm-bindgen-test` for per-dimension admission, bounded and
+  strict skip-ahead, and the S-21 sequence for completed, failed, timed-out,
+  rejected, expired and shutdown-cancelled tasks. Durable dispatch does not
+  apply on the web target (no durable backend in the browser) and a panic
+  aborts the module; both are documented in the crate docs.
 - **WASM pool on the shared dispatcher (cr-38).** The WASM `WorkerPool` now
   admits through the core dispatcher and runs on
   `wasm_bindgen_futures::spawn_local` with JS timers; it no longer depends on
@@ -496,8 +505,7 @@ entry names the OpenSpec change that made it.
 - Lifecycle events are lossy under backpressure: a hook that cannot keep up
   makes the bus drop events (counted), so an observer can miss a terminal
   event. Tasks removed by `ResourcePool::prune_expired` emit no terminal
-  event (the `TaskQueue` contract does not return their ids). The WASM pool
-  does not emit lifecycle events yet (cr-53).
+  event (the `TaskQueue` contract does not return their ids).
 
 ## [0.2.0]
 

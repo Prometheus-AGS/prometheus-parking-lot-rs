@@ -122,11 +122,12 @@ scheduler, and hand results back through a channel.
   Budgets use JS timers. An executor panic cannot be caught on
   `wasm32-unknown-unknown`: it aborts the module, so executors there must
   return errors, not panic.
-
-### Planned
-
-- `cr-53-wasm-parity`: lifecycle events from the WASM pool. It already
-  shares the dispatcher's skip-ahead and per-resource admission.
+- **WASM parity (cr-53).** The WASM pool applies the same per-dimension
+  admission and bounded skip-ahead (`max_head_skips`) as the native pool, and
+  emits the same lifecycle events through `with_hook` (`Submitted`, `Queued`,
+  `Started`, one terminal event). There are no threads on that target, so hooks
+  run inline. Durable dispatch does not apply in the browser: there is no
+  durable backend there, and parked tasks are lost with the page.
 
 ## Sources
 
