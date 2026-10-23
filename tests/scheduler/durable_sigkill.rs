@@ -33,6 +33,7 @@ const ENV_KILL_AT: &str = "PLQ_S16_KILL_AT";
 /// This test's name as libtest lists it, for `--exact`.
 const CHILD_TEST: &str = "durable_sigkill::durable_child_entry";
 /// Queue and mailbox name on Postgres.
+#[cfg(feature = "postgres")]
 const PG_NAME: &str = "s16";
 /// Short, so the restarted pool sees the dead process's lease expire quickly.
 const LEASE: Duration = Duration::from_secs(2);

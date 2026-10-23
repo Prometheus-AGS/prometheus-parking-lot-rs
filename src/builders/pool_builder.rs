@@ -417,6 +417,14 @@ struct Opened<P, T> {
         reason = "only opening a Postgres backend awaits; the signature is the same for every feature set"
     )
 )]
+#[cfg_attr(
+    not(any(feature = "postgres", feature = "embedded")),
+    allow(
+        unused_mut,
+        clippy::never_loop,
+        reason = "without a backend feature there is no map to fill and every section is rejected"
+    )
+)]
 async fn open_backends<P, T>(cfg: &SchedulerConfig) -> Result<Opened<P, T>, SchedulerError>
 where
     P: TaskPayload,
