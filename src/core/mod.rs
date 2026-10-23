@@ -76,7 +76,7 @@ pub use resource_pool::{
     TaskStatus,
 };
 #[cfg(feature = "tokio-runtime")]
-pub use shutdown::{ShutdownHandle, ShutdownPolicy, wait_for_signal};
+pub use shutdown::{ShutdownHandle, ShutdownPolicy, ShutdownReport, wait_for_signal};
 pub use worker_pool::PoolStats;
 #[cfg(any(
     all(feature = "tokio-runtime", not(target_arch = "wasm32")),
