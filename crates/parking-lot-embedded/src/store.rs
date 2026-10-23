@@ -21,6 +21,10 @@ const SCHEMA_VERSION: u64 = 1;
 /// Name of the `schema_version` row in the queue's metadata table.
 const SCHEMA_KEY: &str = "schema_version";
 
+/// Names of the two rows holding the store's random 128-bit id, generated
+/// when the file is first opened: the queue's `LeaseQueue::identity`.
+const STORE_ID_KEYS: [&str; 2] = ["store_id_hi", "store_id_lo"];
+
 /// An open redb database file that hosts a [`RedbLeaseQueue`] and a
 /// [`RedbResultMailbox`].
 ///
@@ -30,6 +34,8 @@ const SCHEMA_KEY: &str = "schema_version";
 pub struct EmbeddedStore {
     pub(crate) db: Arc<Database>,
     pub(crate) clock: Arc<dyn Clock>,
+    /// `redb:<store id>`, the lease queue's identity.
+    pub(crate) identity: Arc<str>,
 }
 
 impl EmbeddedStore {
@@ -60,11 +66,12 @@ impl EmbeddedStore {
             fs::create_dir_all(parent).map_err(backend("embedded::open::create_dir"))?;
         }
         let db = Database::create(path).map_err(backend("embedded::open"))?;
-        let store = Self {
+        let mut store = Self {
             db: Arc::new(db),
             clock: Arc::new(clock),
+            identity: Arc::from(""),
         };
-        store.initialise()?;
+        store.identity = store.initialise()?;
         Ok(store)
     }
 
@@ -86,9 +93,10 @@ impl EmbeddedStore {
         RedbResultMailbox::new(self.clone())
     }
 
-    /// Create every table (readers cannot open a table that does not exist yet)
-    /// and check the layout version, in one transaction.
-    fn initialise(&self) -> Result<(), SchedulerError> {
+    /// Create every table (readers cannot open a table that does not exist yet),
+    /// check the layout version and read (or create) the store id, in one
+    /// transaction. Returns the queue identity.
+    fn initialise(&self) -> Result<Arc<str>, SchedulerError> {
         let txn = self
             .db
             .begin_write()
@@ -105,7 +113,18 @@ impl EmbeddedStore {
                 )));
             }
         }
-        txn.commit().map_err(backend("embedded::open::commit"))
+        let mut id = [0_u64; 2];
+        for (part, name) in id.iter_mut().zip(STORE_ID_KEYS) {
+            *part = if let Some(value) = queue::meta_get(&txn, name)? {
+                value
+            } else {
+                let value = random_u64();
+                queue::meta_set(&txn, name, value)?;
+                value
+            };
+        }
+        txn.commit().map_err(backend("embedded::open::commit"))?;
+        Ok(Arc::from(format!("redb:{:016x}{:016x}", id[0], id[1])))
     }
 
     /// Run `work` on the blocking pool with the database and the clock.
@@ -123,6 +142,18 @@ impl EmbeddedStore {
             .await
             .map_err(|e| SchedulerError::internal(format!("embedded store task failed: {e}")))?
     }
+}
+
+/// A random `u64` from the standard library's per-process hash keys, mixed
+/// with the wall clock and the process id (no extra dependency).
+fn random_u64() -> u64 {
+    use std::hash::{BuildHasher, Hasher};
+    let mut hasher = std::collections::hash_map::RandomState::new().build_hasher();
+    if let Ok(since_epoch) = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+        hasher.write_u128(since_epoch.as_nanos());
+    }
+    hasher.write_u32(std::process::id());
+    hasher.finish()
 }
 
 /// Commit `txn`, running the crash-point hooks around the commit.

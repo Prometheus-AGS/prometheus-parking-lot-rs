@@ -111,7 +111,8 @@ sequenceDiagram
   emits lifecycle events through its `HookBus` (cr-31): `Submitted`, then
   `Queued` if the task parks, `Started` if it runs, and exactly one terminal
   event (`Completed`, `Failed`, `Rejected`, `Cancelled`, `Expired` or
-  `Requeued`). Hooks run on a background delivery thread fed by a bounded
+  `Requeued`). For `DurableResourcePool` that is one terminal event per run:
+  a run that ends in `Requeued` is followed by the task's next run. Hooks run on a background delivery thread fed by a bounded
   queue, so a slow or panicking hook never stalls dispatch; when the queue is
   full, events are dropped and counted (`HookBus::dropped_events`). With no
   hook registered, emission is one atomic load and a branch. The WASM pool

@@ -39,7 +39,7 @@
 //! | the executor returned a value | `Completed` with the value | ack |
 //! | executor error, panic, budget exceeded | `Failed(error)` | dead-letter |
 //! | deadline passed before the task started | `Expired` | dead-letter |
-//! | cost exceeds the pool's total capacity | `Dropped(reason)` | dead-letter |
+//! | cost exceeds this pool's capacity (another consumer may fit it) | nothing | nack (requeue after one lease duration) |
 //! | delivery still failing after retries | nothing | nack (requeue) |
 //! | pool shut down before the task started | nothing | nack (requeue) |
 //! | cancelled by `shutdown_with` while running | nothing | nack (requeue) |
@@ -47,9 +47,14 @@
 //!
 //! Failures are final, as in the in-memory pool (no automatic retry); they are
 //! dead-lettered rather than acked so operators keep a record of them in the
-//! queue. A task that kills its process is redelivered on every restart; cap
-//! that with the backend's own attempt limit (for example
+//! queue. A task that kills its process is redelivered on every restart, and a
+//! task too large for every consumer of the queue cycles between them; cap
+//! both with the backend's own attempt limit (for example
 //! `PgLeaseQueue::with_max_attempts`).
+//!
+//! `max_units` bounds the units of running tasks; a zero-cost task takes no
+//! unit, so the number of running tasks is bounded separately by
+//! [`DurableOptions::with_max_running`] (default: `max_units`).
 //!
 //! # Exactly one consumable result
 //!
@@ -59,13 +64,20 @@
 //! - the task's own [`idempotency_key`](TaskMetadata::idempotency_key) when
 //!   the caller set one, so a client that resubmits a finished task gets no
 //!   second result either;
-//! - otherwise `"<pool name>:entry:<queue entry id>"`. The entry id is
+//! - otherwise `"<queue identity>:entry:<queue entry id>"`. The entry id is
 //!   assigned once at enqueue and travels with every redelivery of the entry
-//!   (it is the [`LeaseToken::entry`]), so every execution of one accepted
-//!   task delivers under one key.
+//!   (it is the [`LeaseToken::entry`]); [`LeaseQueue::identity`] names the
+//!   queue the same way in every process. So every execution of one accepted
+//!   task delivers under one key, whichever pool runs it.
 //!
 //! A redelivered task that already delivered its result therefore runs again
-//! but stores nothing new: the consumer sees exactly one result.
+//! but stores nothing new: the consumer sees exactly one result. The key does
+//! not involve the pool's [name](DurableOptions::with_name): any number of
+//! pools, named alike or differently, can consume one queue, and pools on
+//! different queues can deliver into one mailbox, without a duplicate or a
+//! lost result. One limit: a queue dropped and recreated under the same
+//! identity can reuse entry ids (see [`LeaseQueue::identity`]); recreate its
+//! mailbox with it, or set task idempotency keys.
 //!
 //! # Where duplicates still execute
 //!
@@ -96,18 +108,36 @@
 //! # Lifecycle events (cr-31)
 //!
 //! The pool emits on [`DurableOptions::hooks`], keyed by
-//! [`TaskMetadata::id`]: `Submitted` first in `submit`, `Rejected` when
-//! `submit` refuses the task (nothing is stored then). For each leased task:
-//! `Queued` when it waits for capacity (under the dispatch lock), `Started`
-//! just before the executor runs, then one terminal event for this run,
-//! emitted when the lease is about to be resolved: `Completed` or `Failed`
-//! once the outcome is stored in the mailbox (or at once without a mailbox
-//! key), `Expired` for a deadline that passed before it started, `Rejected`
-//! (`CapacityExceeded`) for a cost the pool can never admit, and `Requeued`
-//! whenever the task goes back to the queue (shutdown, a delivery that keeps
-//! failing, or a panic outside the executor, which leaves the lease to
-//! expire). A redelivered task's events start at `Queued`/`Started`; its
-//! `Submitted` came from the process that accepted it.
+//! [`TaskMetadata::id`].
+//!
+//! **The durable contract is one terminal event per run**, not per task: a
+//! task can run several times (in this process or others), and each run ends
+//! with exactly one terminal event. Every run but the last ends in
+//! `Requeued`; nothing follows a terminal event other than `Requeued`, after
+//! which the next run's events may follow. So within one process a task's
+//! events are `Submitted`, then one or more runs of the form
+//! `[Queued] [Started] terminal`, each run but the last ending in `Requeued`.
+//!
+//! - `Submitted` first in `submit`. `Rejected` when `submit` refuses the task
+//!   for certain (shutdown, expired deadline, a cost over this pool's
+//!   capacity, a full queue): nothing is stored. When the enqueue fails with
+//!   an unknown outcome (a backend error), no terminal event is emitted: the
+//!   task may have been stored and run, and that run emits its own events.
+//! - Per run of a leased task: `Queued` when it waits for capacity (under the
+//!   dispatch lock), `Started` just before the executor runs, then the run's
+//!   terminal event, emitted when the lease is about to be resolved:
+//!   `Completed` or `Failed` once the outcome is stored in the mailbox (or at
+//!   once without a mailbox key), `Expired` for a deadline that passed before
+//!   it started, and `Requeued` whenever the task goes back to the queue
+//!   (shutdown, a cost too large for this pool, a delivery that keeps
+//!   failing, or a panic outside the executor, which leaves the lease to
+//!   expire).
+//!
+//! A run redelivered from the queue starts at `Queued`/`Started`; its
+//! `Submitted` came from the process that accepted it. A redelivered run
+//! reports its own outcome: after a crash between storing a `Failed` result
+//! and dead-lettering it, the next run can emit `Completed` while the stored
+//! result stays `Failed` (first write wins).
 //!
 //! # Ordering difference from the in-memory pool
 //!
@@ -138,7 +168,7 @@ use std::time::{Duration, Instant};
 use prometheus_parking_lot_core::dispatch::{Dispatched, Dispatcher, Grant, Parkable, Ticket};
 use prometheus_parking_lot_core::semaphore::{Permit, UnitSemaphore, UnitVector};
 use prometheus_parking_lot_core::{
-    Delivery, LeaseQueue, LeaseToken, LeasedTask, MailboxKey, NackAction, PoolLimits, ResourceKind,
+    Delivery, LeaseQueue, LeaseToken, LeasedTask, MailboxKey, NackAction, PoolLimits,
     ResultMailbox, ScheduledTask, SchedulerError, Spawn, TaskError, TaskExecutor, TaskId,
     TaskMetadata, TaskPayload, TaskStatus, now_ms,
 };
@@ -147,7 +177,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::contain::contain;
 use crate::events::Events;
-use crate::ledger::{Held, Ledger};
+use crate::ledger::{Background, Held, Ledger};
 use crate::shutdown::{ShutdownPolicy, ShutdownReport};
 
 pub use self::options::DurableOptions;
@@ -156,6 +186,20 @@ pub use self::options::DurableOptions;
 const ATTEMPTS: u32 = 5;
 /// Delay after the first failed attempt; doubles after each further one.
 const FIRST_BACKOFF: Duration = Duration::from_millis(100);
+/// Whether an enqueue error means the task was certainly not stored (the
+/// queue or the pool refused it), as opposed to an outcome the caller cannot
+/// know (a backend or connection failure mid-commit).
+const fn refused_for_sure(error: &SchedulerError) -> bool {
+    matches!(
+        error,
+        SchedulerError::QueueFull { .. }
+            | SchedulerError::CapacityExceeded { .. }
+            | SchedulerError::DeadlineExpired { .. }
+            | SchedulerError::PoolShutdown { .. }
+            | SchedulerError::InvalidConfig { .. }
+    )
+}
+
 /// How long `shutdown_with` waits, after cancelling running tasks, for them
 /// to be handed back (a nack retries for about 1.5 s before giving up).
 const CANCEL_GRACE: Duration = Duration::from_secs(5);
@@ -243,16 +287,6 @@ enum Terminal {
     Ran(Option<Instant>),
     /// Its deadline passed before it started.
     Expired,
-    /// It costs `requested` units in some dimension, more than the pool's
-    /// limit there (`available`).
-    TooLarge {
-        /// The exceeded dimension: a limited kind, or `None` for the total.
-        kind: Option<ResourceKind>,
-        /// Units requested in the exceeded dimension.
-        requested: u32,
-        /// The pool's limit in that dimension.
-        available: u32,
-    },
 }
 
 /// How a settled task's lease is resolved.
@@ -285,7 +319,7 @@ where
     ///
     /// [`SchedulerError::InvalidConfig`] when `options` has a zero lease, a
     /// heartbeat interval that is zero or not shorter than the lease, a zero
-    /// poll interval or an empty name.
+    /// poll interval, a zero running-task bound or an empty name.
     pub fn start(
         limits: PoolLimits,
         queue: Q,
@@ -297,7 +331,7 @@ where
         options.validate()?;
         let dispatcher = Dispatcher::in_memory(
             options.name().to_owned(),
-            UnitSemaphore::new(limits.max_units)
+            UnitSemaphore::with_max_permits(limits.max_units, options.max_running_for(&limits))
                 .with_resource_limits(options.resource_limits().clone()),
             usize::MAX,
         );
@@ -328,9 +362,10 @@ where
                 }
             }
         });
-        // The dispatcher counts as in flight until it has stopped and handed
-        // back what it held, so `shutdown_with` waits for it.
-        let dispatching = Held::new(&inner.ledger);
+        // The dispatcher counts as background work until it has stopped and
+        // handed back what it held, so `shutdown_with` waits for it (without
+        // reporting it as a task).
+        let dispatching = Background::new(&inner.ledger);
         inner
             .spawner
             .spawn(Arc::clone(&inner).dispatch(dispatching));
@@ -348,7 +383,8 @@ where
     ///
     /// # Errors
     ///
-    /// Nothing is stored when this fails:
+    /// Nothing is stored when this fails, except where the outcome is
+    /// unknown (last item):
     ///
     /// - [`SchedulerError::PoolShutdown`] after [`shutdown`](Self::shutdown);
     /// - [`SchedulerError::DeadlineExpired`] when the deadline has passed;
@@ -359,7 +395,7 @@ where
     ///   depth, [`SchedulerError::Backend`] when it cannot store the task. If
     ///   the error leaves the outcome unknown (a connection lost mid-commit),
     ///   retry with an idempotency key set; the retry resolves to the stored
-    ///   entry.
+    ///   entry. Such an error emits no `Rejected` event (the task may run).
     pub async fn submit(&self, task: ScheduledTask<P>) -> Result<TaskStatus, SchedulerError> {
         let inner = &self.inner;
         let events = inner.events();
@@ -391,8 +427,19 @@ where
             return Err(error);
         }
         let enqueued = inner.queue.enqueue(task).await.inspect_err(|error| {
-            tracing::warn!(task_id, %error, "durable enqueue failed; task not accepted");
-            events.rejected(task_id, error);
+            if refused_for_sure(error) {
+                tracing::warn!(task_id, %error, "durable enqueue refused; task not accepted");
+                events.rejected(task_id, error);
+            } else {
+                // The task may have been stored and may run (here or in
+                // another process), so no terminal event: a run that happens
+                // emits its own.
+                tracing::warn!(
+                    task_id,
+                    %error,
+                    "durable enqueue failed with an unknown outcome; the task may still run"
+                );
+            }
         })?;
         tracing::debug!(task_id, entry = %enqueued.entry(), "task persisted");
         inner.wake.notify_one();
@@ -411,7 +458,13 @@ where
     /// and handed back, and the call waits up to 5 s more for that. Every
     /// handed-back task is in the report's `requeued` (also when the nack
     /// failed and the lease is left to expire, which redelivers it the same
-    /// way); the next pool started on the queue runs it.
+    /// way); the next pool started on the queue runs it. That includes a
+    /// task whose outcome could not be stored (its delivery kept failing), so
+    /// it was handed back rather than completed.
+    ///
+    /// A task counts as `completed` once its outcome is stored and its lease
+    /// resolved, not when its executor returns: one still delivering when the
+    /// shutdown begins is counted when its delivery ends.
     ///
     /// Under `Drain`, a task still running at the deadline keeps running,
     /// heartbeat included, and resolves its lease when it finishes; it is
@@ -426,14 +479,11 @@ where
             ?policy,
             "shutting down durable pool"
         );
-        let drained = ledger
-            .wait_until(policy.drain_deadline(), |ledger| ledger.in_flight() == 0)
-            .await;
+        let settled = |ledger: &Ledger| ledger.in_flight() == 0 && ledger.background() == 0;
+        let drained = ledger.wait_until(policy.drain_deadline(), settled).await;
         if !drained && policy.cancels_stragglers() {
             inner.cancel.cancel();
-            ledger
-                .wait_until(CANCEL_GRACE, |ledger| ledger.in_flight() == 0)
-                .await;
+            ledger.wait_until(CANCEL_GRACE, settled).await;
         }
         let report = ledger.report(since);
         tracing::info!(
@@ -551,7 +601,7 @@ where
     /// event that lands between the check and the `notified().await` makes
     /// that await return at once. Work from other processes and expired
     /// leases have no notification; the poll interval bounds their latency.
-    async fn dispatch(self: Arc<Self>, dispatching: Held) {
+    async fn dispatch(self: Arc<Self>, dispatching: Background) {
         let lease_for = self.options.lease_duration();
         let poll_every = self.options.poll_interval();
         loop {
@@ -583,12 +633,16 @@ where
         drop(dispatching);
     }
 
-    /// Room to lease another task: nothing leased is waiting for capacity, and
-    /// at least one unit is free. A leased head that needs more units than are
-    /// free waits in the dispatcher and blocks further leasing (strict order,
-    /// as in the in-memory pool).
+    /// Room to lease another task: nothing leased is waiting for capacity, at
+    /// least one unit is free and fewer than
+    /// [`max_running`](DurableOptions::with_max_running) tasks run (the bound
+    /// that holds for zero-cost tasks, which take no unit). A leased head that
+    /// needs more units than are free waits in the dispatcher and blocks
+    /// further leasing (strict order, as in the in-memory pool).
     fn has_room(&self) -> bool {
-        self.dispatcher.parked() == 0 && self.dispatcher.units_in_use() < self.limits.max_units
+        self.dispatcher.parked() == 0
+            && self.dispatcher.units_in_use() < self.limits.max_units
+            && self.dispatcher.running() < self.options.max_running_for(&self.limits)
     }
 
     /// Take a leased task in: heartbeat it, then start it, let it wait for
@@ -618,36 +672,30 @@ where
         }
         let now = now_ms();
         if item.task.ticket().is_expired(now) {
-            self.settle_unrun(
-                item,
-                TaskStatus::Expired,
-                Terminal::Expired,
-                "deadline passed before the task started",
-            );
+            self.settle_expired(item);
             return;
         }
-        if let Err(SchedulerError::CapacityExceeded {
-            kind,
-            requested,
-            available,
-            ..
-        }) = self
+        if let Err(error) = self
             .dispatcher
             .check_capacity(&UnitVector::from_cost(&item.task.meta.cost))
         {
-            let reason =
-                SchedulerError::capacity_exceeded(self.options.name(), kind, requested, available)
-                    .to_string();
-            self.settle_unrun(
-                item,
-                TaskStatus::Dropped(reason.clone()),
-                Terminal::TooLarge {
-                    kind,
-                    requested,
-                    available,
-                },
-                &reason,
+            // Too large for this process, not necessarily for every consumer
+            // of the queue (mixed capacities, or limits lowered during a
+            // rolling deploy): give it back, delayed so this process does not
+            // spin on it, rather than destroy accepted work.
+            let delay = self.options.lease_duration();
+            tracing::warn!(
+                task_id = item.task.meta.id,
+                %error,
+                ?delay,
+                "leased task is too large for this pool; handing it back for another consumer"
             );
+            let inner = Arc::clone(self);
+            self.spawner.spawn(async move {
+                inner
+                    .hand_back_with(item, NackAction::requeue_after(delay))
+                    .await;
+            });
             return;
         }
         let task_id = item.task.meta.id;
@@ -670,12 +718,7 @@ where
     fn launch(self: &Arc<Self>, dispatched: Dispatched<LeasedItem<P>>) {
         let Dispatched { started, expired } = dispatched;
         for item in expired {
-            self.settle_unrun(
-                item,
-                TaskStatus::Expired,
-                Terminal::Expired,
-                "deadline passed before the task started",
-            );
+            self.settle_expired(item);
         }
         for Grant { item, permit } in started {
             tracing::debug!(task_id = item.task.meta.id, "starting durable task");
@@ -762,6 +805,21 @@ where
                 drop(held);
                 return;
             }
+            // A panic while the cancelled executor future was dropped: the
+            // task was cancelled, not failed, so it is handed back too.
+            Err(panicked) if self.cancel.is_cancelled() => {
+                tracing::warn!(
+                    task_id,
+                    %panicked,
+                    "cancelled durable task panicked while being dropped; handing it back"
+                );
+                self.release(permit);
+                reported.store(true, Ordering::Relaxed);
+                self.requeue(task_id, &idempotency_key, attempt, token, heartbeat)
+                    .await;
+                drop(held);
+                return;
+            }
             Ok(Some(Ok(outcome))) => outcome,
             Ok(Some(Err(_elapsed))) => Err(TaskError::Timeout { budget }),
             Err(panicked) => Err(TaskError::from(panicked)),
@@ -770,7 +828,6 @@ where
         // The units are free once the executor is done; deliver and ack are
         // storage IO and do not hold capacity.
         self.release(permit);
-        self.count_finished();
 
         let (status, payload, resolution) = match outcome {
             Ok(value) => {
@@ -799,9 +856,8 @@ where
             attempt,
             terminal: Terminal::Ran(started),
         };
-        self.settle(settlement, token, heartbeat, Some(reported))
+        self.settle(settlement, token, heartbeat, held, Some(reported))
             .await;
-        drop(held);
     }
 
     /// The release hook's job: spawn a drain and start what it admits, then
@@ -823,21 +879,10 @@ where
         self.wake.notify_one();
     }
 
-    /// Count an execution (or a task that can never run) that reached its
-    /// own outcome.
-    fn count_finished(&self) {
-        self.ledger.finish(1);
-    }
-
-    /// Settle a leased task that never ran (expired, or too large for the
-    /// pool): deliver its status and dead-letter it.
-    fn settle_unrun(
-        self: &Arc<Self>,
-        item: LeasedItem<P>,
-        status: TaskStatus,
-        terminal: Terminal,
-        reason: &str,
-    ) {
+    /// Settle a leased task whose deadline passed before it could start:
+    /// deliver `Expired` and dead-letter it. Every consumer would refuse it
+    /// (as `submit` does), so it is not handed back.
+    fn settle_expired(self: &Arc<Self>, item: LeasedItem<P>) {
         let LeasedItem {
             task,
             token,
@@ -845,23 +890,22 @@ where
             held,
             attempt,
         } = item;
+        let reason = "deadline passed before the task started";
         self.failed.fetch_add(1, Ordering::Relaxed);
-        self.count_finished();
         tracing::warn!(task_id = task.meta.id, reason, "durable task cannot run");
         let settlement = Settlement {
             task_id: task.meta.id,
             mailbox: task.meta.mailbox.clone(),
             idempotency_key: self.idempotency_key(&task.meta, token),
-            status,
+            status: TaskStatus::Expired,
             payload: None,
             resolution: Resolution::DeadLetter(reason.to_owned()),
             attempt,
-            terminal,
+            terminal: Terminal::Expired,
         };
         let inner = Arc::clone(self);
         self.spawner.spawn(async move {
-            inner.settle(settlement, token, heartbeat, None).await;
-            drop(held);
+            inner.settle(settlement, token, heartbeat, held, None).await;
         });
     }
 
@@ -871,12 +915,15 @@ where
     /// task and the idempotent delivery keeps one result.
     ///
     /// The run's terminal event is emitted once the outcome is stored (or the
-    /// task handed back), and `reported` set just before it.
+    /// task handed back), and `reported` set just before it. `held` is
+    /// settled once the lease is resolved: as finished when the outcome was
+    /// stored, as requeued when the task was handed back.
     async fn settle(
         &self,
         settlement: Settlement<T>,
         token: LeaseToken,
         heartbeat: Heartbeat,
+        held: Held,
         reported: Option<&AtomicBool>,
     ) {
         let Settlement {
@@ -918,6 +965,8 @@ where
                 if let Err(error) = self.queue.nack(token, NackAction::requeue()).await {
                     tracing::warn!(task_id, %error, "nack failed; the lease will expire instead");
                 }
+                // Settled as requeued: the task runs again.
+                drop(held);
                 return;
             }
             delivery.status
@@ -933,6 +982,9 @@ where
         drop(heartbeat);
         #[cfg(not(parking_lot_negative_control = "s-16"))]
         self.resolve(task_id, token, &resolution).await;
+        // The outcome is stored: a lease that could not be resolved expires
+        // and the redelivery stores nothing new.
+        held.finish();
     }
 
     /// Emit a settled run's terminal event.
@@ -940,24 +992,6 @@ where
         let events = self.events();
         match (terminal, status) {
             (Terminal::Expired, _) => events.expired(task_id),
-            (
-                Terminal::TooLarge {
-                    kind,
-                    requested,
-                    available,
-                },
-                _,
-            ) => {
-                if events.bus.is_active() {
-                    let error = SchedulerError::capacity_exceeded(
-                        self.options.name(),
-                        *kind,
-                        *requested,
-                        *available,
-                    );
-                    events.rejected(task_id, &error);
-                }
-            }
             (Terminal::Ran(_), TaskStatus::Failed(error)) => events.failed(task_id, error),
             (Terminal::Ran(started), _) => events.completed(task_id, *started),
         }
@@ -1080,6 +1114,11 @@ where
 
     /// Give a leased task that will not run here back to the queue.
     async fn hand_back(&self, item: LeasedItem<P>) {
+        self.hand_back_with(item, NackAction::requeue()).await;
+    }
+
+    /// Give a leased task back to the queue with `action` (a requeue).
+    async fn hand_back_with(&self, item: LeasedItem<P>, action: NackAction) {
         let LeasedItem {
             task,
             token,
@@ -1088,15 +1127,23 @@ where
             attempt,
         } = item;
         let idempotency_key = self.idempotency_key(&task.meta, token);
-        self.requeue(task.meta.id, &idempotency_key, attempt, token, heartbeat)
-            .await;
+        self.requeue_with(
+            task.meta.id,
+            &idempotency_key,
+            attempt,
+            token,
+            heartbeat,
+            action,
+        )
+        .await;
         drop(held);
     }
 
     /// Stop the heartbeat, then `nack(Requeue)` the lease, retrying a backend
-    /// failure. Counted as requeued in every case: a lost lease is already
-    /// back in the queue (or held by its new consumer), and a nack that keeps
-    /// failing leaves the lease to expire, which redelivers it the same way.
+    /// failure. The caller drops the task's `Held` afterwards, which counts it
+    /// as requeued in every case: a lost lease is already back in the queue
+    /// (or held by its new consumer), and a nack that keeps failing leaves the
+    /// lease to expire, which redelivers it the same way.
     ///
     /// Emits the run's `Requeued` event first.
     async fn requeue(
@@ -1107,12 +1154,33 @@ where
         token: LeaseToken,
         heartbeat: Heartbeat,
     ) {
+        self.requeue_with(
+            task_id,
+            idempotency_key,
+            attempt,
+            token,
+            heartbeat,
+            NackAction::requeue(),
+        )
+        .await;
+    }
+
+    /// [`requeue`](Self::requeue) with a chosen requeue action.
+    async fn requeue_with(
+        &self,
+        task_id: TaskId,
+        idempotency_key: &str,
+        attempt: u32,
+        token: LeaseToken,
+        heartbeat: Heartbeat,
+        action: NackAction,
+    ) {
         self.events()
             .requeued(task_id, Some(idempotency_key), attempt);
         drop(heartbeat);
         let mut backoff = FIRST_BACKOFF;
         for attempt in 1..=ATTEMPTS {
-            match self.queue.nack(token, NackAction::requeue()).await {
+            match self.queue.nack(token, action.clone()).await {
                 Ok(()) => break,
                 Err(SchedulerError::LeaseLost { entry }) => {
                     tracing::info!(
@@ -1134,15 +1202,15 @@ where
                 ),
             }
         }
-        self.ledger.requeued();
     }
 
     /// The delivery's idempotency key: the caller's key, or one derived from
-    /// the queue entry, which is the same for every redelivery of the entry.
+    /// the queue's identity and the entry, which is the same for every
+    /// redelivery of the entry whichever pool (whatever its name) leases it.
     fn idempotency_key(&self, meta: &TaskMetadata, token: LeaseToken) -> String {
         meta.idempotency_key
             .clone()
-            .unwrap_or_else(|| format!("{}:entry:{}", self.options.name(), token.entry()))
+            .unwrap_or_else(|| format!("{}:entry:{}", self.queue.identity(), token.entry()))
     }
 
     /// The execution budget: the task's deadline when nearer than the pool's

@@ -3,22 +3,30 @@
 //! A recording hook is registered on the real pools (`ResourcePool`, the
 //! native `WorkerPool`, `DurableResourcePool` on the in-memory lease queue and
 //! result mailbox). The oracle, per task id, over the events in delivery
-//! order: `Submitted` first; then at most one `Queued`; then at most one
-//! `Started`; then exactly one terminal event, and nothing after it. It is
-//! checked over 1,000 concurrently submitted tasks (completions, failures,
-//! panics, expiries and rejections mixed), over shutdown cancellation under
-//! each cr-29 policy, over rejection at submit and over the durable pool's
-//! requeue path.
+//! order: `Submitted` first; then one or more *runs*, each at most one
+//! `Queued`, then at most one `Started`, then exactly one terminal event.
+//! Only a run that ends in `Requeued` (a durable pool handed the task back to
+//! its queue) may be followed by another run; nothing follows any other
+//! terminal event. The in-memory pools never requeue, so for them this is
+//! "exactly one terminal event per task"; for the durable pool it is "exactly
+//! one terminal event per run". It is checked over 1,000 concurrently
+//! submitted tasks (completions, failures, panics, expiries and rejections
+//! mixed), over shutdown cancellation under each cr-29 policy, over rejection
+//! at submit and over the durable pool's requeue paths (shutdown, and a
+//! delivery that keeps failing).
 //!
 //! ```text
 //! cargo nextest run -p prometheus-parking-lot-runtime-tokio --locked -E "test(lifecycle_events_)"
 //! ```
 //!
 //! Negative control: under `--cfg parking_lot_negative_control="s-21"` the
-//! pools suppress the terminal event of a task cancelled at shutdown, so the
-//! `lifecycle_events_*_cancelled_*` tests must fail ("no terminal event").
+//! pools suppress the terminal event of a task cancelled at shutdown and of a
+//! durable run handed back to its queue, so the
+//! `lifecycle_events_*_cancelled_*` and `lifecycle_events_durable_*_requeued_*`
+//! tests must fail.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::future::Future;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -29,9 +37,11 @@ use serde::{Deserialize, Serialize};
 use prometheus_parking_lot_core::config::WorkerPoolConfig;
 use prometheus_parking_lot_core::hooks::{CancelledReason, RejectionReason};
 use prometheus_parking_lot_core::{
-    Hook, HookBus, InMemoryLeaseQueue, InMemoryMailbox, InMemoryQueue, InMemoryResultMailbox,
-    LifecycleEvent, MailboxKey, PoolLimits, Priority, ResourceCost, ResourceKind, ScheduledTask,
-    SchedulerError, TaskError, TaskExecutor, TaskMetadata, WorkerExecutor, now_ms,
+    Delivery, DeliveryOutcome, Enqueued, Hook, HookBus, InMemoryLeaseQueue, InMemoryMailbox,
+    InMemoryQueue, InMemoryResultMailbox, LeaseQueue, LeaseToken, LeasedTask, LifecycleEvent,
+    MailboxEntry, MailboxKey, NackAction, PoolLimits, Priority, QueueDepth, ResourceCost,
+    ResourceKind, ResultMailbox, ScheduledTask, SchedulerError, TaskError, TaskExecutor,
+    TaskMetadata, WorkerExecutor, now_ms,
 };
 use prometheus_parking_lot_runtime_tokio::{
     DurableOptions, DurableResourcePool, ResourcePool, ShutdownPolicy, TokioSpawner, WorkerPool,
@@ -95,8 +105,10 @@ fn violations(events: &[LifecycleEvent], ids: &BTreeSet<u64>) -> Vec<String> {
 }
 
 fn check_sequence(kinds: &[&str]) -> Result<(), String> {
-    // 0 nothing, 1 submitted, 2 queued, 3 started, 4 terminal.
+    // 0 nothing, 1 submitted (or a run handed back: a new run may follow),
+    // 2 queued, 3 started, 4 final terminal.
     let mut stage = 0;
+    let mut handed_back = false;
     for kind in kinds {
         stage = match (*kind, stage) {
             (_, 4) => return Err(format!("`{kind}` after the terminal event")),
@@ -107,10 +119,13 @@ fn check_sequence(kinds: &[&str]) -> Result<(), String> {
                 return Err(format!("`{kind}` out of order"));
             }
             (_, 0) => return Err(format!("terminal `{kind}` before `submitted`")),
+            // The run ended and the task went back to its queue.
+            ("requeued", _) => 1,
             (_, _) => 4,
         };
+        handed_back = *kind == "requeued";
     }
-    if stage == 4 {
+    if stage == 4 || handed_back {
         Ok(())
     } else {
         Err("no terminal event".into())
@@ -645,6 +660,192 @@ async fn lifecycle_events_durable_pool_requeued_at_shutdown() {
 // The oracle itself
 // ---------------------------------------------------------------------------
 
+/// A result mailbox whose first `fail` deliveries fail.
+struct FlakyMailbox {
+    inner: InMemoryResultMailbox<String>,
+    fail: Mutex<u32>,
+}
+
+impl ResultMailbox<String> for FlakyMailbox {
+    async fn deliver(&self, delivery: Delivery<String>) -> Result<DeliveryOutcome, SchedulerError> {
+        let failing = {
+            let mut left = self.fail.lock();
+            left.checked_sub(1).map(|rest| *left = rest).is_some()
+        };
+        if failing {
+            return Err(SchedulerError::internal("injected delivery failure"));
+        }
+        self.inner.deliver(delivery).await
+    }
+
+    fn consume(
+        &self,
+        key: &MailboxKey,
+    ) -> impl Future<Output = Result<Option<MailboxEntry<String>>, SchedulerError>> + Send {
+        self.inner.consume(key)
+    }
+
+    fn peek(
+        &self,
+        key: &MailboxKey,
+    ) -> impl Future<Output = Result<Option<MailboxEntry<String>>, SchedulerError>> + Send {
+        self.inner.peek(key)
+    }
+
+    fn evict_expired(&self) -> impl Future<Output = Result<usize, SchedulerError>> + Send {
+        self.inner.evict_expired()
+    }
+}
+
+fn durable_options(bus: &HookBus) -> DurableOptions {
+    DurableOptions::new(Duration::from_secs(30))
+        .with_name("s21")
+        .with_poll_interval(Duration::from_millis(20))
+        .with_hooks(bus.clone())
+}
+
+/// A durable run whose delivery keeps failing is handed back (`Requeued`
+/// ends that run) and the next run completes: one terminal event per run.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn lifecycle_events_durable_delivery_failure_requeued_then_completed() {
+    let log = Arc::new(Log::default());
+    let bus = HookBus::new();
+    bus.register(Arc::clone(&log) as Arc<dyn Hook>);
+    let pool = DurableResourcePool::start(
+        PoolLimits {
+            max_units: 2,
+            max_queue_depth: 100,
+            default_timeout: Duration::from_secs(60),
+        },
+        InMemoryLeaseQueue::<Job>::new(100),
+        // Five failures: every delivery attempt of the first run fails.
+        FlakyMailbox {
+            inner: InMemoryResultMailbox::new(),
+            fail: Mutex::new(5),
+        },
+        Runner,
+        TokioSpawner::new(tokio::runtime::Handle::current()),
+        durable_options(&bus),
+    )
+    .expect("start");
+    pool.submit(task(1, 1, sleep_job(0)))
+        .await
+        .expect("accepted");
+    wait_for(&log, 1, |event| event.kind() == "completed").await;
+
+    let ids: BTreeSet<u64> = BTreeSet::from([1]);
+    let events = settle(&bus, &log, &ids).await;
+    assert_ordered(&bus, &events, &ids);
+    let kinds: Vec<&str> = log.of(1).iter().map(LifecycleEvent::kind).collect();
+    assert_eq!(
+        kinds,
+        ["submitted", "started", "requeued", "started", "completed"]
+    );
+    let result = pool.mailbox().consume(&key(1)).await.expect("consume");
+    assert!(result.is_some(), "the second run's result is stored");
+}
+
+/// A queue whose `enqueue` fails with `error`, the outcome of which the pool
+/// cannot know.
+struct FailingEnqueue {
+    inner: InMemoryLeaseQueue<Job>,
+    error: fn() -> SchedulerError,
+}
+
+impl LeaseQueue<Job> for FailingEnqueue {
+    fn enqueue(
+        &self,
+        _task: ScheduledTask<Job>,
+    ) -> impl Future<Output = Result<Enqueued, SchedulerError>> + Send {
+        std::future::ready(Err((self.error)()))
+    }
+
+    fn lease(
+        &self,
+        max: usize,
+        lease_for: Duration,
+    ) -> impl Future<Output = Result<Vec<LeasedTask<Job>>, SchedulerError>> + Send {
+        self.inner.lease(max, lease_for)
+    }
+
+    fn ack(&self, token: LeaseToken) -> impl Future<Output = Result<(), SchedulerError>> + Send {
+        self.inner.ack(token)
+    }
+
+    fn nack(
+        &self,
+        token: LeaseToken,
+        action: NackAction,
+    ) -> impl Future<Output = Result<(), SchedulerError>> + Send {
+        self.inner.nack(token, action)
+    }
+
+    fn extend(
+        &self,
+        token: LeaseToken,
+        lease_for: Duration,
+    ) -> impl Future<Output = Result<(), SchedulerError>> + Send {
+        self.inner.extend(token, lease_for)
+    }
+
+    fn depth(&self) -> impl Future<Output = Result<QueueDepth, SchedulerError>> + Send {
+        self.inner.depth()
+    }
+
+    fn max_depth(&self) -> usize {
+        self.inner.max_depth()
+    }
+
+    fn identity(&self) -> &str {
+        self.inner.identity()
+    }
+}
+
+/// An enqueue that fails with an unknown outcome (a backend error) emits no
+/// `Rejected`: the task may have been stored and may still run. A definite
+/// refusal (a full queue) is `Rejected`.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn lifecycle_events_durable_unknown_enqueue_outcome_is_not_rejected() {
+    type Case = (u64, fn() -> SchedulerError, &'static [&'static str]);
+    let cases: [Case; 2] = [
+        (
+            1,
+            || SchedulerError::internal("connection lost mid-commit"),
+            &["submitted"],
+        ),
+        (
+            2,
+            || SchedulerError::queue_full("q", 1, 1),
+            &["submitted", "rejected"],
+        ),
+    ];
+    for (id, error, expected) in cases {
+        let log = Arc::new(Log::default());
+        let bus = HookBus::new();
+        bus.register(Arc::clone(&log) as Arc<dyn Hook>);
+        let pool = DurableResourcePool::start(
+            PoolLimits {
+                max_units: 2,
+                max_queue_depth: 100,
+                default_timeout: Duration::from_secs(60),
+            },
+            FailingEnqueue {
+                inner: InMemoryLeaseQueue::new(100),
+                error,
+            },
+            InMemoryResultMailbox::<String>::new(),
+            Runner,
+            TokioSpawner::new(tokio::runtime::Handle::current()),
+            durable_options(&bus),
+        )
+        .expect("start");
+        assert!(pool.submit(task(id, 1, sleep_job(0))).await.is_err());
+        flush(&bus).await;
+        let kinds: Vec<&str> = log.of(id).iter().map(LifecycleEvent::kind).collect();
+        assert_eq!(kinds, expected, "task {id}");
+    }
+}
+
 #[test]
 fn lifecycle_events_oracle_rejects_bad_sequences() {
     assert!(check_sequence(&["submitted", "queued", "started", "completed"]).is_ok());
@@ -654,4 +855,12 @@ fn lifecycle_events_oracle_rejects_bad_sequences() {
     assert!(check_sequence(&["started", "submitted", "completed"]).is_err());
     assert!(check_sequence(&["submitted", "completed", "failed"]).is_err());
     assert!(check_sequence(&["submitted", "started", "queued", "completed"]).is_err());
+    // Durable runs: `Requeued` ends a run, and another may follow.
+    assert!(check_sequence(&["submitted", "started", "requeued", "started", "completed"]).is_ok());
+    assert!(check_sequence(&["submitted", "queued", "requeued"]).is_ok());
+    assert!(check_sequence(&["submitted", "requeued", "queued", "started", "failed"]).is_ok());
+    assert!(check_sequence(&["submitted", "started", "requeued", "started"]).is_err());
+    assert!(check_sequence(&["submitted", "started", "started", "completed"]).is_err());
+    assert!(check_sequence(&["submitted", "requeued", "submitted", "completed"]).is_err());
+    assert!(check_sequence(&["submitted", "completed", "started", "completed"]).is_err());
 }

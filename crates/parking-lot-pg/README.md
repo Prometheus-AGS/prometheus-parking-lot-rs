@@ -14,8 +14,10 @@ contracts from `prometheus-parking-lot-core`.
 - `PgmqLeaseQueue`: the same contract over the pgmq extension, through plain SQL.
 - `PgResultMailbox`: the durable `ResultMailbox`. `SweeperHandle` evicts
   expired results.
-- `PostgresAuditSink`: the audit table's SQL (`migrations()`); the sink does not
-  write to the database yet.
+- `PostgresAuditSink`: an `AuditSink` that writes events to `pl_audit_events`.
+  `spawn(pool, capacity)` starts a background writer that inserts in batches;
+  `record` never blocks, and a full buffer or a failed batch is counted in
+  `lost()` and logged. `migrate(&pool)` creates the table; `shutdown()` flushes.
 - `PgPool`: re-exported from sqlx.
 - The SQL migrations under `migrations/`, shipped in the package.
 

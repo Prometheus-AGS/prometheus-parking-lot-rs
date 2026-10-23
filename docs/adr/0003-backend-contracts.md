@@ -36,7 +36,7 @@ Two async traits in `prometheus_parking_lot_core::contracts` (re-exported at the
 root and by the facade under `core::backend`):
 
 - `LeaseQueue<P: Send>: Send + Sync` — `enqueue`, `lease`, `ack`, `nack`, `extend`,
-  `depth`, `max_depth`.
+  `depth`, `max_depth`, and `identity` (added by the amendment below).
 - `ResultMailbox<T: Send>: Send + Sync` — `deliver`, `consume`, `peek`, `evict_expired`.
 
 They take `&self` (backends hold their own pools or locks), so one instance is shared
@@ -205,3 +205,23 @@ suite must reject.
   unconsumed result for the same session; rejected as silent result loss.
 - **Forget idempotency keys on consume.** Simpler, but loses the protection exactly in
   the crash-between-deliver-and-ack case durable dispatch must survive.
+
+## Amendment (2026-10-23): queue identity
+
+The 0.3.0 gate review found that a durable pool keyed results it delivered without a
+task idempotency key as `"<pool name>:entry:<entry id>"`. Entry ids are unique only
+within one queue, and pool names are chosen by operators, so exactly-one-result
+depended on naming: differently named consumers of one queue stored a second result
+after a crash between delivery and ack, and pools on two queues sharing a mailbox
+dropped each other's results.
+
+Decision: `LeaseQueue` gains a required `fn identity(&self) -> &str`, a stable name for
+the queue that qualifies its entry ids (the same for every handle, in every process and
+across restarts; different for queues whose ids could repeat). Durable pools key
+results `"<queue identity>:entry:<entry id>"`. Required rather than defaulted, so no
+backend or wrapper silently inherits a shared default and reintroduces the collision.
+
+Known limit: a queue dropped and recreated under the same identity (a Postgres table or
+pgmq queue whose id sequence restarts) can reuse entry ids. Rejected alternative: a
+per-entry random token stored with the task, which needs a schema change in every
+backend; revisit if recreated queues prove common.

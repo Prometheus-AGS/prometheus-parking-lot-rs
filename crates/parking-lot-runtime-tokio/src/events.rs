@@ -125,7 +125,17 @@ impl Events<'_> {
         });
     }
 
+    /// The terminal event of a durable run handed back to its queue.
+    ///
+    /// Negative control S-21: suppressed under the same cfg as
+    /// [`cancelled`](Self::cancelled), so the durable `lifecycle_events_`
+    /// tests must find a requeued run without its terminal event.
     pub fn requeued(&self, task_id: TaskId, idempotency_key: Option<&str>, attempt: u32) {
+        #[cfg(parking_lot_negative_control = "s-21")]
+        {
+            let _ = (task_id, idempotency_key, attempt);
+        }
+        #[cfg(not(parking_lot_negative_control = "s-21"))]
         self.bus.emit_with(|| LifecycleEvent::Requeued {
             task_id,
             idempotency_key: idempotency_key.map(str::to_owned),

@@ -62,6 +62,10 @@ impl<Q: LeaseQueue<String>> LeaseQueue<String> for UnfencedAck<Q> {
     fn max_depth(&self) -> usize {
         self.0.max_depth()
     }
+
+    fn identity(&self) -> &str {
+        self.0.identity()
+    }
 }
 
 struct UnfencedHarness(InMemoryQueueHarness);
