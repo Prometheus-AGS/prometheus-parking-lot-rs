@@ -162,6 +162,15 @@ entry names the OpenSpec change that made it.
 
 ### Added
 
+- **`PostgresAuditSink` writes events (audit finding).** It was an empty stub
+  that silently dropped every event. `PostgresAuditSink::spawn(pool, capacity)`
+  now queues `record`ed events on a bounded channel and a background task
+  inserts them in batches into `pl_audit_events` (migration
+  `007_audit_events.sql`, applied by `PostgresAuditSink::migrate`). It never
+  blocks `record`; events dropped on a full buffer or lost with a failed batch
+  are counted (`lost()`) and logged, and `shutdown().await` drains the queue.
+  `payload` is `TEXT` (the old, never-applied DDL said `JSONB`). Needs a Tokio
+  runtime.
 - **Notifier composition in the facade (cr-34, cr-32, cr-47).**
   `BackgroundNotifier`, `DetachedNotifier`, `RetryPolicy`, `Sleeper`,
   `NotifyStats` and `NotifyStatsSnapshot` are re-exported at
@@ -500,6 +509,9 @@ entry names the OpenSpec change that made it.
 
 ### Removed
 
+- **`migrations/003_install_pgmq.sql`.** Nothing applied it, and its
+  `COMMENT ON EXTENSION` failed when pgmq was absent. `PgmqLeaseQueue` installs
+  the extension through `006_pgmq_lease_queue.sql`.
 - **The sea-orm Postgres backends (cr-27).** The synchronous `PostgresQueue` and
   `PostgresMailbox`, the sea-orm entities (`infra::entities`), and migrations 001
   and 002 are removed (existing `pl_queue_jobs` / `pl_mailbox_messages` tables
@@ -532,6 +544,34 @@ entry names the OpenSpec change that made it.
 
 - The WASM pool ignored `max_units` (audit C1); it now enforces capacity,
   priority then FIFO order and the queue depth (cr-38).
+- **`PgmqLeaseQueue`: a nacked token could still be used (cr-30).** After
+  `nack(Requeue { delay > 0 })` the old lease token passed the fence guard again
+  (the delay sets the visibility timeout without changing `read_ct`), so
+  `ack(old)` deleted the requeued task and `extend(old)` kept it hidden. The
+  nack now records the end of the delay in `pl_pgmq_aux` in the same statement
+  and the guard rejects a token while a delay runs; every operation is still one
+  atomic statement. The shared `LeaseQueue` conformance suite gains
+  `nacked_token_is_fenced_during_delay` (all backends), and
+  `enqueue_and_lease_round_trip` now also asserts `meta.sequence`.
+- **Conformance cases robust on a loaded machine.** `leased_task_is_invisible`
+  and `extend_keeps_lease` use leases much longer than the time they let pass, so a
+  stalled real-clock backend cannot expire a lease between two calls.
+- **Migrations took blocking locks on every start (cr-26, cr-27, cr-30,
+  cr-36).** `CREATE INDEX IF NOT EXISTS` (SHARE) and `DROP TRIGGER` /
+  `CREATE TRIGGER` (ACCESS EXCLUSIVE) ran on every call to `migrate`, and
+  `PgmqLeaseQueue::prepare()` re-ran `pgmq.create`. They are now guarded by
+  catalog checks (`CREATE OR REPLACE TRIGGER` when a trigger is missing), each
+  script sets `lock_timeout = 5s`, and `ALTER TABLE ... SET` runs only when the
+  options differ. A re-run no longer queues behind an open transaction.
+- **`PgLeaseQueue` `lease` and the reaper could wait on, or deadlock over, row
+  locks (cr-26).** The attempts-exhausted sweep inside `lease` and the reaper
+  now pick rows with an ordered `FOR UPDATE SKIP LOCKED` sub-select.
+- **A failed dead-letter write discarded tasks already leased (cr-26, cr-30).**
+  `lease` now logs the failure and returns the tasks it leased; the entry that
+  could not be dead-lettered stays leased until its lease expires.
+- `QueueListener::wait` no longer claims to be cancel safe: sqlx does not
+  promise that a cancelled receive keeps a notification. Callers already poll
+  on `Wake::TimedOut`.
 
 ### Known limitations
 
