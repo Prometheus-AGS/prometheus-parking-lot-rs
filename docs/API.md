@@ -54,10 +54,10 @@ Two generations coexist until durable dispatch (cr-49), per ADR 0003.
 
 | Contract | Kind | Implementations |
 | --- | --- | --- |
-| `TaskQueue<P>` | synchronous, in-process; what `ResourcePool` parks tasks in today | `infra::InMemoryQueue`; `infra::queue::PostgresQueue` (`postgres`); `infra::YaqueQueue` (`embedded`) |
-| `Mailbox<T>` | synchronous; where `ResourcePool` delivers outcomes today | `infra::InMemoryMailbox`; `infra::mailbox::PostgresMailbox` (`postgres`); `infra::YaqueMailbox` (`embedded`) |
-| `LeaseQueue<P>` | async, leasing (`enqueue`, `lease`, `ack`, `nack`, `extend`, `depth`) | `infra::queue::InMemoryLeaseQueue` (reference); Postgres in cr-26, redb in cr-28 |
-| `ResultMailbox<T>` + `Notifier<T>` | async, idempotent (`deliver`, `consume`, `peek`, `evict_expired`) | `infra::mailbox::InMemoryResultMailbox` (reference); `StorageMailbox<S, N>` composes storage and notifier |
+| `TaskQueue<P>` | synchronous, in-process; what `ResourcePool` parks tasks in today | `infra::InMemoryQueue`; `infra::queue::PostgresQueue` (`postgres`) |
+| `Mailbox<T>` | synchronous; where `ResourcePool` delivers outcomes today | `infra::InMemoryMailbox`; `infra::mailbox::PostgresMailbox` (`postgres`) |
+| `LeaseQueue<P>` | async, leasing (`enqueue`, `lease`, `ack`, `nack`, `extend`, `depth`) | `infra::queue::InMemoryLeaseQueue` (reference); `infra::queue::RedbLeaseQueue` from `infra::EmbeddedStore` (`embedded`, crash-safe); Postgres in cr-26 |
+| `ResultMailbox<T>` + `Notifier<T>` | async, idempotent (`deliver`, `consume`, `peek`, `evict_expired`) | `infra::mailbox::InMemoryResultMailbox` (reference); `infra::mailbox::RedbResultMailbox` (`embedded`, crash-safe); Postgres in cr-27; `StorageMailbox<S, N>` composes storage and notifier |
 
 The async contracts live in `core::backend` and are not yet used by any pool.
 The backend conformance suite is `prometheus_parking_lot_core::conformance`

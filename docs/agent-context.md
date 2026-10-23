@@ -30,7 +30,7 @@ crates/parking-lot-core/      contracts/ (sync TaskQueue/Mailbox, async LeaseQue
                               — no async runtime, IO, database or network dependency
 crates/parking-lot-runtime-tokio/  ResourcePool, native WorkerPool, shutdown, cancellation, TokioSpawner
 crates/parking-lot-pg/        SeaORM PostgresQueue/PostgresMailbox, audit sink, migrations/, PG 17/18 test images
-crates/parking-lot-embedded/  file-backed YaqueQueue/YaqueMailbox (redb in cr-28)
+crates/parking-lot-embedded/  redb EmbeddedStore, RedbLeaseQueue, RedbResultMailbox (ADR 0004; pools use them from cr-49)
 crates/parking-lot-wasm/      wasm32 WorkerPool (built for wasm32 only; cr-38)
 tests/, benches/, examples/   full-stack tests, criterion (queue_bench), examples
 docker/                       parking-lot-pg:18 and :17 images (Postgres + pgmq)

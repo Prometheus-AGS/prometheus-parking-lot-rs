@@ -16,9 +16,10 @@ entry names the OpenSpec change that made it.
 - **Workspace split (cr-48).** The crate is now a workspace: the facade
   `prometheus_parking_lot` re-exports `prometheus-parking-lot-core`,
   `-runtime-tokio`, `-pg`, `-embedded` and `-wasm` under the paths 0.2 used
-  (`core::*`, `infra::*`, `config::*`, `runtime::*`, `util::*`). The file-backed
-  `YaqueQueue` and `YaqueMailbox` are now behind the new `embedded` feature
-  (0.2 compiled them unconditionally).
+  (`core::*`, `infra::*`, `config::*`, `runtime::*`, `util::*`). The embedded
+  backends are behind the new `embedded` feature (0.2 compiled its file-backed
+  stores unconditionally); since cr-28 that feature enables the redb backends
+  below.
 - **Toolchain (cr-41).** MSRV is 1.95 and the edition is 2024; the repository
   pins Rust 1.99.1 and commits `Cargo.lock`.
 - **Fallible executors (cr-18).** `TaskExecutor::execute` and
@@ -100,8 +101,8 @@ entry names the OpenSpec change that made it.
   re-exported by the facade under `core::backend`. The reference
   implementations are `InMemoryLeaseQueue` (with `DeadLetter`) in
   `infra::queue` and `InMemoryResultMailbox` in `infra::mailbox`. No pool uses
-  these contracts yet (durable dispatch is cr-49), and no durable backend
-  implements them yet (cr-26, cr-27, cr-28).
+  these contracts yet (durable dispatch is cr-49). The redb backends (cr-28,
+  below) implement them; the Postgres ones are cr-26 and cr-27.
 - `SchedulerError::LeaseLost` (cr-25): the lease on a queue entry is no longer
   held; not retryable.
 - **Backend conformance suite (cr-25).** The `conformance` feature of
@@ -116,6 +117,28 @@ entry names the OpenSpec change that made it.
   use them; the Docker-only (`#[ignore]`d) smoke tests check that each image
   starts and has pgmq. These are
   test and development images, not part of the published crates.
+
+- **Crash-safe embedded queue and mailbox (cr-28, ADR 0004).** With the
+  `embedded` feature, `EmbeddedStore::open(path)` opens one redb database file;
+  `store.lease_queue::<P>(max_depth)` returns a `RedbLeaseQueue` and
+  `store.result_mailbox::<T>()` a `RedbResultMailbox`. They implement the async
+  `LeaseQueue` and `ResultMailbox` contracts and pass the conformance suite.
+  Every operation is one redb write transaction committed durably before it
+  returns, so an accepted task survives a crash, an expired lease is
+  redelivered and an acked task never returns. They need a tokio runtime, and
+  one process holds a database file at a time. The facade re-exports them as
+  `infra::EmbeddedStore`, `infra::queue::RedbLeaseQueue` and
+  `infra::mailbox::RedbResultMailbox`. No pool can use them yet: the pools
+  still park and deliver through the synchronous `TaskQueue` and `Mailbox`
+  until durable dispatch (cr-49). `examples/embedded_pool.rs` shows direct use.
+
+### Removed
+
+- **The JSONL file queue and mailbox (cr-28).** `YaqueQueue`, `YaqueMailbox`
+  and the facade paths `infra::queue::yaque` and `infra::mailbox::yaque` are
+  removed; the redb backends replace them. They were not crash-safe, and their
+  files are not migrated. `examples/yaque_pool.rs` is now
+  `examples/embedded_pool.rs`.
 
 ### Fixed
 

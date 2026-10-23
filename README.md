@@ -34,8 +34,8 @@ migration notes.
 | Priority, then FIFO | Yes. Letting small tasks skip ahead of a large head task is planned (cr-20). |
 | Execution budgets | Yes, for both pools. |
 | Multi-resource admission | Costs are already vectors, but pools admit by the sum of units against one `max_units`; per-dimension limits are cr-23. |
-| Executor panics | **Not contained yet** (cr-21). A panic is not turned into a `TaskError::ExecutorPanicked` outcome; do not rely on a pool surviving one. |
-| Accepted work survives a crash | **No.** The in-memory backends lose everything on restart. The current Postgres queue deletes a row when it dequeues it (at-most-once) and bridges async calls with `block_on`, which panics inside a tokio runtime. Leasing, durable backends replace it: Postgres (cr-26, cr-27) and redb (cr-28). Until then use the in-memory backends. |
+| Executor panics | Contained, for `ResourcePool` and the native `WorkerPool` (cr-21): the outcome is `TaskError::ExecutorPanicked`, the task's units are released and parked work starts; a `WorkerPool` worker killed by a panic is replaced. |
+| Accepted work survives a crash | **Not through the pools yet.** Both pools park tasks in memory and lose them on restart. The embedded redb `RedbLeaseQueue` and `RedbResultMailbox` (feature `embedded`, cr-28) are crash-safe: every operation is one durably committed transaction. They implement the async `LeaseQueue` and `ResultMailbox` contracts, which no pool uses until durable dispatch (cr-49); until then you call them directly (`examples/embedded_pool.rs`). The current Postgres queue deletes a row when it dequeues it (at-most-once) and bridges async calls with `block_on`, which panics inside a tokio runtime; leasing Postgres backends replace it (cr-26, cr-27). |
 
 ## Crates and features
 
@@ -48,14 +48,14 @@ re-exports the rest.
 | `prometheus-parking-lot-core` | Runtime-free contracts and types, the dispatcher and semaphore, hooks and audit types, in-memory backends. No async runtime, IO or database dependency. |
 | `prometheus-parking-lot-runtime-tokio` | `ResourcePool`, the native `WorkerPool`, shutdown, cancellation, `TokioSpawner` |
 | `prometheus-parking-lot-pg` | Postgres queue, mailbox and audit sink (SeaORM) and migrations; replaced by cr-26 and cr-27 |
-| `prometheus-parking-lot-embedded` | File-backed queue and mailbox for desktop use; replaced by redb in cr-28 |
+| `prometheus-parking-lot-embedded` | Crash-safe redb lease queue and result mailbox for desktop and single-node use (`EmbeddedStore`, `RedbLeaseQueue`, `RedbResultMailbox`; ADR 0004). Needs a tokio runtime. Not usable by the pools until cr-49. |
 | `prometheus-parking-lot-wasm` | `WorkerPool` for `wasm32` (async tasks instead of threads); building it for `wasm32-unknown-unknown` is cr-38 |
 
 | Facade feature | Enables | Default |
 | --- | --- | --- |
 | `tokio-runtime` | `ResourcePool`, native `WorkerPool`, shutdown, cancellation, `TokioSpawner`, `builders`, `runtime` | yes |
 | `postgres` | `infra::queue::PostgresQueue`, `infra::mailbox::PostgresMailbox`, `core::PostgresAuditSink`, SeaORM entities | no |
-| `embedded` | `infra::YaqueQueue`, `infra::YaqueMailbox` | no |
+| `embedded` | `infra::EmbeddedStore`, `infra::queue::RedbLeaseQueue`, `infra::mailbox::RedbResultMailbox` | no |
 
 The core crate has one feature, `conformance`, which publishes the test suite
 every queue and mailbox backend must pass.
