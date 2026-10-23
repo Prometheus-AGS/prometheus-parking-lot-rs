@@ -18,6 +18,11 @@
 //!   stored delivery publishes `mailbox.ready` after the result is stored, and
 //!   a notifier failure never loses a stored result.
 //!
+//! - [`IggyStreamSink`] publishes a task's streamed output (for example LLM
+//!   tokens) as ordered, numbered chunks and an end marker; an
+//!   [`IggyStreamReader`] resumes a stream from the last sequence number a
+//!   client saw, with no gap and no duplicate (see [`stream`]).
+//!
 //! # The publisher
 //!
 //! Neither type talks to the network on the caller's thread. Each owns a
@@ -49,12 +54,17 @@ mod notifier;
 mod options;
 mod publisher;
 mod runtime;
+pub mod stream;
 
 pub use hook::IggyHook;
 pub use notifier::IggyNotifier;
 pub use options::IggyOptions;
 pub use publisher::{Publisher, PublisherStats};
 pub use runtime::{TokioHandleSpawner, TokioSleeper};
+pub use stream::{
+    IggyStreamReader, IggyStreamSink, ResumePoint, StreamChunk, StreamCursor, StreamEnd,
+    StreamError, StreamItem, StreamOutcome, StreamWriter, partition_for,
+};
 
 /// Re-exported so applications name the retry schedule without a direct core
 /// import.

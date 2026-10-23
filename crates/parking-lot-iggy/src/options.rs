@@ -20,6 +20,9 @@ pub struct IggyOptions {
     pub lifecycle_topic: String,
     /// Topic for `mailbox.ready` notifications. Created when missing.
     pub mailbox_topic: String,
+    /// Topic for streamed task output ([`IggyStreamSink`](crate::IggyStreamSink)).
+    /// Created when missing.
+    pub stream_topic: String,
     /// Partitions of a topic this crate creates.
     pub partitions: u32,
     /// Tenant that partitions the lifecycle events of an [`IggyHook`](crate::IggyHook);
@@ -47,6 +50,7 @@ impl IggyOptions {
             stream: "parking-lot".to_owned(),
             lifecycle_topic: "lifecycle".to_owned(),
             mailbox_topic: "mailbox.ready".to_owned(),
+            stream_topic: "stream.chunks".to_owned(),
             partitions: 4,
             tenant: None,
             queue_capacity: 1024,
@@ -69,6 +73,13 @@ impl IggyOptions {
     pub fn with_topics(mut self, lifecycle: impl Into<String>, mailbox: impl Into<String>) -> Self {
         self.lifecycle_topic = lifecycle.into();
         self.mailbox_topic = mailbox.into();
+        self
+    }
+
+    /// Publish streamed task output to `topic`.
+    #[must_use]
+    pub fn with_stream_topic(mut self, topic: impl Into<String>) -> Self {
+        self.stream_topic = topic.into();
         self
     }
 
@@ -122,6 +133,7 @@ impl fmt::Debug for IggyOptions {
             .field("stream", &self.stream)
             .field("lifecycle_topic", &self.lifecycle_topic)
             .field("mailbox_topic", &self.mailbox_topic)
+            .field("stream_topic", &self.stream_topic)
             .field("partitions", &self.partitions)
             .field("tenant", &self.tenant)
             .field("queue_capacity", &self.queue_capacity)
