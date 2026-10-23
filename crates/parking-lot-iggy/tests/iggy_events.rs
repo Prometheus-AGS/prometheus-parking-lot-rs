@@ -89,7 +89,10 @@ async fn iggy_subscriber_receives_mailbox_ready_and_replays_from_an_offset() -> 
     assert!(notifier.flush(FLUSH).await, "publisher drained");
 
     let client = server.client().await?;
-    let messages = wait_for_messages(&client, "ready", "mailbox.ready", PARTITIONS, 6).await?;
+    // At-least-once: a send that reached the server but timed out is retried
+    // and stored twice under one id, so assert on distinct ids.
+    let messages =
+        wait_for_distinct_messages(&client, "ready", "mailbox.ready", PARTITIONS, 6).await?;
     assert_eq!(messages.len(), 6, "one mailbox.ready per completed task");
 
     let seen: BTreeSet<u64> = messages
@@ -116,30 +119,38 @@ async fn iggy_subscriber_receives_mailbox_ready_and_replays_from_an_offset() -> 
         "one tenant, one partition (ordering per tenant)"
     );
 
-    // Replay: read the partition again, then only the tail from offset 2.
+    // Replay: read the partition again, then only the tail from an offset.
+    // The offset is that of the third distinct message, so the tail must be the
+    // later four distinct ids in order; an earlier id's retried copy that lands
+    // after that offset is not a new message.
     let partition = messages[0].partition;
-    let from_start: Vec<_> = read_topic(&client, "ready", "mailbox.ready", PARTITIONS, 0)
-        .await?
-        .into_iter()
-        .filter(|m| m.partition == partition)
-        .collect();
+    let in_partition = |all: Vec<support::Read>| -> Vec<support::Read> {
+        all.into_iter()
+            .filter(|m| m.partition == partition)
+            .collect()
+    };
+    let from_start = support::distinct_by_id(in_partition(
+        read_topic(&client, "ready", "mailbox.ready", PARTITIONS, 0).await?,
+    ));
     assert_eq!(
         ready_ids(&from_start),
         ready_ids(&messages),
-        "replay from 0 is identical"
+        "replay from 0 yields the same distinct ids in the same order"
     );
-    let tail: Vec<_> = read_topic(&client, "ready", "mailbox.ready", PARTITIONS, 2)
-        .await?
-        .into_iter()
-        .filter(|m| m.partition == partition)
-        .collect();
+    let from = from_start[2].offset;
+    let earlier: BTreeSet<u128> = from_start[..2].iter().map(|m| m.id).collect();
+    let tail: Vec<_> = support::distinct_by_id(in_partition(
+        read_topic(&client, "ready", "mailbox.ready", PARTITIONS, from).await?,
+    ))
+    .into_iter()
+    .filter(|m| !earlier.contains(&m.id))
+    .collect();
     assert_eq!(
-        tail.len(),
-        4,
-        "replay from offset 2 yields the later messages"
+        ready_ids(&tail),
+        ready_ids(&from_start[2..]),
+        "replay from offset {from} yields the later distinct ids in order"
     );
-    assert_eq!(ready_ids(&tail), ready_ids(&from_start[2..]));
-    assert_eq!(tail[0].offset, 2);
+    assert_eq!(tail[0].offset, from);
     Ok(())
 }
 
