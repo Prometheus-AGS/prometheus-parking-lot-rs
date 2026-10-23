@@ -24,6 +24,12 @@
 //!   The in-memory pools' S-9 tests are in
 //!   `crates/parking-lot-runtime-tokio/tests/shutdown_test.rs`.
 //!
+//! Skip-ahead (cr-20):
+//!
+//! - `skip_ahead`: the `max_head_skips` config field (`config_*`) and a
+//!   `ResourcePool` built from configuration skipping small tasks ahead of a
+//!   blocked head within the bound (`starvation_*`).
+//!
 //! Negative control S-16: under
 //! `RUSTFLAGS='--cfg parking_lot_negative_control="s-16"'` the pool acks
 //! before the mailbox write, and the `*_between_execution_and_delivery` tests
@@ -40,3 +46,4 @@ mod durable_lease;
 mod durable_shutdown;
 #[cfg(any(feature = "postgres", feature = "embedded"))]
 mod durable_sigkill;
+mod skip_ahead;

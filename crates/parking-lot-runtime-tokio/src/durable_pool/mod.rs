@@ -114,6 +114,19 @@
 //! At most one leased task waits for capacity at a time. A task enqueued at a
 //! higher priority after that head was leased waits behind it; in the
 //! in-memory pool it would overtake the parked head.
+//!
+//! # No skip-ahead yet (cr-20)
+//!
+//! The in-memory pools let a parked task that fits start ahead of a head that
+//! does not (bounded by a starvation guard). Here the one leased head is the
+//! only parked task, so the dispatcher never has a candidate behind it and
+//! dispatch stays strictly head-of-line: a durable pool does not read
+//! `max_head_skips`. Supporting it means leasing a window of tasks behind a
+//! blocked head, each holding a lease and a heartbeat while it waits, and
+//! handing back the ones that never fit; that widens the set of tasks a crash
+//! leaves leased (and so redelivered late) and the lease churn on the backend,
+//! and it needs the lease-window crash tests before it can be claimed. It is
+//! left as follow-up work rather than shipped untested.
 
 mod options;
 

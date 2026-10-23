@@ -4,9 +4,11 @@
 //! [`Dispatcher`] owns the parked queue and a unit-weighted
 //! [`UnitSemaphore`](crate::semaphore::UnitSemaphore): submission does the
 //! depth check and the enqueue atomically, and dispatch peeks at the head and
-//! pops it only when it fits. `ResourcePool` and the native `WorkerPool`
-//! (`prometheus-parking-lot-runtime-tokio`) are built on it; the WASM pool is
-//! ported in cr-38.
+//! pops it only when it fits; when it does not, a smaller parked item that
+//! fits may skip ahead of it, a bounded number of times (cr-20). Every pool is
+//! built on it: `ResourcePool`, the native `WorkerPool` and
+//! `DurableResourcePool` (`prometheus-parking-lot-runtime-tokio`) and the WASM
+//! `WorkerPool`.
 //!
 //! `PoolCounters`, `WorkerTask` and the mailbox-key helpers were
 //! `pub(crate)` inside the single crate and are public only so the native and
@@ -16,8 +18,12 @@
 mod dispatcher;
 mod parked;
 
-pub use dispatcher::{Admission, Dispatched, Dispatcher, Grant};
-pub use parked::{Parkable, ParkedQueue, PriorityQueue, TaskQueueAdapter, Ticket};
+pub use dispatcher::{
+    Admission, DEFAULT_MAX_HEAD_SKIPS, Dispatched, Dispatcher, Grant, SkipAheadStats,
+};
+pub use parked::{
+    ADAPTER_LOOKAHEAD, Parkable, ParkedQueue, PriorityQueue, TaskQueueAdapter, Ticket,
+};
 
 use std::sync::atomic::{AtomicU64, Ordering};
 

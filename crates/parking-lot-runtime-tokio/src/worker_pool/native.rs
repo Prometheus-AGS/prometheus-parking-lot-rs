@@ -11,7 +11,9 @@
 //!   with `ResourcePool`. It enforces `max_units` (audit C1: the 0.2 pool
 //!   ignored it), serves parked tasks by priority then submission order, and
 //!   bounds admitted tasks by the worker count, so an admitted task always has
-//!   a worker and `max_queue_depth` bounds exactly the tasks waiting.
+//!   a worker and `max_queue_depth` bounds exactly the tasks waiting. A
+//!   parked task that fits may skip ahead of a head that does not, at most
+//!   [`WorkerPoolConfig::max_head_skips`] times per head (cr-20).
 //! - **Bounded execution**: every execution runs under a budget (the task's
 //!   deadline or the pool's default timeout, whichever is nearer); a task
 //!   still running at its budget is cancelled, its units are released and its
@@ -62,7 +64,7 @@ use tracing::{debug, error, info, warn};
 
 use prometheus_parking_lot_core::config::WorkerPoolConfig;
 use prometheus_parking_lot_core::dispatch::{
-    Dispatched, Dispatcher, Grant, PoolCounters, WorkerTask, generate_mailbox_key,
+    Dispatched, Dispatcher, Grant, PoolCounters, SkipAheadStats, WorkerTask, generate_mailbox_key,
     mailbox_key_to_string,
 };
 use prometheus_parking_lot_core::semaphore::UnitSemaphore;
@@ -710,7 +712,8 @@ where
                 POOL_NAME,
                 UnitSemaphore::with_max_permits(config.max_units, worker_permits),
                 config.max_queue_depth,
-            ),
+            )
+            .with_max_head_skips(config.max_head_skips),
             config: config.clone(),
             results: ResultSlots::new(config.default_timeout()),
             counters: PoolCounters::default(),
@@ -999,6 +1002,13 @@ where
             Ok(outcome) => outcome.map_err(SchedulerError::Task),
             Err(missing) => Err(missing_error(key, missing)),
         }
+    }
+
+    /// Skip-ahead counters (cr-20): tasks started ahead of a parked head that
+    /// did not fit, and heads the starvation guard reserved capacity for.
+    #[must_use]
+    pub fn skip_ahead_stats(&self) -> SkipAheadStats {
+        self.shared.dispatcher.skip_ahead_stats()
     }
 
     /// Get current pool statistics.
