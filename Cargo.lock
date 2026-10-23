@@ -2783,6 +2783,7 @@ version = "0.2.0"
 dependencies = [
  "iggy",
  "prometheus-parking-lot-core",
+ "serde",
  "serde_json",
  "testcontainers",
  "tokio",

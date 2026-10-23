@@ -425,7 +425,7 @@ entry names the OpenSpec change that made it.
   `examples/embedded_pool.rs`.
 - **Unused dependencies (cr-39).** Dropped from the manifests: the `chrono` and
   `testcontainers-modules` entries of `[workspace.dependencies]` (no member used
-  them), `serde` from `prometheus-parking-lot-iggy`, and the `tracing-subscriber`
+  them) and the `tracing-subscriber`
   dev-dependency of `prometheus-parking-lot-runtime-tokio`. Build-only: no public
   API or feature changes. `Cargo.lock` shrinks from 518 to 507 packages.
 - **Duplicate `reqwest` and `flume` (cr-39).** The runtime crate's test-only
