@@ -108,11 +108,11 @@ pub mod infra {
     pub mod queue {
         pub use prometheus_parking_lot_core::contracts::memory_queue as memory;
         #[cfg(feature = "postgres")]
-        pub use prometheus_parking_lot_pg::queue as postgres;
+        pub use prometheus_parking_lot_pg::lease_queue as postgres;
 
         pub use memory::InMemoryQueue;
         #[cfg(feature = "postgres")]
-        pub use postgres::PostgresQueue;
+        pub use postgres::PgLeaseQueue;
         pub use prometheus_parking_lot_core::contracts::memory_lease_queue::{
             DeadLetter, InMemoryLeaseQueue,
         };
@@ -128,20 +128,19 @@ pub mod infra {
 
         pub use memory::InMemoryMailbox;
         #[cfg(feature = "postgres")]
-        pub use postgres::PostgresMailbox;
+        pub use postgres::PgResultMailbox;
         pub use prometheus_parking_lot_core::contracts::memory_result_mailbox::InMemoryResultMailbox;
         #[cfg(feature = "embedded")]
         pub use prometheus_parking_lot_embedded::RedbResultMailbox;
     }
-
-    #[cfg(feature = "postgres")]
-    pub use prometheus_parking_lot_pg::entities;
 
     pub use mailbox::InMemoryMailbox;
     #[cfg(feature = "embedded")]
     pub use mailbox::RedbResultMailbox;
     #[cfg(feature = "embedded")]
     pub use prometheus_parking_lot_embedded::EmbeddedStore;
+    #[cfg(feature = "postgres")]
+    pub use prometheus_parking_lot_pg::PgPool;
     pub use queue::InMemoryQueue;
     #[cfg(feature = "embedded")]
     pub use queue::RedbLeaseQueue;

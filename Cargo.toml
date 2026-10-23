@@ -38,7 +38,6 @@ crossbeam-channel = "0.5"
 num_cpus = "1.16"
 parking_lot = "0.12"
 redb = "4.4"
-sea-orm = "1.1.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sqlx = { version = "0.9.0", default-features = false }
@@ -103,10 +102,8 @@ rustdoc-args = ["--cfg", "docsrs"]
 default = ["tokio-runtime"]
 # Async ResourcePool, native WorkerPool, shutdown, cancellation, TokioSpawner.
 tokio-runtime = ["dep:prometheus-parking-lot-runtime-tokio"]
-# Postgres queue, mailbox, entities and audit schema. `sea-orm` stays a direct
-# optional dependency so applications (and examples/postgres_pool.rs) can open
-# the connection the backends take.
-postgres = ["dep:prometheus-parking-lot-pg", "dep:sea-orm"]
+# Postgres lease queue, result mailbox and audit schema (raw sqlx).
+postgres = ["dep:prometheus-parking-lot-pg"]
 # Embedded redb-backed lease queue and result mailbox (ADR 0004).
 embedded = ["dep:prometheus-parking-lot-embedded"]
 
@@ -115,7 +112,6 @@ prometheus-parking-lot-core.workspace = true
 prometheus-parking-lot-runtime-tokio = { workspace = true, optional = true }
 prometheus-parking-lot-pg = { workspace = true, optional = true }
 prometheus-parking-lot-embedded = { workspace = true, optional = true }
-sea-orm = { workspace = true, optional = true, features = ["runtime-tokio-rustls", "sqlx-postgres", "macros"] }
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true

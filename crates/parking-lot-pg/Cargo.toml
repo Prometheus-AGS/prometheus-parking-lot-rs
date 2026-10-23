@@ -1,6 +1,6 @@
 [package]
 name = "prometheus-parking-lot-pg"
-description = "Postgres queue and mailbox backends for prometheus_parking_lot."
+description = "Postgres lease queue and result mailbox backends for prometheus_parking_lot."
 documentation = "https://docs.rs/prometheus-parking-lot-pg"
 keywords = ["scheduler", "queue", "postgres", "ai"]
 categories = ["asynchronous", "database"]
@@ -19,12 +19,10 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 prometheus-parking-lot-core.workspace = true
-chrono.workspace = true
-sea-orm = { workspace = true, features = ["runtime-tokio-rustls", "sqlx-postgres", "macros"] }
 serde.workspace = true
 serde_json.workspace = true
 sqlx = { workspace = true, features = ["postgres", "runtime-tokio", "tls-rustls", "json"] }
-tokio = { workspace = true, features = ["rt", "time"] }
+tokio = { workspace = true, features = ["rt", "sync", "time"] }
 tracing.workspace = true
 
 [lints]
