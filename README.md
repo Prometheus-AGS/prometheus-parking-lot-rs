@@ -49,6 +49,7 @@ re-exports the rest.
 | `prometheus-parking-lot-runtime-tokio` | `ResourcePool`, the native `WorkerPool`, shutdown, cancellation, `TokioSpawner` |
 | `prometheus-parking-lot-pg` | Postgres lease queue, result mailbox and audit sink on raw sqlx, plus migrations |
 | `prometheus-parking-lot-embedded` | Crash-safe redb lease queue and result mailbox for desktop and single-node use (`EmbeddedStore`, `RedbLeaseQueue`, `RedbResultMailbox`; ADR 0004). Needs a tokio runtime. Not usable by the pools until cr-49. |
+| `prometheus-parking-lot-ffi` | UniFFI (Kotlin, Swift) bindings over the embedded queue and mailbox for Android and iOS; not published. See `bindings/README.md`; `bindings/tauri-desktop` is a Tauri 2 example whose queue survives an app restart. |
 | `prometheus-parking-lot-wasm` | `WorkerPool` for `wasm32` (async tasks instead of threads); building it for `wasm32-unknown-unknown` is cr-38 |
 
 | Facade feature | Enables | Default |

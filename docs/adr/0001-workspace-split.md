@@ -40,6 +40,11 @@ Requirements (openspec `crate-structure`):
 `parking-lot-iggy` and `parking-lot-ffi` are not created here; cr-31/cr-32 and cr-44
 create them, with their own features, when they have code.
 
+*Amendment (cr-44):* `crates/parking-lot-ffi` now exists as `prometheus-parking-lot-ffi`
+(not published): UniFFI Kotlin/Swift bindings over the embedded backend, owned by
+platform-engineer. The binding generator and the Tauri example live in standalone
+workspaces under `bindings/`, outside this workspace.
+
 ### Dependency rules
 
 1. **core** depends on no async runtime, IO, database or network crate. Its normal
