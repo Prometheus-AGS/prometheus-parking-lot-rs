@@ -155,6 +155,19 @@ entry names the OpenSpec change that made it.
   (`.github/scripts/check-doc-snippets.py`), and the `Docs examples` workflow
   builds every example and runs each one, the Postgres and Iggy ones against
   containers.
+- **Benchmark suites and CI job (cr-40).** Four criterion suites replace
+  `queue_bench` and `skip_ahead_bench`: `components` (semaphore, dispatcher,
+  queue, mailbox, hooks), `throughput` (tasks per second through
+  `ResourcePool`, the native `WorkerPool` and `DurableResourcePool` on the
+  in-memory backends and on redb), `latency` (submit-to-start and
+  submit-to-result p50/p95/p99 under light and saturated load, with the
+  spread across rounds) and `utilization` (the cr-20 simulation extended with a
+  cost-vector workload). Each suite writes machine and toolchain metadata with
+  its numbers (`target/bench-report/`). CI job `Benchmarks` runs them in a
+  reduced configuration on every push and pull request, stores the results as
+  the `bench-results-<sha>` artifact, and compares pull requests with the last
+  `main` baseline (report-only; see `benches/README.md`).
+  `docs/ARCHITECTURE.md` section 7 now quotes measured numbers.
 - **Multi-resource admission (cr-23, scenario S-19).** A pool can limit the
   units of each `ResourceKind` it holds at once: `resource_limits` in
   `PoolConfig` and `WorkerPoolConfig` (e.g. `{"gpu_vram": 24, "cpu": 4}`),
@@ -194,7 +207,7 @@ entry names the OpenSpec change that made it.
   skip-ahead), `UnitSemaphore::available_units`, `DEFAULT_MAX_HEAD_SKIPS`,
   `SkipAheadStats`, `ADAPTER_LOOKAHEAD`. `PriorityQueue` is now an ordered
   map, and `take_all` returns items in dispatch order. Benchmark:
-  `cargo bench --bench skip_ahead_bench` (utilization 0.947 with the default
+  `cargo bench --bench utilization` (utilization 0.947 with the default
   against 0.917 under strict order on a 95%-loaded mixed workload).
 - **Stream replay (cr-33, scenario S-33).** `IggyStreamSink` publishes a task's
   streamed output (for example LLM tokens) to the `stream.chunks` topic as

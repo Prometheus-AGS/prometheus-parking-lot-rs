@@ -1,174 +1,106 @@
-# Parking Lot Scheduler Benchmarks
+# Benchmarks
 
-Comprehensive performance benchmarks for the `prometheus_parking_lot` scheduler.
+Four [criterion](https://docs.rs/criterion) suites (cr-40). The numbers quoted in
+`docs/ARCHITECTURE.md` section 7 come from them, with the machine, toolchain and command
+next to the numbers.
 
-## Running Benchmarks
+| Suite | Measures | Source |
+|---|---|---|
+| `components` | Cost of each piece a submission goes through, one thread: semaphore claim/release (one dimension, and with a per-kind limit), dispatcher submit/complete and park/wake, `InMemoryQueue`, `InMemoryMailbox`, lifecycle-hook emission and its overhead on a pool cycle | `components.rs` |
+| `throughput` | Tasks per second through each pool: `ResourcePool`, native `WorkerPool`, `DurableResourcePool` on the in-memory backends and on redb | `throughput.rs` |
+| `latency` | Submit-to-start and submit-to-result p50/p95/p99/max per pool under light and saturated load, plus pool utilization under saturation; criterion times one idle round trip | `latency.rs` |
+| `utilization` | Units busy over time in a virtual-time simulation of the real dispatcher: strict order against skip-ahead (cr-20), one dimension against cost vectors with per-kind limits (cr-23) | `utilization.rs` |
 
-### Run all benchmarks
-```bash
-cargo bench
-```
+Each file's module documentation gives the exact workloads. Shared code: `support/mod.rs`
+(seeded generator, timeline probe, percentiles, criterion settings, metadata) and
+`support/pools.rs` (the pools under test behind one interface).
 
-### Run specific benchmark group
-```bash
-cargo bench --bench queue_bench -- queue_enqueue_dequeue
-cargo bench --bench queue_bench -- mailbox_deliver
-cargo bench --bench queue_bench -- pool_submit
-```
+## Running
 
-### Quick test (no actual benchmarking)
-```bash
-cargo bench --bench queue_bench -- --test
-```
-
-## Benchmark Categories
-
-### 1. Queue Benchmarks (`queue_benches`)
-
-#### `queue_enqueue_dequeue`
-- **What it measures**: Raw queue performance for enqueue and dequeue operations
-- **Sizes tested**: 100, 1,000, 10,000 tasks
-- **Key metric**: Throughput (operations/second)
-- **Why it matters**: Queue is the core data structure for parking tasks
-
-#### `queue_priority_sorting`
-- **What it measures**: Performance of priority-based task ordering
-- **Priorities**: Critical, High, Normal, Low (mixed in queue)
-- **Sizes tested**: 100, 1,000, 5,000 tasks
-- **Key metric**: Time to enqueue and sort all tasks
-- **Why it matters**: Priority ordering is critical for fair scheduling
-
-#### `queue_prune_expired`
-- **What it measures**: Performance of removing expired tasks
-- **Scenario**: 50% expired tasks mixed with valid tasks
-- **Sizes tested**: 100, 1,000, 5,000 tasks
-- **Key metric**: Time to identify and remove expired tasks
-- **Why it matters**: Deadline enforcement prevents resource waste
-
-### 2. Mailbox Benchmarks (`mailbox_benches`)
-
-#### `mailbox_deliver`
-- **What it measures**: Performance of delivering results to mailbox
-- **Sizes tested**: 100, 1,000, 10,000 messages
-- **Key metric**: Throughput (deliveries/second)
-- **Why it matters**: Mailbox is how results reach disconnected clients
-
-#### `mailbox_fetch`
-- **What it measures**: Performance of retrieving messages from mailbox
-- **Scenario**: Pre-populated mailbox with varying sizes
-- **Sizes tested**: 100, 1,000, 5,000 messages
-- **Key metric**: Time to fetch all messages for a mailbox key
-- **Why it matters**: Clients need fast access to their results
-
-### 3. ResourcePool Benchmarks (`pool_benches`)
-
-#### `pool_submit_immediate`
-- **What it measures**: Task submission when capacity is available
-- **Scenario**: Submit tasks that fit within pool capacity
-- **Capacities tested**: 10, 50, 100 units
-- **Key metric**: Submission latency
-- **Why it matters**: Low latency critical for immediate task execution
-
-#### `pool_submit_with_queueing`
-- **What it measures**: Task submission when capacity is exhausted
-- **Scenario**: Submit more tasks than pool capacity (forces queueing)
-- **Pool capacity**: 10 units (fixed)
-- **Task counts**: 50, 100, 200 tasks
-- **Key metric**: Throughput (submissions/second)
-- **Why it matters**: Queue management overhead impacts overall throughput
-
-#### `pool_mixed_priorities`
-- **What it measures**: Scheduling performance with mixed priority tasks
-- **Scenario**: 100 tasks with varied priorities (Critical, High, Normal, Low)
-- **Distribution**: Realistic mix simulating production workload
-- **Key metric**: Total scheduling time
-- **Why it matters**: Priority scheduling must not significantly degrade performance
-
-#### `pool_deadline_checking`
-- **What it measures**: Performance of deadline enforcement
-- **Scenario**: Submit 50 tasks with expired deadlines
-- **Key metric**: Rejection latency
-- **Why it matters**: Fast rejection prevents wasted resources
-
-### 4. End-to-End Scenarios (`scenario_benches`)
-
-#### `end_to_end_scenario/realistic_workload`
-- **What it measures**: Complete parking lot algorithm under realistic conditions
-- **Scenario**: 
-  - 150 tasks submitted
-  - Mixed priorities (20% Critical, 30% High, 30% Normal, 20% Low)
-  - 10% have deadlines
-  - Pool capacity: 25 units
-  - Queue capacity: 500 tasks
-- **Workflow**:
-  1. Tasks submitted (some immediate, some queued)
-  2. Tasks execute and complete
-  3. Queued tasks wake up as capacity frees
-  4. Results delivered to mailbox
-- **Key metric**: Total scenario completion time
-- **Why it matters**: Best representation of production performance
-
-## Performance Targets
-
-Based on typical AI agent workloads:
-
-| Operation | Target | Why |
-|-----------|--------|-----|
-| Queue enqueue/dequeue | > 1M ops/sec | Core operations must be fast |
-| Priority sorting | < 1ms for 1K tasks | Scheduling decisions must be quick |
-| Task submission (immediate) | < 100μs | Low latency for responsive agents |
-| Task submission (queued) | < 500μs | Acceptable overhead for parking |
-| Mailbox delivery | > 100K msgs/sec | High throughput for concurrent tasks |
-
-## Interpreting Results
-
-### Good Performance Indicators
-- ✅ Queue operations scale linearly with task count
-- ✅ Priority sorting overhead < 10% vs FIFO queue
-- ✅ Submission latency consistent regardless of queue depth
-- ✅ Wake-up mechanism doesn't add significant overhead
-
-### Performance Red Flags
-- ⚠️ Queue operations slow down with size (> O(n log n))
-- ⚠️ Submission latency increases with queue depth
-- ⚠️ Priority sorting takes > 1ms for moderate workloads
-- ⚠️ Memory usage grows unbounded
-
-## Hardware Considerations
-
-Benchmark results vary by:
-- **CPU**: Single-threaded performance matters for queue operations
-- **Memory**: Large queues need sufficient RAM
-- **OS**: Thread scheduling affects async performance
-
-Record your hardware specs when benchmarking:
-```bash
-# Linux
-lscpu | grep "Model name"
-free -h
-
-# macOS
-sysctl -n machdep.cpu.brand_string
-sysctl -n hw.memsize | awk '{print $0/1024/1024/1024 " GB"}'
-```
-
-## Continuous Performance Testing
-
-Run benchmarks regularly to catch performance regressions:
+The redb cases need the `embedded` feature; run with `--all-features` (what CI does):
 
 ```bash
-# Baseline
-cargo bench --bench queue_bench -- --save-baseline main
+# Full local configuration: 2 s warm-up, 5 s measurement, 50 samples per benchmark.
+cargo bench --all-features --locked \
+  --bench components --bench throughput --bench latency --bench utilization -- --noplot
 
-# After changes
-cargo bench --bench queue_bench -- --baseline main
+# One suite, or the benchmarks matching a name filter.
+cargo bench --all-features --locked --bench throughput -- throughput/worker_pool
+
+# Compile and run every benchmark once, no measurement (the report passes run small
+# and write nothing).
+cargo bench --all-features --locked --bench latency -- --test
 ```
 
-## Future Benchmarks
+CI (job `Benchmarks` in `.github/workflows/ci.yml`) runs the same four suites with
+`--noplot --warm-up-time 1 --measurement-time 3 --sample-size 20`, then
+`.github/scripts/bench-report.py`, which turns the results into the job summary. The
+latency percentile pass and the utilization simulation always run in full.
 
-Planned additions:
-- [ ] Postgres queue backend benchmarks
-- [ ] Yaque file queue benchmarks
-- [ ] Multi-threaded contention scenarios
-- [ ] Memory usage profiling
-- [ ] Stress tests (millions of tasks)
+## Where the results go
+
+| What | Where | Override |
+|---|---|---|
+| criterion estimates, samples, baselines | `target/criterion/` | `CRITERION_HOME` |
+| latency percentiles and utilization reports, each with machine metadata | `target/bench-report/{latency,utilization}.json` | `PARKING_LOT_BENCH_REPORT_DIR` |
+| Markdown summary of both | stdout of `.github/scripts/bench-report.py --criterion DIR --reports DIR` | `--summary FILE` |
+
+In CI both directories live under `bench-results/` and are uploaded as the artifact
+`bench-results-<commit sha>` (kept 90 days).
+
+## Reproducibility
+
+- **Fixed inputs.** Every random workload uses one linear congruential generator with
+  seed `0x5eed`; the same build produces the same sequence of costs and arrivals.
+- **Virtual time where it matters.** The `utilization` suite advances a tick counter
+  instead of reading a clock, so its utilization and wait numbers are identical on every
+  machine (only the criterion timing of a simulation run varies).
+- **Fixed parallelism.** Async suites run on a tokio runtime with exactly 4 worker
+  threads (the vCPU count of a GitHub-hosted Linux runner); pools have 16 units; the
+  native `WorkerPool` has 16 threads.
+- **Warm-up and measurement.** Locally 2 s warm-up, 5 s measurement, 50 samples,
+  noise threshold 5% (`support::criterion_config`); CI shortens these on the command
+  line. The durable cases use criterion's flat sampling (their iterations take
+  milliseconds to a second).
+- **Metadata.** `latency.json` and `utilization.json` record OS, architecture, CPU
+  model, logical CPUs, memory, the load average when the report was written,
+  `rustc --version`, the profile, the runtime worker count, the commit and the CI
+  runner name. A number is only comparable with another taken on the same machine at
+  a similar load.
+- **Variance.** The latency pass runs 5 rounds per pool and workload, each on a fresh
+  pool, and reports per statistic the median and the minimum and maximum across
+  rounds. Criterion reports a 95% confidence interval per benchmark.
+
+What these suites do not control: other processes on the machine (the numbers in
+`docs/ARCHITECTURE.md` were taken with other builds running), CPU frequency scaling, and
+the storage device behind `$TMPDIR` (the redb cases commit with fsync to a store in a
+temporary directory, so they measure the disk as much as the scheduler).
+
+## Regression policy (report-only)
+
+On `main`, CI saves the run as criterion's `main` baseline (`--save-baseline main`,
+stored with `actions/cache` under `bench-baseline-<sha>`). A pull request restores the
+newest `main` baseline and runs with `--baseline-lenient main`, so each benchmark's
+change appears in the job summary with its confidence interval. A benchmark whose
+whole 95% interval of change lies above **+25%** gets a `::warning::` annotation. The
+job never fails on a number.
+
+Why report-only, and why 25%: two back-to-back runs of identical code at the CI
+configuration on one machine (M1 Max, load average 20 to 30, 2026-10-23) produced
+changes whose 95% intervals excluded zero by up to 22%: for example
+`throughput/resource_pool/mixed` -21.7% [-31.2%, -12.5%] and
+`hook_pool_cycle/noop_hook` +8.3% [+4.4%, +12.7%]. A third run, after merging a
+change that does not touch these paths, reported `latency_round_trip/resource_pool`
++27.1% [+15.1%, +38.8%] and `hook_pool_cycle/no_hooks` +69.9% [+12.6%, +134.9%]: a
+15% threshold would have warned on both, 25% on neither. Between CI runs the variance is
+larger, not smaller: a pull request and its `main` baseline usually run on different
+runner hosts, possibly with different CPU models. A gate tighter than that noise
+would fail unchanged code; a much looser one would never fire. A slower number is a
+prompt to re-run both sides on one machine, not a verdict.
+
+## Postgres
+
+No Postgres case is included: the lease queue and mailbox need Docker
+(`crates/parking-lot-pg/tests`), and a benchmark that silently skips is worse than
+none. Adding one is follow-up work: a Docker-gated `throughput/durable_pg` case behind
+the `postgres` feature, run by the `postgres` CI job.
