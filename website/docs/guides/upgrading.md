@@ -97,4 +97,7 @@ events and Iggy publishing ([Iggy events](./iggy-events.md)), stream replay
 - A durable pool dispatches strictly in order, holds at most one leased task
   waiting for capacity, and polls for work other processes enqueue.
 - Lifecycle events are dropped (and counted) under backpressure on the native
-  pools. The WASM pool calls its hooks inline (there are no threads there).
+  pools. The WASM pool calls its hooks inline (there are no threads there):
+  a slow hook stalls it, a hook must not call back into the pool, and a
+  panicking hook aborts the module. Tasks removed by `prune_expired` emit no
+  terminal event (issue #57).

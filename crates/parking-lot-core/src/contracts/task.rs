@@ -38,7 +38,9 @@ pub struct TaskMetadata {
     pub priority: Priority,
     /// Resource cost for capacity accounting.
     pub cost: ResourceCost,
-    /// Absolute deadline in milliseconds since epoch.
+    /// Absolute deadline in milliseconds since epoch. The task is expired
+    /// once the time is past it (`now_ms > deadline_ms`); at the deadline
+    /// itself it is still live.
     pub deadline_ms: Option<u128>,
     /// Creation timestamp in milliseconds since epoch.
     pub created_at_ms: u128,

@@ -122,7 +122,10 @@ background task, so `record` never blocks and a full buffer drops and counts).
 task, `Submitted`, then `Queued` if it parks, `Started` when the executor is
 about to run, and exactly one terminal event: `Completed`, `Failed`,
 `Rejected`, `Cancelled`, `Expired` or (durable pool) `Requeued`
-(`LifecycleEvent::is_terminal`). Register hooks with `with_hook` /
+(`LifecycleEvent::is_terminal`); a task removed by `prune_expired` emits no
+terminal event (the `TaskQueue` contract does not return the pruned ids;
+issue #57). `RejectionReason::CapacityExceeded { kind }` names the dimension
+that did not fit (`None`: the pool's total). Register hooks with `with_hook` /
 `hooks().register(..)` on the in-memory pools, `DurableOptions::with_hooks`
 on the durable pool, or `builders::build_pools_from_scheduler_config_with_hooks`.
 Hooks run on the bus's own thread, in emission order; emission never blocks a
@@ -130,8 +133,9 @@ pool (a full queue drops the event and counts it in
 `HookBus::dropped_events`), and a pool with no hook pays one atomic load per
 transition. `HookBus::flush` waits for delivery. The WASM pool (`prometheus-parking-lot-wasm`)
 emits the same events (cr-53) through `WorkerPool::with_hook` / `hooks()`; it has
-no threads, so its hooks run inline on the emitting call, and `worker_id` is
-always 0. Durable dispatch does not apply on the web target.
+no threads, so its hooks run inline on the emitting call (`Queued` under the
+dispatch lock: a hook must not call back into the pool; a hook panic aborts
+the module), and `worker_id` is always 0. Durable dispatch does not apply on the web target.
 
 ## Iggy events and notifications (feature `iggy`)
 
@@ -184,8 +188,9 @@ all (`try_acquire(units)` is the single-dimension form);
 `available()` returns the free `UnitVector` and `exceeded_limit` the first
 dimension a demand can never fit. `ParkedQueue::fitting` takes the free
 `UnitVector` instead of a unit count. `Dispatcher::check_capacity`,
-`units_in_use_of`, `resource_limit` and `set_resource_limit` expose the same
-per kind. Pools: `PoolConfig::resource_limits` and
+`units_in_use_of`, `resource_limit` and `set_resource_limit` (before the
+first submission only) expose the same per kind. A cost whose per-kind units
+sum past `u32::MAX` exceeds every total. Pools: `PoolConfig::resource_limits` and
 `WorkerPoolConfig::resource_limits` (a map from kind to units, empty by
 default), `ResourcePool::with_resource_limit` (before the first submit) and
 `active_units_of`, `DurableOptions::with_resource_limit`, native
@@ -198,4 +203,14 @@ does starts in its place (skip-ahead); after `max_head_skips` such skips
 capacity for the head and starts nothing else until it has started.
 `ResourcePool::with_max_head_skips` and `skip_ahead_stats`,
 `WorkerPoolConfig::max_head_skips` and the native `WorkerPool::skip_ahead_stats`
-expose it; `DurableResourcePool` dispatches strictly head-of-line.
+expose it; `DurableResourcePool` dispatches strictly head-of-line. With
+`max_queue_depth` items parked, a submission that would start at once (a
+higher priority than the head that fits, or a permitted skip) is admitted;
+only one that would wait gets `QueueFull`. That at-depth skip needs
+`ParkedQueue::supports_skip_ahead`.
+
+Returning permits: a `Grant`'s permit goes back through
+`Dispatcher::complete`, which drains. A permit dropped any other way calls the
+hook installed with `Dispatcher::install_release_hook`, which should schedule
+a `Dispatcher::poke`; without one, the owner must poke. A dispatcher whose
+semaphore allows 0 permits refuses submissions with `InvalidConfig`.

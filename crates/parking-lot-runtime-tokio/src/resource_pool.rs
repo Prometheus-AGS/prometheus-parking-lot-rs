@@ -277,8 +277,8 @@ where
     ///
     /// # Panics
     ///
-    /// When a task is running (it shares the pool's state): limits are part
-    /// of building the pool. Call it before the first `submit`.
+    /// After the first `submit` (the pool's state is then shared): limits
+    /// are part of building the pool. Call it before the first `submit`.
     #[must_use]
     pub fn with_resource_limit(mut self, kind: ResourceKind, limit: u32) -> Self {
         let set = Arc::get_mut(&mut self.inner)
@@ -453,6 +453,7 @@ where
             events.rejected(task_id, &error);
             return Err(error);
         }
+        inner.ensure_release_hook();
         let now_ms = inner.now_ms();
         let meta = task.meta.clone();
         let admission = inner
@@ -624,6 +625,40 @@ where
     fn budget(&self, meta: &TaskMetadata) -> Duration {
         let _ = (meta, &self.limits);
         Duration::from_secs(u64::from(u32::MAX))
+    }
+
+    /// Install the dispatcher's release hook (once): a permit dropped other
+    /// than through `Dispatcher::complete` — a task future the spawner
+    /// discarded without running it — schedules a poke through the spawner,
+    /// so the units it frees reach parked work. Every other path returns its
+    /// permit through `complete`, or pokes after catching a panic.
+    ///
+    /// Installed at the first submission rather than in `new`: the hook holds
+    /// a `Weak` to this state, and the builder methods need the state
+    /// unshared.
+    fn ensure_release_hook(self: &Arc<Self>) {
+        if self.dispatcher.has_release_hook() {
+            return;
+        }
+        self.dispatcher.install_release_hook(|| {
+            let weak = Arc::downgrade(self);
+            move || {
+                if let Some(inner) = weak.upgrade() {
+                    inner.poke_later();
+                }
+            }
+        });
+    }
+
+    /// Spawn a drain of the parked queue and start what it admits (the
+    /// release hook's job; it must not drain on the dropping thread, which
+    /// may hold this pool's locks).
+    fn poke_later(self: &Arc<Self>) {
+        let inner = Arc::clone(self);
+        self.spawner.spawn(async move {
+            let woken = inner.dispatcher.poke(inner.now_ms());
+            inner.launch(woken, None);
+        });
     }
 
     /// Start every task the dispatcher admitted and report every task it

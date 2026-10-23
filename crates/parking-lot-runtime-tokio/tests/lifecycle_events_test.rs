@@ -493,7 +493,10 @@ async fn lifecycle_events_rejected_at_submit_in_both_pools() {
     let events = settle(pool.hooks(), &log, &ids).await;
     assert_ordered(pool.hooks(), &events, &ids);
     assert_eq!(rejection(&log, 3), Some(RejectionReason::QueueFull));
-    assert_eq!(rejection(&log, 4), Some(RejectionReason::CapacityExceeded));
+    assert_eq!(
+        rejection(&log, 4),
+        Some(RejectionReason::CapacityExceeded { kind: None })
+    );
     assert_eq!(rejection(&log, 5), Some(RejectionReason::DeadlineExpired));
     assert_eq!(rejection(&log, 6), Some(RejectionReason::PoolShutdown));
 
@@ -518,9 +521,62 @@ async fn lifecycle_events_rejected_at_submit_in_both_pools() {
     let events = settle(pool.hooks(), &log, &ids).await;
     assert_ordered(pool.hooks(), &events, &ids);
     assert_eq!(rejection(&log, 3), Some(RejectionReason::QueueFull));
-    assert_eq!(rejection(&log, 4), Some(RejectionReason::CapacityExceeded));
+    assert_eq!(
+        rejection(&log, 4),
+        Some(RejectionReason::CapacityExceeded { kind: None })
+    );
     assert_eq!(rejection(&log, 5), Some(RejectionReason::DeadlineExpired));
     assert_eq!(rejection(&log, 6), Some(RejectionReason::PoolShutdown));
+}
+
+/// cr-23: a rejection for a per-kind limit names the kind, in both pools.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn lifecycle_events_rejected_capacity_names_the_exceeded_kind() {
+    let vram = |id| {
+        let mut task = task(id, 1, sleep_job(0));
+        task.meta.cost = ResourceCost::new(ResourceKind::GpuVram, 3);
+        task
+    };
+    let wanted = Some(RejectionReason::CapacityExceeded {
+        kind: Some(ResourceKind::GpuVram),
+    });
+
+    let log = Arc::new(Log::default());
+    let pool = resource_pool(4, 1, &log).with_resource_limit(ResourceKind::GpuVram, 2);
+    let refused = pool.submit(vram(1)).await;
+    assert!(
+        matches!(
+            refused,
+            Err(SchedulerError::CapacityExceeded {
+                kind: Some(ResourceKind::GpuVram),
+                ..
+            })
+        ),
+        "{refused:?}"
+    );
+    let ids: BTreeSet<u64> = BTreeSet::from([1]);
+    let events = settle(pool.hooks(), &log, &ids).await;
+    assert_ordered(pool.hooks(), &events, &ids);
+    assert_eq!(rejection(&log, 1), wanted);
+
+    let log = Arc::new(Log::default());
+    let pool = WorkerPool::new(
+        WorkerPoolConfig::new()
+            .with_worker_count(1)
+            .with_max_units(4)
+            .with_max_queue_depth(1)
+            .with_timeout_ms(10_000)
+            .with_resource_limit(ResourceKind::GpuVram, 2),
+        Runner,
+    )
+    .expect("worker pool")
+    .with_hook(Arc::clone(&log) as Arc<dyn Hook>);
+    let mut meta = meta(1, 1);
+    meta.cost = ResourceCost::new(ResourceKind::GpuVram, 3);
+    assert!(pool.submit(sleep_job(0), meta).is_err());
+    let events = settle(pool.hooks(), &log, &ids).await;
+    assert_ordered(pool.hooks(), &events, &ids);
+    assert_eq!(rejection(&log, 1), wanted);
 }
 
 // ---------------------------------------------------------------------------

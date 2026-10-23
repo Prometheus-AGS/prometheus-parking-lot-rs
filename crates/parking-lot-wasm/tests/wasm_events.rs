@@ -304,7 +304,7 @@ async fn lifecycle_events_rejected_at_submit() {
 
     for (id, expected) in [
         (3, RejectionReason::QueueFull),
-        (4, RejectionReason::CapacityExceeded),
+        (4, RejectionReason::CapacityExceeded { kind: None }),
         (5, RejectionReason::DeadlineExpired),
         (6, RejectionReason::PoolShutdown),
     ] {

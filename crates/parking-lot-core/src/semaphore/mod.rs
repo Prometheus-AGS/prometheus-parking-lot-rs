@@ -11,9 +11,12 @@
 //! Admission yields a [`Permit`]. Dropping the permit returns its units (RAII),
 //! so capacity cannot leak even when the holder unwinds. Pools return permits
 //! through [`Dispatcher::complete`](crate::dispatch::Dispatcher::complete),
-//! which also starts the parked work the freed capacity admits; a permit
-//! dropped any other way frees capacity but wakes nothing until the next
-//! submission or completion (cr-21 routes unwinding through `complete`).
+//! which also starts the parked work the freed capacity admits. A permit
+//! dropped any other way frees capacity and then calls the semaphore's
+//! *release hook*, if one is installed
+//! ([`Dispatcher::install_release_hook`](crate::dispatch::Dispatcher::install_release_hook)),
+//! so that its owner can drain; without a hook it wakes nothing until the
+//! next submission, completion or poke.
 //!
 //! ## Representation
 //!
@@ -70,6 +73,8 @@ pub(crate) mod sync;
 mod vector;
 
 pub use self::vector::{KIND_COUNT, UnitVector};
+
+use std::sync::OnceLock;
 
 use self::sync::{Arc, AtomicU64, Mutex, Ordering};
 use self::vector::{KINDS, kind_index};
@@ -178,6 +183,16 @@ impl KindLimits {
     }
 }
 
+/// Called after a [`Permit`] is dropped other than through
+/// [`Dispatcher::complete`](crate::dispatch::Dispatcher::complete).
+struct ReleaseHook(Box<dyn Fn() + Send + Sync>);
+
+impl std::fmt::Debug for ReleaseHook {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ReleaseHook")
+    }
+}
+
 /// A unit-weighted counting semaphore with an optional bound on permits and
 /// optional per-kind limits (cr-23).
 #[derive(Debug)]
@@ -189,6 +204,12 @@ pub struct UnitSemaphore {
     /// `None` until a kind gets a limit: then the single-dimension path never
     /// takes a lock.
     kinds: Option<KindLimits>,
+    /// Set at most once, by the dispatcher's owner. Read (one `Acquire`
+    /// load, `OnceLock::get`) only when a permit is dropped outside
+    /// `Dispatcher::complete`; that load synchronizes-with the `Release` in
+    /// `OnceLock::set`, so the hook's captured state is visible to the
+    /// dropping thread.
+    release_hook: OnceLock<ReleaseHook>,
 }
 
 impl UnitSemaphore {
@@ -200,6 +221,11 @@ impl UnitSemaphore {
 
     /// A semaphore of `max_units` units that also admits at most
     /// `max_permits` holders at once.
+    ///
+    /// `max_permits == 0` admits nothing; a
+    /// [`Dispatcher`](crate::dispatch::Dispatcher) over such a semaphore
+    /// refuses every submission with `SchedulerError::InvalidConfig` rather
+    /// than parking work that could never start.
     #[must_use]
     #[cfg_attr(
         not(parking_lot_loom),
@@ -214,6 +240,7 @@ impl UnitSemaphore {
             max_permits,
             state: AtomicU64::new(0),
             kinds: None,
+            release_hook: OnceLock::new(),
         }
     }
 
@@ -347,10 +374,14 @@ impl UnitSemaphore {
     /// as `(kind, requested, limit)` (`kind` is `None` for the total), or
     /// `None` when it fits an idle semaphore. Such a demand can never be
     /// admitted; pools reject it at submission.
+    ///
+    /// A demand whose per-kind units sum past `u32::MAX` exceeds the total
+    /// whatever `max_units` is: [`UnitVector::from_cost`] saturates its total
+    /// at `u32::MAX`, which is reported as `requested`.
     #[must_use]
     #[inline]
     pub fn exceeded_limit(&self, demand: &UnitVector) -> Option<(Option<ResourceKind>, u32, u32)> {
-        if demand.total() > self.max_units {
+        if demand.total() > self.max_units || demand.total_overflows() {
             return Some((None, demand.total(), self.max_units));
         }
         // Single-dimension pools stop here: this runs on every submission.
@@ -359,6 +390,47 @@ impl UnitSemaphore {
             let requested = demand.of(kind);
             (requested > limit).then_some((Some(kind), requested, limit))
         })
+    }
+
+    /// Install `make()` as the release hook unless one is installed; `make`
+    /// is called at most once. Returns whether this call installed it. See
+    /// [`Dispatcher::install_release_hook`](crate::dispatch::Dispatcher::install_release_hook).
+    pub(crate) fn install_release_hook<F>(&self, make: impl FnOnce() -> F) -> bool
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        let mut installed = false;
+        let _ = self.release_hook.get_or_init(|| {
+            installed = true;
+            ReleaseHook(Box::new(make()))
+        });
+        installed
+    }
+
+    /// Whether a release hook is installed.
+    pub(crate) fn has_release_hook(&self) -> bool {
+        self.release_hook.get().is_some()
+    }
+
+    /// After a permit was dropped other than through `Dispatcher::complete`:
+    /// call the release hook, if any. Not while the thread unwinds (a panic
+    /// inside the hook would then abort the process; the pools poke after
+    /// they catch the panic instead), and a panic in the hook is contained
+    /// and logged rather than escaping the permit's `drop`.
+    #[cold]
+    fn after_stray_release(&self) {
+        let Some(hook) = self.release_hook.get() else {
+            return;
+        };
+        if std::thread::panicking() {
+            return;
+        }
+        let called = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| (hook.0)()));
+        if called.is_err() {
+            tracing::error!(
+                "semaphore release hook panicked; parked work may wait for the next completion"
+            );
+        }
     }
 
     /// Claim `units` units of the total dimension and one permit if both fit;
@@ -446,6 +518,7 @@ impl UnitSemaphore {
                     return Some(Permit {
                         semaphore: Arc::clone(this),
                         demand: *demand,
+                        wake: true,
                     });
                 }
                 Err(actual) => current = actual,
@@ -514,12 +587,18 @@ impl UnitSemaphore {
 /// Proof of admission: a [`UnitVector`] demand and one permit of a
 /// [`UnitSemaphore`].
 ///
-/// Dropping the permit returns them.
+/// Dropping the permit returns them. Return it through
+/// [`Dispatcher::complete`](crate::dispatch::Dispatcher::complete), which also
+/// starts the parked work the freed units admit; a permit dropped any other
+/// way calls the semaphore's release hook (see the module docs).
 #[derive(Debug)]
 #[must_use = "dropping a permit releases its units immediately"]
 pub struct Permit {
     semaphore: Arc<UnitSemaphore>,
     demand: UnitVector,
+    /// Whether dropping it calls the release hook: `false` once the
+    /// dispatcher returns it under its own lock and drains itself.
+    wake: bool,
 }
 
 impl Permit {
@@ -534,12 +613,23 @@ impl Permit {
     pub const fn demand(&self) -> &UnitVector {
         &self.demand
     }
+
+    /// Return the units without calling the release hook: the dispatcher
+    /// drops a permit this way under its dispatch lock, where it drains
+    /// itself (and where a hook that pokes would deadlock).
+    #[inline]
+    pub(crate) fn release_quietly(mut self) {
+        self.wake = false;
+    }
 }
 
 impl Drop for Permit {
     #[inline]
     fn drop(&mut self) {
         self.semaphore.release(&self.demand);
+        if self.wake {
+            self.semaphore.after_stray_release();
+        }
     }
 }
 

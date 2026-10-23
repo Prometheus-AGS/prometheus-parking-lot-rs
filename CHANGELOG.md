@@ -159,6 +159,24 @@ entry names the OpenSpec change that made it.
   `PoolShutdown` from such a pool, its lifecycle events and its cancellation
   log now carry that name instead of `resource_pool`. In the core crate,
   `Dispatcher::pool_name` and `Dispatcher::set_pool_name` are new.
+- **`RejectionReason::CapacityExceeded` names the dimension (cr-23).** It is
+  now `CapacityExceeded { kind: Option<ResourceKind> }`: the limited kind the
+  task exceeded, or `None` for the pool's total, the same dimension as
+  `SchedulerError::CapacityExceeded`. Every pool (`ResourcePool`, the native
+  and WASM `WorkerPool`s, `DurableResourcePool`) fills it in its `Rejected`
+  event. Match it with `CapacityExceeded { .. }`.
+- **Resource limits are set before the first submission (core).**
+  `Dispatcher::set_resource_limit` now returns `InvalidConfig` once anything
+  has been submitted (it used to check only for outstanding permits, so an
+  item already parked could end up over the new limit and block the queue
+  for good). `ResourcePool::with_resource_limit` and `with_name` panic after
+  the first `submit`, as documented, even once the pool is idle again: the
+  pool's state is shared from then on.
+- **A zero-permit semaphore is refused (core).** `Dispatcher::submit` returns
+  `SchedulerError::InvalidConfig` when its semaphore admits no permit
+  (`UnitSemaphore::with_max_permits(_, 0)`) instead of parking every item
+  forever. The pools already reject `worker_count == 0` in their
+  configuration.
 
 ### Added
 
@@ -285,6 +303,15 @@ entry names the OpenSpec change that made it.
   `"type": "iggy"` (`config::IggyBackendConfig`, example
   `examples/configs/iggy.json`); `LifecycleEvent::pool()` is new in core.
 
+- **Release hook for dropped permits (core).** `Dispatcher::install_release_hook`
+  and `has_release_hook`: a permit dropped other than through
+  `Dispatcher::complete` (a dropped `Grant`, `Dispatched` or `Admission`, or a
+  task future the spawner discarded) returns its units and then calls the
+  hook, which should schedule a `Dispatcher::poke`. `ResourcePool` and
+  `DurableResourcePool` install one that spawns the poke through their
+  spawner. `ParkedQueue::supports_skip_ahead` (default `false`) tells the
+  dispatcher a queue implements `fitting`/`take`; `PriorityQueue` and
+  `TaskQueueAdapter` return `true`.
 - **Lifecycle events (cr-31, scenario S-21).** `ResourcePool`, the native
   `WorkerPool` and `DurableResourcePool` emit `Submitted`, `Queued`,
   `Started` and exactly one terminal event per task (`Completed`, `Failed`,
@@ -567,6 +594,42 @@ entry names the OpenSpec change that made it.
 - **Docs overclaimed the stream offset hint (review W4)**: a hint past the end
   of a stream waits instead of reporting an error. `streaming-replay.md` and the
   `stream` module say so.
+- **`QueueFull` no longer refuses work that can start now (cr-20).** With
+  `max_queue_depth` tasks parked, a submission that would start at once is
+  admitted instead of refused: one with a strictly higher priority than the
+  parked head that fits, or one that fits beside a blocked head while the
+  starvation guard still allows a skip (it counts as a skip). Priority order
+  and the `max_head_skips` bound are unchanged; a task that would have to
+  wait still gets `QueueFull`.
+- **A dropped grant no longer strands parked work.** A permit returned other
+  than through `Dispatcher::complete` freed its units but drained nothing, so
+  parked work it would admit waited for the next submission or completion,
+  possibly forever (for example after a spawner discarded a task future).
+  It now calls the dispatcher's release hook (see Added), which the tokio
+  pools use to poke; the native and WASM `WorkerPool`s return every permit
+  through `complete` or poke after a panic.
+- **A cost whose units overflow is rejected.** A `ResourceCost` whose
+  per-kind units sum past `u32::MAX` (its total saturates) was admitted by a
+  pool of `u32::MAX` units; it is now `CapacityExceeded` (`kind: None`).
+- **The drain cannot spin on a vanishing head.** If a `ParkedQueue` reported
+  an expired head and then could not pop it, the drain looped forever; it now
+  stops, as it already did for a head that fits.
+- **`BackgroundNotifier::with_policy` always applies.** It was silently
+  ignored once a dispatched notification still held the notifier's shared
+  state; the policy now applies to every notification dispatched after the
+  call.
+- **One deadline rule.** `InMemoryQueue::prune_expired` removed a task whose
+  deadline equalled `now`, while the dispatcher (`Ticket::is_expired`) and the
+  pools treat it as live until `now > deadline`. It now keeps it, and
+  `TaskQueue::prune_expired` and `TaskMetadata::deadline_ms` document the rule.
+- **Documentation.** The hook docs no longer promise isolation on `wasm32`:
+  there, hooks run inline on the scheduling path (`Queued` under the dispatch
+  lock, so a hook must not call back into the pool) and a panicking hook
+  aborts the module. The event-sequence docs now say that tasks removed by
+  `prune_expired` emit no terminal event (issue #57, 0.4.0). The
+  `loom_skip_ahead` model now asserts the starvation bound itself
+  (`skipped <= max_head_skips`) and that the guard engaged, and fails under
+  the S-20 negative control.
 - **One undecodable task wedged the whole embedded queue.** `RedbLeaseQueue::lease`
   aborted its transaction on a stored task that did not decode as `P` (for
   example after an app update changed the payload type), leaving the entry at the

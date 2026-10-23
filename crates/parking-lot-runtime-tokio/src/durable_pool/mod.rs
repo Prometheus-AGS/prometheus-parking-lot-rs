@@ -317,6 +317,17 @@ where
             failed: AtomicU64::new(0),
             _results: PhantomData,
         });
+        // A permit dropped other than through `Dispatcher::complete` (a task
+        // future the spawner discarded) schedules a poke, so the units it
+        // frees reach the waiting task; see `poke_later`.
+        inner.dispatcher.install_release_hook(|| {
+            let weak = Arc::downgrade(&inner);
+            move || {
+                if let Some(inner) = weak.upgrade() {
+                    inner.poke_later();
+                }
+            }
+        });
         // The dispatcher counts as in flight until it has stopped and handed
         // back what it held, so `shutdown_with` waits for it.
         let dispatching = Held::new(&inner.ledger);
@@ -791,6 +802,18 @@ where
         self.settle(settlement, token, heartbeat, Some(reported))
             .await;
         drop(held);
+    }
+
+    /// The release hook's job: spawn a drain and start what it admits, then
+    /// wake the dispatcher (freed units may let it lease more). Spawned,
+    /// because the dropping thread may hold this pool's locks.
+    fn poke_later(self: &Arc<Self>) {
+        let inner = Arc::clone(self);
+        self.spawner.spawn(async move {
+            let woken = inner.dispatcher.poke(now_ms());
+            inner.launch(woken);
+            inner.wake.notify_one();
+        });
     }
 
     /// Return a permit and start what the freed units admit.

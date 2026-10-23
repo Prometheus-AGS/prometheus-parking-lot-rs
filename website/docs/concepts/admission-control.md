@@ -42,7 +42,9 @@ flowchart TD
   D -->|no| F{"queue empty and cost fits<br/>in every dimension?"}
   F -->|yes| RUN["Admit now: Running"]
   F -->|no| QD{"queue at max_queue_depth?"}
-  QD -->|yes| R3["Refuse: QueueFull<br/>(back-pressure)"]
+  QD -->|yes| N{"would start now anyway?<br/>(precedes the head and fits,<br/>or may skip it)"}
+  N -->|yes| RUN
+  N -->|no| R3["Refuse: QueueFull<br/>(back-pressure)"]
   QD -->|no| PARK["Park: Queued"]
 ```
 
@@ -126,10 +128,14 @@ introduced the term or the technique, so this chapter does not attribute it.
   admitted only while `in_use + u <= max_units`, by a single compare-and-swap
   on one packed atomic. The worker pools also bound admitted tasks by their
   worker count, so an admitted task always has a worker.
-- **Early refusal.** A cost greater than `max_units` returns
-  `SchedulerError::CapacityExceeded`; a task whose `deadline_ms` has already
-  passed returns `SchedulerError::DeadlineExpired`; a full queue returns
-  `SchedulerError::QueueFull`, which `is_retryable` reports as retryable.
+- **Early refusal.** A cost greater than `max_units` (or whose per-kind
+  units sum past `u32::MAX`) returns `SchedulerError::CapacityExceeded`; a
+  task whose `deadline_ms` has already passed returns
+  `SchedulerError::DeadlineExpired`; a task that would have to wait while the
+  queue is full returns `SchedulerError::QueueFull`, which `is_retryable`
+  reports as retryable. A task that would start at once is admitted even
+  when the queue is full: one with a higher priority than the head that
+  fits, or one the starvation guard still lets skip the head.
 - **Strict priority, then FIFO.** The parked queue is ordered by `Priority`
   (`Low`, `Normal`, `High`, `Critical`), then by a submission sequence number
   that the pool stamps on each task. Equal-priority tasks therefore start in
@@ -152,9 +158,11 @@ introduced the term or the technique, so this chapter does not attribute it.
   rather than EASY's time-based one: the scheduler does not know run times.
   `ResourcePool` looks at most 64 parked tasks deep; a durable pool holds one
   leased task waiting for capacity and so dispatches strictly in order.
-- **Deadlines in the queue.** A queued task found expired when it reaches the
-  head is not started; its mailbox receives `TaskStatus::Expired`.
-  `prune_expired` removes expired tasks in bulk.
+- **Deadlines in the queue.** A task is expired once the time is past its
+  `deadline_ms` (at the deadline it is still live). A queued task found
+  expired when it reaches the head is not started; its mailbox receives
+  `TaskStatus::Expired`. `prune_expired` removes expired tasks in bulk; those
+  emit no terminal lifecycle event (issue #57).
 - **Multi-resource admission (cr-23).** A `ResourceCost` is a vector of
   units per kind (`Cpu`, `GpuVram`, `Io`, `Mixed`). A pool may limit any kind
   (`resource_limits` in `PoolConfig` and `WorkerPoolConfig`,

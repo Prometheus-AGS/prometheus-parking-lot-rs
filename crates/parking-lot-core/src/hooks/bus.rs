@@ -26,8 +26,14 @@
 //!   channel and no thread: [`HookBus::emit_with`] is one atomic load and a
 //!   branch, and the event (its `String`s included) is never built.
 //!
-//! On `wasm32` targets, which have no threads, delivery is inline on the
-//! emitting call (still behind `catch_unwind`).
+//! **On `wasm32` targets, which have no threads, none of the isolation
+//! above holds.** Delivery is inline on the emitting call: a slow hook
+//! stalls the pool's scheduling path; the `Queued` event is delivered while
+//! the pool holds its dispatch lock, so a hook must not call back into the
+//! pool (it would deadlock or panic on the lock); and the `catch_unwind`
+//! around each call contains nothing on `wasm32-unknown-unknown`, which
+//! aborts on panic, so a panicking hook aborts the module. Keep wasm hooks
+//! short, non-panicking and non-reentrant.
 //!
 //! The uncomfortable part: under sustained hook backpressure events are
 //! dropped, so an observer can miss a task's terminal event. That is the price
@@ -111,6 +117,10 @@ struct Shared {
 /// A cheap handle: clones share the hooks and the delivery thread, so one bus
 /// can serve several pools. See the module docs (`hooks::bus`) for the
 /// delivery guarantees. Two handles are equal when they are the same bus.
+///
+/// On `wasm32` delivery is inline, on the pool's scheduling path (under its
+/// dispatch lock for `Queued`), and a hook panic aborts the module; the
+/// module docs give the details.
 #[derive(Clone)]
 pub struct HookBus {
     shared: Arc<Shared>,
@@ -193,7 +203,8 @@ impl HookBus {
     /// called, so nothing is allocated. With hooks the event is queued with
     /// a non-blocking send; a full queue drops it (counted in
     /// [`dropped_events`](Self::dropped_events)). Never blocks, never
-    /// panics on a hook's behalf, so it is safe under a pool's locks.
+    /// panics on a hook's behalf, so it is safe under a pool's locks. On
+    /// `wasm32` it calls the hooks inline instead (see the module docs).
     #[inline]
     pub fn emit_with(&self, make: impl FnOnce() -> LifecycleEvent) {
         // `OnceLock::get` is an acquire load: it synchronizes with the

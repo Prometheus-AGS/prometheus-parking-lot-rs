@@ -170,6 +170,19 @@ pub trait ParkedQueue<T> {
         None
     }
 
+    /// Whether this queue implements [`fitting`](Self::fitting) and
+    /// [`take`](Self::take), so a blocked head may be skipped. The
+    /// dispatcher reads it to decide whether a submission that arrives with
+    /// the queue at its depth limit may start as a skip; a `None` from
+    /// `fitting` cannot tell "nothing fits" from "not implemented".
+    ///
+    /// The default is `false`, which pairs with the defaults above. A queue
+    /// that implements them but leaves this `false` still skips ahead in the
+    /// drain; only the at-depth start is then refused (`QueueFull`).
+    fn supports_skip_ahead(&self) -> bool {
+        false
+    }
+
     /// Remove every parked item whose deadline passed at `now_ms`; return how
     /// many were removed.
     ///
@@ -298,6 +311,10 @@ impl<T: Parkable> ParkedQueue<T> for PriorityQueue<T> {
             .map(|entry| entry.ticket))
     }
 
+    fn supports_skip_ahead(&self) -> bool {
+        true
+    }
+
     fn take(&mut self, ticket: &Ticket) -> Option<T> {
         let order = Reverse(ticket.priority);
         let key = self
@@ -420,6 +437,10 @@ impl<P, Q: TaskQueue<P>> ParkedQueue<ScheduledTask<P>> for TaskQueueAdapter<P, Q
 
     fn take(&mut self, ticket: &Ticket) -> Option<ScheduledTask<P>> {
         self.front.take(ticket)
+    }
+
+    fn supports_skip_ahead(&self) -> bool {
+        true
     }
 
     fn prune_expired(&mut self, now_ms: u128) -> Result<usize, SchedulerError> {

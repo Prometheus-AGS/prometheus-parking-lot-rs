@@ -164,12 +164,12 @@ impl<T: Send + Sync> DetachedNotifier<T> for NoopNotifier {
 struct Inner<N, Sl> {
     notifier: N,
     sleeper: Sl,
-    policy: RetryPolicy,
     counters: Arc<Counters>,
 }
 
 impl<N, Sl: Sleeper> Inner<N, Sl> {
-    async fn run<T>(&self, key: MailboxKey, entry: MailboxEntry<T>)
+    /// Notify under `policy`, the notifier's policy when it was dispatched.
+    async fn run<T>(&self, key: MailboxKey, entry: MailboxEntry<T>, policy: RetryPolicy)
     where
         T: Send + Sync,
         N: Notifier<T>,
@@ -180,7 +180,7 @@ impl<N, Sl: Sleeper> Inner<N, Sl> {
                 self.counters.notified.fetch_add(1, Ordering::Relaxed);
                 return;
             };
-            if let Some(wait) = self.policy.backoff_after(attempt) {
+            if let Some(wait) = policy.backoff_after(attempt) {
                 self.counters.retried.fetch_add(1, Ordering::Relaxed);
                 tracing::warn!(
                     task_id = entry.task_id,
@@ -209,6 +209,9 @@ impl<N, Sl: Sleeper> Inner<N, Sl> {
 /// retried with backoff up to a bound, and its failures counted and logged.
 pub struct BackgroundNotifier<N, Sp, Sl> {
     inner: Arc<Inner<N, Sl>>,
+    /// Copied into each dispatched notification, so replacing it never
+    /// depends on whether a notification still holds `inner`.
+    policy: RetryPolicy,
     spawner: Sp,
     clock: Arc<dyn Clock>,
 }
@@ -216,7 +219,7 @@ pub struct BackgroundNotifier<N, Sp, Sl> {
 impl<N, Sp, Sl> std::fmt::Debug for BackgroundNotifier<N, Sp, Sl> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("BackgroundNotifier")
-            .field("policy", &self.inner.policy)
+            .field("policy", &self.policy)
             .finish_non_exhaustive()
     }
 }
@@ -231,20 +234,19 @@ impl<N, Sp, Sl> BackgroundNotifier<N, Sp, Sl> {
             inner: Arc::new(Inner {
                 notifier,
                 sleeper,
-                policy: RetryPolicy::default(),
                 counters: Arc::default(),
             }),
+            policy: RetryPolicy::default(),
             spawner,
             clock: Arc::new(SystemClock),
         }
     }
 
-    /// Replace the retry policy.
+    /// Replace the retry policy. Notifications dispatched from now on use
+    /// it; one already in flight keeps the policy it was dispatched with.
     #[must_use]
-    pub fn with_policy(mut self, policy: RetryPolicy) -> Self {
-        if let Some(inner) = Arc::get_mut(&mut self.inner) {
-            inner.policy = policy;
-        }
+    pub const fn with_policy(mut self, policy: RetryPolicy) -> Self {
+        self.policy = policy;
         self
     }
 
@@ -278,8 +280,9 @@ where
         let key = delivery.key.clone();
         let entry = MailboxEntry::from_delivery(delivery.clone(), self.clock.now_ms());
         let inner = Arc::clone(&self.inner);
+        let policy = self.policy;
         self.spawner
-            .spawn(async move { inner.run(key, entry).await });
+            .spawn(async move { inner.run(key, entry, policy).await });
     }
 
     #[cfg(parking_lot_negative_control = "s-10")]

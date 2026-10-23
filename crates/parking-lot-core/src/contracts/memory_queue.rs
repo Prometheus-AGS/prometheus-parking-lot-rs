@@ -94,11 +94,13 @@ impl<P> TaskQueue<P> for InMemoryQueue<P> {
 
     fn prune_expired(&mut self, now_ms: u128) -> Result<usize, SchedulerError> {
         let before = self.tasks.len();
-        // Rebuild heap without expired tasks
+        // Rebuild heap without expired tasks. A task is expired once
+        // `now_ms > deadline` (it is still live at its deadline), the rule of
+        // `Ticket::is_expired` and the pools.
         let tasks: Vec<_> = self.tasks.drain().collect();
         self.tasks = tasks
             .into_iter()
-            .filter(|pt| pt.task.meta.deadline_ms.is_none_or(|d| d > now_ms))
+            .filter(|pt| pt.task.meta.deadline_ms.is_none_or(|d| d >= now_ms))
             .collect();
         let after = self.tasks.len();
         Ok(before.saturating_sub(after))
