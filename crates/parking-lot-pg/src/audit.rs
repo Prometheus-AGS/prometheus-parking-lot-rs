@@ -118,7 +118,10 @@ impl AuditSink for PostgresAuditSink {
             Err(TrySendError::Full(event) | TrySendError::Closed(event)) => event.event_id,
         };
         self.lost.fetch_add(1, Ordering::Relaxed);
-        tracing::warn!(event_id, "audit event dropped: the Postgres audit buffer is full");
+        tracing::warn!(
+            event_id,
+            "audit event dropped: the Postgres audit buffer is full"
+        );
     }
 }
 
@@ -141,7 +144,10 @@ async fn write_loop(pool: PgPool, mut queue: mpsc::Receiver<AuditEvent>, lost: A
 async fn insert(pool: &PgPool, batch: &[AuditEvent]) -> Result<(), sqlx::Error> {
     let column = |f: fn(&AuditEvent) -> String| batch.iter().map(f).collect::<Vec<_>>();
     let payloads: Vec<Option<String>> = batch.iter().map(|e| e.payload.clone()).collect();
-    #[allow(clippy::cast_precision_loss, reason = "milliseconds since the epoch fit f64 exactly")]
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "milliseconds since the epoch fit f64 exactly"
+    )]
     let millis: Vec<f64> = batch.iter().map(|e| e.created_at_ms as f64).collect();
     sqlx::query(INSERT)
         .bind(column(|e| e.event_id.clone()))
