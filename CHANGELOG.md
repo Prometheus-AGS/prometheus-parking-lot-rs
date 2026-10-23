@@ -38,8 +38,7 @@ entry names the OpenSpec change that made it.
   `ResourceKind`: build it with `ResourceCost::new(kind, units)` and `.with(..)`
   instead of a struct literal. It serializes as a map (`{"gpu_vram": 8}`) and
   still reads the 0.2 `{"kind": ..., "units": ...}` form. `ResourceKind` is
-  `#[non_exhaustive]`. Pools still admit by `total_units()` against one
-  `max_units`.
+  `#[non_exhaustive]`. Since cr-23 a pool can also limit each kind (below).
 - **Submission order (cr-18).** `TaskMetadata` has a `sequence` field (set it
   to `0`; the pool stamps it), so equal-priority tasks run in submission order
   even within one millisecond.
@@ -126,6 +125,14 @@ entry names the OpenSpec change that made it.
   `LifecycleEvent` gains `Expired` and `Requeued`, and `RejectionReason`
   gains `CapacityExceeded` (both enums are `#[non_exhaustive]`).
 
+- **Vector admission internals (cr-23).** In `prometheus-parking-lot-core`,
+  `dispatch::Ticket`'s `units: u32` field is replaced by `demand: UnitVector`
+  (`Ticket::units()` returns the total); `ParkedQueue::fitting` takes the free
+  capacity as `&UnitVector` instead of a `u32`; `semaphore::Permit` holds a
+  `UnitVector` (`units()` still returns the total). `PoolConfig` and
+  `WorkerPoolConfig` gain a public `resource_limits` field, so struct
+  literals of them need `resource_limits: BTreeMap::new()` (serialized
+  configurations are unaffected: the field is optional).
 - **Skip-ahead is on by default (cr-20).** The in-memory pools no longer
   stop at a parked head that does not fit: a smaller parked task that fits
   starts in its place, at most 8 times per head (see Added). Set
@@ -137,6 +144,22 @@ entry names the OpenSpec change that made it.
 
 ### Added
 
+- **Multi-resource admission (cr-23, scenario S-19).** A pool can limit the
+  units of each `ResourceKind` it holds at once: `resource_limits` in
+  `PoolConfig` and `WorkerPoolConfig` (e.g. `{"gpu_vram": 24, "cpu": 4}`),
+  `ResourcePool::with_resource_limit`, `DurableOptions::with_resource_limit`.
+  A task is admitted only when its cost fits `max_units` (now the total over
+  every kind) and every limited kind at once; a task needing 8 units of VRAM
+  and one CPU slot waits while VRAM is free but no slot is. A task over any
+  one limit is rejected with `CapacityExceeded` (requested and available are
+  that dimension's). A pool without `resource_limits` admits exactly as
+  before. Skip-ahead uses the same fit, and its starvation bound is
+  unchanged. Validation rejects a kind limit of zero or above `max_units`.
+  Per-kind usage: `ResourcePool::active_units_of` and native
+  `WorkerPool::active_units_of`. Lifecycle events are unchanged. Checked by
+  the `loom_vector` model (`--cfg parking_lot_negative_control="s-19"`
+  checks only the total and must fail) and `vector_*` property tests on both
+  in-memory pools.
 - **Skip-ahead bin-packing with a starvation guard (cr-20, scenario S-20).**
   When the head of the parked queue does not fit the free units, the
   dispatcher starts the first parked task, in priority-then-FIFO order, that

@@ -87,6 +87,42 @@ async fn smoke_submit_and_retrieve() {
     assert_eq!(stats.used_units, 0);
 }
 
+/// cr-23: per-kind limits from the configuration reach admission. 100 total
+/// units but 2 VRAM units: two 2-unit VRAM tasks never run together, and a
+/// 3-unit VRAM task is rejected.
+#[wasm_bindgen_test]
+async fn resource_limits_admit_by_every_dimension() {
+    let executor = Tracking::default();
+    let pool = WorkerPool::new(
+        config(4, 100, 8, 5_000).with_resource_limit(ResourceKind::GpuVram, 2),
+        executor.clone(),
+    )
+    .expect("pool");
+    let vram = |id: u64, units: u32| TaskMetadata {
+        cost: ResourceCost::new(ResourceKind::GpuVram, units),
+        ..meta(id, Priority::Normal, 0)
+    };
+    assert!(matches!(
+        pool.submit(5, vram(1, 3)),
+        Err(SchedulerError::CapacityExceeded {
+            requested: 3,
+            available: 2,
+            ..
+        })
+    ));
+    let keys: Vec<_> = (2..5)
+        .map(|id| pool.submit(5, vram(id, 2)).expect("submit"))
+        .collect();
+    for key in &keys {
+        pool.retrieve_async(key, LONG).await.expect("result");
+    }
+    assert_eq!(
+        executor.peak.load(Ordering::SeqCst),
+        2,
+        "VRAM tasks overlapped"
+    );
+}
+
 #[wasm_bindgen_test]
 async fn capacity_is_never_exceeded() {
     // 16 worker slots but 3 units: the 0.2 pool (audit C1) ran all of them.

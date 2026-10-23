@@ -1,6 +1,12 @@
 //! The priority dispatcher: one owner for the parked queue and the
 //! unit-weighted semaphore.
 //!
+//! Admission is by every capacity dimension at once (cr-23): an item's
+//! [`Ticket::demand`] is a [`UnitVector`] (total units plus units per
+//! resource kind), and the semaphore admits it only when it fits the total,
+//! the permit bound and every kind the pool limits. "Fits" below always means
+//! fits in every dimension.
+//!
 //! ## Protocol
 //!
 //! Every decision about parked work is made under one mutex (the *dispatch
@@ -36,8 +42,11 @@
 //! Strict head-of-line order leaves units idle while a large head waits for
 //! them. When the head does not fit, the drain instead starts the first
 //! parked item, in priority-then-FIFO order, that is not expired and fits the
-//! free units (and a free permit): among the items that *can* start, priority
-//! and FIFO order still hold. Each such start is a *skip* of the head.
+//! free capacity in every dimension (and a free permit): among the items that
+//! *can* start, priority and FIFO order still hold. Each such start is a
+//! *skip* of the head. With several dimensions, the skipped-in item may be
+//! one that needs nothing of the dimension the head is short in; it is a skip
+//! all the same.
 //!
 //! The *starvation guard* bounds the skips. The dispatcher counts the skips of
 //! the current head, keyed by its sequence number (the count restarts when a
@@ -78,14 +87,17 @@
 //! `H`.
 //!
 //! (2) While `H` is the head, every item holding a permit is in `R` or `S`
-//! (by (1), nothing else starts). `H`'s cost is at most `max_units` (larger
-//! items are rejected at submission), so `H` fits as soon as no permit is
-//! held. Every completion returns its permit under the dispatch lock and then
+//! (by (1), nothing else starts). `H`'s demand is within the pool's limit in
+//! *every* dimension (the total `max_units` and each limited kind; an item
+//! over any limit is rejected at submission, cr-23), and a pool has at least
+//! one permit, so `H` fits as soon as no permit is held: every dimension is
+//! then back to zero. Every completion returns its permit under the dispatch lock and then
 //! drains ([`complete`](Dispatcher::complete); a permit dropped any other way
 //! is followed by [`poke`](Dispatcher::poke) in the pools), and that drain
 //! reads `H` as the head and starts it once it fits; so `H` starts no later
 //! than the drain after the last completion in `R` and `S`. For the
-//! wall-clock form: `H` does not fit only while some permit is held, so from
+//! wall-clock form: `H` does not fit (in any dimension) only while some
+//! permit is held, so from
 //! the moment `H` became the head until it starts, some item of `R` or `S` is
 //! running at every instant, and that interval is no longer than the sum of
 //! their run times. The pools bound a run time by the execution budget where
@@ -107,10 +119,12 @@
 //!
 //! ## Capacity invariant
 //!
-//! Units are claimed only through [`UnitSemaphore::try_acquire`], whose CAS
-//! never moves the count past `max_units` (see `crate::semaphore`). A started
-//! item holds a [`Permit`] until it completes, so the units of all running
-//! items never exceed `max_units`.
+//! Units are claimed only through [`UnitSemaphore::try_acquire_vector`],
+//! which never moves the total past `max_units` nor a limited kind past its
+//! limit, and claims every dimension of a demand or none (see
+//! `crate::semaphore`). A started item holds a [`Permit`] until it completes,
+//! so in every dimension the units of all running items never exceed the
+//! limit. The `loom_capacity` and `loom_vector` models check this.
 //!
 //! ## No lost wakeup
 //!
@@ -137,9 +151,9 @@
 
 use std::marker::PhantomData;
 
-use crate::contracts::SchedulerError;
+use crate::contracts::{ResourceKind, SchedulerError};
 use crate::semaphore::sync::{Arc, Mutex};
-use crate::semaphore::{Permit, UnitSemaphore};
+use crate::semaphore::{Permit, UnitSemaphore, UnitVector};
 
 use super::parked::{Parkable, ParkedQueue, PriorityQueue, Ticket};
 
@@ -288,6 +302,9 @@ impl<T: Parkable> Dispatcher<T, PriorityQueue<T>> {
 impl<T, Q> Dispatcher<T, Q> {
     /// A dispatcher named `pool` (used in errors) admitting through
     /// `semaphore` and parking at most `max_queue_depth` items in `queue`.
+    ///
+    /// Per-dimension limits (cr-23) are the semaphore's; see
+    /// [`UnitSemaphore::with_resource_limit`].
     pub fn new(
         pool: impl Into<String>,
         semaphore: UnitSemaphore,
@@ -307,6 +324,30 @@ impl<T, Q> Dispatcher<T, Q> {
             }),
             _items: PhantomData,
         }
+    }
+
+    /// Limit dimension `kind` to `limit` units (cr-23) on a dispatcher with no
+    /// permit outstanding (every permit shares the semaphore, so exclusive
+    /// access to it is the check). Pools call it while they are being built,
+    /// before anything is submitted.
+    ///
+    /// # Errors
+    ///
+    /// [`SchedulerError::InvalidConfig`] when a permit is outstanding;
+    /// nothing changes then.
+    pub fn set_resource_limit(
+        &mut self,
+        kind: ResourceKind,
+        limit: u32,
+    ) -> Result<(), SchedulerError> {
+        let Some(semaphore) = Arc::get_mut(&mut self.semaphore) else {
+            return Err(SchedulerError::invalid_config(format!(
+                "pool '{}': resource limits can only be set while no task holds capacity",
+                self.pool
+            )));
+        };
+        semaphore.set_resource_limit(kind, limit);
+        Ok(())
     }
 
     /// Set how many times a head that does not fit may be skipped before
@@ -344,10 +385,54 @@ impl<T, Q> Dispatcher<T, Q> {
         self.semaphore.max_units()
     }
 
+    /// The limit of dimension `kind`, if the pool limits it (cr-23).
+    #[must_use]
+    pub fn resource_limit(&self, kind: ResourceKind) -> Option<u32> {
+        self.semaphore.resource_limit(kind)
+    }
+
     /// Units held by started, not yet completed items.
     #[must_use]
     pub fn units_in_use(&self) -> u32 {
         self.semaphore.units_in_use()
+    }
+
+    /// Units held in dimension `kind` by started, not yet completed items, or
+    /// `None` when the pool does not limit `kind` (cr-23).
+    #[must_use]
+    pub fn units_in_use_of(&self, kind: ResourceKind) -> Option<u32> {
+        self.semaphore.units_in_use_of(kind)
+    }
+
+    /// Reject a demand that exceeds the pool's limit in some dimension (the
+    /// total or a limited kind): it could never start, and parked at the head
+    /// it would block the items behind it.
+    ///
+    /// # Errors
+    ///
+    /// [`SchedulerError::CapacityExceeded`] with the requested units and the
+    /// limit of the first dimension exceeded (the total first, then kinds in
+    /// `ResourceKind` order).
+    pub fn check_capacity(&self, demand: &UnitVector) -> Result<(), SchedulerError> {
+        match self.semaphore.exceeded_limit(demand) {
+            None => Ok(()),
+            Some((kind, requested, available)) => {
+                if let Some(kind) = kind {
+                    tracing::debug!(
+                        pool = %self.pool,
+                        ?kind,
+                        requested,
+                        limit = available,
+                        "demand exceeds the pool's limit in one dimension"
+                    );
+                }
+                Err(SchedulerError::CapacityExceeded {
+                    pool: self.pool.clone(),
+                    requested,
+                    available,
+                })
+            }
+        }
     }
 
     /// Started, not yet completed items.
@@ -403,7 +488,9 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
     /// # Errors
     ///
     /// - [`SchedulerError::CapacityExceeded`] when the item needs more units
-    ///   than the semaphore has in total (it could never start);
+    ///   than the pool's limit in some dimension: the total, or a limited
+    ///   kind (it could never start; see
+    ///   [`check_capacity`](Self::check_capacity));
     /// - [`SchedulerError::QueueFull`] when it must wait and `max_queue_depth`
     ///   items are already parked;
     /// - the parked queue's error when it cannot store the item.
@@ -430,14 +517,8 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
         now_ms: u128,
         on_park: impl FnOnce(usize),
     ) -> Result<Admission<T>, SchedulerError> {
-        let units = item.ticket().units;
-        if units > self.semaphore.max_units() {
-            return Err(SchedulerError::CapacityExceeded {
-                pool: self.pool.clone(),
-                requested: units,
-                available: self.semaphore.max_units(),
-            });
-        }
+        let demand = item.ticket().demand;
+        self.check_capacity(&demand)?;
 
         let mut state = self.state.lock();
         state.last_sequence += 1;
@@ -445,7 +526,7 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
         item.set_sequence(sequence);
 
         if state.queue.is_empty()
-            && let Some(permit) = UnitSemaphore::try_acquire(&self.semaphore, units)
+            && let Some(permit) = UnitSemaphore::try_acquire_vector(&self.semaphore, &demand)
         {
             drop(state);
             return Ok(Admission {
@@ -563,7 +644,8 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
                 }
                 continue;
             }
-            if let Some(permit) = UnitSemaphore::try_acquire(&self.semaphore, ticket.units) {
+            if let Some(permit) = UnitSemaphore::try_acquire_vector(&self.semaphore, &ticket.demand)
+            {
                 match state.queue.pop_head() {
                     Some(item) => dispatched.started.push(Grant { item, permit }),
                     None => break,
@@ -616,10 +698,10 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
             return false;
         }
         state.blocked = Some(blocked);
-        let Some(free_units) = self.semaphore.available_units() else {
+        let Some(free) = self.semaphore.available() else {
             return false;
         };
-        let candidate = match state.queue.fitting(free_units, now_ms) {
+        let candidate = match state.queue.fitting(&free, now_ms) {
             Ok(Some(candidate)) => candidate,
             Ok(None) => return false,
             Err(error) => {
@@ -628,7 +710,8 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
                 return false;
             }
         };
-        let Some(permit) = UnitSemaphore::try_acquire(&self.semaphore, candidate.units) else {
+        let Some(permit) = UnitSemaphore::try_acquire_vector(&self.semaphore, &candidate.demand)
+        else {
             return false;
         };
         // Dropping `permit` on the `None` path returns its units under the
@@ -659,6 +742,8 @@ mod tests {
         name: &'static str,
         priority: Priority,
         units: u32,
+        /// A vector demand (cr-23); `None` is `UnitVector::scalar(units)`.
+        vector: Option<UnitVector>,
         deadline_ms: Option<u128>,
         sequence: u64,
     }
@@ -668,9 +753,32 @@ mod tests {
             name,
             priority,
             units,
+            vector: None,
             deadline_ms: None,
             sequence: 0,
         }
+    }
+
+    /// An item needing `vram` GPU VRAM units and `slots` CPU slots.
+    fn vitem(name: &'static str, priority: Priority, vram: u32, slots: u32) -> Item {
+        let cost = crate::contracts::ResourceCost::new(ResourceKind::GpuVram, vram)
+            .with(ResourceKind::Cpu, slots);
+        let demand = UnitVector::from_cost(&cost);
+        Item {
+            vector: Some(demand),
+            ..item(name, priority, demand.total())
+        }
+    }
+
+    /// A pool of 16 VRAM units and 2 slots; the total is not binding.
+    fn vector_dispatcher() -> Dispatcher<Item> {
+        Dispatcher::in_memory(
+            "test",
+            UnitSemaphore::new(u32::MAX)
+                .with_resource_limit(ResourceKind::GpuVram, 16)
+                .with_resource_limit(ResourceKind::Cpu, 2),
+            16,
+        )
     }
 
     impl Parkable for Item {
@@ -678,7 +786,9 @@ mod tests {
             Ticket {
                 priority: self.priority,
                 sequence: self.sequence,
-                units: self.units,
+                demand: self
+                    .vector
+                    .unwrap_or_else(|| UnitVector::scalar(self.units)),
                 deadline_ms: self.deadline_ms,
             }
         }
@@ -873,6 +983,109 @@ mod tests {
         let mut running = woken;
         let after = dispatcher.complete(running.pop().expect("head").permit, 0);
         assert_eq!(names(&after.started), vec!["s3"]);
+    }
+
+    /// The spec scenario through the dispatcher: (8 GiB, 1 slot) waits while
+    /// 8 GiB are free but no slot is, and starts when a slot is returned.
+    #[test]
+    fn vector_item_short_in_one_dimension_waits_until_it_fits() {
+        let dispatcher = vector_dispatcher();
+        let a = dispatcher
+            .submit(vitem("a", Priority::Normal, 4, 1), 0)
+            .expect("ok");
+        let b = dispatcher
+            .submit(vitem("b", Priority::Normal, 4, 1), 0)
+            .expect("ok");
+        assert!(a.started && b.started);
+        assert_eq!(dispatcher.units_in_use_of(ResourceKind::GpuVram), Some(8));
+        assert_eq!(dispatcher.units_in_use_of(ResourceKind::Cpu), Some(2));
+        let c = dispatcher
+            .submit(vitem("c", Priority::Normal, 8, 1), 0)
+            .expect("ok");
+        assert!(!c.started, "8 GiB free, 0 slots free: the task waits");
+        assert_eq!(dispatcher.parked(), 1);
+        let mut running = a.dispatched.started;
+        let woken = dispatcher.complete(running.pop().expect("a").permit, 0);
+        assert_eq!(names(&woken.started), vec!["c"]);
+        assert_eq!(dispatcher.units_in_use_of(ResourceKind::GpuVram), Some(12));
+        assert_eq!(dispatcher.units_in_use_of(ResourceKind::Cpu), Some(2));
+        drop((b, woken));
+    }
+
+    /// Skip-ahead by vector: the head is short in VRAM; an item that needs
+    /// only a slot skips ahead, one short in slots is passed over.
+    #[test]
+    fn starvation_vector_skip_ahead_uses_the_fit_in_every_dimension() {
+        let dispatcher = vector_dispatcher();
+        let blocker = dispatcher
+            .submit(vitem("blocker", Priority::Normal, 10, 1), 0)
+            .expect("ok");
+        let head = dispatcher
+            .submit(vitem("head", Priority::High, 8, 0), 0)
+            .expect("ok");
+        assert!(!head.started, "6 VRAM free, the head needs 8");
+        let two_slots = dispatcher
+            .submit(vitem("two-slots", Priority::Normal, 1, 2), 0)
+            .expect("ok");
+        assert!(!two_slots.started, "one slot free, it needs two");
+        let one_slot = dispatcher
+            .submit(vitem("one-slot", Priority::Low, 6, 1), 0)
+            .expect("ok");
+        assert!(one_slot.started, "fits the free VRAM and the free slot");
+        assert_eq!(dispatcher.skip_ahead_stats().skipped, 1);
+        assert_eq!(dispatcher.units_in_use_of(ResourceKind::GpuVram), Some(16));
+        let mut woken = Vec::new();
+        for grant in blocker
+            .dispatched
+            .started
+            .into_iter()
+            .chain(one_slot.dispatched.started)
+        {
+            woken.extend(dispatcher.complete(grant.permit, 0).started);
+        }
+        assert_eq!(names(&woken), vec!["head", "two-slots"]);
+    }
+
+    #[test]
+    fn vector_item_over_a_kind_limit_is_rejected_at_submission() {
+        let dispatcher = vector_dispatcher();
+        assert!(matches!(
+            dispatcher.submit(vitem("wide", Priority::Normal, 4, 3), 0),
+            Err(SchedulerError::CapacityExceeded {
+                requested: 3,
+                available: 2,
+                ..
+            })
+        ));
+        assert!(matches!(
+            dispatcher.submit(vitem("big", Priority::Normal, 17, 1), 0),
+            Err(SchedulerError::CapacityExceeded {
+                requested: 17,
+                available: 16,
+                ..
+            })
+        ));
+        assert_eq!(dispatcher.parked(), 0);
+        assert_eq!(dispatcher.units_in_use(), 0);
+    }
+
+    #[test]
+    fn resource_limits_are_set_only_while_no_permit_is_out() {
+        let mut dispatcher = Dispatcher::in_memory("test", UnitSemaphore::new(4), 8);
+        dispatcher
+            .set_resource_limit(ResourceKind::GpuVram, 2)
+            .expect("idle");
+        assert_eq!(dispatcher.resource_limit(ResourceKind::GpuVram), Some(2));
+        let running = dispatcher
+            .submit(vitem("a", Priority::Normal, 2, 0), 0)
+            .expect("ok");
+        assert!(running.started);
+        assert!(matches!(
+            dispatcher.set_resource_limit(ResourceKind::Cpu, 1),
+            Err(SchedulerError::InvalidConfig { .. })
+        ));
+        assert_eq!(dispatcher.resource_limit(ResourceKind::Cpu), None);
+        drop(running);
     }
 
     #[test]

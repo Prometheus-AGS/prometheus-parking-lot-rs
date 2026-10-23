@@ -19,8 +19,15 @@ its cost fits in what is left:
 admit(task)  iff  active_units + task.cost <= max_units
 ```
 
-That one inequality is the library's central promise: the sum of the costs of
-running tasks never exceeds the capacity. Everything else in this chapter is
+With per-kind limits (cr-23) the same inequality holds in every dimension at
+once: the total, and each resource kind the pool limits:
+
+```text
+admit(task)  iff  for every dimension d:  active[d] + task.cost[d] <= limit[d]
+```
+
+That inequality is the library's central promise: in every dimension, the sum
+of the costs of running tasks never exceeds the capacity. Everything else in this chapter is
 about *which* waiting task to admit when capacity frees, and what to do with
 tasks that cannot be admitted.
 
@@ -28,11 +35,11 @@ There are three outcomes for a submission:
 
 ```mermaid
 flowchart TD
-  S["submit(task)"] --> X{"cost > max_units?"}
+  S["submit(task)"] --> X{"cost over a limit<br/>in any dimension?"}
   X -->|yes| R1["Refuse: CapacityExceeded<br/>(could never run)"]
   X -->|no| D{"deadline already passed?"}
   D -->|yes| R2["Refuse: DeadlineExpired"]
-  D -->|no| F{"queue empty and cost fits?"}
+  D -->|no| F{"queue empty and cost fits<br/>in every dimension?"}
   F -->|yes| RUN["Admit now: Running"]
   F -->|no| QD{"queue at max_queue_depth?"}
   QD -->|yes| R3["Refuse: QueueFull<br/>(back-pressure)"]
@@ -148,15 +155,21 @@ introduced the term or the technique, so this chapter does not attribute it.
 - **Deadlines in the queue.** A queued task found expired when it reaches the
   head is not started; its mailbox receives `TaskStatus::Expired`.
   `prune_expired` removes expired tasks in bulk.
-- **One number per task.** `ResourceCost` can describe several resource kinds
-  (`Cpu`, `GpuVram`, `Io`, `Mixed`), but the pools admit on the **sum** of a
-  task's units across kinds against a single `max_units`.
+- **Multi-resource admission (cr-23).** A `ResourceCost` is a vector of
+  units per kind (`Cpu`, `GpuVram`, `Io`, `Mixed`). A pool may limit any kind
+  (`resource_limits` in `PoolConfig` and `WorkerPoolConfig`,
+  `ResourcePool::with_resource_limit`, `DurableOptions::with_resource_limit`);
+  `max_units` then bounds the total over every kind. A task is admitted only
+  when it fits the total and every limited kind at once, so a task needing 8
+  units of VRAM and 1 CPU slot waits while 8 units of VRAM are free but no slot
+  is. A kind without a limit is bounded by the total alone, and a pool with no
+  per-kind limits admits by the total exactly as before. A task over any one
+  limit is refused with `CapacityExceeded`. The claim is atomic across
+  dimensions: no other admission sees a task holding some dimensions but not
+  others. Skip-ahead uses the same every-dimension fit, and the starvation
+  bound above is unchanged. This is first-fit in priority order, not
+  Tetris-style alignment packing.
 - **No aging.** Under sustained high-priority load, `Low` tasks wait.
-
-### Planned
-
-- `cr-23-multi-resource`: per-dimension admission, so a task needing 8 GB of
-  VRAM and 1 worker slot waits when either is short.
 
 ## Sources
 

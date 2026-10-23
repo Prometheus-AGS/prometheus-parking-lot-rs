@@ -18,6 +18,7 @@ use std::cmp::Reverse;
 use std::collections::BTreeMap;
 
 use crate::contracts::{Priority, ScheduledTask, SchedulerError, TaskQueue};
+use crate::semaphore::UnitVector;
 
 use super::WorkerTask;
 
@@ -29,8 +30,9 @@ pub struct Ticket {
     pub priority: Priority,
     /// Submission sequence stamped by the dispatcher: FIFO within a priority.
     pub sequence: u64,
-    /// Units the item needs from the semaphore.
-    pub units: u32,
+    /// Units the item needs from the semaphore, in every dimension (cr-23).
+    /// [`UnitVector::scalar`] for an item with a single unit count.
+    pub demand: UnitVector,
     /// Absolute deadline (wall-clock ms) after which the item must not start.
     pub deadline_ms: Option<u128>,
 }
@@ -53,10 +55,17 @@ impl Ticket {
         self.deadline_ms.is_some_and(|deadline| now_ms > deadline)
     }
 
+    /// Units the item needs in the total dimension.
+    #[must_use]
+    pub const fn units(&self) -> u32 {
+        self.demand.total()
+    }
+
     /// Whether the item can start now in place of a blocked head: not
-    /// expired, and it needs at most `free_units`.
-    fn can_skip_ahead(&self, free_units: u32, now_ms: u128) -> bool {
-        self.units <= free_units && !self.is_expired(now_ms)
+    /// expired, and its demand fits `free` in every dimension.
+    #[must_use]
+    pub fn can_skip_ahead(&self, free: &UnitVector, now_ms: u128) -> bool {
+        self.demand.fits_in(free) && !self.is_expired(now_ms)
     }
 }
 
@@ -74,7 +83,7 @@ impl<P> Parkable for ScheduledTask<P> {
         Ticket {
             priority: self.meta.priority,
             sequence: self.meta.sequence,
-            units: self.meta.cost.total_units(),
+            demand: UnitVector::from_cost(&self.meta.cost),
             deadline_ms: self.meta.deadline_ms,
         }
     }
@@ -89,7 +98,7 @@ impl<P> Parkable for WorkerTask<P> {
         Ticket {
             priority: self.meta.priority,
             sequence: self.meta.sequence,
-            units: self.meta.cost.total_units(),
+            demand: UnitVector::from_cost(&self.meta.cost),
             deadline_ms: self.meta.deadline_ms,
         }
     }
@@ -131,9 +140,10 @@ pub trait ParkedQueue<T> {
     fn pop_head(&mut self) -> Option<T>;
 
     /// Skip-ahead (cr-20): the ticket of the first item, in dispatch order,
-    /// that is not expired at `now_ms` and needs at most `free_units`, without
-    /// removing it. The dispatcher calls it only when the head does not fit
-    /// in `free_units`, so the head itself is not normally a candidate.
+    /// that is not expired at `now_ms` and whose demand fits `free` in every
+    /// dimension ([`Ticket::can_skip_ahead`]), without removing it. The
+    /// dispatcher calls it only when the head does not fit, so the head itself
+    /// is not normally a candidate.
     ///
     /// The default finds nothing: a queue that does not implement it keeps
     /// strict head-of-line order.
@@ -141,8 +151,12 @@ pub trait ParkedQueue<T> {
     /// # Errors
     ///
     /// The backend's error when it cannot be read; nothing is removed.
-    fn fitting(&mut self, free_units: u32, now_ms: u128) -> Result<Option<Ticket>, SchedulerError> {
-        let _ = (free_units, now_ms);
+    fn fitting(
+        &mut self,
+        free: &UnitVector,
+        now_ms: u128,
+    ) -> Result<Option<Ticket>, SchedulerError> {
+        let _ = (free, now_ms);
         Ok(None)
     }
 
@@ -180,14 +194,14 @@ struct Entry<T> {
 ///
 /// The head and removals are `O(log n)`. The skip-ahead lookup walks the
 /// queue in dispatch order and stops at the first item that fits; it returns
-/// at once when the smallest parked cost exceeds the free units, which it
-/// reads from a per-cost index.
+/// at once when the smallest parked total exceeds the free total, which it
+/// reads from a per-cost index (a demand fits only if its total does).
 #[derive(Debug)]
 pub struct PriorityQueue<T> {
     entries: BTreeMap<Key, Entry<T>>,
     /// Arrival counter for [`Key`]'s tie-break.
     arrivals: u64,
-    /// Number of parked items per cost in units.
+    /// Number of parked items per total cost in units.
     costs: BTreeMap<u32, usize>,
 }
 
@@ -217,7 +231,7 @@ impl<T> PriorityQueue<T> {
     /// Remove the entry under `key`, keeping the cost index in step.
     fn remove(&mut self, key: &Key) -> Option<T> {
         let entry = self.entries.remove(key)?;
-        self.count_cost(entry.ticket.units, false);
+        self.count_cost(entry.ticket.units(), false);
         Some(entry.item)
     }
 
@@ -253,7 +267,7 @@ impl<T: Parkable> ParkedQueue<T> for PriorityQueue<T> {
         let ticket = item.ticket();
         self.arrivals += 1;
         let key = (Reverse(ticket.priority), ticket.sequence, self.arrivals);
-        self.count_cost(ticket.units, true);
+        self.count_cost(ticket.units(), true);
         self.entries.insert(key, Entry { ticket, item });
         Ok(())
     }
@@ -264,20 +278,24 @@ impl<T: Parkable> ParkedQueue<T> for PriorityQueue<T> {
 
     fn pop_head(&mut self) -> Option<T> {
         let (_, entry) = self.entries.pop_first()?;
-        self.count_cost(entry.ticket.units, false);
+        self.count_cost(entry.ticket.units(), false);
         Some(entry.item)
     }
 
-    fn fitting(&mut self, free_units: u32, now_ms: u128) -> Result<Option<Ticket>, SchedulerError> {
+    fn fitting(
+        &mut self,
+        free: &UnitVector,
+        now_ms: u128,
+    ) -> Result<Option<Ticket>, SchedulerError> {
         let smallest = self.costs.first_key_value().map(|(&units, _)| units);
-        if smallest.is_none_or(|units| units > free_units) {
+        if smallest.is_none_or(|units| units > free.total()) {
             return Ok(None);
         }
         Ok(self
             .entries
             .values()
             .map(|entry| entry.ticket)
-            .find(|ticket| ticket.can_skip_ahead(free_units, now_ms)))
+            .find(|ticket| ticket.can_skip_ahead(free, now_ms)))
     }
 
     fn take(&mut self, ticket: &Ticket) -> Option<T> {
@@ -379,8 +397,12 @@ impl<P, Q: TaskQueue<P>> ParkedQueue<ScheduledTask<P>> for TaskQueueAdapter<P, Q
         self.front.pop_head()
     }
 
-    fn fitting(&mut self, free_units: u32, now_ms: u128) -> Result<Option<Ticket>, SchedulerError> {
-        if let Some(ticket) = self.front.fitting(free_units, now_ms)? {
+    fn fitting(
+        &mut self,
+        free: &UnitVector,
+        now_ms: u128,
+    ) -> Result<Option<Ticket>, SchedulerError> {
+        if let Some(ticket) = self.front.fitting(free, now_ms)? {
             return Ok(Some(ticket));
         }
         while self.front.len() < ADAPTER_LOOKAHEAD {
@@ -389,7 +411,7 @@ impl<P, Q: TaskQueue<P>> ParkedQueue<ScheduledTask<P>> for TaskQueueAdapter<P, Q
             };
             let ticket = task.ticket();
             self.front.push(task)?;
-            if ticket.can_skip_ahead(free_units, now_ms) {
+            if ticket.can_skip_ahead(free, now_ms) {
                 return Ok(Some(ticket));
             }
         }
@@ -429,6 +451,11 @@ mod tests {
             },
             payload: sequence,
         }
+    }
+
+    /// Free capacity of `units` in the total dimension, no kind limits.
+    const fn free(units: u32) -> UnitVector {
+        UnitVector::free(units, [u32::MAX; crate::semaphore::KIND_COUNT])
     }
 
     fn drain<Q: ParkedQueue<ScheduledTask<u64>>>(queue: &mut Q) -> Vec<u64> {
@@ -475,11 +502,17 @@ mod tests {
         queue.push(late).expect("push");
         queue.push(sized(3, Priority::Low, 1)).expect("push");
         queue.push(sized(4, Priority::Normal, 2)).expect("push");
-        assert_eq!(queue.fitting(0, 10).expect("fitting"), None);
-        let found = queue.fitting(2, 10).expect("fitting").expect("4 fits");
+        assert_eq!(queue.fitting(&free(0), 10).expect("fitting"), None);
+        let found = queue
+            .fitting(&free(2), 10)
+            .expect("fitting")
+            .expect("4 fits");
         assert_eq!(found.sequence, 4);
         assert_eq!(queue.take(&found).map(|t| t.payload), Some(4));
-        let found = queue.fitting(2, 10).expect("fitting").expect("3 fits");
+        let found = queue
+            .fitting(&free(2), 10)
+            .expect("fitting")
+            .expect("3 fits");
         assert_eq!(found.sequence, 3);
         assert_eq!(queue.take(&found).map(|t| t.payload), Some(3));
         assert_eq!(drain(&mut queue), vec![1, 2]);
@@ -511,7 +544,10 @@ mod tests {
         queue.push(sized(3, Priority::Normal, 1)).expect("push");
         queue.push(sized(4, Priority::Low, 1)).expect("push");
         assert_eq!(queue.head().expect("head").map(|t| t.sequence), Some(1));
-        let found = queue.fitting(1, 0).expect("fitting").expect("3 fits");
+        let found = queue
+            .fitting(&free(1), 0)
+            .expect("fitting")
+            .expect("3 fits");
         assert_eq!(found.sequence, 3);
         assert_eq!(queue.take(&found).map(|t| t.payload), Some(3));
         // A task that must precede the front's last (2) joins the front; one
@@ -537,7 +573,7 @@ mod tests {
         assert!(queue.head().expect("head").is_some());
         // Only ADAPTER_LOOKAHEAD tasks are examined; the one-unit task lies
         // beyond the window.
-        assert_eq!(queue.fitting(1, 0).expect("fitting"), None);
+        assert_eq!(queue.fitting(&free(1), 0).expect("fitting"), None);
         assert_eq!(queue.front.len(), ADAPTER_LOOKAHEAD);
         assert_eq!(queue.len(), usize::try_from(total).expect("small") + 1);
     }

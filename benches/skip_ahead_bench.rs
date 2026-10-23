@@ -31,7 +31,7 @@ use prometheus_parking_lot_core::Priority;
 use prometheus_parking_lot_core::dispatch::{
     DEFAULT_MAX_HEAD_SKIPS, Dispatcher, Grant, Parkable, Ticket,
 };
-use prometheus_parking_lot_core::semaphore::{Permit, UnitSemaphore};
+use prometheus_parking_lot_core::semaphore::{Permit, UnitSemaphore, UnitVector};
 
 const MAX_UNITS: u32 = 16;
 const TICKS: u64 = 2_000;
@@ -50,7 +50,7 @@ impl Parkable for Job {
         Ticket {
             priority: Priority::Normal,
             sequence: self.sequence,
-            units: self.units,
+            demand: UnitVector::scalar(self.units),
             deadline_ms: None,
         }
     }

@@ -1,4 +1,5 @@
-//! Shared fixtures for the loom models (`loom_capacity`, `loom_wakeup`).
+//! Shared fixtures for the loom models (`loom_capacity`, `loom_wakeup`,
+//! `loom_skip_ahead`, `loom_vector`).
 //!
 //! The models drive the real `Dispatcher` and `UnitSemaphore`: under
 //! `--cfg parking_lot_loom` their mutex and atomics are loom's, so loom
@@ -7,22 +8,39 @@
 use loom::sync::Arc;
 use loom::sync::atomic::{AtomicU32, Ordering};
 
-use prometheus_parking_lot_core::Priority;
 use prometheus_parking_lot_core::dispatch::{Dispatcher, Grant, Parkable, Ticket};
+use prometheus_parking_lot_core::semaphore::UnitVector;
+use prometheus_parking_lot_core::{Priority, ResourceCost, ResourceKind};
 
 /// A unit of parked work.
 #[derive(Debug)]
 pub struct Job {
     pub priority: Priority,
     pub units: u32,
+    pub demand: UnitVector,
     pub sequence: u64,
 }
 
 impl Job {
+    /// A single-dimension job of `units` units.
     pub const fn new(priority: Priority, units: u32) -> Self {
         Self {
             priority,
             units,
+            demand: UnitVector::scalar(units),
+            sequence: 0,
+        }
+    }
+
+    /// A job needing `vram` GPU VRAM units and `slots` CPU slots (cr-23).
+    #[allow(dead_code, reason = "used by the loom_vector model only")]
+    pub fn vector(priority: Priority, vram: u32, slots: u32) -> Self {
+        let cost = ResourceCost::new(ResourceKind::GpuVram, vram).with(ResourceKind::Cpu, slots);
+        let demand = UnitVector::from_cost(&cost);
+        Self {
+            priority,
+            units: demand.total(),
+            demand,
             sequence: 0,
         }
     }
@@ -33,7 +51,7 @@ impl Parkable for Job {
         Ticket {
             priority: self.priority,
             sequence: self.sequence,
-            units: self.units,
+            demand: self.demand,
             deadline_ms: None,
         }
     }

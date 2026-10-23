@@ -1,9 +1,10 @@
 //! Tuning of a [`DurableResourcePool`](super::DurableResourcePool): lease
 //! duration, heartbeat and poll intervals, result TTL and the pool name.
 
+use std::collections::BTreeMap;
 use std::time::Duration;
 
-use prometheus_parking_lot_core::{HookBus, SchedulerError};
+use prometheus_parking_lot_core::{HookBus, ResourceKind, SchedulerError};
 
 /// Pool name used in errors and in the fallback result idempotency key.
 pub(super) const DEFAULT_NAME: &str = "resource_pool";
@@ -33,6 +34,7 @@ pub struct DurableOptions {
     result_ttl: Option<Duration>,
     name: String,
     hooks: HookBus,
+    resource_limits: BTreeMap<ResourceKind, u32>,
 }
 
 impl DurableOptions {
@@ -48,6 +50,7 @@ impl DurableOptions {
             result_ttl: None,
             name: DEFAULT_NAME.to_owned(),
             hooks: HookBus::new(),
+            resource_limits: BTreeMap::new(),
         }
     }
 
@@ -95,6 +98,22 @@ impl DurableOptions {
     pub fn with_hooks(mut self, hooks: HookBus) -> Self {
         self.hooks = hooks;
         self
+    }
+
+    /// Limit the units of dimension `kind` held by running tasks to `limit`
+    /// (cr-23): a task starts only when its cost fits `max_units` and every
+    /// limited kind at once, and a task over any limit is rejected at
+    /// submission (or settled as dropped when it is leased).
+    #[must_use]
+    pub fn with_resource_limit(mut self, kind: ResourceKind, limit: u32) -> Self {
+        self.resource_limits.insert(kind, limit);
+        self
+    }
+
+    /// The per-kind limits, in `ResourceKind` order.
+    #[must_use]
+    pub const fn resource_limits(&self) -> &BTreeMap<ResourceKind, u32> {
+        &self.resource_limits
     }
 
     /// The bus the pool emits lifecycle events on.

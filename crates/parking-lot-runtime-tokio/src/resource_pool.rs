@@ -26,6 +26,12 @@
 //! pool's total capacity is rejected at submission, because parked at the head
 //! of the queue it would block every task behind it forever.
 //!
+//! With per-kind limits ([`with_resource_limit`](ResourcePool::with_resource_limit),
+//! cr-23) a task's cost is a vector: it starts only when it fits the total
+//! `max_units` and every limited kind at once (a task needing 8 GiB of VRAM
+//! and one slot waits while 8 GiB are free but no slot is), and a task over
+//! any one limit is rejected at submission.
+//!
 //! A running task owns its semaphore permit; completion returns the permit
 //! through the dispatcher, which starts whatever the freed units admit under
 //! the same lock (no lost wakeup; see the dispatcher's module docs).
@@ -96,7 +102,7 @@ use prometheus_parking_lot_core::dispatch::{
 };
 use prometheus_parking_lot_core::semaphore::{Permit, UnitSemaphore};
 use prometheus_parking_lot_core::{
-    AuditSink, Clock, Hook, HookBus, Mailbox, MailboxKey, PoolLimits, ScheduledTask,
+    AuditSink, Clock, Hook, HookBus, Mailbox, MailboxKey, PoolLimits, ResourceKind, ScheduledTask,
     SchedulerError, Spawn, SystemClock, TaskError, TaskExecutor, TaskId, TaskMetadata, TaskPayload,
     TaskQueue, TaskStatus,
 };
@@ -237,6 +243,32 @@ where
         self
     }
 
+    /// Limit the units of dimension `kind` held by running tasks to `limit`
+    /// (cr-23). A task is then admitted only when its cost fits
+    /// `limits.max_units` (the total over every kind) and every limited kind at
+    /// once; a kind without a limit is bounded by the total alone. A task
+    /// needing more than `limit` of `kind` is rejected with
+    /// [`SchedulerError::CapacityExceeded`].
+    ///
+    /// # Panics
+    ///
+    /// When a task is running (it shares the pool's state): limits are part
+    /// of building the pool. Call it before the first `submit`.
+    #[must_use]
+    pub fn with_resource_limit(mut self, kind: ResourceKind, limit: u32) -> Self {
+        let set = Arc::get_mut(&mut self.inner)
+            .ok_or_else(|| {
+                SchedulerError::invalid_config("resource pool is shared by running tasks")
+            })
+            .and_then(|inner| inner.dispatcher.set_resource_limit(kind, limit));
+        if let Err(error) = set {
+            panic!(
+                "ResourcePool::with_resource_limit must be called before the pool holds work: {error}"
+            );
+        }
+        self
+    }
+
     /// Skip-ahead counters: tasks started ahead of a blocked head, and heads
     /// the starvation guard reserved capacity for.
     #[must_use]
@@ -285,6 +317,14 @@ where
     #[must_use]
     pub fn active_units(&self) -> u32 {
         self.inner.dispatcher.units_in_use()
+    }
+
+    /// Units of dimension `kind` held by running tasks, or `None` when the
+    /// pool does not limit `kind` (cr-23; [`active_units`](Self::active_units)
+    /// is the total over every kind).
+    #[must_use]
+    pub fn active_units_of(&self, kind: ResourceKind) -> Option<u32> {
+        self.inner.dispatcher.units_in_use_of(kind)
     }
 
     /// Tasks currently running (holding units).
@@ -360,7 +400,7 @@ where
     /// - [`SchedulerError::DeadlineExpired`] when the task's deadline has
     ///   already passed by the pool's clock;
     /// - [`SchedulerError::CapacityExceeded`] when the task's cost exceeds the
-    ///   pool's total capacity, so it could never start;
+    ///   pool's total capacity or a per-kind limit, so it could never start;
     /// - [`SchedulerError::QueueFull`] when the task must wait and the queue is
     ///   at its depth limit (checked atomically with the enqueue);
     /// - the queue backend's error when enqueueing fails.
