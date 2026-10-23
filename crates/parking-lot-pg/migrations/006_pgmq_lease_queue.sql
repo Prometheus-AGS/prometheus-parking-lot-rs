@@ -9,8 +9,25 @@
 --
 -- `entry_id` is the entry id the queue hands out: pgmq `msg_id * 4 + lane`.
 --
+-- Locks: a re-run must not queue behind, or in front of, queue traffic. Three
+-- statements would take strong table locks even when there is nothing to do,
+-- so each is guarded by a catalog check (no table lock) and runs only when the
+-- object is missing or different:
+--   CREATE INDEX IF NOT EXISTS   takes SHARE on the table before it looks for
+--                                the index (blocks every writer);
+--   (CREATE OR REPLACE) TRIGGER  takes ACCESS EXCLUSIVE / SHARE ROW EXCLUSIVE;
+--   ALTER TABLE ... SET (...)    takes SHARE UPDATE EXCLUSIVE (harmless to
+--                                traffic, but it rewrites the catalog row).
+-- A lock a first run needs is bounded by lock_timeout: the migration fails
+-- after 5 s instead of queueing behind a long transaction, and with it every
+-- later query on the table.
+--
+-- Apply with one call (sqlx does) or `psql --single-transaction`: the advisory
+-- lock and SET LOCAL last for the transaction.
+--
 -- Safe to run repeatedly and concurrently.
 
+SET LOCAL lock_timeout = '5s';
 SELECT pg_advisory_xact_lock(hashtextextended('pl_pgmq_aux.migration', 0));
 
 -- pgmq itself. A no-op when the image or an earlier migration installed it.
@@ -26,9 +43,15 @@ CREATE TABLE IF NOT EXISTS pl_pgmq_aux (
     PRIMARY KEY (queue_name, entry_id)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS pl_pgmq_aux_idem_key
+DO $$
+BEGIN
+    IF to_regclass('pl_pgmq_aux_idem_key') IS NULL THEN
+        CREATE UNIQUE INDEX pl_pgmq_aux_idem_key
     ON pl_pgmq_aux (queue_name, idem_key)
     WHERE idem_key IS NOT NULL;
+    END IF;
+END
+$$;
 
 -- Autovacuum (cr-36); this replaces the cr-30 settings (0.02 / 50). Queue tables
 -- churn constantly: a row is inserted, updated a few times and deleted. A
@@ -43,16 +66,27 @@ CREATE UNIQUE INDEX IF NOT EXISTS pl_pgmq_aux_idem_key
 -- ready/leased/dead mix shifts. The TOAST table behind the JSONB columns needs no
 -- toast.* options: with none set it uses the table's own (PostgreSQL docs,
 -- CREATE TABLE, storage parameters). ALTER TABLE ... SET takes SHARE UPDATE
--- EXCLUSIVE, which does not block queue reads or writes, and re-applying it is
--- a no-op, so the migration stays safe to run at every start.
+-- EXCLUSIVE, which does not block queue reads or writes; the guard skips it
+-- when the options are already in place, so a re-run touches nothing.
 -- The side table holds a row only for entries with an idempotency key or a
 -- nack delay, so it is the smallest of the queue tables.
-ALTER TABLE pl_pgmq_aux SET (
-    autovacuum_vacuum_scale_factor = 0,
-    autovacuum_vacuum_threshold = 500,
-    autovacuum_analyze_scale_factor = 0,
-    autovacuum_analyze_threshold = 500
-);
+DO $$
+BEGIN
+    IF NOT coalesce((SELECT c.reloptions @> ARRAY[
+                'autovacuum_vacuum_scale_factor=0',
+                'autovacuum_vacuum_threshold=500',
+                'autovacuum_analyze_scale_factor=0',
+                'autovacuum_analyze_threshold=500']
+                       FROM pg_class c WHERE c.oid = 'pl_pgmq_aux'::regclass), false) THEN
+        ALTER TABLE pl_pgmq_aux SET (
+            autovacuum_vacuum_scale_factor = 0,
+            autovacuum_vacuum_threshold = 500,
+            autovacuum_analyze_scale_factor = 0,
+            autovacuum_analyze_threshold = 500
+        );
+    END IF;
+END
+$$;
 
 -- pgmq's own tables. pgmq.create() builds pgmq.q_<name> (and pgmq.a_<name>, the
 -- archive, which PgmqLeaseQueue never writes to: it deletes). The q_ tables take
@@ -66,7 +100,14 @@ CREATE OR REPLACE FUNCTION pl_pgmq_tune_queue(queue text) RETURNS void
 DECLARE
     q_table regclass := to_regclass(format('pgmq.%I', 'q_' || queue));
 BEGIN
-    IF q_table IS NOT NULL THEN
+    -- Skip the ALTER when the options are already set: prepare() runs at every
+    -- start, and the guard keeps it from touching a live queue table at all.
+    IF q_table IS NOT NULL AND NOT coalesce((SELECT c.reloptions @> ARRAY[
+                'autovacuum_vacuum_scale_factor=0',
+                'autovacuum_vacuum_threshold=1000',
+                'autovacuum_analyze_scale_factor=0',
+                'autovacuum_analyze_threshold=1000']
+                FROM pg_class c WHERE c.oid = q_table), false) THEN
         EXECUTE format(
             'ALTER TABLE %s SET (
                 autovacuum_vacuum_scale_factor = 0,
