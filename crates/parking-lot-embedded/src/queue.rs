@@ -296,10 +296,38 @@ impl<'txn> Tables<'txn> {
         Ok(!expired.is_empty() || !due.is_empty())
     }
 
+    /// Move a live entry that is in no index to the dead letters, keeping its
+    /// task JSON verbatim (or as a string when it is not valid JSON), and free
+    /// its idempotency key.
+    fn bury(&mut self, id: u64, attempts: u32, reason: &str) -> Result<(), SchedulerError> {
+        let context = "embedded::queue::dead_letter";
+        let task_json = self
+            .tasks
+            .remove(id)
+            .map_err(backend(context))?
+            .map(|guard| guard.value().to_vec())
+            .unwrap_or_default();
+        let task = serde_json::from_slice::<serde_json::Value>(&task_json).unwrap_or_else(|_| {
+            serde_json::Value::String(String::from_utf8_lossy(&task_json).into_owned())
+        });
+        let letter = serde_json::json!({
+            "task": task,
+            "attempts": attempts,
+            "reason": reason,
+        });
+        let letter = serde_json::to_vec(&letter).map_err(backend(context))?;
+        self.dead
+            .insert(id, letter.as_slice())
+            .map_err(backend(context))?;
+        self.state.remove(id).map_err(backend(context))?;
+        self.release_key(id)
+    }
+
+    /// The stored task, or the decode error when its JSON is not a `P`.
     fn decode_task<P: DeserializeOwned>(
         &self,
         id: u64,
-    ) -> Result<ScheduledTask<P>, SchedulerError> {
+    ) -> Result<Result<ScheduledTask<P>, serde_json::Error>, SchedulerError> {
         let guard = self
             .tasks
             .get(id)
@@ -307,7 +335,7 @@ impl<'txn> Tables<'txn> {
             .ok_or_else(|| {
                 SchedulerError::internal(format!("embedded queue entry {id} has no task row"))
             })?;
-        serde_json::from_slice(guard.value()).map_err(backend("embedded::queue::task_decode"))
+        Ok(serde_json::from_slice(guard.value()))
     }
 }
 
@@ -373,6 +401,7 @@ fn len_of(table: &impl ReadableTableMetadata) -> Result<usize, SchedulerError> {
 pub struct RedbLeaseQueue<P> {
     store: EmbeddedStore,
     max_depth: usize,
+    max_attempts: Option<u32>,
     payload: PhantomData<fn() -> P>,
 }
 
@@ -381,8 +410,22 @@ impl<P> RedbLeaseQueue<P> {
         Self {
             store,
             max_depth,
+            max_attempts: None,
             payload: PhantomData,
         }
+    }
+
+    /// Dead-letter an entry that has been leased `max_attempts` times instead
+    /// of leasing it again: a task is delivered exactly `max_attempts` times,
+    /// then the next lease moves it to the dead letters with the reason
+    /// `max attempts (N) exhausted`. Unset by default (redeliver forever).
+    ///
+    /// Without a limit, a task that kills its process is redelivered on every
+    /// restart; a desktop app that crashes on it crashes again on every launch.
+    #[must_use]
+    pub const fn with_max_attempts(mut self, max_attempts: u32) -> Self {
+        self.max_attempts = Some(max_attempts);
+        self
     }
 
     /// The dead letters, oldest first, as `(entry id, JSON)` where the JSON
@@ -461,6 +504,7 @@ fn lease_tx<P: DeserializeOwned>(
     clock: &dyn Clock,
     max: usize,
     lease_for: Duration,
+    max_attempts: Option<u32>,
 ) -> Result<Vec<LeasedTask<P>>, SchedulerError> {
     let context = "embedded::queue::lease";
     let now = now_ms(clock);
@@ -481,7 +525,28 @@ fn lease_tx<P: DeserializeOwned>(
             let mut row = t.state_of(id)?.ok_or_else(|| {
                 SchedulerError::internal(format!("embedded queue entry {id} has no state row"))
             })?;
-            let task = t.decode_task::<P>(id)?;
+            if let Some(limit) = max_attempts
+                && row.attempts >= limit
+            {
+                t.bury(
+                    id,
+                    row.attempts,
+                    &format!("max attempts ({limit}) exhausted"),
+                )?;
+                continue;
+            }
+            // An entry this build cannot decode (for example after an update
+            // changed the payload type) is dead-lettered in this transaction
+            // instead of failing the lease, which would roll back the
+            // transaction and leave the entry at the front for every later
+            // lease.
+            let task = match t.decode_task::<P>(id)? {
+                Ok(task) => task,
+                Err(error) => {
+                    t.bury(id, row.attempts, &format!("undecodable task: {error}"))?;
+                    continue;
+                }
+            };
             row.attempts = row.attempts.saturating_add(1);
             row.fence = t.next(NEXT_FENCE)?;
             row.kind = Kind::Leased;
@@ -546,27 +611,7 @@ fn nack_tx(
                     .map_err(backend(context))?;
                 t.set_state(id, row)?;
             }
-            NackAction::DeadLetter { reason } => {
-                let task_json = t
-                    .tasks
-                    .remove(id)
-                    .map_err(backend(context))?
-                    .map(|guard| guard.value().to_vec())
-                    .unwrap_or_default();
-                let task: serde_json::Value =
-                    serde_json::from_slice(&task_json).map_err(backend(context))?;
-                let letter = serde_json::json!({
-                    "task": task,
-                    "attempts": row.attempts,
-                    "reason": reason,
-                });
-                let letter = serde_json::to_vec(&letter).map_err(backend(context))?;
-                t.dead
-                    .insert(id, letter.as_slice())
-                    .map_err(backend(context))?;
-                t.state.remove(id).map_err(backend(context))?;
-                t.release_key(id)?;
-            }
+            NackAction::DeadLetter { reason } => t.bury(id, row.attempts, reason)?,
             // `NackAction` is non-exhaustive: refuse actions this build cannot honour.
             _ => {
                 return Err(SchedulerError::invalid_config(
@@ -650,13 +695,14 @@ where
     ) -> impl Future<Output = Result<Vec<LeasedTask<P>>, SchedulerError>> + Send {
         let validated = require_positive(lease_for);
         let store = self.store.clone();
+        let max_attempts = self.max_attempts;
         async move {
             validated?;
             if max == 0 {
                 return Ok(Vec::new());
             }
             store
-                .blocking(move |db, clock| lease_tx::<P>(db, clock, max, lease_for))
+                .blocking(move |db, clock| lease_tx::<P>(db, clock, max, lease_for, max_attempts))
                 .await
         }
     }

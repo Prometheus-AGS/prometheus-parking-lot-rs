@@ -119,6 +119,11 @@ collect cycle end to end.
   by a crash runs again from the start after its lease expires. The idempotency
   key stops a second stored answer, not a second generation. Keep side effects
   of a prompt idempotent.
+- **A prompt that crashes the app crashes it again.** A task that kills the
+  process is redelivered on every launch until it is dead-lettered. Set
+  `max_attempts` on the `redb` backend (for example 3) to give up on it after
+  that many deliveries; it then waits in the dead letters
+  (`RedbLeaseQueue::dead_letters`) instead of crashing every start.
 - **Long leases delay recovery.** `lease_secs` is how long a crashed run blocks
   its prompt before the next launch picks it up; the pool's heartbeat keeps a
   live run's lease from expiring, so a short lease is safe.
