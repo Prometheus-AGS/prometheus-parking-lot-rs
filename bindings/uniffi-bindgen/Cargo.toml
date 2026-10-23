@@ -1,0 +1,27 @@
+# The UniFFI binding generator for crates/parking-lot-ffi, as its own tiny workspace.
+#
+# UniFFI ships its generator as a library entry point (`uniffi::uniffi_bindgen_main`),
+# so a project builds a two-line binary around it. That binary pulls in clap, askama and
+# the Kotlin/Swift/Python generators, none of which belong in the root workspace's graph:
+# every `cargo ... --workspace` job in CI would compile them. Keeping it out of the root
+# workspace (the empty [workspace] table below) leaves the main build untouched; it has
+# its own Cargo.lock and is built only by bindings/generate.sh and its CI job.
+#
+# The version must equal the `uniffi` version in the root Cargo.lock: generate.sh checks.
+[package]
+name = "uniffi-bindgen"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.95"
+publish = false
+description = "Runs UniFFI's Kotlin/Swift generator for crates/parking-lot-ffi (not part of the root workspace)."
+license = "MIT"
+
+[workspace]
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/main.rs"
+
+[dependencies]
+uniffi = { version = "=0.32.2", features = ["cli"] }

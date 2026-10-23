@@ -1,0 +1,16 @@
+[package]
+name = "parking-lot-tauri-queue-service"
+description = "The Tauri example's queue logic (submit, work, collect) over the embedded parking-lot store; no GUI."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+prometheus-parking-lot-ffi = { path = "../../../crates/parking-lot-ffi" }
+serde.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { version = "1", features = ["rt", "macros", "time"] }
