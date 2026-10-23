@@ -41,7 +41,7 @@ impl<P> MailboxMessage<P> {
 /// In-memory mailbox for development and testing.
 ///
 /// **Limitation:** no cross-restart durability. Use a persistent backend
-/// (`PostgresMailbox`, `YaqueMailbox`) for production.
+/// (`PostgresMailbox`, `RedbResultMailbox`) for production.
 pub struct InMemoryMailbox<P> {
     /// Keyed by `MailboxKey`. At most one message per key (consume-once).
     messages: HashMap<MailboxKey, MailboxMessage<P>>,
