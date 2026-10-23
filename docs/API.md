@@ -15,7 +15,7 @@ Paths below are facade paths unless a crate is named.
 | `ResourcePool<P, T, Q, M, E, S>`: async parking-lot scheduler over a `TaskQueue`, a `Mailbox`, a `TaskExecutor` and a `Spawn` | `core::ResourcePool` | `tokio-runtime` (default) |
 | `WorkerPool<P, R, E>`: dedicated OS worker threads (native) for CPU/GPU-bound work over a `WorkerExecutor` | `WorkerPool`, `core::WorkerPool` | `tokio-runtime` on native; wasm32 by target |
 | `PoolLimits { max_units, max_queue_depth, default_timeout }` | `core::PoolLimits` | always |
-| `WorkerPoolConfig` (builder: `with_worker_count`, `with_max_units`, `with_max_queue_depth`, `with_timeout_ms`) | `config::WorkerPoolConfig` | always |
+| `WorkerPoolConfig` (builder: `with_worker_count`, `with_max_units`, `with_max_queue_depth`, `with_timeout_ms`, `with_max_head_skips`) | `config::WorkerPoolConfig` | always |
 | `PoolStats` | `core::PoolStats` | always |
 | `TokioSpawner` (`new(handle)`, `with_worker_threads(n)`) | `runtime::TokioSpawner` | `tokio-runtime` |
 | `ShutdownHandle`, `ShutdownPolicy`, `ShutdownReport`, `wait_for_signal` | `core::shutdown` (`ShutdownReport` also top level) | `tokio-runtime` |
@@ -47,7 +47,7 @@ returning a `ShutdownReport` (cr-29).
 | Item | Path | Feature |
 | --- | --- | --- |
 | `SchedulerConfig { backends, pools }` (`from_json_str`, `validate`); every config struct rejects unknown fields | `config::SchedulerConfig` | always |
-| `PoolConfig { max_units, max_queue_depth, default_timeout_secs, queue, mailbox }`, `StorageConfig` (`"in_memory"` or `{ "backend": name }`) | `config::*` | always |
+| `PoolConfig { max_units, max_queue_depth, default_timeout_secs, queue, mailbox, max_head_skips }`, `StorageConfig` (`"in_memory"` or `{ "backend": name }`) | `config::*` | always |
 | `BackendConfig` (`"type": "postgres"` / `"redb"`), `PostgresBackendConfig`, `RedbBackendConfig` | `config::*` | always (validation requires `postgres` / `embedded`) |
 | `ConfigError` (`Parse` names an unknown or missing field; `Invalid { field, reason }` with a dotted path) | `config::ConfigError` | always |
 | `build_pools_from_scheduler_config(cfg, executor_factory, spawner)` → `BuiltScheduler { pools, durable_pools, postgres, redb }` | `builders::*` | `tokio-runtime` |
@@ -122,6 +122,16 @@ yet.
 
 `prometheus_parking_lot_core::dispatch` (`Dispatcher`, `Admission`,
 `Dispatched`, `Grant`, `Ticket`, `Parkable`, `ParkedQueue`, `PriorityQueue`,
-`TaskQueueAdapter`) and `prometheus_parking_lot_core::semaphore`
+`TaskQueueAdapter`, `SkipAheadStats`, `DEFAULT_MAX_HEAD_SKIPS`,
+`ADAPTER_LOOKAHEAD`) and `prometheus_parking_lot_core::semaphore`
 (`UnitSemaphore`, `Permit`) are what both pools admit through. The facade does
 not re-export them.
+
+Admission order (cr-20): parked tasks start in priority, then submission,
+order. When the head does not fit the free units, the first parked task that
+does starts in its place (skip-ahead); after `max_head_skips` such skips
+(default 8, `0` for strict head-of-line order) the dispatcher reserves the
+capacity for the head and starts nothing else until it has started.
+`ResourcePool::with_max_head_skips` and `skip_ahead_stats`,
+`WorkerPoolConfig::max_head_skips` and the native `WorkerPool::skip_ahead_stats`
+expose it; `DurableResourcePool` dispatches strictly head-of-line.

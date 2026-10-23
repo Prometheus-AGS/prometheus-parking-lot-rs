@@ -31,7 +31,7 @@ migration notes.
 | Guarantee | Today |
 | --- | --- |
 | Admitted units never exceed `max_units` | Yes, for both pools: one dispatcher and one unit-weighted semaphore, covered by loom and property tests. |
-| Priority, then FIFO | Yes. Letting small tasks skip ahead of a large head task is planned (cr-20). |
+| Priority, then FIFO | Yes, among the tasks that fit. A smaller task that fits starts ahead of a large head that does not, at most `max_head_skips` times (default 8) before the head gets the capacity reserved (cr-20); `0` keeps strict head-of-line order. Durable pools dispatch strictly in order. |
 | Execution budgets | Yes, for both pools. |
 | Multi-resource admission | Costs are already vectors, but pools admit by the sum of units against one `max_units`; per-dimension limits are cr-23. |
 | Executor panics | Contained, for `ResourcePool` and the native `WorkerPool` (cr-21): the outcome is `TaskError::ExecutorPanicked`, the task's units are released and parked work starts; a `WorkerPool` worker killed by a panic is replaced. |
@@ -402,7 +402,9 @@ every backend; `builders::build_pools` builds in-memory pools from queue and
 mailbox factories you supply instead.
 
 The schema is strict: an unknown or misspelled field fails to load, and the
-error names it. A pool whose `queue` and `mailbox` are `"in_memory"` parks
+error names it. A pool's optional `max_head_skips` (default 8) bounds how often
+a parked task that does not fit may be passed by smaller tasks that do before
+the pool reserves capacity for it; `0` keeps strict head-of-line order. A pool whose `queue` and `mailbox` are `"in_memory"` parks
 tasks and delivers results in memory. A pool whose `queue` and `mailbox` both
 name a backend (`{"backend": "local"}`) is built as a `DurableResourcePool` on
 it (cr-49): accepted tasks and their results survive a crash. Each backend
