@@ -1,172 +1,114 @@
-//! Example of using `PostgresQueue` and `PostgresMailbox` for persistent task scheduling.
+//! Durable cloud parking with the Postgres lease queue and result mailbox.
 //!
-//! This example demonstrates a cloud-deployment scenario with:
-//! - Postgres-backed persistent queue
-//! - Postgres-backed result mailbox
-//! - Task submission and result retrieval
+//! A service accepts work into a durable queue, runs it, stores each result in
+//! a durable mailbox, and acknowledges the task only after the result is
+//! stored. Killing the process at any point loses nothing: unacknowledged work
+//! is redelivered when its lease expires, and the idempotency key keeps the
+//! first stored result. The client collects its result later, exactly once.
 //!
 //! ## Setup
 //!
-//! 1. Start Postgres using Docker Compose:
+//! 1. Start Postgres (the project image, see `docker/postgres18`):
 //!    ```bash
-//!    docker-compose -f docker-compose.test.yml up -d
+//!    docker compose -f docker-compose.test.yml up -d --build postgres18
 //!    ```
 //!
-//! 2. Run this example:
+//! 2. Run this example (`DATABASE_URL` defaults to the compose service):
 //!    ```bash
 //!    cargo run --example postgres_pool --features postgres
 //!    ```
 
-use prometheus_parking_lot::core::{
-    PoolLimits, ResourcePool, ScheduledTask, Spawn, TaskExecutor, TaskMetadata,
-};
-use prometheus_parking_lot::infra::mailbox::postgres::PostgresMailbox;
-use prometheus_parking_lot::infra::queue::postgres::PostgresQueue;
-use prometheus_parking_lot::util::clock::now_ms;
-use prometheus_parking_lot::util::serde::{MailboxKey, Priority, ResourceCost, ResourceKind};
-
-use async_trait::async_trait;
-use prometheus_parking_lot::core::TaskError;
-use sea_orm::Database;
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use std::time::Duration;
 
-/// Example task payload for demonstration.
+use prometheus_parking_lot::core::{
+    Delivery, Enqueued, LeaseQueue, ResultMailbox, ScheduledTask, TaskMetadata, TaskStatus,
+};
+use prometheus_parking_lot::infra::PgPool;
+use prometheus_parking_lot::infra::mailbox::PgResultMailbox;
+use prometheus_parking_lot::infra::queue::PgLeaseQueue;
+use prometheus_parking_lot::util::clock::now_ms;
+use prometheus_parking_lot::util::serde::{MailboxKey, Priority, ResourceCost, ResourceKind};
+use serde::{Deserialize, Serialize};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct DemoTask {
-    id: u64,
-    operation: String,
-    data: String,
+struct Prompt {
+    text: String,
 }
 
-/// Example result payload.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct DemoResult {
-    task_id: u64,
-    output: String,
-    processed_at: u128,
-}
-
-/// Simple executor that simulates some work.
-#[derive(Clone)]
-struct DemoExecutor;
-
-#[async_trait]
-impl TaskExecutor<DemoTask, DemoResult> for DemoExecutor {
-    async fn execute(
-        &self,
-        payload: DemoTask,
-        meta: TaskMetadata,
-    ) -> Result<DemoResult, TaskError> {
-        // Simulate some work
-        tokio::time::sleep(Duration::from_millis(100)).await;
-
-        Ok(DemoResult {
-            task_id: meta.id,
-            output: format!("Processed {}: {}", payload.operation, payload.data),
-            processed_at: now_ms(),
-        })
+fn task(id: u64, priority: Priority, text: &str) -> ScheduledTask<Prompt> {
+    ScheduledTask {
+        meta: TaskMetadata {
+            id,
+            mailbox: Some(mailbox_key()),
+            priority,
+            cost: ResourceCost::new(ResourceKind::GpuVram, 4),
+            deadline_ms: None,
+            created_at_ms: now_ms(),
+            idempotency_key: Some(format!("prompt-{id}")),
+            sequence: id,
+        },
+        payload: Prompt { text: text.into() },
     }
 }
 
-/// Tokio-based spawner.
-#[derive(Clone)]
-struct TokioSpawner;
-
-impl Spawn for TokioSpawner {
-    fn spawn<F>(&self, fut: F)
-    where
-        F: std::future::Future<Output = ()> + Send + 'static,
-    {
-        tokio::spawn(fut);
+fn mailbox_key() -> MailboxKey {
+    MailboxKey {
+        tenant: "demo-tenant".into(),
+        user_id: Some("demo-user".into()),
+        session_id: None,
     }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize tracing
-    tracing_subscriber::fmt::init();
-
-    println!("=== Postgres Pool Example ===\n");
-
-    // Connect to database
     let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://testuser:testpass@localhost:5433/testdb".into());
+        .unwrap_or_else(|_| "postgresql://postgres:postgres@localhost:5433/postgres".into());
+    println!("connecting to {database_url}");
+    let pool = PgPool::connect(&database_url).await?;
 
-    println!("Connecting to database: {database_url}");
-    let db = Database::connect(&database_url).await?;
-    println!("✓ Connected to database\n");
+    // Idempotent; run once per deployment (or at startup).
+    PgLeaseQueue::<Prompt>::migrate(&pool).await?;
+    PgResultMailbox::<String>::migrate(&pool).await?;
 
-    // Create queue and mailbox
-    let queue = PostgresQueue::new(db.clone(), "demo_queue".into(), 1000);
-    let mailbox = PostgresMailbox::new(db.clone());
+    // A unique queue and mailbox name per run keeps reruns independent.
+    let run = now_ms();
+    let queue = PgLeaseQueue::<Prompt>::new(pool.clone(), format!("demo-queue-{run}"), 100);
+    let mailbox = PgResultMailbox::<String>::new(pool, format!("demo-results-{run}"));
+    let _reaper = queue.spawn_reaper(Duration::from_secs(5));
+    let _sweeper = mailbox.spawn_sweeper(Duration::from_secs(30));
 
-    // Configure pool
-    let limits = PoolLimits {
-        max_units: 10,
-        max_queue_depth: 1000,
-        default_timeout: Duration::from_secs(60),
-    };
-
-    // Create resource pool
-    let pool = Arc::new(ResourcePool::new(
-        limits,
-        queue,
-        mailbox,
-        DemoExecutor,
-        TokioSpawner,
-    ));
-
-    println!("✓ Resource pool created with:");
-    println!("  - Max units: 10");
-    println!("  - Max queue depth: 1000");
-    println!("  - Postgres queue backend");
-    println!("  - Postgres mailbox backend\n");
-
-    // Submit some tasks
-    println!("Submitting tasks...");
-    for i in 1..=5 {
-        let task = ScheduledTask {
-            meta: TaskMetadata {
-                id: i,
-                mailbox: Some(MailboxKey {
-                    tenant: "demo-tenant".into(),
-                    user_id: Some(format!("user-{i}")),
-                    session_id: None,
-                }),
-                priority: if i % 2 == 0 {
-                    Priority::High
-                } else {
-                    Priority::Normal
-                },
-                cost: ResourceCost::new(ResourceKind::Cpu, 1),
-                deadline_ms: None,
-                created_at_ms: now_ms(),
-                idempotency_key: None,
-                sequence: 0,
-            },
-            payload: DemoTask {
-                id: i,
-                operation: format!("process_{i}"),
-                data: format!("demo-data-{i}"),
-            },
-        };
-
-        let status = pool.submit(task).await?;
-        println!("  Task {i} submitted with status: {status:?}");
+    for (id, priority, text) in [
+        (1, Priority::Low, "summarise the changelog"),
+        (2, Priority::High, "explain quantum computing"),
+    ] {
+        let accepted = queue.enqueue(task(id, priority, text)).await?;
+        assert!(matches!(accepted, Enqueued::Accepted(_)));
+        println!("accepted task {id} ({priority:?})");
     }
 
-    println!("\n✓ All tasks submitted");
-    println!("\nWaiting for tasks to complete...");
+    // Highest priority first.
+    while let Some(leased) = queue.lease(1, Duration::from_secs(30)).await?.pop() {
+        let meta = &leased.task.meta;
+        println!(
+            "running task {} (attempt {}): {}",
+            meta.id, leased.attempt, leased.task.payload.text
+        );
+        let result = format!("answer to '{}'", leased.task.payload.text);
+        // Store the result first, then acknowledge: a crash in between re-runs
+        // the task, and the idempotency key keeps the first result.
+        let mut delivery =
+            Delivery::new(mailbox_key(), meta.id, TaskStatus::Completed, Some(result))
+                .with_ttl(Duration::from_secs(3600));
+        if let Some(key) = &meta.idempotency_key {
+            delivery = delivery.with_idempotency_key(key.clone());
+        }
+        let _ = mailbox.deliver(delivery).await?;
+        queue.ack(leased.token).await?;
+    }
 
-    // Wait a bit for tasks to process
-    tokio::time::sleep(Duration::from_secs(2)).await;
-
-    println!("\n✓ Tasks processed");
-    println!("\n=== Example Complete ===");
-    println!("\nNote: Results are stored in the Postgres mailbox.");
-    println!("Check the pl_mailbox_messages table to see the results.");
-
+    // The client collects its results later, once each.
+    while let Some(entry) = mailbox.consume(&mailbox_key()).await? {
+        println!("client received: {:?}", entry.payload);
+    }
     Ok(())
 }

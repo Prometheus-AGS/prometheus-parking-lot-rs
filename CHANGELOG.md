@@ -138,8 +138,17 @@ entry names the OpenSpec change that made it.
   `QueueListener`). `reap_expired` and `spawn_reaper` return expired leases.
   Migration `004_lease_queue.sql` adds the `pl_lease_queue` table, and
   `migrate(pool)` applies it. No pool uses it yet (durable dispatch is cr-49).
-- The pg crate's direct sqlx dependency is now 0.9; sea-orm keeps sqlx 0.8 until
-  the Postgres mailbox moves off it (cr-27).
+- **Postgres result mailbox (cr-27).** `prometheus-parking-lot-pg::PgResultMailbox`
+  is an async `ResultMailbox` on raw sqlx 0.9. Consume is one `DELETE ... RETURNING`
+  with `FOR UPDATE SKIP LOCKED`, so a result reaches exactly one consumer.
+  Duplicate deliveries keep the first write via `INSERT ... ON CONFLICT`. TTLs use
+  database time, with `evict_expired` and a background sweeper (`spawn_sweeper`).
+  Migration `005_result_mailbox.sql`; `infra::PgPool` is re-exported.
+- **Removed:** the synchronous sea-orm `PostgresQueue` and `PostgresMailbox`, the
+  sea-orm entities (`infra::entities`), and migrations 001 and 002 (existing
+  `pl_queue_jobs` / `pl_mailbox_messages` tables are not dropped). sea-orm and
+  sqlx 0.8 are gone from the dependency graph; the `postgres` feature now uses
+  raw sqlx 0.9 only.
 
 - **Crash-safe embedded queue and mailbox (cr-28, ADR 0004).** With the
   `embedded` feature, `EmbeddedStore::open(path)` opens one redb database file;
@@ -188,10 +197,8 @@ entry names the OpenSpec change that made it.
 
 ### Known limitations
 
-- The synchronous Postgres `TaskQueue` and `Mailbox` still remove a task when
-  it is dequeued (at-most-once) and bridge async calls with `block_on`. The
-  leasing `PgLeaseQueue` (cr-26) replaces the queue once the pools use it
-  (cr-49); the Postgres mailbox moves in cr-27.
+- No pool runs on the Postgres backends yet: `PgLeaseQueue` and `PgResultMailbox`
+  are called directly until durable dispatch (cr-49).
 
 ## [0.2.0]
 
