@@ -89,6 +89,10 @@ pub(super) const LEASE_READ: &str =
 /// Create one pgmq queue (idempotent). `$1` queue.
 pub(super) const CREATE_QUEUE: &str = "SELECT pgmq.create($1::text)";
 
+/// Apply the per-table autovacuum settings (cr-36) to one pgmq queue's table.
+/// Idempotent; defined in the migration. `$1` queue.
+pub(super) const TUNE_QUEUE: &str = "SELECT pl_pgmq_tune_queue($1::text)";
+
 /// Statements that depend on the lane's table, plus the depth query.
 pub(super) struct Statements {
     pub lanes: [Lane; LANES],
