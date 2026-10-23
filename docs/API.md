@@ -109,7 +109,9 @@ behind that crate's `conformance` feature.
 
 `core::hooks` (`Hook`, `HookBus`, `LifecycleEvent`, `TracingHook`,
 `RecordingHook`) and `core::audit` (`AuditSink`, `AuditEvent`,
-`InMemoryAuditSink`; `PostgresAuditSink` with `postgres`).
+`InMemoryAuditSink`; `PostgresAuditSink` with `postgres`: `migrate(&pool)`,
+`spawn(pool, capacity)`, `lost()`, `shutdown().await`; it writes through a
+background task, so `record` never blocks and a full buffer drops and counts).
 
 `ResourcePool`, the native `WorkerPool` and `DurableResourcePool` emit, per
 task, `Submitted`, then `Queued` if it parks, `Started` when the executor is

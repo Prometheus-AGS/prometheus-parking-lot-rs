@@ -122,23 +122,52 @@ the server major: after a 17 to 18 upgrade, install pgmq for 18 before running
 ## 5. Running migrations
 
 There is no separate migration tool. Each type applies its idempotent script
-with one multi-statement call, safe to run at every start and from several
-processes at once (each script takes an advisory lock first):
+with one multi-statement call (one implicit transaction), safe to run at every
+start and from several processes at once (each script takes an advisory lock
+first):
 
 | Call | Script |
 |---|---|
 | `PgLeaseQueue::migrate(&pool)` | `crates/parking-lot-pg/migrations/004_lease_queue.sql` |
 | `PgResultMailbox::migrate(&pool)` | `005_result_mailbox.sql` |
 | `PgmqLeaseQueue::prepare()` (or `migrate`, then create queues) | `006_pgmq_lease_queue.sql`, then `pgmq.create` and `pl_pgmq_tune_queue` per queue |
+| `PostgresAuditSink::migrate(&pool)` | `007_audit_events.sql` |
 
-The facade runs them for a configured Postgres backend. Manual application:
-`psql -v ON_ERROR_STOP=1 -f crates/parking-lot-pg/migrations/004_lease_queue.sql`
-(and 005, 006).
+The facade runs them for a configured Postgres backend. Manual application
+(`--single-transaction` keeps the advisory lock and `lock_timeout` in force for
+the whole script, as one call does):
+`psql -v ON_ERROR_STOP=1 --single-transaction -f crates/parking-lot-pg/migrations/004_lease_queue.sql`
+(and 005, 006, 007).
 
 Because the scripts are re-applied, an upgrade of this library that changes
 storage parameters (cr-36 did) takes effect the first time the new version
-calls `migrate`/`prepare`. The `ALTER TABLE ... SET` statements take a SHARE
-UPDATE EXCLUSIVE lock, which does not block queue reads or writes.
+calls `migrate`/`prepare`.
+
+### Locks taken by a re-run
+
+A re-run takes **no table lock stronger than the catalog read it needs**. Three
+statements would, even when there is nothing to change, so each is guarded by a
+catalog check and runs only when the object is missing or the option differs
+(observed on the PG 17 and 18 images by holding an open transaction that had
+written to the table, see `crates/parking-lot-pg/tests/migrations.rs`):
+
+| Statement | Lock | Effect while held |
+|---|---|---|
+| `CREATE [UNIQUE] INDEX IF NOT EXISTS` | `SHARE` on the table, taken before the index is looked up | blocks every writer |
+| `DROP TRIGGER` / `CREATE TRIGGER` | `ACCESS EXCLUSIVE` | blocks readers too |
+| `CREATE OR REPLACE TRIGGER` | `SHARE ROW EXCLUSIVE` | blocks every writer |
+| `ALTER TABLE ... SET (...)` | `SHARE UPDATE EXCLUSIVE` | does not block reads or writes |
+
+A lock request that waits also holds up every request behind it, so a re-run
+queued behind one long transaction would stall the queue. The first run on a
+fresh database does need these locks (the table is empty and new), and every
+script starts with `SET LOCAL lock_timeout = '5s'`: if a lock is not granted in
+5 s the migration fails with a `lock timeout` error instead of queueing, and
+can be retried. `PgmqLeaseQueue::prepare()` likewise skips `pgmq.create` for a
+queue that exists (it would run `CREATE INDEX IF NOT EXISTS` on the pgmq
+table). Changing a trigger definition therefore needs a new numbered migration;
+editing an existing script does not reach databases that already have the
+trigger.
 
 ## 6. Autovacuum settings and monitoring bloat
 

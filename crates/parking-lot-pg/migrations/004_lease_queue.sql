@@ -14,9 +14,26 @@
 -- which is one short transaction (see queue/sql.rs for the per-statement
 -- argument). Nothing here needs REPEATABLE READ or SERIALIZABLE.
 --
+-- Locks: a re-run must not queue behind, or in front of, queue traffic. Three
+-- statements would take strong table locks even when there is nothing to do,
+-- so each is guarded by a catalog check (no table lock) and runs only when the
+-- object is missing or different:
+--   CREATE INDEX IF NOT EXISTS   takes SHARE on the table before it looks for
+--                                the index (blocks every writer);
+--   (CREATE OR REPLACE) TRIGGER  takes ACCESS EXCLUSIVE / SHARE ROW EXCLUSIVE;
+--   ALTER TABLE ... SET (...)    takes SHARE UPDATE EXCLUSIVE (harmless to
+--                                traffic, but it rewrites the catalog row).
+-- A lock a first run needs is bounded by lock_timeout: the migration fails
+-- after 5 s instead of queueing behind a long transaction, and with it every
+-- later query on the table.
+--
+-- Apply with one call (sqlx does) or `psql --single-transaction`: the advisory
+-- lock and SET LOCAL last for the transaction.
+--
 -- Safe to run repeatedly and concurrently: the advisory lock serialises the
 -- catalog changes of two processes migrating at once.
 
+SET LOCAL lock_timeout = '5s';
 SELECT pg_advisory_xact_lock(hashtextextended('pl_lease_queue.migration', 0));
 
 CREATE TABLE IF NOT EXISTS pl_lease_queue (
@@ -52,20 +69,38 @@ CREATE TABLE IF NOT EXISTS pl_lease_queue (
 
 -- Claim path: priority-then-FIFO over the entries that can still be leased.
 -- Dead letters and acked rows (deleted) stay out of the index.
-CREATE INDEX IF NOT EXISTS idx_pl_lease_queue_claim
+DO $$
+BEGIN
+    IF to_regclass('idx_pl_lease_queue_claim') IS NULL THEN
+        CREATE INDEX idx_pl_lease_queue_claim
     ON pl_lease_queue (queue_name, priority DESC, id)
     WHERE state <> 'dead';
+    END IF;
+END
+$$;
 
 -- Reaper path: leases ordered by expiry.
-CREATE INDEX IF NOT EXISTS idx_pl_lease_queue_expiry
+DO $$
+BEGIN
+    IF to_regclass('idx_pl_lease_queue_expiry') IS NULL THEN
+        CREATE INDEX idx_pl_lease_queue_expiry
     ON pl_lease_queue (queue_name, lease_expires_at)
     WHERE state = 'leased';
+    END IF;
+END
+$$;
 
 -- First-write-wins idempotency: at most one non-dead entry per key per queue.
 -- A dead letter releases its key; an ack deletes the row, which releases it too.
-CREATE UNIQUE INDEX IF NOT EXISTS uq_pl_lease_queue_idempotency
+DO $$
+BEGIN
+    IF to_regclass('uq_pl_lease_queue_idempotency') IS NULL THEN
+        CREATE UNIQUE INDEX uq_pl_lease_queue_idempotency
     ON pl_lease_queue (queue_name, idempotency_key)
     WHERE idempotency_key IS NOT NULL AND state <> 'dead';
+    END IF;
+END
+$$;
 
 -- Wake-up: tell idle dispatchers that an entry became leasable. One channel,
 -- payload = queue name (channel identifiers are limited to 63 bytes, queue
@@ -80,20 +115,34 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS pl_lease_queue_wake_insert ON pl_lease_queue;
-CREATE TRIGGER pl_lease_queue_wake_insert
-    AFTER INSERT ON pl_lease_queue
-    FOR EACH ROW WHEN (NEW.state = 'ready' AND NEW.not_before <= now())
-    EXECUTE FUNCTION pl_lease_queue_notify();
-
-DROP TRIGGER IF EXISTS pl_lease_queue_wake_update ON pl_lease_queue;
-CREATE TRIGGER pl_lease_queue_wake_update
-    AFTER UPDATE OF state, not_before ON pl_lease_queue
-    FOR EACH ROW WHEN (
-        NEW.state = 'ready' AND NEW.not_before <= now()
-        AND (OLD.state IS DISTINCT FROM NEW.state OR OLD.not_before IS DISTINCT FROM NEW.not_before)
-    )
-    EXECUTE FUNCTION pl_lease_queue_notify();
+-- The triggers are created only when missing (a catalog check, no table lock):
+-- CREATE OR REPLACE TRIGGER (PostgreSQL 14 and later) would take SHARE ROW
+-- EXCLUSIVE on the table, which blocks every writer, and DROP TRIGGER takes
+-- ACCESS EXCLUSIVE, which blocks readers too. A changed trigger definition
+-- ships as a new numbered migration.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger
+                    WHERE tgrelid = 'pl_lease_queue'::regclass
+                      AND tgname = 'pl_lease_queue_wake_insert') THEN
+        CREATE OR REPLACE TRIGGER pl_lease_queue_wake_insert
+            AFTER INSERT ON pl_lease_queue
+            FOR EACH ROW WHEN (NEW.state = 'ready' AND NEW.not_before <= now())
+            EXECUTE FUNCTION pl_lease_queue_notify();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger
+                    WHERE tgrelid = 'pl_lease_queue'::regclass
+                      AND tgname = 'pl_lease_queue_wake_update') THEN
+        CREATE OR REPLACE TRIGGER pl_lease_queue_wake_update
+            AFTER UPDATE OF state, not_before ON pl_lease_queue
+            FOR EACH ROW WHEN (
+                NEW.state = 'ready' AND NEW.not_before <= now()
+                AND (OLD.state IS DISTINCT FROM NEW.state OR OLD.not_before IS DISTINCT FROM NEW.not_before)
+            )
+            EXECUTE FUNCTION pl_lease_queue_notify();
+    END IF;
+END
+$$;
 
 -- Autovacuum (cr-36). Queue tables churn constantly: a row is inserted, updated
 -- a few times and deleted. A backlog can also grow them large (a deep queue,
@@ -110,12 +159,23 @@ CREATE TRIGGER pl_lease_queue_wake_update
 -- CREATE TABLE, storage parameters). ALTER TABLE ... SET takes SHARE UPDATE
 -- EXCLUSIVE, which does not block queue reads or writes, and re-applying it is
 -- a no-op, so the migration stays safe to run at every start.
-ALTER TABLE pl_lease_queue SET (
-    autovacuum_vacuum_scale_factor = 0,
-    autovacuum_vacuum_threshold = 1000,
-    autovacuum_analyze_scale_factor = 0,
-    autovacuum_analyze_threshold = 1000
-);
+DO $$
+BEGIN
+    IF NOT coalesce((SELECT c.reloptions @> ARRAY[
+                'autovacuum_vacuum_scale_factor=0',
+                'autovacuum_vacuum_threshold=1000',
+                'autovacuum_analyze_scale_factor=0',
+                'autovacuum_analyze_threshold=1000']
+                       FROM pg_class c WHERE c.oid = 'pl_lease_queue'::regclass), false) THEN
+        ALTER TABLE pl_lease_queue SET (
+            autovacuum_vacuum_scale_factor = 0,
+            autovacuum_vacuum_threshold = 1000,
+            autovacuum_analyze_scale_factor = 0,
+            autovacuum_analyze_threshold = 1000
+        );
+    END IF;
+END
+$$;
 
 COMMENT ON TABLE pl_lease_queue IS 'Leasing task queue: at-least-once delivery with fenced leases (cr-26)';
 COMMENT ON COLUMN pl_lease_queue.attempts IS 'Leases granted so far; also the fencing token of the current lease';

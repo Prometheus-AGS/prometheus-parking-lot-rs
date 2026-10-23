@@ -1,6 +1,6 @@
 //! Audit sink contract and the in-memory implementation.
 //!
-//! The Postgres audit sink (schema only) lives in `prometheus-parking-lot-pg`.
+//! The Postgres audit sink, `PostgresAuditSink`, lives in `prometheus-parking-lot-pg`.
 
 use std::collections::VecDeque;
 

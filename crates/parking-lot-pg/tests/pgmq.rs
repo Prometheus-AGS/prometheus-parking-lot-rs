@@ -672,3 +672,28 @@ async fn pgmq_queue_names_are_validated() {
     }
     assert!(PgmqLeaseQueue::<String>::new(pool, "ok_name_1", 1).is_ok());
 }
+
+#[tokio::test]
+#[ignore = "needs Docker: starts a parking-lot-pg container"]
+async fn pgmq_failed_dead_letter_does_not_discard_leased_tasks() -> TestResult<()> {
+    let pg = start().await?;
+    let queue = PgmqLeaseQueue::<String>::new(pg.pool.clone(), "dlfail", 100)?.with_max_attempts(1);
+    queue.prepare().await?;
+    let _ = queue.enqueue(task(Priority::Normal, "spent", None)).await?;
+    assert_eq!(queue.lease(1, Duration::from_secs(1)).await?.len(), 1);
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    let _ = queue.enqueue(task(Priority::Normal, "good", None)).await?;
+    // The dead-letter queue is gone, so dead-lettering "spent" must fail.
+    sqlx::query("SELECT pgmq.drop_queue('pl_dlfail_dead')")
+        .execute(&pg.pool)
+        .await?;
+
+    let leased = queue.lease(10, Duration::from_secs(30)).await?;
+    assert_eq!(
+        leased.len(),
+        1,
+        "the good task was leased and must be returned"
+    );
+    assert_eq!(leased[0].task.payload, "good");
+    Ok(())
+}

@@ -62,8 +62,11 @@ impl QueueListener {
     /// Notifications for other queues are skipped. Returns at once when one
     /// arrived while the caller was busy.
     ///
-    /// **Cancellation:** safe; no notification is consumed unless the future
-    /// resolves with it.
+    /// **Cancellation:** not guaranteed lossless. sqlx does not promise that
+    /// dropping a pending receive keeps a notification that was being read, so
+    /// a cancelled `wait` may drop one. That is harmless as long as the caller
+    /// polls `lease` on [`Wake::TimedOut`], which this type's contract already
+    /// requires.
     ///
     /// # Errors
     ///

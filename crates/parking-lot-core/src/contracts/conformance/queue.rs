@@ -99,17 +99,24 @@ pub async fn enqueue_and_lease_round_trip<H: QueueHarness>(h: &H) {
     assert_eq!(got.created_at_ms, want.created_at_ms);
     assert_eq!(got.idempotency_key, want.idempotency_key);
     assert_eq!(got.mailbox, want.mailbox);
+    assert_eq!(
+        got.sequence, want.sequence,
+        "sequence must survive the round trip"
+    );
     queue.ack(leased.token).await.expect("ack");
 }
 
 /// A leased task is invisible to other lease calls while its lease holds.
 pub async fn leased_task_is_invisible<H: QueueHarness>(h: &H) {
     let queue = h.queue(ROOMY).await;
-    let lease_for = h.lease_duration();
+    // A lease far longer than the time the case lets pass: on a backend that
+    // reads the real clock, a slow machine must not be able to expire it
+    // between two of the calls below.
+    let lease_for = h.lease_duration() * 10;
     let _ = enqueue(&queue, task(Priority::Normal, "only")).await;
     let leased = lease_one(&queue, lease_for).await;
 
-    h.advance(lease_for / 2).await;
+    h.advance(h.lease_duration() / 2).await;
     assert!(
         lease(&queue, 10, lease_for).await.is_empty(),
         "leased task was handed out twice"
@@ -253,6 +260,48 @@ pub async fn nack_requeue_with_delay<H: QueueHarness>(h: &H) {
     queue.ack(second.token).await.expect("ack");
 }
 
+/// A nacked token is resolved: while the delay runs, `ack`, `extend` and
+/// `nack` with it are `LeaseLost` and leave the requeued task alone, which is
+/// redelivered once the delay has elapsed.
+pub async fn nacked_token_is_fenced_during_delay<H: QueueHarness>(h: &H) {
+    let queue = h.queue(ROOMY).await;
+    let lease_for = h.lease_duration();
+    let _ = enqueue(&queue, task(Priority::Normal, "backoff")).await;
+    let first = lease_one(&queue, lease_for).await;
+    queue
+        .nack(first.token, NackAction::requeue_after(lease_for))
+        .await
+        .expect("nack");
+
+    assert_lease_lost(
+        queue.ack(first.token).await,
+        first.token,
+        "ack with the nacked token during the delay",
+    );
+    // An extend that took effect would hide the task well past the delay.
+    assert_lease_lost(
+        queue.extend(first.token, lease_for * 10).await,
+        first.token,
+        "extend with the nacked token during the delay",
+    );
+    assert_lease_lost(
+        queue.nack(first.token, NackAction::requeue()).await,
+        first.token,
+        "nack with the nacked token during the delay",
+    );
+
+    h.advance(lease_for + lease_for / 2).await;
+    let second = lease_one(&queue, lease_for).await;
+    assert_eq!(second.task.payload, "backoff");
+    assert_eq!(second.attempt, 2);
+    assert_lease_lost(
+        queue.ack(first.token).await,
+        first.token,
+        "ack with the nacked token after redelivery",
+    );
+    queue.ack(second.token).await.expect("ack");
+}
+
 /// Dead-lettering removes the task from the live set for good, counts it,
 /// frees its idempotency key and fences the token.
 pub async fn nack_dead_letter<H: QueueHarness>(h: &H) {
@@ -295,10 +344,16 @@ pub async fn extend_keeps_lease<H: QueueHarness>(h: &H) {
     let _ = enqueue(&queue, task(Priority::Normal, "long")).await;
     let leased = lease_one(&queue, lease_for).await;
 
-    h.advance(lease_for / 2).await;
-    queue.extend(leased.token, lease_for).await.expect("extend");
-    // Past the original expiry (1.25 x) but inside the extended one (1.5 x).
-    h.advance(lease_for * 3 / 4).await;
+    // Extend early (a quarter of the lease) and by far more than the case
+    // waits afterwards, so a slow machine cannot expire either lease between
+    // calls on a backend that reads the real clock.
+    h.advance(lease_for / 4).await;
+    queue
+        .extend(leased.token, lease_for * 10)
+        .await
+        .expect("extend");
+    // Past the original expiry (1.25 x), far inside the extended one.
+    h.advance(lease_for).await;
     assert!(
         lease(&queue, 10, lease_for).await.is_empty(),
         "extended lease was not honoured"
@@ -442,6 +497,7 @@ pub async fn run_all<H: QueueHarness>(h: &H) {
     ack_removes_task(h).await;
     nack_requeue_redelivers(h).await;
     nack_requeue_with_delay(h).await;
+    nacked_token_is_fenced_during_delay(h).await;
     nack_dead_letter(h).await;
     extend_keeps_lease(h).await;
     priority_then_fifo(h).await;

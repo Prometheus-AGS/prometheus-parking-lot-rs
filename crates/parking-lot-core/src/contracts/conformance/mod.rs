@@ -209,6 +209,7 @@ macro_rules! lease_queue_conformance {
                 ack_removes_task,
                 nack_requeue_redelivers,
                 nack_requeue_with_delay,
+                nacked_token_is_fenced_during_delay,
                 nack_dead_letter,
                 extend_keeps_lease,
                 priority_then_fifo,

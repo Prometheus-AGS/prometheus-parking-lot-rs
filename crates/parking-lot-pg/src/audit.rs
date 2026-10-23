@@ -1,33 +1,163 @@
-//! Postgres audit sink (schema definitions; DB I/O not wired).
+//! Postgres audit sink: [`AuditEvent`]s written to `pl_audit_events`.
+//!
+//! [`AuditSink::record`] is synchronous and must not block a scheduler thread
+//! on the network, so the sink only queues the event on a bounded channel; a
+//! background task inserts queued events in batches. Three consequences:
+//!
+//! - **`record` never blocks and never fails.** When the channel is full (the
+//!   database is slower than the producers) the event is dropped, counted and
+//!   logged at `warn`; [`PostgresAuditSink::lost`] reports the count. An audit
+//!   log must not stall the work it describes.
+//! - **Events are written shortly after `record`, not during it.** Call
+//!   [`shutdown`](PostgresAuditSink::shutdown) before exit to wait for the
+//!   queue to drain.
+//! - **A failed batch is lost, counted and logged at `error`.** There is no
+//!   retry; an audit sink that retried forever would hold events (and memory)
+//!   during an outage. For a replayable event log use the Iggy events backend.
+//!
+//! The write is idempotent: `event_id` is the primary key and a repeated event
+//! is ignored.
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+use prometheus_parking_lot_core::SchedulerError;
 use prometheus_parking_lot_core::hooks::audit::{AuditEvent, AuditSink};
+use sqlx::PgPool;
+use tokio::sync::mpsc::{self, error::TrySendError};
+use tokio::task::JoinHandle;
 
-/// Postgres-backed audit sink (schema-only; DB I/O not wired).
-pub struct PostgresAuditSink;
+/// The migration that creates `pl_audit_events`.
+const MIGRATION: &str = include_str!("../migrations/007_audit_events.sql");
+
+/// Events written per statement.
+const MAX_BATCH: usize = 256;
+
+/// Insert a batch. `$1`..`$6` text arrays, `$7` event time in milliseconds.
+const INSERT: &str = "INSERT INTO pl_audit_events
+        (event_id, task_id, pool, tenant, action, payload, created_at)
+     SELECT e.event_id, e.task_id, e.pool, e.tenant, e.action, e.payload,
+            to_timestamp(e.ms / 1000.0)
+       FROM UNNEST($1::text[], $2::text[], $3::text[], $4::text[], $5::text[],
+                   $6::text[], $7::float8[])
+            AS e(event_id, task_id, pool, tenant, action, payload, ms)
+     ON CONFLICT (event_id) DO NOTHING";
+
+/// Postgres-backed audit sink. See the [module docs](self).
+#[derive(Debug)]
+pub struct PostgresAuditSink {
+    events: mpsc::Sender<AuditEvent>,
+    lost: Arc<AtomicU64>,
+    writer: JoinHandle<()>,
+}
 
 impl PostgresAuditSink {
-    /// Returns SQL migration statements for the audit log.
+    /// The migration statements for the audit log (one script).
     #[must_use]
     pub const fn migrations() -> &'static [&'static str] {
-        &[r"
-CREATE TABLE IF NOT EXISTS pl_audit_events (
-    event_id TEXT PRIMARY KEY,
-    task_id TEXT NOT NULL,
-    pool TEXT NOT NULL,
-    tenant TEXT NOT NULL,
-    action TEXT NOT NULL,
-    payload JSONB,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_pl_audit_events_tenant_created ON pl_audit_events (tenant, created_at);
-CREATE INDEX IF NOT EXISTS idx_pl_audit_events_task ON pl_audit_events (task_id);
-CREATE INDEX IF NOT EXISTS idx_pl_audit_events_pool ON pl_audit_events (pool);
-"]
+        &[MIGRATION]
+    }
+
+    /// Create `pl_audit_events` and its indexes if missing. Idempotent.
+    ///
+    /// # Errors
+    ///
+    /// [`SchedulerError::Backend`] when the migration fails.
+    pub async fn migrate(pool: &PgPool) -> Result<(), SchedulerError> {
+        sqlx::raw_sql(MIGRATION)
+            .execute(pool)
+            .await
+            .map(|_| ())
+            .map_err(|e| SchedulerError::backend("pg audit sink: migrate", e))
+    }
+
+    /// Start a sink that buffers up to `capacity` events (at least 1) and
+    /// writes them to `pool`. The schema must exist: call
+    /// [`migrate`](Self::migrate) first.
+    ///
+    /// Must be called inside a Tokio runtime.
+    #[must_use]
+    pub fn spawn(pool: PgPool, capacity: usize) -> Self {
+        let (events, queue) = mpsc::channel(capacity.max(1));
+        let lost = Arc::new(AtomicU64::new(0));
+        let writer = tokio::spawn(write_loop(pool, queue, Arc::clone(&lost)));
+        Self {
+            events,
+            lost,
+            writer,
+        }
+    }
+
+    /// Events that never reached the table: dropped because the buffer was
+    /// full, or part of a batch whose insert failed.
+    #[must_use]
+    pub fn lost(&self) -> u64 {
+        self.lost.load(Ordering::Relaxed)
+    }
+
+    /// Stop accepting events and wait until every queued event has been
+    /// written (or counted as lost). Returns [`lost`](Self::lost) as it stands.
+    pub async fn shutdown(self) -> u64 {
+        let Self {
+            events,
+            lost,
+            writer,
+        } = self;
+        drop(events);
+        if let Err(error) = writer.await {
+            tracing::error!(%error, "audit writer task failed");
+        }
+        lost.load(Ordering::Relaxed)
     }
 }
 
 impl AuditSink for PostgresAuditSink {
-    fn record(&mut self, _event: AuditEvent) {
-        // Stub: actual DB writes require a runtime + client; left to integration layer.
+    fn record(&mut self, event: AuditEvent) {
+        let event_id = match self.events.try_send(event) {
+            Ok(()) => return,
+            Err(TrySendError::Full(event) | TrySendError::Closed(event)) => event.event_id,
+        };
+        self.lost.fetch_add(1, Ordering::Relaxed);
+        tracing::warn!(
+            event_id,
+            "audit event dropped: the Postgres audit buffer is full"
+        );
     }
+}
+
+async fn write_loop(pool: PgPool, mut queue: mpsc::Receiver<AuditEvent>, lost: Arc<AtomicU64>) {
+    while let Some(first) = queue.recv().await {
+        let mut batch = vec![first];
+        while batch.len() < MAX_BATCH {
+            match queue.try_recv() {
+                Ok(event) => batch.push(event),
+                Err(_) => break,
+            }
+        }
+        if let Err(error) = insert(&pool, &batch).await {
+            lost.fetch_add(batch.len() as u64, Ordering::Relaxed);
+            tracing::error!(%error, events = batch.len(), "audit batch not written");
+        }
+    }
+}
+
+async fn insert(pool: &PgPool, batch: &[AuditEvent]) -> Result<(), sqlx::Error> {
+    let column = |f: fn(&AuditEvent) -> String| batch.iter().map(f).collect::<Vec<_>>();
+    let payloads: Vec<Option<String>> = batch.iter().map(|e| e.payload.clone()).collect();
+    #[allow(
+        clippy::cast_precision_loss,
+        reason = "milliseconds since the epoch fit f64 exactly"
+    )]
+    let millis: Vec<f64> = batch.iter().map(|e| e.created_at_ms as f64).collect();
+    sqlx::query(INSERT)
+        .bind(column(|e| e.event_id.clone()))
+        .bind(column(|e| e.task_id.clone()))
+        .bind(column(|e| e.pool.clone()))
+        .bind(column(|e| e.tenant.clone()))
+        .bind(column(|e| e.action.clone()))
+        .bind(payloads)
+        .bind(millis)
+        .execute(pool)
+        .await
+        .map(|_| ())
 }
