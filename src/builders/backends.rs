@@ -166,8 +166,12 @@ where
 {
     let store = EmbeddedStore::open(&cfg.path)
         .map_err(|e| SchedulerError::backend(format!("backends.{name}: open"), e))?;
+    let mut queue = store.lease_queue(cfg.max_depth);
+    if let Some(max_attempts) = cfg.max_attempts {
+        queue = queue.with_max_attempts(max_attempts);
+    }
     Ok(RedbBackend {
-        queue: store.lease_queue(cfg.max_depth),
+        queue,
         mailbox: store.result_mailbox(),
         store,
         lease_for: Duration::from_secs(cfg.lease_secs),

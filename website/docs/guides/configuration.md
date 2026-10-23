@@ -119,10 +119,15 @@ Each `postgres` or `redb` backend drives at most one pool.
 ### `redb`
 
 ```json
-{ "type": "redb", "path": "./data/parking-lot.redb", "max_depth": 1000, "lease_secs": 300 }
+{ "type": "redb", "path": "./data/parking-lot.redb", "max_depth": 1000, "lease_secs": 300, "max_attempts": 5 }
 ```
 
-`path`, `max_depth` and `lease_secs` are required. One process may hold the
+`path`, `max_depth` and `lease_secs` are required. `max_attempts` is optional:
+without it, a task that kills the app is redelivered on every launch; with it,
+the task is dead-lettered once it has been leased that many times (it must be
+greater than 0). An entry whose payload no longer decodes (an app update changed
+the task type) is dead-lettered with the decode error, so the entries behind it
+still run. One process may hold the
 file open at a time. [Tauri local LLM](./tauri-local-llm.md) and
 [Shutdown and requeue](./shutdown-and-requeue.md) run on it.
 

@@ -38,7 +38,7 @@ use super::error::ConfigError;
 /// ```
 ///
 /// ```json
-/// { "type": "redb", "path": "./data/parking-lot.redb", "max_depth": 1000, "lease_secs": 300 }
+/// { "type": "redb", "path": "./data/parking-lot.redb", "max_depth": 1000, "lease_secs": 300, "max_attempts": 5 }
 /// ```
 ///
 /// ```json
@@ -219,6 +219,11 @@ pub struct RedbBackendConfig {
     pub max_depth: usize,
     /// Lease duration in seconds (see [`PostgresBackendConfig::lease_secs`]).
     pub lease_secs: u64,
+    /// Dead-letter an entry after this many leases instead of redelivering it
+    /// forever, so a task that crashes the app does not crash it again on every
+    /// launch. Absent: redeliver forever.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_attempts: Option<u32>,
 }
 
 impl RedbBackendConfig {
@@ -235,7 +240,14 @@ impl RedbBackendConfig {
                 "must not be empty",
             ));
         }
-        validate_common(path, self.max_depth, self.lease_secs)
+        validate_common(path, self.max_depth, self.lease_secs)?;
+        if self.max_attempts == Some(0) {
+            return Err(ConfigError::invalid(
+                format!("{path}.max_attempts"),
+                "must be greater than 0 (omit it to redeliver forever)",
+            ));
+        }
+        Ok(())
     }
 }
 
