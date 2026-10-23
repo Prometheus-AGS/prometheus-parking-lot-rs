@@ -758,3 +758,114 @@ mod examples {
         );
     }
 }
+
+/// An Iggy personal access token (`iggy://<token>@host:port`, one credential
+/// with no colon) is a secret: `Debug` must not print it.
+#[cfg(feature = "iggy")]
+#[test]
+fn config_iggy_debug_hides_a_personal_access_token() {
+    let json = format!(
+        r#"{{ "backends": {{ "ev": {{ "type": "iggy",
+            "connection_string": "iggy://pat-t0ken-s3cret@iggy:8090" }} }},
+            "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    let parsed = SchedulerConfig::from_json_str(&json).expect("a token connection string loads");
+    let shown = format!("{parsed:?}");
+    assert!(!shown.contains("t0ken"), "{shown}");
+    assert!(shown.contains("***@iggy:8090"), "{shown}");
+}
+
+/// A password given as a `?password=` query parameter is redacted from `Debug`
+/// like one in the userinfo.
+#[cfg(feature = "postgres")]
+#[test]
+fn config_postgres_debug_hides_a_password_query_parameter() {
+    for url in [
+        "postgres://app@db/app?password=q-s3cret&sslmode=require",
+        "postgres://app@db/app?sslmode=require&password=q-s3cret",
+        "postgres://app@db/app?PASSWORD=q-s3cret",
+    ] {
+        let json = format!(
+            r#"{{ "backends": {{ "db": {{ "type": "postgres", "url": "{url}",
+                "queue_name": "q", "max_depth": 10, "lease_secs": 30 }},
+                "q2": {{ "type": "pgmq", "url": "{url}", "queue_name": "q",
+                "max_depth": 10, "lease_secs": 30 }} }},
+                "pools": {{ "p": {{ {POOL} }} }} }}"#
+        );
+        let parsed: SchedulerConfig = serde_json::from_str(&json).expect("parses");
+        let shown = format!("{parsed:?}");
+        assert!(!shown.contains("q-s3cret"), "{url}: {shown}");
+        assert!(
+            shown.contains("sslmode=require") || url.contains("PASSWORD"),
+            "{shown}"
+        );
+    }
+}
+
+/// A connection string the Iggy client cannot parse is rejected at load, not
+/// discovered later as silently dropped events.
+#[cfg(feature = "iggy")]
+#[test]
+fn config_iggy_connection_string_is_parsed_at_validation() {
+    for bad in [
+        "not-a-url",
+        "iggy://iggy:8090",
+        "iggy://app:s3cret@iggy",
+        "iggy://app:s3cret@iggy:notaport",
+        "http://app:s3cret@iggy:8090",
+    ] {
+        let json = format!(
+            r#"{{ "backends": {{ "ev": {{ "type": "iggy", "connection_string": "{bad}" }} }},
+                "pools": {{ "p": {{ {POOL} }} }} }}"#
+        );
+        assert_eq!(
+            invalid_field(&json),
+            "backends.ev.connection_string",
+            "{bad}"
+        );
+    }
+    for good in [
+        "iggy://app:s3cret@iggy:8090",
+        "iggy://pat-token@iggy:8090",
+        "iggy+tcp://app:s3cret@iggy:8090?tls=true",
+    ] {
+        let json = format!(
+            r#"{{ "backends": {{ "ev": {{ "type": "iggy", "connection_string": "{good}" }} }},
+                "pools": {{ "p": {{ {POOL} }} }} }}"#
+        );
+        SchedulerConfig::from_json_str(&json).unwrap_or_else(|e| panic!("{good}: {e}"));
+    }
+}
+
+/// `retention_secs` reaches the options; zero is rejected.
+#[cfg(feature = "iggy")]
+#[test]
+fn config_iggy_retention_reaches_the_options() {
+    let section = format!(r#"{IGGY_BACKEND}, "retention_secs": 3600"#);
+    let json = format!(
+        r#"{{ "backends": {{ "ev": {{ {section} }} }}, "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    let parsed = SchedulerConfig::from_json_str(&json).expect("loads");
+    let Some(BackendConfig::Iggy(section)) = parsed.backends.get("ev") else {
+        panic!("`type: iggy` parses as an iggy section");
+    };
+    assert_eq!(
+        section.options().retention,
+        Some(std::time::Duration::from_secs(3600))
+    );
+    let default = format!(
+        r#"{{ "backends": {{ "ev": {{ {IGGY_BACKEND} }} }}, "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    let parsed = SchedulerConfig::from_json_str(&default).expect("loads");
+    let Some(BackendConfig::Iggy(section)) = parsed.backends.get("ev") else {
+        panic!("iggy");
+    };
+    assert_eq!(
+        section.options().retention,
+        None,
+        "the default keeps messages"
+    );
+
+    let zero = json.replace("3600", "0");
+    assert_eq!(invalid_field(&zero), "backends.ev.retention_secs");
+}

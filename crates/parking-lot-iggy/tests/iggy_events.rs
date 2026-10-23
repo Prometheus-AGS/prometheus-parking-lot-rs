@@ -89,7 +89,10 @@ async fn iggy_subscriber_receives_mailbox_ready_and_replays_from_an_offset() -> 
     assert!(notifier.flush(FLUSH).await, "publisher drained");
 
     let client = server.client().await?;
-    let messages = wait_for_messages(&client, "ready", "mailbox.ready", PARTITIONS, 6).await?;
+    // At-least-once: a send that reached the server but timed out is retried
+    // and stored twice under one id, so assert on distinct ids.
+    let messages =
+        wait_for_distinct_messages(&client, "ready", "mailbox.ready", PARTITIONS, 6).await?;
     assert_eq!(messages.len(), 6, "one mailbox.ready per completed task");
 
     let seen: BTreeSet<u64> = messages
@@ -116,30 +119,38 @@ async fn iggy_subscriber_receives_mailbox_ready_and_replays_from_an_offset() -> 
         "one tenant, one partition (ordering per tenant)"
     );
 
-    // Replay: read the partition again, then only the tail from offset 2.
+    // Replay: read the partition again, then only the tail from an offset.
+    // The offset is that of the third distinct message, so the tail must be the
+    // later four distinct ids in order; an earlier id's retried copy that lands
+    // after that offset is not a new message.
     let partition = messages[0].partition;
-    let from_start: Vec<_> = read_topic(&client, "ready", "mailbox.ready", PARTITIONS, 0)
-        .await?
-        .into_iter()
-        .filter(|m| m.partition == partition)
-        .collect();
+    let in_partition = |all: Vec<support::Read>| -> Vec<support::Read> {
+        all.into_iter()
+            .filter(|m| m.partition == partition)
+            .collect()
+    };
+    let from_start = support::distinct_by_id(in_partition(
+        read_topic(&client, "ready", "mailbox.ready", PARTITIONS, 0).await?,
+    ));
     assert_eq!(
         ready_ids(&from_start),
         ready_ids(&messages),
-        "replay from 0 is identical"
+        "replay from 0 yields the same distinct ids in the same order"
     );
-    let tail: Vec<_> = read_topic(&client, "ready", "mailbox.ready", PARTITIONS, 2)
-        .await?
-        .into_iter()
-        .filter(|m| m.partition == partition)
-        .collect();
+    let from = from_start[2].offset;
+    let earlier: BTreeSet<u128> = from_start[..2].iter().map(|m| m.id).collect();
+    let tail: Vec<_> = support::distinct_by_id(in_partition(
+        read_topic(&client, "ready", "mailbox.ready", PARTITIONS, from).await?,
+    ))
+    .into_iter()
+    .filter(|m| !earlier.contains(&m.id))
+    .collect();
     assert_eq!(
-        tail.len(),
-        4,
-        "replay from offset 2 yields the later messages"
+        ready_ids(&tail),
+        ready_ids(&from_start[2..]),
+        "replay from offset {from} yields the later distinct ids in order"
     );
-    assert_eq!(ready_ids(&tail), ready_ids(&from_start[2..]));
-    assert_eq!(tail[0].offset, 2);
+    assert_eq!(tail[0].offset, from);
     Ok(())
 }
 
@@ -364,4 +375,98 @@ async fn wait_published(notifier: &IggyNotifier, count: usize) {
     while notifier.stats().published < count as u64 && Instant::now() < deadline {
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
+}
+
+/// Task ids are caller-supplied and may repeat (the README example uses 0 for
+/// every task): lifecycle events that differ only by repeating ids must all be
+/// published, each with its own message id.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "needs Docker: starts a pinned apache/iggy container"]
+async fn iggy_repeated_task_ids_do_not_collapse_lifecycle_events() -> TestResult<()> {
+    let server = IggyServer::start().await?;
+    let hook = IggyHook::start(&options(&server, "repeat"))?;
+    let bus = HookBus::new();
+    bus.register(Arc::new(hook.clone()));
+    for _ in 0..10 {
+        // Same task id, pool, kind and (almost always) the same millisecond.
+        emit_completed(&bus, 0, "gpu", 5);
+    }
+    flush_bus(&bus, Duration::from_secs(10)).await?;
+    assert!(hook.flush(FLUSH).await);
+
+    let client = server.client().await?;
+    let messages =
+        wait_for_distinct_messages(&client, "repeat", "lifecycle", PARTITIONS, 10).await?;
+    assert_eq!(messages.len(), 10, "ten events, ten distinct ids");
+    assert_eq!(hook.stats().deduplicated, 0, "{:?}", hook.stats());
+    Ok(())
+}
+
+/// Without an idempotency key the `mailbox.ready` id must still tell two
+/// results apart when task ids repeat.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "needs Docker: starts a pinned apache/iggy container"]
+async fn iggy_mailbox_ready_without_a_key_survives_repeated_task_ids() -> TestResult<()> {
+    use prometheus_parking_lot_core::{MailboxEntry, Notifier};
+
+    let server = IggyServer::start().await?;
+    let notifier = IggyNotifier::start(&options(&server, "nokey"))?;
+    let key = mailbox_key("acme");
+    for delivered_at in 1..=3_u128 {
+        let entry = MailboxEntry::new(0, TaskStatus::Completed, Some(1_u8), None, delivered_at);
+        notifier.notify(&key, &entry).await?;
+    }
+    assert!(notifier.flush(FLUSH).await);
+
+    let client = server.client().await?;
+    let messages =
+        wait_for_distinct_messages(&client, "nokey", "mailbox.ready", PARTITIONS, 3).await?;
+    assert_eq!(messages.len(), 3, "three results, three distinct ids");
+    assert_eq!(notifier.stats().deduplicated, 0, "{:?}", notifier.stats());
+    Ok(())
+}
+
+/// A retention set in the options reaches a topic the crate creates; the
+/// default creates a topic that never expires.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "needs Docker: starts a pinned apache/iggy container"]
+async fn iggy_retention_option_sets_the_topic_expiry() -> TestResult<()> {
+    use iggy::prelude::{Identifier, IggyExpiry, TopicClient};
+
+    let server = IggyServer::start().await?;
+    let kept =
+        IggyHook::start(&options(&server, "retained").with_retention(Duration::from_secs(3600)))?;
+    let forever = IggyNotifier::start(&options(&server, "retained"))?;
+    let bus = HookBus::new();
+    bus.register(Arc::new(kept.clone()));
+    emit_completed(&bus, 1, "gpu", 1);
+    flush_bus(&bus, Duration::from_secs(10)).await?;
+    assert!(kept.flush(FLUSH).await);
+    {
+        use prometheus_parking_lot_core::{MailboxEntry, Notifier};
+        let entry = MailboxEntry::new(1, TaskStatus::Completed, Some(1_u8), Some("k".into()), 1);
+        forever.notify(&mailbox_key("acme"), &entry).await?;
+        assert!(forever.flush(FLUSH).await);
+    }
+
+    let client = server.client().await?;
+    let stream = Identifier::from_str_value("retained")?;
+    let expiry = |topic: &str| {
+        let client = &client;
+        let stream = stream.clone();
+        let topic = Identifier::from_str_value(topic);
+        async move {
+            let details = client.get_topic(&stream, &topic?).await?;
+            Ok::<_, Box<dyn std::error::Error + Send + Sync>>(details.map(|t| t.message_expiry))
+        }
+    };
+    assert_eq!(
+        expiry("lifecycle").await?,
+        Some(IggyExpiry::ExpireDuration(Duration::from_secs(3600).into()))
+    );
+    assert_eq!(
+        expiry("mailbox.ready").await?,
+        Some(IggyExpiry::NeverExpire)
+    );
+    Ok(())
 }

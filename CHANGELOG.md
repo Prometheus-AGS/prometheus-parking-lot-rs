@@ -171,6 +171,11 @@ entry names the OpenSpec change that made it.
   are counted (`lost()`) and logged, and `shutdown().await` drains the queue.
   `payload` is `TEXT` (the old, never-applied DDL said `JSONB`). Needs a Tokio
   runtime.
+- **Iggy topic retention (review W5).** `IggyOptions::with_retention` and
+  `"retention_secs"` in the `iggy` backend section set the expiry of topics the
+  crate creates. The default is unchanged (never expire), so operators must size
+  the server's disk or set it.
+
 - **`RedbLeaseQueue::with_max_attempts` and `max_attempts` in the `redb`
   backend section.** A task is delivered exactly that many times, then the next
   lease dead-letters it with the reason `max attempts (N) exhausted`, the same
@@ -541,6 +546,27 @@ entry names the OpenSpec change that made it.
 
 ### Fixed
 
+- **Iggy personal access token printed by `Debug` (review C3).** A connection
+  string `iggy://<token>@host:8090` (one credential, no colon) is now masked
+  whole in `IggyOptions` and `IggyBackendConfig` `Debug`. Before, only userinfo
+  with a colon was masked, so the token was printed in full.
+- **`?password=` in a Postgres URL printed by `Debug` (review W2).** The value
+  of any `password` query parameter is masked in `PostgresBackendConfig` and
+  `PgmqBackendConfig` `Debug`.
+- **Iggy message ids collided when task ids repeat (review W1).** Task ids are
+  caller-supplied (the README uses 0 for every task), so lifecycle ids built
+  from pool, kind, task id and millisecond collided, and the publisher's repeat
+  window dropped real events as "deduplicated". A lifecycle event now has its own
+  id and bypasses the window; a `mailbox.ready` without an idempotency key gets a
+  distinct id per notification. `TaskMetadata.id` is documented as caller-supplied.
+- **Iggy streams assumed the configured partition count (review W3).** A stream
+  topic that already existed with another count made writes fail and readers wait
+  forever. The sink and reader now read the topic's real partition count.
+- **An invalid Iggy `connection_string` loaded and then lost every event (review
+  W7).** It is now parsed with the Iggy client's parser during validation.
+- **Docs overclaimed the stream offset hint (review W4)**: a hint past the end
+  of a stream waits instead of reporting an error. `streaming-replay.md` and the
+  `stream` module say so.
 - **One undecodable task wedged the whole embedded queue.** `RedbLeaseQueue::lease`
   aborted its transaction on a stored task that did not decode as `P` (for
   example after an app update changed the payload type), leaving the entry at the

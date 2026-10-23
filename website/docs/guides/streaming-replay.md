@@ -87,9 +87,13 @@ mailbox: Some((Completed, Some(20)))
 
 A `ResumePoint` is the last sequence number seen plus an offset hint. Store it
 on the client (local storage, the app's state). The sequence number is the
-cursor; the offset only saves re-reading the partition, and a wrong one cannot
-cause a gap: the cursor delivers `last + 1` and nothing else, skips any lower
-number as a duplicate, and reports a higher one as `StreamError::Gap`.
+cursor; the offset only saves re-reading the partition. A wrong offset cannot
+silently skip data once later messages arrive: the cursor delivers `last + 1`
+and nothing else, skips any lower number as a duplicate, and reports a higher
+one as `StreamError::Gap`. A hint that is too high is not detected on its own,
+though: if no message follows it (for example the stream already ended), `next()`
+waits instead of reporting an error. Take the hint only from
+`StreamItem::resume_point`, or omit it, and wrap `next()` in a timeout.
 
 ## What this does not do
 
