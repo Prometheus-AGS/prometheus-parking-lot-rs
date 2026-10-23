@@ -20,9 +20,16 @@
 //!   admitted tasks; results go to per-task slots (`super::slots`, cr-22)
 //!   that async callers await without holding a thread. Unretrieved results
 //!   are evicted after the result TTL (default: the pool's task timeout).
-//! - **Clean shutdown**: dropping the sender unblocks workers naturally;
-//!   parked tasks are failed with [`TaskError::Cancelled`] rather than dropped
-//!   silently.
+//! - **Shutdown without loss** (cr-29): `shutdown_with` applies a
+//!   [`ShutdownPolicy`]. During the drain, admitted tasks keep running and
+//!   parked ones keep starting; at the deadline the parked remainder, any
+//!   admitted task a worker receives from then on, and (unless the policy is
+//!   `Drain`) running stragglers are cancelled: their result slot gets
+//!   [`TaskError::Cancelled`] and a [`CancelledTask`] goes to the pool's
+//!   [`CancellationSink`] from a dedicated sink thread. 0.2 dropped a task a
+//!   worker received after the shutdown flag (no result, no capture); the
+//!   negative control `--cfg parking_lot_negative_control="s-9"` restores
+//!   that, and the `shutdown_` accounting tests must then fail.
 //! - **Panic containment** (cr-21): an executor panic fails its task with
 //!   [`TaskError::ExecutorPanicked`], returns its units through the
 //!   dispatcher and leaves the worker serving. A panic that gets past that
@@ -39,6 +46,8 @@ use std::time::Duration;
 
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, unbounded};
 use parking_lot::{Mutex, RwLock};
+use tokio::sync::mpsc::UnboundedSender;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
 use prometheus_parking_lot_core::config::WorkerPoolConfig;
@@ -53,7 +62,13 @@ use prometheus_parking_lot_core::{
 };
 
 use super::slots::{Missing, ResultSlots, SlotId};
+use crate::cancellation::{
+    CancelReason, CancellationConfig, CancellationSink, CancelledTask, LoggingCancellationSink,
+    offer,
+};
 use crate::contain::{Panicked, catch, contain};
+use crate::ledger::Ledger;
+use crate::shutdown::{ShutdownPolicy, ShutdownReport};
 
 /// Pool name used in errors (pools are not named yet).
 const POOL_NAME: &str = "worker_pool";
@@ -113,6 +128,24 @@ const MIN_SWEEP_INTERVAL: Duration = Duration::from_millis(50);
 /// An admitted task on its way to a worker.
 type Admitted<P> = Grant<WorkerTask<P>>;
 
+/// Extra wait, beyond the sink's `delta`, for cancelled stragglers to settle.
+const SETTLE_MARGIN: Duration = Duration::from_secs(1);
+
+/// How long `shutdown_with` waits for the worker threads to exit once the
+/// policy's steps are done; a worker still running then is detached (0.2's
+/// per-worker join bound).
+const WORKER_EXIT_BOUND: Duration = Duration::from_secs(2);
+
+/// How far one task got on a worker, for the panic backstop.
+#[derive(Debug, Default)]
+struct Progress {
+    /// The task's outcome (or its capture) has been started.
+    reported: bool,
+    /// The task has been settled in the ledger (or handed to the sink thread,
+    /// which settles it).
+    settled: bool,
+}
+
 /// State shared by the pool handle and its worker threads.
 struct Shared<P, R, E> {
     /// Pool configuration.
@@ -129,8 +162,24 @@ struct Shared<P, R, E> {
     ready_tx: Mutex<Option<Sender<Admitted<P>>>>,
     /// Time source for deadlines and budgets.
     clock: RwLock<Arc<dyn Clock>>,
-    /// Shutdown flag.
+    /// Set by `shutdown_with`/`Drop`: submissions are refused.
     shutdown: AtomicBool,
+    /// Set when the parked queue is taken at the drain deadline: a submission
+    /// that raced it captures what it parked.
+    parked_closed: AtomicBool,
+    /// Fired at the drain deadline (policies that cancel stragglers): running
+    /// tasks stop at their next await point, and a task a worker receives from
+    /// then on is captured without running.
+    cancel: CancellationToken,
+    /// Accepted tasks until settled; shared with the sink thread.
+    ledger: Arc<Ledger>,
+    /// Where cancelled tasks go (`None`: a [`LoggingCancellationSink`]).
+    sink: RwLock<Option<Arc<dyn CancellationSink<P>>>>,
+    /// The sink's per-call bound (`delta`).
+    cancellation: RwLock<CancellationConfig>,
+    /// Cancelled tasks to the sink thread, started on the first capture.
+    /// Dropped with `Shared`, which ends the thread once it has drained.
+    capture_tx: Mutex<Option<UnboundedSender<CancelledTask<P>>>>,
     /// The executor; each worker runs a clone.
     executor: E,
     /// Worker thread handles, joined by `shutdown`. A replacement worker's
@@ -202,40 +251,115 @@ where
     /// Hand every admitted task to the workers and fail every task found
     /// expired at the head of the queue.
     ///
-    /// A task admitted after shutdown took the sender cannot run: it is
-    /// failed with [`TaskError::Cancelled`] (its permit is released by drop;
-    /// the parked queue was already emptied by `shutdown`).
+    /// A task admitted after the workers' channel was closed cannot run: its
+    /// units are returned through the dispatcher and it is captured as never
+    /// started (and so is anything that return admits).
     fn launch(&self, dispatched: Dispatched<WorkerTask<P>>) {
-        let Dispatched { started, expired } = dispatched;
-        for task in expired {
-            warn!(
-                task_id = task.meta.id,
-                "queued task expired before it could start"
-            );
-            self.finish(&task.mailbox_key, Err(TaskError::DeadlineExpired));
-        }
-        if started.is_empty() {
-            return;
-        }
-        // A clone sent after `shutdown` took the original still delivers: the
-        // worker then sees the shutdown flag and cancels the task.
-        let ready_tx = self.ready_tx.lock().clone();
-        for admitted in started {
-            let refused = match ready_tx.as_ref() {
-                Some(tx) => tx.send(admitted).err().map(|error| error.0),
-                None => Some(admitted),
-            };
-            if let Some(Grant { item: task, permit }) = refused {
-                drop(permit);
-                self.finish(&task.mailbox_key, Err(shutdown_cancelled()));
+        let mut pending = dispatched;
+        while !pending.is_empty() {
+            let Dispatched { started, expired } = std::mem::take(&mut pending);
+            for task in expired {
+                warn!(
+                    task_id = task.meta.id,
+                    "queued task expired before it could start"
+                );
+                self.finish(&task.mailbox_key, Err(TaskError::DeadlineExpired));
+                self.ledger.finish(1);
+                self.ledger.settle(1);
+            }
+            if started.is_empty() {
+                continue;
+            }
+            // A clone sent after shutdown took the original still delivers;
+            // the worker that receives it runs or captures it.
+            let ready_tx = self.ready_tx.lock().clone();
+            for admitted in started {
+                let refused = match ready_tx.as_ref() {
+                    Some(tx) => tx.send(admitted).err().map(|error| error.0),
+                    None => Some(admitted),
+                };
+                if let Some(Grant { item: task, permit }) = refused {
+                    let woken = self.dispatcher.complete(permit, self.now_ms());
+                    self.capture_unstarted(task);
+                    pending.started.extend(woken.started);
+                    pending.expired.extend(woken.expired);
+                }
             }
         }
     }
 
-    /// Fail every parked task (shutdown): nothing parked is dropped silently.
-    fn cancel_parked(&self) {
+    /// Capture every parked task (drain deadline, drop, or a submission that
+    /// raced the shutdown): nothing parked is dropped silently.
+    fn capture_parked(&self) {
         for task in self.dispatcher.take_parked() {
-            self.finish(&task.mailbox_key, Err(shutdown_cancelled()));
+            self.capture_unstarted(task);
+        }
+    }
+
+    /// Capture a task that never started, with its payload.
+    fn capture_unstarted(&self, task: WorkerTask<P>) {
+        let WorkerTask {
+            payload,
+            meta,
+            mailbox_key,
+        } = task;
+        self.capture(
+            meta,
+            &mailbox_key,
+            Some(payload),
+            CancelReason::QueueShutdown,
+        );
+    }
+
+    /// Record a cancelled task: fail its result slot with
+    /// [`TaskError::Cancelled`] and hand a [`CancelledTask`] to the sink
+    /// thread, which offers it to the sink under `delta` and then settles it.
+    /// Never blocks, so it is safe on any thread.
+    fn capture(
+        &self,
+        meta: TaskMetadata,
+        mailbox_key: &MailboxKey,
+        payload: Option<P>,
+        reason: CancelReason,
+    ) {
+        let task_id = meta.id;
+        warn!(task_id, ?reason, "task cancelled at shutdown");
+        self.finish(mailbox_key, Err(shutdown_cancelled()));
+        self.ledger.begin_capture();
+        let cancelled = CancelledTask {
+            payload,
+            meta,
+            reason,
+            attempt: 0,
+            cancelled_at_ms: u64::try_from(self.now_ms()).unwrap_or(u64::MAX),
+        };
+        let unsent = {
+            let mut capture_tx = self.capture_tx.lock();
+            if capture_tx.is_none() {
+                let sink = self.sink.read().clone().unwrap_or_else(|| {
+                    Arc::new(LoggingCancellationSink::new(POOL_NAME))
+                        as Arc<dyn CancellationSink<P>>
+                });
+                let delta = self.cancellation.read().delta;
+                match spawn_sink_thread(sink, delta, Arc::clone(&self.ledger)) {
+                    Ok(tx) => *capture_tx = Some(tx),
+                    Err(spawn_error) => {
+                        error!(error = %spawn_error, "could not start the cancellation sink thread");
+                    }
+                }
+            }
+            match capture_tx.as_ref() {
+                Some(tx) => tx.send(cancelled).err().map(|error| error.0),
+                None => Some(cancelled),
+            }
+        };
+        if let Some(cancelled) = unsent {
+            error!(
+                task_id = cancelled.meta.id,
+                "cancellation sink unavailable; the cancelled task is not recorded"
+            );
+            self.ledger.end_capture(task_id, None);
+            self.ledger.settle(1);
         }
     }
 
@@ -252,16 +376,20 @@ where
     ) -> Result<(), Panicked> {
         let task_id = admitted.item.meta.id;
         let mailbox_key = admitted.item.mailbox_key.clone();
-        let mut reported = false;
-        let ran = catch(|| self.execute(runtime, admitted, &mut reported));
+        let mut progress = Progress::default();
+        let ran = catch(|| self.execute(runtime, admitted, &mut progress));
         if let Err(panicked) = &ran {
             error!(
                 task_id,
                 %panicked,
                 "panic escaped the executor containment; replacing the worker"
             );
-            if !reported {
+            if !progress.reported {
                 self.finish(&mailbox_key, Err(TaskError::from(panicked.clone())));
+                self.ledger.finish(1);
+            }
+            if !progress.settled {
+                self.ledger.settle(1);
             }
             let woken = self.dispatcher.poke(self.now_ms());
             self.launch(woken);
@@ -276,58 +404,101 @@ where
     /// [`contain`], so an executor panic — in the call, in a poll, or in the
     /// drop of its future when the budget elapses — becomes
     /// [`TaskError::ExecutorPanicked`] and the task finishes normally.
-    /// `reported` is set just before the completion starts.
+    /// `progress` records when the completion (or capture) starts and when
+    /// the task is settled.
+    ///
+    /// A task received after the cancel phase began is captured without
+    /// running (it never started, so the sink gets its payload). A running
+    /// task is raced against the cancel token; when it fires the executor
+    /// future is dropped and the task is captured without its payload, which
+    /// the executor consumed.
     fn execute(
         &self,
         runtime: &tokio::runtime::Runtime,
         admitted: Admitted<P>,
-        reported: &mut bool,
+        progress: &mut Progress,
     ) {
         let Grant { item: task, permit } = admitted;
+
+        // Negative control S-9 (the 0.2 worker loop): a task received after
+        // the shutdown flag is dropped — no result, no capture. Its units and
+        // its ledger entry are released so the pool still shuts down; the
+        // `shutdown_` accounting tests must find the task missing.
+        #[cfg(parking_lot_negative_control = "s-9")]
+        if self.shutdown.load(Ordering::SeqCst) {
+            drop(task);
+            progress.reported = true;
+            progress.settled = true;
+            let woken = self.dispatcher.complete(permit, self.now_ms());
+            self.ledger.settle(1);
+            self.launch(woken);
+            return;
+        }
+
+        if self.cancel.is_cancelled() {
+            progress.reported = true;
+            progress.settled = true;
+            let woken = self.dispatcher.complete(permit, self.now_ms());
+            self.capture_unstarted(task);
+            self.launch(woken);
+            return;
+        }
+
         let WorkerTask {
             payload,
             meta,
             mailbox_key,
         } = task;
         let task_id = meta.id;
-
-        let outcome = if self.shutdown.load(Ordering::Acquire) {
-            // Acquire pairs with the Release in `shutdown()`: the pool is
-            // shutting down, so the task is failed rather than started.
-            Err(shutdown_cancelled())
-        } else {
-            let budget = self.budget(&meta);
-            debug!(task_id, ?budget, "worker executing task");
-            // On elapse the executor future is dropped, which cancels it at
-            // its next await point. The timer is created inside `block_on`:
-            // it needs the worker runtime's time driver in context.
-            let executor = &self.executor;
-            let contained = runtime.block_on(contain(async move {
-                tokio::time::timeout(budget, executor.execute(payload, meta)).await
-            }));
-            match contained {
-                Ok(Ok(outcome)) => outcome,
-                Ok(Err(_elapsed)) => {
-                    warn!(
-                        task_id,
-                        ?budget,
-                        "task exceeded its budget and was cancelled"
-                    );
-                    Err(TaskError::Timeout { budget })
-                }
-                Err(panicked) => {
-                    error!(task_id, %panicked, "executor panicked; task failed");
-                    Err(TaskError::from(panicked))
-                }
+        let kept_meta = meta.clone();
+        let budget = self.budget(&meta);
+        debug!(task_id, ?budget, "worker executing task");
+        // On elapse or cancellation the executor future is dropped, which
+        // cancels it at its next await point. The timer is created inside
+        // `block_on`: it needs the worker runtime's time driver in context.
+        let executor = &self.executor;
+        let cancel = &self.cancel;
+        let contained = runtime.block_on(contain(async move {
+            tokio::select! {
+                biased;
+                () = cancel.cancelled() => None,
+                ran = tokio::time::timeout(budget, executor.execute(payload, meta)) => Some(ran),
+            }
+        }));
+        let outcome = match contained {
+            Ok(None) => {
+                warn!(task_id, "running task cancelled at the drain deadline");
+                progress.reported = true;
+                progress.settled = true;
+                let woken = self.dispatcher.complete(permit, self.now_ms());
+                self.capture(kept_meta, &mailbox_key, None, CancelReason::DrainTimeout);
+                self.launch(woken);
+                return;
+            }
+            Ok(Some(Ok(outcome))) => outcome,
+            Ok(Some(Err(_elapsed))) => {
+                warn!(
+                    task_id,
+                    ?budget,
+                    "task exceeded its budget and was cancelled"
+                );
+                Err(TaskError::Timeout { budget })
+            }
+            Err(panicked) => {
+                error!(task_id, %panicked, "executor panicked; task failed");
+                Err(TaskError::from(panicked))
             }
         };
 
         // Return the units before publishing the outcome, so a caller that
         // has retrieved the result already sees them released.
         let now_ms = self.now_ms();
-        *reported = true;
+        progress.reported = true;
         let woken = self.dispatcher.complete(permit, now_ms);
         self.finish(&mailbox_key, outcome);
+        self.ledger.finish(1);
+        self.ledger.settle(1);
+        progress.settled = true;
         self.launch(woken);
     }
 
@@ -335,10 +506,12 @@ where
     /// on the same channel. The replacement takes the dead worker's place in
     /// `live_workers`.
     ///
-    /// The shutdown flag is read under the `workers` lock, which `shutdown`
-    /// also takes after setting the flag, so a replacement is either joined
-    /// by `shutdown` or never spawned. A worker that is not replaced drains
-    /// the admitted tasks still in the channel, failing each as cancelled,
+    /// Workers are replaced until the channel's sender is taken (the end of
+    /// a shutdown, or drop), so a worker that dies during a drain is still
+    /// replaced. The sender is checked under the `workers` lock, which
+    /// `shutdown_with` takes after taking the sender, so a replacement is
+    /// either in the list `shutdown_with` reaps or never spawned. A worker
+    /// that is not replaced captures the admitted tasks still in the channel,
     /// in case it was the last worker.
     fn respawn(
         self: &Arc<Self>,
@@ -347,9 +520,8 @@ where
         stack_size: usize,
     ) {
         let mut workers = self.workers.lock();
-        // Acquire pairs with the Release in `shutdown()`; the lock orders it
-        // after the swap as well.
-        let replaced = if self.shutdown.load(Ordering::Acquire) {
+        let winding_down = self.ready_tx.lock().is_none();
+        let replaced = if winding_down {
             false
         } else {
             match spawn_worker(worker_id, ready_rx.clone(), Arc::clone(self), stack_size) {
@@ -366,14 +538,72 @@ where
         };
         drop(workers);
         if !replaced {
-            // Relaxed: a statistic.
-            self.live_workers.fetch_sub(1, Ordering::Relaxed);
+            self.worker_exited();
             for Grant { item: task, permit } in ready_rx.try_iter() {
-                drop(permit);
-                self.finish(&task.mailbox_key, Err(shutdown_cancelled()));
+                let woken = self.dispatcher.complete(permit, self.now_ms());
+                self.capture_unstarted(task);
+                self.launch(woken);
             }
         }
     }
+
+    /// A worker thread stopped serving. SeqCst: `shutdown_with` waits for
+    /// `live_workers` to reach zero through the ledger (see `crate::ledger`).
+    fn worker_exited(&self) {
+        self.live_workers.fetch_sub(1, Ordering::SeqCst);
+        self.ledger.poke();
+    }
+
+    /// Join the worker threads that have exited and detach the rest (a
+    /// worker still running a task that ignores cancellation). A replacement
+    /// for a worker that died is spawned only while the sender is present
+    /// and under the `workers` lock, so none can appear after this.
+    fn reap_workers(&self) {
+        let workers: Vec<_> = self.workers.lock().drain(..).collect();
+        let mut detached = 0_usize;
+        for worker in workers {
+            if worker.is_finished() {
+                if worker.join().is_err() {
+                    warn!("a worker thread panicked");
+                }
+            } else {
+                detached += 1;
+            }
+        }
+        if detached > 0 {
+            warn!(
+                detached,
+                "worker threads still running at shutdown were detached; their tasks deliver later"
+            );
+        }
+    }
+}
+
+/// Start the thread that offers cancelled tasks to `sink`, one at a time,
+/// each bounded by `delta`, and settles them in `ledger`. It runs until every
+/// sender is dropped and the channel is empty.
+fn spawn_sink_thread<P: Send + 'static>(
+    sink: Arc<dyn CancellationSink<P>>,
+    delta: Duration,
+    ledger: Arc<Ledger>,
+) -> std::io::Result<UnboundedSender<CancelledTask<P>>> {
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<CancelledTask<P>>();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()?;
+    thread::Builder::new()
+        .name("pl-cancel-sink".into())
+        .spawn(move || {
+            runtime.block_on(async move {
+                while let Some(cancelled) = rx.recv().await {
+                    let task_id = cancelled.meta.id;
+                    let answer = offer(&sink, cancelled, delta).await;
+                    ledger.end_capture(task_id, answer);
+                    ledger.settle(1);
+                }
+            });
+        })?;
+    Ok(tx)
 }
 
 /// The error for a task that will not run because the pool shut down.
@@ -402,7 +632,13 @@ fn shutdown_cancelled() -> TaskError {
 /// - **Result TTL**: a result not retrieved within the result TTL (default:
 ///   the pool's `default_timeout_ms`) is evicted; see
 ///   [`with_result_ttl`](Self::with_result_ttl).
-/// - **Clean shutdown**: Dropping sender naturally unblocks all workers
+/// - **Shutdown**: [`shutdown_with`](Self::shutdown_with) /
+///   [`shutdown_with_async`](Self::shutdown_with_async) apply a
+///   [`ShutdownPolicy`] and report on every accepted task; tasks cancelled at
+///   the drain deadline go to the [`CancellationSink`]
+///   ([`with_cancellation_sink`](Self::with_cancellation_sink)). Dropping the
+///   pool refuses new work, captures the waiting tasks and lets the workers
+///   exit once their current tasks finish, without joining them.
 pub struct WorkerPool<P, R, E>
 where
     P: Send + 'static,
@@ -451,6 +687,12 @@ where
             ready_tx: Mutex::new(Some(ready_tx)),
             clock: RwLock::new(Arc::new(SystemClock::new())),
             shutdown: AtomicBool::new(false),
+            parked_closed: AtomicBool::new(false),
+            cancel: CancellationToken::new(),
+            ledger: Arc::new(Ledger::default()),
+            sink: RwLock::new(None),
+            cancellation: RwLock::new(CancellationConfig::default()),
+            capture_tx: Mutex::new(None),
             executor,
             workers: Mutex::new(Vec::new()),
             live_workers: AtomicUsize::new(config.worker_count),
@@ -510,6 +752,28 @@ where
         self
     }
 
+    /// Hand tasks cancelled at shutdown to `sink` (default: a
+    /// [`LoggingCancellationSink`], which logs and drops them).
+    ///
+    /// The sink is called from a dedicated thread, started on the first
+    /// cancellation. A running task cancelled at the drain deadline reaches
+    /// it without its payload (`None`): the executor consumed it, and
+    /// `WorkerPool` payloads need be neither `Clone` nor serializable. Tasks
+    /// that never started carry their payload.
+    #[must_use]
+    pub fn with_cancellation_sink(self, sink: Arc<dyn CancellationSink<P>>) -> Self {
+        *self.shared.sink.write() = Some(sink);
+        self
+    }
+
+    /// Bound each sink call by `config.delta` (default 5 s). The other fields
+    /// of [`CancellationConfig`] do not apply to the pool.
+    #[must_use]
+    pub fn with_cancellation_config(self, config: CancellationConfig) -> Self {
+        *self.shared.cancellation.write() = config;
+        self
+    }
+
     /// Submit a task asynchronously.
     ///
     /// This method can be called from an async context and will not block.
@@ -554,12 +818,17 @@ where
     ///   `max_queue_depth` tasks are already waiting
     pub fn submit(&self, payload: P, meta: TaskMetadata) -> Result<MailboxKey, SchedulerError> {
         let shared = &self.shared;
-        // Acquire pairs with the Release in `shutdown()`.
-        if shared.shutdown.load(Ordering::Acquire) {
+        // Count the task before reading the flag; SeqCst on both sides (see
+        // `crate::ledger`): either this submission is refused or a concurrent
+        // `shutdown_with` counts it and waits for it.
+        shared.ledger.accept();
+        if shared.shutdown.load(Ordering::SeqCst) {
+            shared.ledger.settle(1);
             return Err(pool_shutdown());
         }
         let now_ms = shared.now_ms();
         if meta.deadline_ms.is_some_and(|deadline| now_ms > deadline) {
+            shared.ledger.settle(1);
             return Err(SchedulerError::DeadlineExpired { task_id: meta.id });
         }
 
@@ -577,6 +846,7 @@ where
             Ok(admission) => admission,
             Err(error) => {
                 shared.results.discard(task_id);
+                shared.ledger.settle(1);
                 warn!(%error, "worker pool rejected task");
                 return Err(error);
             }
@@ -592,11 +862,13 @@ where
         );
         shared.launch(admission.dispatched);
 
-        // A shutdown that raced this submission may have emptied the parked
-        // queue before this task was parked; fail anything parked since.
-        // Acquire pairs with the Release in `shutdown()`.
-        if shared.shutdown.load(Ordering::Acquire) {
-            shared.cancel_parked();
+        // A shutdown that took the parked queue before this task was parked
+        // cannot see it. The park happened inside the dispatch lock, so if
+        // the flag reads false here `take_parked` (which takes the lock after
+        // the flag is stored) found the task; if it reads true, capture
+        // whatever is parked now.
+        if shared.parked_closed.load(Ordering::SeqCst) {
+            shared.capture_parked();
         }
         Ok(mailbox_key)
     }
@@ -692,71 +964,128 @@ where
         stats
     }
 
-    /// Shut down the pool gracefully with timeout.
+    /// Shut down the pool as 0.2 did: refuse new submissions, capture the
+    /// tasks still waiting, let running tasks finish, and return once the
+    /// workers exit or after about 2 s (a worker still running then is
+    /// detached and delivers its result later).
     ///
-    /// New submissions are refused, tasks still waiting in the queue are
-    /// failed with [`TaskError::Cancelled`], admitted tasks not yet started
-    /// are failed the same way, and running tasks finish (within their
-    /// budgets). Workers are then joined with a 2-second bound each; a worker
-    /// that does not exit in time is detached so shutdown never hangs.
+    /// This is [`shutdown_with`](Self::shutdown_with) with
+    /// `ShutdownPolicy::Drain { deadline: Duration::ZERO }`. Blocks the
+    /// calling thread; safe to call from async code too (the steps run on a
+    /// helper thread).
     pub fn shutdown(&self) {
-        let shared = &self.shared;
-        // AcqRel: Release publishes the flag to the Acquire loads in
-        // `submit`/`execute`; Acquire makes a second caller see the first.
-        if shared.shutdown.swap(true, Ordering::AcqRel) {
-            return; // Already shut down
-        }
+        let _report = self.shutdown_with(ShutdownPolicy::Drain {
+            deadline: Duration::ZERO,
+        });
+    }
 
-        info!("Shutting down worker pool");
-
-        // Drop the sender to unblock all workers waiting on recv()
-        drop(shared.ready_tx.lock().take());
-        shared.cancel_parked();
-
-        // Join workers with timeout. A replacement for a worker that died is
-        // spawned only while the flag is clear and under this lock, so none
-        // can appear after this drain.
-        let workers: Vec<_> = shared.workers.lock().drain(..).collect();
-        let worker_count = workers.len();
-
-        for (idx, worker) in workers.into_iter().enumerate() {
-            // Try to join with timeout using a helper thread
-            let (tx, rx) = std::sync::mpsc::channel();
-            let join_thread = thread::spawn(move || {
-                let result = worker.join();
-                let _ = tx.send(result.is_ok());
+    /// [`shutdown_with_async`](Self::shutdown_with_async), blocking the
+    /// calling thread until it returns.
+    ///
+    /// The steps run on a helper thread with its own single-threaded runtime,
+    /// so this is safe to call from a plain thread and from inside a runtime
+    /// (where it blocks that runtime thread for the duration, like 0.2's
+    /// `shutdown`).
+    ///
+    /// # Panics
+    ///
+    /// Re-raises a panic from the shutdown steps (which run no user code
+    /// except the cancellation sink, whose panics are contained).
+    pub fn shutdown_with(&self, policy: ShutdownPolicy) -> ShutdownReport {
+        thread::scope(|scope| {
+            let helper = scope.spawn(|| {
+                match tokio::runtime::Builder::new_current_thread()
+                    .enable_time()
+                    .build()
+                {
+                    Ok(runtime) => runtime.block_on(self.shutdown_with_async(policy)),
+                    Err(build_error) => {
+                        error!(error = %build_error, "could not build the shutdown runtime; signalling shutdown only");
+                        self.close();
+                        self.shared.ledger.report(self.shared.ledger.tally())
+                    }
+                }
             });
+            helper
+                .join()
+                .unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+        })
+    }
 
-            // Wait up to 2 seconds for this worker to exit.
-            match rx.recv_timeout(Duration::from_secs(2)) {
-                Ok(true) => {
-                    debug!(worker_id = idx, "Worker joined successfully");
-                    // Helper has already sent its result, so it is about to
-                    // finish — joining it returns immediately.
-                    let _ = join_thread.join();
-                }
-                Ok(false) => {
-                    warn!(worker_id = idx, "Worker panicked");
-                    let _ = join_thread.join();
-                }
-                Err(_) => {
-                    warn!(
-                        worker_id = idx,
-                        "Worker did not exit within timeout - detaching"
-                    );
-                    // The helper is still blocked on `worker.join()`; joining it
-                    // here would block until the wedged worker exits, defeating
-                    // the timeout. Detach instead so shutdown() always returns
-                    // within its per-worker bound. The OS reclaims the thread.
-                    drop(join_thread);
-                }
+    /// Shut the pool down under `policy` and report what happened to every
+    /// accepted task.
+    ///
+    /// Submissions are refused at once. Until the policy's drain deadline,
+    /// admitted tasks run and parked tasks keep starting as workers and units
+    /// free; the drain ends as soon as every accepted task is settled. At the
+    /// deadline, parked tasks are cancelled ([`CancelReason::QueueShutdown`]),
+    /// and under `DrainThenCancel` and `CancelImmediately` running tasks are
+    /// cancelled at their next await point ([`CancelReason::DrainTimeout`])
+    /// and any admitted task a worker receives from then on is captured
+    /// without running. A cancelled task's result slot holds
+    /// [`TaskError::Cancelled`]; the task is offered to the cancellation sink
+    /// (bounded by [`CancellationConfig::delta`]), and the call waits at most
+    /// `delta` plus one second for that. Finally the workers' channel is
+    /// closed and the call waits up to 2 s for the worker threads to exit;
+    /// one that does not (an executor blocking without yielding) is detached.
+    ///
+    /// The report's `unsettled` counts tasks still running at return; their
+    /// results still land in their slots.
+    pub async fn shutdown_with_async(&self, policy: ShutdownPolicy) -> ShutdownReport {
+        let shared = &self.shared;
+        let ledger = &shared.ledger;
+        let since = ledger.tally();
+        // SeqCst: pairs with the `in_flight` increment in `submit` (see
+        // `crate::ledger`).
+        shared.shutdown.store(true, Ordering::SeqCst);
+        info!(?policy, "shutting down worker pool");
+
+        let drained = ledger
+            .wait_until(policy.drain_deadline(), |ledger| ledger.in_flight() == 0)
+            .await;
+        if !drained {
+            // SeqCst: pairs with the load in `submit` (see there).
+            shared.parked_closed.store(true, Ordering::SeqCst);
+            shared.capture_parked();
+            if policy.cancels_stragglers() {
+                shared.cancel.cancel();
+            }
+            let bound = shared.cancellation.read().delta + SETTLE_MARGIN;
+            if policy.cancels_stragglers() {
+                ledger
+                    .wait_until(bound, |ledger| ledger.in_flight() == 0)
+                    .await;
+            } else {
+                ledger
+                    .wait_until(bound, |ledger| ledger.capturing() == 0)
+                    .await;
             }
         }
 
-        info!(
-            worker_count = worker_count,
-            "Worker pool shut down complete"
-        );
+        // Close the workers' channel: each worker exits once it is empty.
+        self.close();
+        let exited = ledger
+            .wait_until(WORKER_EXIT_BOUND, |_| {
+                shared.live_workers.load(Ordering::SeqCst) == 0
+            })
+            .await;
+        if !exited {
+            warn!("worker threads did not exit within 2 s of shutdown");
+        }
+        shared.reap_workers();
+        let report = ledger.report(since);
+        info!(?report, "worker pool shut down");
+        report
+    }
+
+    /// Refuse submissions, capture the parked tasks and close the workers'
+    /// channel, without waiting (drop, and the fallback of `shutdown_with`).
+    fn close(&self) {
+        let shared = &self.shared;
+        shared.shutdown.store(true, Ordering::SeqCst);
+        shared.parked_closed.store(true, Ordering::SeqCst);
+        shared.capture_parked();
+        drop(shared.ready_tx.lock().take());
     }
 }
 
@@ -767,17 +1096,12 @@ where
     E: WorkerExecutor<P, R>,
 {
     fn drop(&mut self) {
-        // Signal shutdown but DON'T join workers in Drop
-        // This prevents test hangs when pools are dropped with tasks still running
-        if !self.shared.shutdown.swap(true, Ordering::AcqRel) {
-            // Drop the sender to unblock waiting workers
-            drop(self.shared.ready_tx.lock().take());
-            self.shared.cancel_parked();
-
-            // DON'T join workers here - let OS clean up threads
-            // Explicit shutdown() is required for graceful cleanup
-            debug!("WorkerPool dropped without explicit shutdown - workers will be detached");
-        }
+        // Refuse submissions, capture what is parked and let the workers exit
+        // once their channel is empty, without joining them: dropping a pool
+        // with tasks still running must not hang. `shutdown_with` is the
+        // graceful path.
+        self.close();
+        debug!("WorkerPool dropped; workers exit once their current tasks finish");
     }
 }
 
@@ -811,8 +1135,7 @@ where
                         error = %e,
                         "Failed to create worker runtime"
                     );
-                    // Relaxed: a statistic.
-                    shared.live_workers.fetch_sub(1, Ordering::Relaxed);
+                    shared.worker_exited();
                     return;
                 }
             };
@@ -839,8 +1162,7 @@ where
                 }
             }
 
-            // Relaxed: a statistic.
-            shared.live_workers.fetch_sub(1, Ordering::Relaxed);
+            shared.worker_exited();
             debug!(worker_id = worker_id, "Worker thread exiting");
         })
 }

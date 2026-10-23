@@ -33,6 +33,18 @@
 //! around the whole task: the permit, freed by unwinding, is followed by
 //! [`Dispatcher::poke`] so parked work it admits starts at once, and the task
 //! is reported as panicked unless its outcome was already recorded.
+//!
+//! ## Shutdown (cr-29)
+//!
+//! [`shutdown_with`](ResourcePool::shutdown_with) applies a
+//! [`ShutdownPolicy`]: queued tasks keep starting during the drain, running
+//! tasks finish, and at the drain deadline the queued remainder (and, unless
+//! the policy is `Drain`, the running stragglers) are cancelled: the mailbox
+//! receives [`TaskError::Cancelled`] and a [`CancelledTask`] goes to the
+//! pool's [`CancellationSink`]. A running straggler's payload is restored from
+//! a JSON snapshot the pool keeps while a sink is registered. The pool's
+//! [`Ledger`] counts accepted tasks until each is settled, so the returned
+//! [`ShutdownReport`] accounts for every one of them.
 
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -40,8 +52,15 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
 use parking_lot::{Mutex, RwLock};
+use tokio_util::sync::CancellationToken;
 
+use crate::cancellation::{
+    CancelReason, CancellationConfig, CancellationSink, CancelledTask, LoggingCancellationSink,
+    offer,
+};
 use crate::contain::contain;
+use crate::ledger::{Ledger, SettleOnDrop};
+use crate::shutdown::{ShutdownPolicy, ShutdownReport};
 
 use prometheus_parking_lot_core::dispatch::{Dispatched, Dispatcher, Grant, TaskQueueAdapter};
 use prometheus_parking_lot_core::semaphore::{Permit, UnitSemaphore};
@@ -52,6 +71,16 @@ use prometheus_parking_lot_core::{
 
 /// Pool name used in errors and audit events (pools are not named yet).
 const POOL_NAME: &str = "resource_pool";
+
+/// Extra wait, beyond the sink's `delta`, for cancelled stragglers to settle.
+const SETTLE_MARGIN: Duration = Duration::from_secs(1);
+
+/// The error a cancelled task's mailbox receives.
+fn shutdown_cancelled() -> TaskError {
+    TaskError::Cancelled {
+        reason: "resource pool shut down".into(),
+    }
+}
 
 /// Resource pool with capacity accounting and the parking-lot algorithm.
 ///
@@ -82,7 +111,21 @@ struct Inner<P, T, Q, M, E, S> {
     spawner: S,
     audit: Mutex<Option<Box<dyn AuditSink>>>,
     clock: RwLock<Arc<dyn Clock>>,
+    /// Set by `shutdown`/`shutdown_with`: submissions are refused.
     shutdown: AtomicBool,
+    /// Set when `shutdown_with` takes the parked queue at the drain deadline:
+    /// a submission that raced it captures what it parked.
+    parked_closed: AtomicBool,
+    /// Fired at the drain deadline (policies that cancel stragglers): running
+    /// tasks stop at their next await point and are captured.
+    cancel: CancellationToken,
+    /// Accepted tasks until settled, and how cancellations ended.
+    ledger: Ledger,
+    /// Where cancelled tasks go; `None` means a [`LoggingCancellationSink`]
+    /// and no payload snapshots.
+    sink: RwLock<Option<Arc<dyn CancellationSink<P>>>>,
+    /// The sink's per-call bound (`delta`).
+    cancellation: RwLock<CancellationConfig>,
     /// Tasks that ran and returned a value.
     completed: AtomicU64,
     /// Tasks whose outcome was a failure: an executor error or panic, a
@@ -119,6 +162,11 @@ where
                 audit: Mutex::new(None),
                 clock: RwLock::new(Arc::new(SystemClock::new())),
                 shutdown: AtomicBool::new(false),
+                parked_closed: AtomicBool::new(false),
+                cancel: CancellationToken::new(),
+                ledger: Ledger::default(),
+                sink: RwLock::new(None),
+                cancellation: RwLock::new(CancellationConfig::default()),
                 completed: AtomicU64::new(0),
                 failed: AtomicU64::new(0),
                 _types: PhantomData,
@@ -141,6 +189,27 @@ where
     #[must_use]
     pub fn with_clock(self, clock: impl Clock + 'static) -> Self {
         *self.inner.clock.write() = Arc::new(clock);
+        self
+    }
+
+    /// Hand tasks cancelled at shutdown to `sink` (default: a
+    /// [`LoggingCancellationSink`], which logs and drops them).
+    ///
+    /// While a sink is registered the pool keeps a JSON snapshot
+    /// (`serde_json::Value`) of each running task's payload, so a running
+    /// straggler cancelled at the drain deadline reaches the sink with its
+    /// payload. That costs one serialization per started task.
+    #[must_use]
+    pub fn with_cancellation_sink(self, sink: Arc<dyn CancellationSink<P>>) -> Self {
+        *self.inner.sink.write() = Some(sink);
+        self
+    }
+
+    /// Bound each sink call by `config.delta` (default 5 s). The other fields
+    /// of [`CancellationConfig`] do not apply to the pool.
+    #[must_use]
+    pub fn with_cancellation_config(self, config: CancellationConfig) -> Self {
+        *self.inner.cancellation.write() = config;
         self
     }
 
@@ -178,14 +247,17 @@ where
         self.inner.failed.load(Ordering::Relaxed)
     }
 
-    /// Stop accepting new submissions.
+    /// Stop accepting new submissions, and nothing else.
     ///
     /// Later calls to [`submit`](Self::submit) return
-    /// [`SchedulerError::PoolShutdown`]. Running tasks finish and queued tasks
-    /// keep draining as capacity frees; draining and cancellation policy is
-    /// cr-29.
+    /// [`SchedulerError::PoolShutdown`]. Every accepted task still runs:
+    /// running tasks finish and queued tasks keep starting as capacity frees,
+    /// with no deadline. To bound that and capture what is left, use
+    /// [`shutdown_with`](Self::shutdown_with).
     pub fn shutdown(&self) {
-        self.inner.shutdown.store(true, Ordering::Release);
+        // SeqCst: pairs with the `in_flight` increment in `submit` (see
+        // `crate::ledger`).
+        self.inner.shutdown.store(true, Ordering::SeqCst);
     }
 }
 
@@ -224,19 +296,20 @@ where
     /// - [`SchedulerError::QueueFull`] when the task must wait and the queue is
     ///   at its depth limit (checked atomically with the enqueue);
     /// - the queue backend's error when enqueueing fails.
-    #[expect(
-        clippy::unused_async,
-        clippy::unused_async_trait_impl,
-        reason = "public async API; dispatch becomes awaited with the durable dispatcher (cr-18/cr-49), so the signature stays async (the trait-impl variant misfires on an inherent method)"
-    )]
     pub async fn submit(&self, task: ScheduledTask<P>) -> Result<TaskStatus, SchedulerError> {
         let inner = &self.inner;
-        if inner.shutdown.load(Ordering::Acquire) {
+        // Count the task before reading the flag; SeqCst on both sides (see
+        // `crate::ledger`): either this submission is refused or a concurrent
+        // `shutdown_with` counts it and waits for it.
+        inner.ledger.accept();
+        if inner.shutdown.load(Ordering::SeqCst) {
+            inner.ledger.settle(1);
             return Err(SchedulerError::PoolShutdown {
                 pool: POOL_NAME.into(),
             });
         }
         if inner.is_expired(&task.meta) {
+            inner.ledger.settle(1);
             tracing::warn!(task_id = task.meta.id, "task expired before enqueue");
             return Err(SchedulerError::DeadlineExpired {
                 task_id: task.meta.id,
@@ -245,6 +318,7 @@ where
         let now_ms = inner.now_ms();
         let meta = task.meta.clone();
         let admission = inner.dispatcher.submit(task, now_ms).inspect_err(|error| {
+            inner.ledger.settle(1);
             tracing::warn!(task_id = meta.id, %error, "task rejected at admission");
         })?;
         let status = if admission.started {
@@ -257,7 +331,62 @@ where
             TaskStatus::Queued
         };
         inner.launch(admission.dispatched, Some(admission.sequence));
+        // A `shutdown_with` that took the parked queue before this task was
+        // parked cannot see it. The park happened inside the dispatch lock, so
+        // if the flag reads false here `take_parked` (which takes the lock
+        // after the flag is stored) found the task; if it reads true, capture
+        // whatever is parked now.
+        if inner.parked_closed.load(Ordering::SeqCst) {
+            inner.capture_parked().await;
+        }
         Ok(status)
+    }
+
+    /// Shut the pool down under `policy` and report what happened to every
+    /// accepted task.
+    ///
+    /// Submissions are refused at once. Until the policy's drain deadline,
+    /// running tasks finish and queued tasks keep starting as capacity frees;
+    /// the call returns as soon as every accepted task is settled. At the
+    /// deadline, queued tasks that never started are cancelled (reason
+    /// [`CancelReason::QueueShutdown`]); under `DrainThenCancel` and
+    /// `CancelImmediately` running tasks are cancelled too, at their next
+    /// await point ([`CancelReason::DrainTimeout`]). Each cancelled task's
+    /// mailbox receives [`TaskError::Cancelled`] and the task is offered to
+    /// the cancellation sink, each call bounded by
+    /// [`CancellationConfig::delta`]. The call then waits at most `delta`
+    /// plus one second for cancelled stragglers to settle.
+    ///
+    /// The report's `unsettled` counts tasks still running when it returns (a
+    /// `Drain` straggler, or an executor that blocks without yielding); they
+    /// are not dropped and deliver their outcome later. Calling it again runs
+    /// the same steps for whatever is left.
+    pub async fn shutdown_with(&self, policy: ShutdownPolicy) -> ShutdownReport {
+        let inner = &self.inner;
+        let since = inner.ledger.tally();
+        self.shutdown();
+        tracing::info!(?policy, "shutting down resource pool");
+        let deadline = policy.drain_deadline();
+        let drained = inner
+            .ledger
+            .wait_until(deadline, |ledger| ledger.in_flight() == 0)
+            .await;
+        if !drained {
+            // SeqCst: pairs with the load in `submit` (see there).
+            inner.parked_closed.store(true, Ordering::SeqCst);
+            inner.capture_parked().await;
+            if policy.cancels_stragglers() {
+                inner.cancel.cancel();
+                let bound = inner.cancellation.read().delta + SETTLE_MARGIN;
+                inner
+                    .ledger
+                    .wait_until(bound, |ledger| ledger.in_flight() == 0)
+                    .await;
+            }
+        }
+        let report = inner.ledger.report(since);
+        tracing::info!(?report, "resource pool shut down");
+        report
     }
 
     /// Remove queued tasks whose deadline has passed by the pool's clock and
@@ -279,6 +408,9 @@ where
         let inner = &self.inner;
         let now_ms = inner.now_ms();
         let (removed, dispatched) = inner.dispatcher.prune_expired(now_ms)?;
+        let removed_count = u64::try_from(removed).unwrap_or(u64::MAX);
+        inner.ledger.finish(removed_count);
+        inner.ledger.settle(removed_count);
         // Removing an expired head that did not fit can admit the tasks
         // behind it.
         inner.launch(dispatched, None);
@@ -380,6 +512,8 @@ where
     /// the queue but before they were started, those tasks are lost with it;
     /// that needs a panicking `Mailbox` or `AuditSink`.
     async fn supervise(self: Arc<Self>, task: ScheduledTask<P>, permit: Permit) {
+        // Settles the task however `run` ends, unwinding included.
+        let _settle = SettleOnDrop(&self.ledger);
         let task_id = task.meta.id;
         let mailbox_key = task.meta.mailbox.clone();
         // Set by `run` just before it starts the completion. Relaxed: it is
@@ -414,25 +548,55 @@ where
     /// [`contain`], so an executor panic — in the call, in a poll, or in the
     /// drop of its future when the budget elapses — becomes
     /// [`TaskError::ExecutorPanicked`] and the task finishes normally.
+    ///
+    /// A task started after the shutdown's cancel phase began is captured
+    /// without running. A running task is raced against the pool's cancel
+    /// token: when it fires, the executor future is dropped and the task is
+    /// captured with its payload restored from the snapshot.
     async fn run(self: Arc<Self>, task: ScheduledTask<P>, permit: Permit, reported: &AtomicBool) {
         let ScheduledTask { meta, payload } = task;
         let task_id = meta.id;
+        if self.cancel.is_cancelled() {
+            reported.store(true, Ordering::Relaxed);
+            let woken = self.dispatcher.complete(permit, self.now_ms());
+            self.launch(woken, None);
+            self.capture(meta, Some(payload), CancelReason::QueueShutdown)
+                .await;
+            return;
+        }
         let mailbox_key = meta.mailbox.clone();
         let budget = self.budget(&meta);
+        let snapshot = self.snapshot(task_id, &payload);
+        let kept_meta = meta.clone();
         tracing::debug!(task_id, ?budget, "executing task");
 
-        // On elapse the executor future is dropped, which cancels it at its
-        // next await point; an executor owning a `tokio::process::Child` built
-        // with `kill_on_drop(true)` has the child reaped by that drop.
+        // On elapse (or cancellation) the executor future is dropped, which
+        // cancels it at its next await point; an executor owning a
+        // `tokio::process::Child` built with `kill_on_drop(true)` has the
+        // child reaped by that drop.
         let executor = &self.executor;
-        let contained =
-            contain(
-                async move { tokio::time::timeout(budget, executor.execute(payload, meta)).await },
-            )
-            .await;
+        let cancel = &self.cancel;
+        let contained = contain(async move {
+            tokio::select! {
+                biased;
+                () = cancel.cancelled() => None,
+                ran = tokio::time::timeout(budget, executor.execute(payload, meta)) => Some(ran),
+            }
+        })
+        .await;
         let outcome = match contained {
-            Ok(Ok(outcome)) => outcome,
-            Ok(Err(_elapsed)) => Err(TaskError::Timeout { budget }),
+            Ok(None) => {
+                tracing::warn!(task_id, "running task cancelled at the drain deadline");
+                reported.store(true, Ordering::Relaxed);
+                let woken = self.dispatcher.complete(permit, self.now_ms());
+                self.launch(woken, None);
+                let payload = snapshot.and_then(|value| Self::restore(task_id, value));
+                self.capture(kept_meta, payload, CancelReason::DrainTimeout)
+                    .await;
+                return;
+            }
+            Ok(Some(Ok(outcome))) => outcome,
+            Ok(Some(Err(_elapsed))) => Err(TaskError::Timeout { budget }),
             Err(panicked) => Err(TaskError::from(panicked)),
         };
 
@@ -462,6 +626,7 @@ where
         };
         // Relaxed: see `ResourcePool::completed_tasks`.
         counter.fetch_add(1, Ordering::Relaxed);
+        self.ledger.finish(1);
         let action = match &outcome {
             Ok(_) => "complete",
             Err(TaskError::Timeout { budget }) => {
@@ -498,6 +663,8 @@ where
     /// Record a queued task that reached the head after its deadline.
     fn expire(&self, meta: &TaskMetadata) {
         self.failed.fetch_add(1, Ordering::Relaxed);
+        self.ledger.finish(1);
+        self.ledger.settle(1);
         tracing::warn!(
             task_id = meta.id,
             "queued task expired before it could start"
@@ -510,6 +677,69 @@ where
             .as_ref()
             .map_or("unknown", |key| key.tenant.as_str());
         self.record_event(meta.id, tenant, "expire");
+    }
+
+    /// Take every parked task out of the queue and capture it as never
+    /// started; each is settled once its sink call ends.
+    async fn capture_parked(&self) {
+        for task in self.dispatcher.take_parked() {
+            let ScheduledTask { meta, payload } = task;
+            self.capture(meta, Some(payload), CancelReason::QueueShutdown)
+                .await;
+            self.ledger.settle(1);
+        }
+    }
+
+    /// Record a cancelled task: deliver [`TaskError::Cancelled`] to its
+    /// mailbox, audit it, and offer it to the sink under `delta`. Settling is
+    /// the caller's (a running task settles when `supervise` returns).
+    async fn capture(&self, meta: TaskMetadata, payload: Option<P>, reason: CancelReason) {
+        let task_id = meta.id;
+        tracing::warn!(task_id, ?reason, "task cancelled at shutdown");
+        if let Some(key) = meta.mailbox.as_ref() {
+            self.deliver(task_id, key, TaskStatus::Failed(shutdown_cancelled()), None);
+        }
+        let tenant = meta
+            .mailbox
+            .as_ref()
+            .map_or("unknown", |key| key.tenant.as_str());
+        self.record_event(task_id, tenant, "cancel");
+        let sink = self.sink.read().clone().unwrap_or_else(|| {
+            Arc::new(LoggingCancellationSink::new(POOL_NAME)) as Arc<dyn CancellationSink<P>>
+        });
+        let delta = self.cancellation.read().delta;
+        let cancelled = CancelledTask {
+            payload,
+            meta,
+            reason,
+            attempt: 0,
+            cancelled_at_ms: u64::try_from(self.now_ms()).unwrap_or(u64::MAX),
+        };
+        self.ledger.begin_capture();
+        let answer = offer(&sink, cancelled, delta).await;
+        self.ledger.end_capture(task_id, answer);
+    }
+
+    /// A JSON copy of a running task's payload, kept only while a sink is
+    /// registered (only the sink can use it).
+    fn snapshot(&self, task_id: TaskId, payload: &P) -> Option<serde_json::Value> {
+        if self.sink.read().is_none() {
+            return None;
+        }
+        serde_json::to_value(payload)
+            .inspect_err(|error| {
+                tracing::warn!(task_id, %error, "payload snapshot failed; a cancelled run reaches the sink without it");
+            })
+            .ok()
+    }
+
+    /// Rebuild a payload from its snapshot.
+    fn restore(task_id: TaskId, snapshot: serde_json::Value) -> Option<P> {
+        serde_json::from_value(snapshot)
+            .inspect_err(|error| {
+                tracing::warn!(task_id, %error, "payload snapshot did not deserialize; the sink gets the task without it");
+            })
+            .ok()
     }
 
     /// Deliver an outcome to the mailbox. A failed delivery is logged, not

@@ -138,12 +138,6 @@ impl<T: Parkable> Dispatcher<T, PriorityQueue<T>> {
     ) -> Self {
         Self::new(pool, semaphore, max_queue_depth, PriorityQueue::new())
     }
-
-    /// Remove and return every parked item (for shutdown), in no particular
-    /// order.
-    pub fn take_parked(&self) -> Vec<T> {
-        self.state.lock().queue.take_all()
-    }
 }
 
 impl<T, Q> Dispatcher<T, Q> {
@@ -191,6 +185,36 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
     #[must_use]
     pub fn parked(&self) -> usize {
         self.state.lock().queue.len()
+    }
+
+    /// Remove and return every parked item (for shutdown), in dispatch order.
+    ///
+    /// Items leave through the same peek-then-pop path as a drain, so a
+    /// [`TaskQueueAdapter`](super::TaskQueueAdapter) hands back what its
+    /// backend holds too. If the queue's head becomes unreadable, the items
+    /// taken so far are returned and the rest stay parked (logged); a caller
+    /// that counts accepted tasks sees them as not settled.
+    pub fn take_parked(&self) -> Vec<T> {
+        let mut state = self.state.lock();
+        let mut taken = Vec::new();
+        loop {
+            match state.queue.head() {
+                Ok(Some(_)) => match state.queue.pop_head() {
+                    Some(item) => taken.push(item),
+                    None => break,
+                },
+                Ok(None) => break,
+                Err(error) => {
+                    tracing::error!(
+                        pool = %self.pool,
+                        %error,
+                        "parked queue head unreadable; items left parked"
+                    );
+                    break;
+                }
+            }
+        }
+        taken
     }
 
     /// Submit `item`: start it, park it, or reject it.
@@ -443,6 +467,25 @@ mod tests {
         let mut grants = blocker.dispatched.started;
         let woken = dispatcher.complete(grants.pop().expect("blocker").permit, 0);
         assert_eq!(names(&woken.started), vec!["big"]);
+    }
+
+    #[test]
+    fn take_parked_returns_every_parked_item_in_dispatch_order() {
+        let dispatcher = Dispatcher::in_memory("test", UnitSemaphore::new(1), 8);
+        let running = dispatcher
+            .submit(item("running", Priority::Normal, 1), 0)
+            .expect("ok");
+        for (name, priority) in [("low", Priority::Low), ("high", Priority::High)] {
+            let _ = dispatcher.submit(item(name, priority, 1), 0).expect("ok");
+        }
+        let taken: Vec<_> = dispatcher
+            .take_parked()
+            .into_iter()
+            .map(|item| item.name)
+            .collect();
+        assert_eq!(taken, vec!["high", "low"]);
+        assert_eq!(dispatcher.parked(), 0);
+        drop(running);
     }
 
     #[test]

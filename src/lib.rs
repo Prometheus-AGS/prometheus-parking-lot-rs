@@ -166,7 +166,7 @@ pub use crate::core::hooks::{
     CancelledReason, Hook, HookBus, LifecycleEvent, RecordingHook, RejectionReason, TracingHook,
 };
 #[cfg(feature = "tokio-runtime")]
-pub use crate::core::shutdown::{ShutdownHandle, ShutdownPolicy, wait_for_signal};
+pub use crate::core::shutdown::{ShutdownHandle, ShutdownPolicy, ShutdownReport, wait_for_signal};
 pub use crate::core::{PoolStats, TaskMetadata};
 /// The crash-durable resource pool (cr-49): accepted tasks persist in a
 /// durable lease queue and results in a durable result mailbox. Built from

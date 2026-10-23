@@ -22,6 +22,7 @@ prometheus-parking-lot-core.workspace = true
 async-trait.workspace = true
 parking_lot.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time", "signal"] }
 tokio-util = { workspace = true, features = ["rt"] }
 tracing.workspace = true

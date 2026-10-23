@@ -35,7 +35,8 @@ migration notes.
 | Execution budgets | Yes, for both pools. |
 | Multi-resource admission | Costs are already vectors, but pools admit by the sum of units against one `max_units`; per-dimension limits are cr-23. |
 | Executor panics | Contained, for `ResourcePool` and the native `WorkerPool` (cr-21): the outcome is `TaskError::ExecutorPanicked`, the task's units are released and parked work starts; a `WorkerPool` worker killed by a panic is replaced. |
-| Accepted work survives a crash | **Yes, for `ResourcePool` on a durable backend** (cr-49): configure a pool's `queue` and `mailbox` as `{"backend": "<name>"}` (or start a `DurableResourcePool` directly) on Postgres (`PgLeaseQueue`, `PgResultMailbox`) or redb (`RedbLeaseQueue`, `RedbResultMailbox`). `submit` returns only after the task is committed to the lease queue; the task's lease is extended while it waits or runs and is acked only after its outcome is stored in the result mailbox, so a process killed at any point (tested with `SIGKILL` mid-execution and between execution and the mailbox write, on PG 18 and redb) has the task re-run after the lease expires and exactly one result consumable. The executor itself can run more than once for one task (at-least-once); make side effects idempotent. In-memory pools and the `WorkerPool` still lose parked work on restart. |
+| Accepted work survives a crash | **Yes, for `ResourcePool` on a durable backend** (cr-49): configure a pool's `queue` and `mailbox` as `{"backend": "<name>"}` (or start a `DurableResourcePool` directly) on Postgres (`PgLeaseQueue`, `PgResultMailbox`) or redb (`RedbLeaseQueue`, `RedbResultMailbox`). `submit` returns only after the task is committed to the lease queue; the task's lease is extended while it waits or runs and is acked only after its outcome is stored in the result mailbox, so a process killed at any point (tested with `SIGKILL` mid-execution and between execution and the mailbox write, on PG 18 and redb) has the task re-run after the lease expires and exactly one result consumable. The executor itself can run more than once for one task (at-least-once); make side effects idempotent. In-memory pools and the `WorkerPool` still lose parked work on a crash. |
+| No silent loss at shutdown | **Yes, for all three pools** (cr-29): `shutdown_with(ShutdownPolicy)` (default `DrainThenCancel { deadline: 30 s }`) returns a `ShutdownReport` in which every accepted task either completed, was cancelled, or is still running (`unsettled`). The in-memory pools hand each cancelled task to a `CancellationSink` (its mailbox or result slot gets `TaskError::Cancelled`); the durable pool hands it back to its queue (`nack`, requeue), and a restarted pool runs it (tested on PG 18 and redb). A running task cancelled by the native `WorkerPool` reaches the sink without its payload. |
 
 ## Crates and features
 
@@ -304,6 +305,92 @@ async fn main() -> Result<(), SchedulerError> {
 
 A failed task is delivered as `TaskStatus::Failed(TaskError)` with no payload.
 A task with `mailbox: None` runs, but its outcome is not stored.
+
+## Shutdown without losing work
+
+`shutdown_with(policy)` refuses new work, lets accepted work run until the
+policy's drain deadline, then cancels what is left, and reports where every
+task went. Each cancelled task's mailbox receives `TaskError::Cancelled`, and
+the task, with its payload, goes to the pool's `CancellationSink` (by default
+one that logs it). `ShutdownPolicy::Drain` never cancels a running task;
+`CancelImmediately` drains for zero time. The durable pool needs no sink: it
+hands cancelled tasks back to its queue, and the next pool on that queue runs
+them.
+
+```rust
+use std::sync::Arc;
+use std::time::Duration;
+
+use async_trait::async_trait;
+use prometheus_parking_lot::core::{
+    CancellationSink, PoolLimits, RecordingCancellationSink, ResourcePool, ScheduledTask,
+    ShutdownPolicy, TaskError, TaskExecutor, TaskMetadata, TaskStatus,
+};
+use prometheus_parking_lot::infra::{InMemoryMailbox, InMemoryQueue};
+use prometheus_parking_lot::runtime::TokioSpawner;
+use prometheus_parking_lot::util::{Priority, ResourceCost, ResourceKind, now_ms};
+
+/// Sleeps for the number of milliseconds in the payload.
+#[derive(Clone)]
+struct Sleep;
+
+#[async_trait]
+impl TaskExecutor<u64, u64> for Sleep {
+    async fn execute(&self, ms: u64, _meta: TaskMetadata) -> Result<u64, TaskError> {
+        tokio::time::sleep(Duration::from_millis(ms)).await;
+        Ok(ms)
+    }
+}
+
+fn task(id: u64, ms: u64) -> ScheduledTask<u64> {
+    ScheduledTask {
+        meta: TaskMetadata {
+            id,
+            mailbox: None,
+            priority: Priority::Normal,
+            cost: ResourceCost::new(ResourceKind::Cpu, 1),
+            deadline_ms: None,
+            created_at_ms: now_ms(),
+            idempotency_key: None,
+            sequence: 0,
+        },
+        payload: ms,
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    let sink = Arc::new(RecordingCancellationSink::new());
+    let pool = ResourcePool::new(
+        PoolLimits {
+            max_units: 1,
+            max_queue_depth: 8,
+            default_timeout: Duration::from_secs(60),
+        },
+        InMemoryQueue::new(8),
+        InMemoryMailbox::new(),
+        Sleep,
+        TokioSpawner::new(tokio::runtime::Handle::current()),
+    )
+    .with_cancellation_sink(Arc::clone(&sink) as Arc<dyn CancellationSink<u64>>);
+
+    // One task runs for a minute; one waits behind it.
+    assert_eq!(pool.submit(task(1, 60_000)).await.unwrap(), TaskStatus::Running);
+    assert_eq!(pool.submit(task(2, 10)).await.unwrap(), TaskStatus::Queued);
+
+    let report = pool
+        .shutdown_with(ShutdownPolicy::DrainThenCancel {
+            deadline: Duration::from_millis(100),
+        })
+        .await;
+    // Both were cancelled at the deadline and recorded by the sink, the
+    // running one with its payload too.
+    assert_eq!((report.cancelled, report.recorded, report.unsettled), (2, 2, 0));
+    let mut payloads: Vec<_> = sink.drain().await.into_iter().map(|t| t.payload).collect();
+    payloads.sort_unstable();
+    assert_eq!(payloads, [Some(10), Some(60_000)]);
+}
+```
 
 ## Configuration
 

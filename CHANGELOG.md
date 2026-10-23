@@ -101,7 +101,53 @@ entry names the OpenSpec change that made it.
   pools name a durable backend; build those with
   `build_pools_from_scheduler_config`.
 
+- **Shutdown and cancellation capture (cr-29).** `CancelledTask::payload` is
+  now `Option<P>`: a task that never started always carries its payload, a
+  running task cancelled by `ResourcePool` carries it while a sink is
+  registered (restored from a JSON snapshot), and one cancelled by the native
+  `WorkerPool` carries `None`. `LoggingCancellationSink` no longer requires
+  `P: Debug + Sync`. `WorkerPool::shutdown()` is now
+  `shutdown_with(ShutdownPolicy::Drain { deadline: 0 })`: tasks still waiting
+  are handed to the cancellation sink (their result slot still gets
+  `TaskError::Cancelled`), and it waits about 2 s in total (0.2 waited up to
+  2 s per worker) for workers to exit before detaching them. An admitted task
+  a worker receives after `shutdown` began now runs instead of being failed
+  as cancelled; once the cancel phase of `shutdown_with` has begun it is
+  captured to the sink. `ShutdownHandle::shutdown_with` is documented as what
+  it always did, firing the token; the policy is applied by the pools' own
+  `shutdown_with`. `ResourcePool::submit` and `ResourcePool::shutdown` now
+  use `SeqCst` on the shutdown flag (no behaviour change). The runtime crate
+  depends on `serde_json` (payload snapshots).
+
 ### Added
+
+- **Shutdown without silent loss (cr-29, scenario S-9).** Every pool has
+  `shutdown_with(ShutdownPolicy) -> ShutdownReport` (`ResourcePool` and
+  `DurableResourcePool`: async; `WorkerPool`: blocking `shutdown_with` and
+  async `shutdown_with_async`). Submissions are refused at once; under
+  `Drain { deadline }` and the default `DrainThenCancel { deadline }` accepted
+  work keeps running (in-memory pools keep starting queued tasks) until the
+  deadline; then queued tasks, and except under `Drain` running stragglers,
+  are cancelled. `CancelImmediately` drains for zero time. In the in-memory
+  pools each cancelled task's mailbox or result slot gets
+  `TaskError::Cancelled` and a `CancelledTask` goes to the pool's
+  `CancellationSink` (`with_cancellation_sink`, default
+  `LoggingCancellationSink`), each call bounded by
+  `CancellationConfig::delta` (`with_cancellation_config`); the native
+  `WorkerPool` calls the sink from a dedicated thread. The durable pool stops
+  leasing at once, hands back (`nack(Requeue)`) the leased task waiting for
+  capacity and every cancelled straggler, and the next pool on the queue runs
+  them. `ShutdownReport` (top level and `core::shutdown`) counts `completed`,
+  `cancelled` (= `recorded + requeued + dropped + unanswered`) and
+  `unsettled` tasks. `ShutdownPolicy::drain_deadline` and
+  `cancels_stragglers` are public. Fixes the native `WorkerPool` path where a
+  task received after the shutdown flag was dropped with no capture (0.2 dropped
+  it with no result at all); the negative control
+  `--cfg parking_lot_negative_control="s-9"` restores it and the `shutdown_`
+  tests detect the loss. Tested by `-E "test(shutdown_)"`: every policy on
+  `ResourcePool` and `WorkerPool`, and on `DurableResourcePool` over redb and
+  Postgres (Docker, `--run-ignored all`; in the CI `postgres` job on PG 17 and
+  18) with a restart that runs every handed-back task exactly once.
 
 - **Durable dispatch (cr-49).** `DurableResourcePool` (top level, and
   `prometheus-parking-lot-runtime-tokio::durable_pool`) is the crash-durable

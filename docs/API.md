@@ -18,22 +18,29 @@ Paths below are facade paths unless a crate is named.
 | `WorkerPoolConfig` (builder: `with_worker_count`, `with_max_units`, `with_max_queue_depth`, `with_timeout_ms`) | `config::WorkerPoolConfig` | always |
 | `PoolStats` | `core::PoolStats` | always |
 | `TokioSpawner` (`new(handle)`, `with_worker_threads(n)`) | `runtime::TokioSpawner` | `tokio-runtime` |
-| `ShutdownHandle`, `ShutdownPolicy`, `wait_for_signal` | `core::shutdown` | `tokio-runtime` |
-| Cancellation channel and sinks | `core::cancellation` | `tokio-runtime` |
+| `ShutdownHandle`, `ShutdownPolicy`, `ShutdownReport`, `wait_for_signal` | `core::shutdown` (`ShutdownReport` also top level) | `tokio-runtime` |
+| `CancellationSink`, `CancelledTask`, `CancelReason`, `SinkOutcome`, `CancellationConfig`, the logging and recording sinks, `CancellationChannel` | `core::cancellation` | `tokio-runtime` |
 
-`ResourcePool`: `new`, `with_audit`, `with_clock`, `submit`, `prune_expired`,
-`active_units`, `running_tasks`, `queued_tasks`, `shutdown`.
+`ResourcePool`: `new`, `with_audit`, `with_clock`, `with_cancellation_sink`,
+`with_cancellation_config`, `submit`, `prune_expired`, `active_units`,
+`running_tasks`, `queued_tasks`, `shutdown` (refuse new work only),
+`shutdown_with(policy)` (async; returns a `ShutdownReport`, cr-29).
 
 `DurableResourcePool` (crash-durable mode on a `LeaseQueue` and a
 `ResultMailbox`, cr-49; top-level `DurableResourcePool`, `DurableOptions`):
 `start(limits, queue, mailbox, executor, spawner, options)`, `submit` (returns
 once the task is persisted), `queue`, `mailbox`, `options`, `active_units`,
-`running_tasks`, `completed_tasks`, `failed_tasks`, `shutdown`.
+`running_tasks`, `completed_tasks`, `failed_tasks`, `shutdown` (stop leasing
+only), `shutdown_with(policy)` (async; hands cancelled tasks back to the queue
+and returns a `ShutdownReport`, cr-29).
 `DurableOptions::new(lease_for)` with `with_heartbeat_interval`,
 `with_poll_interval`, `with_result_ttl`, `with_name`.
 
-`WorkerPool`: `new`, `with_clock`, `submit` / `submit_async`, `retrieve` /
-`retrieve_async`, `stats`, `shutdown`.
+`WorkerPool`: `new`, `with_clock`, `with_result_ttl`, `with_cancellation_sink`,
+`with_cancellation_config`, `submit` / `submit_async`, `retrieve` /
+`retrieve_async`, `stats`, `shutdown` (`shutdown_with(Drain { deadline: 0 })`),
+`shutdown_with(policy)` (blocking) / `shutdown_with_async(policy)`, both
+returning a `ShutdownReport` (cr-29).
 
 ## Configuration
 
