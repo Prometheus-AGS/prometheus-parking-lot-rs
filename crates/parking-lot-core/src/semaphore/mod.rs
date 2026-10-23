@@ -330,6 +330,7 @@ impl UnitSemaphore {
     ///
     /// [`try_acquire_vector`]: Self::try_acquire_vector
     #[must_use]
+    #[inline]
     pub fn available(&self) -> Option<UnitVector> {
         let state = self.state.load(Ordering::Relaxed);
         if permits_of(state) >= self.max_permits {
@@ -347,10 +348,13 @@ impl UnitSemaphore {
     /// `None` when it fits an idle semaphore. Such a demand can never be
     /// admitted; pools reject it at submission.
     #[must_use]
+    #[inline]
     pub fn exceeded_limit(&self, demand: &UnitVector) -> Option<(Option<ResourceKind>, u32, u32)> {
         if demand.total() > self.max_units {
             return Some((None, demand.total(), self.max_units));
         }
+        // Single-dimension pools stop here: this runs on every submission.
+        self.kinds.as_ref()?;
         self.resource_limits().find_map(|(kind, limit)| {
             let requested = demand.of(kind);
             (requested > limit).then_some((Some(kind), requested, limit))
@@ -364,6 +368,7 @@ impl UnitSemaphore {
     /// Takes the `Arc` explicitly (rather than `self: &Arc<Self>`) because the
     /// loom build substitutes loom's `Arc`, which cannot be a method receiver.
     #[must_use]
+    #[inline]
     pub fn try_acquire(this: &Arc<Self>, units: u32) -> Option<Permit> {
         Self::try_acquire_vector(this, &UnitVector::scalar(units))
     }
@@ -373,23 +378,47 @@ impl UnitSemaphore {
     /// otherwise claim nothing and return `None`. See the module docs for why
     /// no other claimer can see part of the claim.
     #[must_use]
+    #[inline]
     pub fn try_acquire_vector(this: &Arc<Self>, demand: &UnitVector) -> Option<Permit> {
-        match &this.kinds {
-            Some(kinds) if kinds.touches(demand) => {
-                let mut in_use = kinds.in_use.lock();
-                if !kinds.fits(&in_use, demand) {
-                    return None;
-                }
-                let permit = Self::claim_packed(this, demand)?;
-                kinds.apply(&mut in_use, demand, true);
-                drop(in_use);
-                Some(permit)
-            }
-            _ => Self::claim_packed(this, demand),
+        if let Some(kinds) = &this.kinds
+            && kinds.touches(demand)
+        {
+            return Self::claim_with_kinds(this, kinds, demand);
         }
+        Self::claim_packed(this, demand)
+    }
+
+    /// The claim of a demand that needs a limited kind: the kind check, the
+    /// packed CAS and the kind units in one kind-lock critical section.
+    ///
+    /// Out of line so that the single-dimension path (`claim_packed` alone)
+    /// does not carry the lock path's frame. Measured on
+    /// `benches/skip_ahead_bench.rs` (strict, single-dimension): with both
+    /// paths in one function the claim took about 50% more profile samples
+    /// and the simulation ran about 6% slower than the cr-20 semaphore;
+    /// split, about 2%.
+    #[inline(never)]
+    fn claim_with_kinds(
+        this: &Arc<Self>,
+        kinds: &KindLimits,
+        demand: &UnitVector,
+    ) -> Option<Permit> {
+        let mut in_use = kinds.in_use.lock();
+        if !kinds.fits(&in_use, demand) {
+            return None;
+        }
+        let permit = Self::claim_packed(this, demand)?;
+        kinds.apply(&mut in_use, demand, true);
+        drop(in_use);
+        Some(permit)
     }
 
     /// The packed claim: `demand.total()` units and one permit, by CAS.
+    #[inline(always)]
+    #[expect(
+        clippy::inline_always,
+        reason = "the single-dimension hot path; see claim_with_kinds for the measurement"
+    )]
     fn claim_packed(this: &Arc<Self>, demand: &UnitVector) -> Option<Permit> {
         let units = demand.total();
         let delta = packed_delta(units);
@@ -444,22 +473,31 @@ impl UnitSemaphore {
     }
 
     /// Return `demand` in every dimension.
+    #[inline]
     fn release(&self, demand: &UnitVector) {
-        match &self.kinds {
-            Some(kinds) if kinds.touches(demand) => {
-                // Kind units and the packed total leave in one kind-lock
-                // critical section, so a claimer under the kind lock sees
-                // both returned or neither.
-                let mut in_use = kinds.in_use.lock();
-                kinds.apply(&mut in_use, demand, false);
-                self.release_packed(demand.total());
-                drop(in_use);
-            }
-            _ => self.release_packed(demand.total()),
+        if let Some(kinds) = &self.kinds
+            && kinds.touches(demand)
+        {
+            self.release_with_kinds(kinds, demand);
+            return;
         }
+        self.release_packed(demand.total());
+    }
+
+    /// Release of a demand that holds limited kinds. Kind units and the
+    /// packed total leave in one kind-lock critical section, so a claimer
+    /// under the kind lock sees both returned or neither. Out of line for the
+    /// same reason as `claim_with_kinds`.
+    #[inline(never)]
+    fn release_with_kinds(&self, kinds: &KindLimits, demand: &UnitVector) {
+        let mut in_use = kinds.in_use.lock();
+        kinds.apply(&mut in_use, demand, false);
+        self.release_packed(demand.total());
+        drop(in_use);
     }
 
     /// Return `units` units and one permit to the packed state.
+    #[inline]
     fn release_packed(&self, units: u32) {
         let delta = packed_delta(units);
         // `Release`: everything this holder did happens-before any later
@@ -499,6 +537,7 @@ impl Permit {
 }
 
 impl Drop for Permit {
+    #[inline]
     fn drop(&mut self) {
         self.semaphore.release(&self.demand);
     }

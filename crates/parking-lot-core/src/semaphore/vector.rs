@@ -69,6 +69,7 @@ impl UnitVector {
     /// The demand of `cost`: its units per kind, and their sum (saturating,
     /// as [`ResourceCost::total_units`]) as the total.
     #[must_use]
+    #[inline]
     pub fn from_cost(cost: &ResourceCost) -> Self {
         let mut demand = Self::default();
         for (kind, units) in cost.iter() {
@@ -103,13 +104,20 @@ impl UnitVector {
 
     /// Whether this demand fits in `free` in every dimension at once.
     #[must_use]
+    #[inline]
+    #[expect(
+        clippy::needless_bitwise_bool,
+        reason = "branch-free over the kinds, so the compare vectorizes"
+    )]
     pub fn fits_in(&self, free: &Self) -> bool {
+        // Non-short-circuit over the fixed-size kinds so it compiles to one
+        // vector compare: this runs for every skip-ahead candidate.
         self.total <= free.total
             && self
                 .kinds
                 .iter()
                 .zip(free.kinds.iter())
-                .all(|(need, have)| need <= have)
+                .fold(true, |fits, (need, have)| fits & (need <= have))
     }
 }
 

@@ -294,8 +294,8 @@ impl<T: Parkable> ParkedQueue<T> for PriorityQueue<T> {
         Ok(self
             .entries
             .values()
-            .map(|entry| entry.ticket)
-            .find(|ticket| ticket.can_skip_ahead(free, now_ms)))
+            .find(|entry| entry.ticket.can_skip_ahead(free, now_ms))
+            .map(|entry| entry.ticket))
     }
 
     fn take(&mut self, ticket: &Ticket) -> Option<T> {
