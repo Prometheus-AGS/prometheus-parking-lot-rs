@@ -144,7 +144,11 @@ pub mod pg {
     use testcontainers::runners::AsyncRunner;
     use testcontainers::{ContainerAsync, GenericImage, ImageExt};
 
-    const PG_MAJOR: &str = "18";
+    /// Postgres major under test: `PARKING_LOT_PG_MAJOR` (the CI matrix sets 17 or
+    /// 18), default 18.
+    fn pg_major() -> String {
+        std::env::var("PARKING_LOT_PG_MAJOR").unwrap_or_else(|_| "18".to_owned())
+    }
     /// Test-only superuser password configured in the container.
     const PG_PASSWORD: &str = "postgres";
 
@@ -156,7 +160,8 @@ pub mod pg {
 
     impl Pg18 {
         pub async fn start() -> Self {
-            let tag = format!("parking-lot-pg:{PG_MAJOR}");
+            let major = pg_major();
+            let tag = format!("parking-lot-pg:{major}");
             let present = Command::new("docker")
                 .args(["image", "inspect", &tag])
                 .output()
@@ -168,14 +173,14 @@ pub mod pg {
                 let status = Command::new("docker")
                     .arg("build")
                     .arg("-f")
-                    .arg(root.join(format!("docker/postgres{PG_MAJOR}/Dockerfile")))
+                    .arg(root.join(format!("docker/postgres{major}/Dockerfile")))
                     .args(["-t", &tag])
                     .arg(root.join("docker"))
                     .status()
                     .expect("run docker build");
                 assert!(status.success(), "docker build of {tag} failed");
             }
-            let container = GenericImage::new("parking-lot-pg", PG_MAJOR)
+            let container = GenericImage::new("parking-lot-pg", major.as_str())
                 .with_exposed_port(ContainerPort::Tcp(5432))
                 .with_wait_for(WaitFor::message_on_stderr(
                     "database system is ready to accept connections",
