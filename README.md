@@ -443,7 +443,15 @@ example per backend, each loaded and built by the test suite:
 
 - [Documentation site](https://prometheus-ags.github.io/prometheus-parking-lot-rs/):
   concepts (parking lots, admission, leases, mailboxes, worker pools, event
-  logs) and their current state on `main`.
+  logs) and their current state on `main`, and
+  [guides](https://prometheus-ags.github.io/prometheus-parking-lot-rs/docs/guides)
+  per deployment: a GPU inference pool, a Tauri local LLM, a multi-tenant
+  Postgres service, disconnected clients, shutdown and requeue, Iggy events,
+  streaming replay, configuration, and upgrading from 0.2.
+- [examples/](examples/): the programs behind the guides, built and run in
+  CI, the Postgres and Iggy ones against containers
+  (`cargo run --example gpu_inference_pool`; each file's header gives its
+  features and setup).
 - [docs/API.md](docs/API.md): map of the public API by module and feature.
 - [docs/adr/](docs/adr/): design decisions (workspace split, core contracts,
   backend contracts, embedded backend).
@@ -453,7 +461,8 @@ example per backend, each loaded and built by the test suite:
   Postgres backends on PostgreSQL 18.
 - [CHANGELOG.md](CHANGELOG.md): what changed, with migration notes.
 - [docs/README.md](docs/README.md): index of the rest.
-- Rustdoc: `cargo doc --workspace --no-deps --all-features --open`.
+- Rustdoc: on [docs.rs](https://docs.rs/prometheus_parking_lot) from the 0.3.0
+  release; until then `cargo doc --workspace --no-deps --all-features --open`.
 
 ## License
 
