@@ -11,6 +11,7 @@
 //! default `tokio-runtime` feature.
 
 pub mod cancellation;
+mod contain;
 pub mod resource_pool;
 pub mod shutdown;
 pub mod tokio_spawner;
