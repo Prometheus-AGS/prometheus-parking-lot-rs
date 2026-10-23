@@ -26,7 +26,7 @@ use crate::options::IggyOptions;
 const MAX_KEY_LEN: usize = 255;
 
 /// One message to publish.
-pub(crate) struct Envelope {
+pub struct Envelope {
     /// Deterministic message id (see [`crate::ids`]).
     pub(crate) id: u128,
     /// Partition key: messages with the same key land on the same partition.
@@ -84,7 +84,7 @@ pub struct Publisher {
 
 /// Why a message was not queued.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum EnqueueError {
+pub enum EnqueueError {
     /// The queue is full or the publisher has stopped.
     Rejected,
 }
@@ -95,14 +95,16 @@ impl Publisher {
     pub(crate) fn start(handle: &Handle, options: &IggyOptions, topic: &str) -> Self {
         let (sender, receiver) = mpsc::channel(options.queue_capacity.max(1));
         let counters = Arc::new(Counters::default());
-        let worker = Worker {
-            options: options.clone(),
-            topic: topic.to_owned(),
-            counters: Arc::clone(&counters),
-            connection: None,
-            recent: Recent::new(options.dedup_window),
-        };
-        let task = handle.spawn(worker.run(receiver));
+        let task = handle.spawn(
+            Worker {
+                options: options.clone(),
+                topic: topic.to_owned(),
+                counters: Arc::clone(&counters),
+                connection: None,
+                recent: Recent::new(options.dedup_window),
+            }
+            .run(receiver),
+        );
         Self {
             sender,
             counters,
@@ -113,18 +115,16 @@ impl Publisher {
     /// Queue `envelope` without blocking.
     #[cfg(not(parking_lot_negative_control = "s-11"))]
     pub(crate) fn enqueue(&self, envelope: Envelope) -> Result<(), EnqueueError> {
-        match self.sender.try_send(Command::Publish {
+        let command = Command::Publish {
             envelope,
             done: None,
-        }) {
-            Ok(()) => {
-                self.counters.enqueued.fetch_add(1, Ordering::Relaxed);
-                Ok(())
-            }
-            Err(_) => {
-                self.counters.dropped.fetch_add(1, Ordering::Relaxed);
-                Err(EnqueueError::Rejected)
-            }
+        };
+        if self.sender.try_send(command).is_ok() {
+            self.counters.enqueued.fetch_add(1, Ordering::Relaxed);
+            Ok(())
+        } else {
+            self.counters.dropped.fetch_add(1, Ordering::Relaxed);
+            Err(EnqueueError::Rejected)
         }
     }
 

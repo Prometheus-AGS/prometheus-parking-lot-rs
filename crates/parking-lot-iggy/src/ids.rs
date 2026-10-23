@@ -1,6 +1,6 @@
 //! Deterministic message ids.
 //!
-//! An id is the UUIDv5 of a scope and the task's stable key under a fixed
+//! An id is the `UUIDv5` of a scope and the task's stable key under a fixed
 //! namespace, as a `u128` (Iggy's message id type). The same scope and key give
 //! the same id in every process and after every restart, so a retried publish
 //! can be recognized and skipped. The stable key is the task's idempotency key,

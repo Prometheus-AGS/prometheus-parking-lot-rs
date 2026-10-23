@@ -16,7 +16,7 @@ use crate::publisher::{Envelope, Publisher, PublisherStats};
 ///
 /// The message is a pointer, not the result: the mailbox key, task id, status,
 /// idempotency key and a `result_ref` to read the entry from the mailbox
-/// storage. Its id is the UUIDv5 of the idempotency key (or of the task's
+/// storage. Its id is the `UUIDv5` of the idempotency key (or of the task's
 /// address when it has none), so a re-notification of the same result carries
 /// the same id. Partitioned by tenant.
 ///

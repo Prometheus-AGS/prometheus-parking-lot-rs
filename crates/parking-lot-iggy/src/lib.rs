@@ -32,7 +32,7 @@
 //!
 //! # Message ids
 //!
-//! Every message carries a deterministic 128-bit id, a UUIDv5 of the task's
+//! Every message carries a deterministic 128-bit id, a `UUIDv5` of the task's
 //! stable key (the idempotency key, or a key derived from the task), so a
 //! retried publish carries the same id ([`ids`]). Iggy 0.9 deduplicates retried
 //! requests per client rather than by message id, so the publisher also keeps a
