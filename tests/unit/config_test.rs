@@ -132,12 +132,12 @@ fn config_misspelled_0_2_runtime_field_is_rejected_instead_of_ignored() {
 #[test]
 fn config_unknown_backend_type_is_rejected_naming_the_type() {
     let json = format!(
-        r#"{{ "backends": {{ "q": {{ "type": "pgmq", "queue_name": "q" }} }},
+        r#"{{ "backends": {{ "q": {{ "type": "sqlite", "queue_name": "q" }} }},
             "pools": {{ "p": {{ {POOL} }} }} }}"#
     );
     let message = parse_error(&json);
     assert!(
-        message.contains("unknown variant `pgmq`"),
+        message.contains("unknown variant `sqlite`"),
         "error must name the type: {message}"
     );
 }
@@ -329,6 +329,98 @@ fn config_postgres_values_are_validated_and_debug_hides_the_password() {
     assert!(debug.contains("postgres://app:***@db/app"), "{debug}");
 }
 
+const PGMQ_BACKEND: &str = r#""type": "pgmq", "url": "postgres://app:s3cret@db/app",
+                             "queue_name": "events", "max_depth": 10, "lease_secs": 30"#;
+
+#[test]
+fn config_misspelled_pgmq_backend_field_is_rejected_naming_it() {
+    let json = format!(
+        r#"{{ "backends": {{ "q": {{ {PGMQ_BACKEND}, "prepair": true }} }},
+            "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    let message = parse_error(&json);
+    assert!(
+        message.contains("unknown field `prepair`"),
+        "error must name the misspelled field: {message}"
+    );
+}
+
+#[cfg(feature = "postgres")]
+#[test]
+fn config_pgmq_values_are_validated_and_debug_hides_the_password() {
+    let ok = format!(
+        r#"{{ "backends": {{ "q": {{ {PGMQ_BACKEND} }} }}, "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    let parsed = SchedulerConfig::from_json_str(&ok).expect("a valid pgmq section loads");
+    let Some(BackendConfig::Pgmq(section)) = parsed.backends.get("q") else {
+        panic!("`type: pgmq` parses as a pgmq section");
+    };
+    assert!(!section.listen && !section.prepare && section.max_attempts.is_none());
+    let debug = format!("{parsed:?}");
+    assert!(
+        !debug.contains("s3cret"),
+        "Debug leaks the password: {debug}"
+    );
+    assert!(debug.contains("postgres://app:***@db/app"), "{debug}");
+
+    // The queue name becomes part of SQL identifiers: the rule
+    // `PgmqLeaseQueue::new` enforces is checked at validation.
+    let too_long = "q".repeat(39);
+    for name in ["", "Events", "ev-ents", too_long.as_str()] {
+        let json = ok.replace(
+            r#""queue_name": "events""#,
+            &format!(r#""queue_name": "{name}""#),
+        );
+        assert_eq!(
+            invalid_field(&json),
+            "backends.q.queue_name",
+            "name {name:?}"
+        );
+    }
+    let json = ok.replace(
+        r#""lease_secs": 30"#,
+        r#""lease_secs": 30, "max_attempts": 0"#,
+    );
+    assert_eq!(invalid_field(&json), "backends.q.max_attempts");
+    let json = ok.replace(r#""max_depth": 10"#, r#""max_depth": 0"#);
+    assert_eq!(invalid_field(&json), "backends.q.max_depth");
+}
+
+/// A pgmq backend is a queue for the application: no pool can run on it,
+/// because pool-level crash durability on pgmq is not claimed (S-18).
+#[cfg(feature = "postgres")]
+#[test]
+fn config_pool_on_a_pgmq_backend_is_rejected() {
+    let durable = r#""max_units": 4, "max_queue_depth": 8, "default_timeout_secs": 30,
+                     "queue": { "backend": "q" }, "mailbox": { "backend": "q" }"#;
+    let json = format!(
+        r#"{{ "backends": {{ "q": {{ {PGMQ_BACKEND} }} }}, "pools": {{ "p": {{ {durable} }} }} }}"#
+    );
+    let err = SchedulerConfig::from_json_str(&json).expect_err("no pool runs on pgmq");
+    assert_eq!(err.field(), Some("pools.p.queue"));
+    let message = err.to_string();
+    assert!(
+        message.contains("`pgmq`") && message.contains("postgres"),
+        "the error names the backend type and the alternative: {message}"
+    );
+
+    let half = r#""max_units": 4, "max_queue_depth": 8, "default_timeout_secs": 30,
+                  "queue": "in_memory", "mailbox": { "backend": "q" }"#;
+    let json = format!(
+        r#"{{ "backends": {{ "q": {{ {PGMQ_BACKEND} }} }}, "pools": {{ "p": {{ {half} }} }} }}"#
+    );
+    assert_eq!(invalid_field(&json), "pools.p.mailbox");
+}
+
+#[cfg(not(feature = "postgres"))]
+#[test]
+fn config_pgmq_backend_without_the_feature_is_rejected() {
+    let json = format!(
+        r#"{{ "backends": {{ "q": {{ {PGMQ_BACKEND} }} }}, "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    assert_eq!(invalid_field(&json), "backends.q.type");
+}
+
 #[cfg(not(feature = "postgres"))]
 #[test]
 fn config_postgres_backend_without_the_feature_is_rejected() {
@@ -377,7 +469,10 @@ mod examples {
                     .into_owned()
             })
             .collect();
-        assert_eq!(names, ["in-memory.json", "postgres.json", "redb.json"]);
+        assert_eq!(
+            names,
+            ["in-memory.json", "pgmq.json", "postgres.json", "redb.json"]
+        );
         for file in &files {
             let text = std::fs::read_to_string(file).expect("read example");
             if let Err(err) = SchedulerConfig::from_json_str(&text) {
