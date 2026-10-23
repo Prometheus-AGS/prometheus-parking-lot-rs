@@ -43,13 +43,10 @@ pub const PG_DATABASE: &str = "postgres";
 /// If `PARKING_LOT_PG_MAJOR` is set to anything but a supported major.
 #[must_use]
 pub fn pg_major() -> u8 {
-    match std::env::var("PARKING_LOT_PG_MAJOR") {
-        Err(_) => 18,
-        Ok(v) => match v.trim().parse::<u8>() {
-            Ok(major @ (17 | 18)) => major,
-            _ => panic!("PARKING_LOT_PG_MAJOR must be 17 or 18, got {v:?}"),
-        },
-    }
+    std::env::var("PARKING_LOT_PG_MAJOR").map_or(18, |v| match v.trim().parse::<u8>() {
+        Ok(major @ (17 | 18)) => major,
+        _ => panic!("PARKING_LOT_PG_MAJOR must be 17 or 18, got {v:?}"),
+    })
 }
 
 /// A running `parking-lot-pg` container with a ready pool.
