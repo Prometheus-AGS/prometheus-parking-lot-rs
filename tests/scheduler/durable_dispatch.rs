@@ -439,3 +439,75 @@ async fn durable_capacity_and_priority_then_fifo_order_hold() {
         "leased in priority, then enqueue, order"
     );
 }
+
+/// Counts the tasks executing at once.
+#[derive(Clone, Default)]
+struct PeakExecutor {
+    running: Arc<AtomicU32>,
+    peak: Arc<AtomicU32>,
+    done: Arc<AtomicU32>,
+}
+
+#[async_trait]
+impl TaskExecutor<String, String> for PeakExecutor {
+    async fn execute(&self, payload: String, _meta: TaskMetadata) -> Result<String, TaskError> {
+        let now = self.running.fetch_add(1, Ordering::SeqCst) + 1;
+        self.peak.fetch_max(now, Ordering::SeqCst);
+        tokio::time::sleep(Duration::from_millis(150)).await;
+        self.running.fetch_sub(1, Ordering::SeqCst);
+        self.done.fetch_add(1, Ordering::SeqCst);
+        Ok(payload)
+    }
+}
+
+/// cr-23 on the durable pool: with 8 VRAM units per pool (and 100 total
+/// units), two tasks of 8 VRAM never run together although the total fits,
+/// both still run, and a task over the VRAM limit is rejected at submission.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn durable_admits_by_every_dimension() {
+    let executor = PeakExecutor::default();
+    let pool = DurableResourcePool::start(
+        limits(100),
+        InMemoryLeaseQueue::<String>::new(100),
+        InMemoryResultMailbox::<String>::new(),
+        executor.clone(),
+        spawner(),
+        options().with_resource_limit(prometheus_parking_lot::util::ResourceKind::GpuVram, 8),
+    )
+    .expect("start");
+    let vram_task = |session: &str, vram: u32| {
+        let mut task = task(session, session);
+        task.meta.cost = prometheus_parking_lot::util::ResourceCost::new(
+            prometheus_parking_lot::util::ResourceKind::GpuVram,
+            vram,
+        )
+        .with(prometheus_parking_lot::util::ResourceKind::Cpu, 1);
+        task
+    };
+    let too_big = pool.submit(vram_task("big", 9)).await;
+    assert!(
+        matches!(
+            too_big,
+            Err(SchedulerError::CapacityExceeded {
+                requested: 9,
+                available: 8,
+                ..
+            })
+        ),
+        "{too_big:?}"
+    );
+    for session in ["a", "b"] {
+        pool.submit(vram_task(session, 8)).await.expect("accepted");
+    }
+    let finished = eventually(Duration::from_secs(10), || {
+        let done = Arc::clone(&executor.done);
+        async move { (done.load(Ordering::SeqCst) == 2).then_some(()) }
+    })
+    .await;
+    assert!(finished.is_some(), "both accepted tasks run");
+    assert_eq!(
+        executor.peak.load(Ordering::SeqCst),
+        1,
+        "two 8-unit VRAM tasks ran together under an 8-unit limit"
+    );
+}

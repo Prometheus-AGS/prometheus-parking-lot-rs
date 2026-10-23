@@ -27,7 +27,7 @@ use std::collections::BTreeMap;
 
 use prometheus_parking_lot_core::Priority;
 use prometheus_parking_lot_core::dispatch::{Dispatcher, Grant, Parkable, Ticket};
-use prometheus_parking_lot_core::semaphore::{Permit, UnitSemaphore};
+use prometheus_parking_lot_core::semaphore::{Permit, UnitSemaphore, UnitVector};
 
 /// A simulated item: who it is, what it costs, how long it runs.
 #[derive(Debug)]
@@ -44,7 +44,7 @@ impl Parkable for Job {
         Ticket {
             priority: self.priority,
             sequence: self.sequence,
-            units: self.units,
+            demand: UnitVector::scalar(self.units),
             deadline_ms: None,
         }
     }

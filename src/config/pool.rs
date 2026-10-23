@@ -10,7 +10,8 @@
 //!   },
 //!   "pools": {
 //!     "inference": {
-//!       "max_units": 8,
+//!       "max_units": 32,
+//!       "resource_limits": { "gpu_vram": 24, "cpu": 4 },
 //!       "max_queue_depth": 200,
 //!       "default_timeout_secs": 120,
 //!       "queue": "in_memory",
@@ -22,6 +23,7 @@
 
 use std::collections::BTreeMap;
 
+use prometheus_parking_lot_core::ResourceKind;
 use serde::{Deserialize, Serialize};
 
 use super::backend::BackendConfig;
@@ -77,6 +79,23 @@ pub struct PoolConfig {
     /// strictly head-of-line and does not use it.
     #[serde(default = "default_max_head_skips")]
     pub max_head_skips: u32,
+    /// Per-dimension limits (cr-23): units each resource kind may hold at
+    /// once, e.g. `{"gpu_vram": 24, "cpu": 4}`. A task starts only when its
+    /// cost fits `max_units` (the total over every kind) and every limit here
+    /// at once; a kind not listed is bounded only by `max_units`. A task over
+    /// any limit is rejected with `CapacityExceeded`. Optional; empty means
+    /// single-dimension admission by `max_units` alone (the 0.2 behaviour).
+    /// Each limit must be greater than zero and at most `max_units`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub resource_limits: BTreeMap<ResourceKind, u32>,
+}
+
+/// The configuration key of `kind` (its serde name, e.g. `gpu_vram`).
+fn kind_name(kind: ResourceKind) -> String {
+    serde_json::to_value(kind)
+        .ok()
+        .and_then(|value| value.as_str().map(str::to_owned))
+        .unwrap_or_else(|| format!("{kind:?}"))
 }
 
 /// Default for [`PoolConfig::max_head_skips`]: the dispatcher's default.
@@ -136,6 +155,25 @@ impl PoolConfig {
                 format!("{prefix}default_timeout_secs"),
                 "must be greater than 0",
             ));
+        }
+        for (kind, &limit) in &self.resource_limits {
+            let field = format!("{prefix}resource_limits.{}", kind_name(*kind));
+            if limit == 0 {
+                return Err(ConfigError::invalid(
+                    field,
+                    "must be greater than 0 (omit the kind to leave it bounded by max_units)",
+                ));
+            }
+            if limit > self.max_units {
+                return Err(ConfigError::invalid(
+                    field,
+                    format!(
+                        "{limit} exceeds max_units ({}), so it could never be reached; raise \
+                         max_units to at least the largest kind limit",
+                        self.max_units
+                    ),
+                ));
+            }
         }
         Ok(())
     }

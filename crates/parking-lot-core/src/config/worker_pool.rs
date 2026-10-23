@@ -4,9 +4,12 @@
 //! (native in `prometheus-parking-lot-runtime-tokio`, WASM in
 //! `prometheus-parking-lot-wasm`) are constructed from it.
 
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+
+use crate::contracts::ResourceKind;
 
 /// Default number of worker threads (uses CPU count on native, 1 on WASM).
 #[cfg_attr(
@@ -121,6 +124,19 @@ pub struct WorkerPoolConfig {
     /// Default: 8 (`prometheus_parking_lot_core::dispatch::DEFAULT_MAX_HEAD_SKIPS`).
     #[serde(default = "default_max_head_skips")]
     pub max_head_skips: u32,
+
+    /// Per-dimension limits (cr-23): units each [`ResourceKind`] may hold at
+    /// once, e.g. `{"gpu_vram": 24, "cpu": 4}`. A task is admitted only when
+    /// its cost fits `max_units` (the total over every kind), the worker
+    /// count and every limit here at once; a kind not listed is bounded only
+    /// by `max_units`. A task over any limit is rejected with
+    /// `CapacityExceeded`.
+    ///
+    /// Optional; empty by default, which is single-dimension admission by
+    /// `max_units` alone. Each limit must be greater than zero and at most
+    /// `max_units` (a larger one could never be reached; raise `max_units`).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub resource_limits: BTreeMap<ResourceKind, u32>,
 }
 
 impl Default for WorkerPoolConfig {
@@ -132,6 +148,7 @@ impl Default for WorkerPoolConfig {
             max_queue_depth: default_max_queue_depth(),
             default_timeout_ms: default_timeout_ms(),
             max_head_skips: default_max_head_skips(),
+            resource_limits: BTreeMap::new(),
         }
     }
 }
@@ -187,6 +204,14 @@ impl WorkerPoolConfig {
         self
     }
 
+    /// Limit dimension `kind` to `limit` units; see
+    /// [`resource_limits`](Self::resource_limits).
+    #[must_use]
+    pub fn with_resource_limit(mut self, kind: ResourceKind, limit: u32) -> Self {
+        self.resource_limits.insert(kind, limit);
+        self
+    }
+
     /// The execution budget (and native default result TTL) as a `Duration`.
     #[must_use]
     pub const fn default_timeout(&self) -> Duration {
@@ -210,6 +235,21 @@ impl WorkerPoolConfig {
         }
         if self.default_timeout_ms == 0 {
             return Err("default_timeout_ms must be greater than 0".into());
+        }
+        for (kind, &limit) in &self.resource_limits {
+            if limit == 0 {
+                return Err(format!(
+                    "resource_limits[{kind:?}] must be greater than 0 (omit the kind to leave it \
+                     bounded by max_units alone)"
+                ));
+            }
+            if limit > self.max_units {
+                return Err(format!(
+                    "resource_limits[{kind:?}] ({limit}) exceeds max_units ({}); raise max_units \
+                     to at least the largest kind limit",
+                    self.max_units
+                ));
+            }
         }
         #[cfg(not(target_arch = "wasm32"))]
         if self.thread_stack_size < 64 * 1024 {

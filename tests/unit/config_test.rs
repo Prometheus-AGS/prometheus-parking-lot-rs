@@ -11,6 +11,8 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use prometheus_parking_lot::util::ResourceKind;
+
 use prometheus_parking_lot::config::{
     BackendConfig, ConfigError, PoolConfig, RedbBackendConfig, SchedulerConfig, StorageConfig,
     WorkerPoolConfig,
@@ -24,6 +26,7 @@ const fn pool(max_units: u32) -> PoolConfig {
         queue: StorageConfig::InMemory,
         mailbox: StorageConfig::InMemory,
         max_head_skips: 8,
+        resource_limits: BTreeMap::new(),
     }
 }
 
@@ -174,6 +177,75 @@ fn config_pool_limits_are_validated() {
     assert_eq!(
         zero_timeout.validate().expect_err("zero timeout").field(),
         Some("default_timeout_secs")
+    );
+}
+
+/// cr-23: per-dimension limits load from JSON, are optional (a 0.2-shaped
+/// pool loads unchanged) and are validated per kind by dotted path.
+#[test]
+fn config_resource_limits_load_and_are_validated_per_kind() {
+    let cfg = SchedulerConfig::from_json_str(
+        r#"{ "pools": { "inference": {
+            "max_units": 32, "max_queue_depth": 10, "default_timeout_secs": 60,
+            "queue": "in_memory", "mailbox": "in_memory",
+            "resource_limits": { "gpu_vram": 24, "cpu": 4 } } } }"#,
+    )
+    .expect("multi-dimension limits load");
+    let limits = &cfg.pools["inference"].resource_limits;
+    assert_eq!(limits.get(&ResourceKind::GpuVram), Some(&24));
+    assert_eq!(limits.get(&ResourceKind::Cpu), Some(&4));
+    let json = serde_json::to_string(&cfg.pools["inference"]).expect("serialize");
+    assert!(
+        json.contains(r#""resource_limits":{"cpu":4,"gpu_vram":24}"#),
+        "{json}"
+    );
+    assert!(
+        !serde_json::to_string(&pool(8))
+            .expect("serialize")
+            .contains("resource_limits"),
+        "an empty map is omitted, so 0.2-shaped output is unchanged"
+    );
+
+    let mut zero = pool(8);
+    zero.resource_limits.insert(ResourceKind::Cpu, 0);
+    let err = one_pool(zero).validate().expect_err("zero limit");
+    assert_eq!(err.field(), Some("pools.inference.resource_limits.cpu"));
+
+    let mut unreachable = pool(8);
+    unreachable.resource_limits.insert(ResourceKind::GpuVram, 9);
+    let err = unreachable.validate().expect_err("limit above max_units");
+    assert_eq!(err.field(), Some("resource_limits.gpu_vram"));
+    assert!(err.to_string().contains("exceeds max_units (8)"), "{err}");
+
+    let message = parse_error(
+        r#"{ "pools": { "p": { "max_units": 8, "max_queue_depth": 1, "default_timeout_secs": 1,
+            "queue": "in_memory", "mailbox": "in_memory",
+            "resource_limits": { "tpu": 1 } } } }"#,
+    );
+    assert!(message.contains("unknown variant `tpu`"), "{message}");
+}
+
+#[test]
+fn config_worker_pool_resource_limits_load_and_are_validated() {
+    let cfg: WorkerPoolConfig = serde_json::from_str(
+        r#"{ "max_units": 16, "resource_limits": { "gpu_vram": 16, "cpu": 2 } }"#,
+    )
+    .expect("worker pool limits load");
+    assert_eq!(cfg.resource_limits.get(&ResourceKind::Cpu), Some(&2));
+    assert!(cfg.validate().is_ok());
+    let over = WorkerPoolConfig::new()
+        .with_max_units(4)
+        .with_resource_limit(ResourceKind::GpuVram, 5);
+    assert!(
+        over.validate()
+            .expect_err("over max_units")
+            .contains("exceeds max_units")
+    );
+    let zero = WorkerPoolConfig::new().with_resource_limit(ResourceKind::Io, 0);
+    assert!(
+        zero.validate()
+            .expect_err("zero")
+            .contains("greater than 0")
     );
 }
 

@@ -69,8 +69,8 @@ use prometheus_parking_lot_core::dispatch::{
 };
 use prometheus_parking_lot_core::semaphore::UnitSemaphore;
 use prometheus_parking_lot_core::{
-    Clock, Hook, HookBus, MailboxKey, PoolStats, SchedulerError, SystemClock, TaskError,
-    TaskMetadata, WorkerExecutor,
+    Clock, Hook, HookBus, MailboxKey, PoolStats, ResourceKind, SchedulerError, SystemClock,
+    TaskError, TaskMetadata, WorkerExecutor,
 };
 
 use super::slots::{Missing, ResultSlots, SlotId};
@@ -653,7 +653,8 @@ fn shutdown_cancelled() -> TaskError {
 /// # Design
 ///
 /// - **Capacity**: a task runs only while the units of all running tasks,
-///   including it, fit in `max_units`, and at most `worker_count` tasks run.
+///   including it, fit in `max_units` and in every per-kind limit of
+///   `resource_limits` (cr-23), and at most `worker_count` tasks run.
 ///   Others wait in a priority queue (at most `max_queue_depth`), highest
 ///   priority first, FIFO within a priority.
 /// - **Budgets**: each execution is bounded by the task's deadline or
@@ -710,7 +711,8 @@ where
         let shared = Arc::new(Shared {
             dispatcher: Dispatcher::in_memory(
                 POOL_NAME,
-                UnitSemaphore::with_max_permits(config.max_units, worker_permits),
+                UnitSemaphore::with_max_permits(config.max_units, worker_permits)
+                    .with_resource_limits(config.resource_limits.clone()),
                 config.max_queue_depth,
             )
             .with_max_head_skips(config.max_head_skips),
@@ -1009,6 +1011,14 @@ where
     #[must_use]
     pub fn skip_ahead_stats(&self) -> SkipAheadStats {
         self.shared.dispatcher.skip_ahead_stats()
+    }
+
+    /// Units held in dimension `kind` by running tasks, or `None` when the
+    /// configuration does not limit `kind` (cr-23; `stats().used_units` is
+    /// the total over every kind).
+    #[must_use]
+    pub fn active_units_of(&self, kind: ResourceKind) -> Option<u32> {
+        self.shared.dispatcher.units_in_use_of(kind)
     }
 
     /// Get current pool statistics.

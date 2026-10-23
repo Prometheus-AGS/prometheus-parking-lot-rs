@@ -46,6 +46,7 @@ const fn pool_config(max_units: u32) -> PoolConfig {
         queue: StorageConfig::InMemory,
         mailbox: StorageConfig::InMemory,
         max_head_skips: 8,
+        resource_limits: BTreeMap::new(),
     }
 }
 
@@ -162,6 +163,58 @@ async fn config_build_pools_builds_one_pool_per_configured_name() {
 
     let names: Vec<_> = built.keys().cloned().collect();
     assert_eq!(names, ["fast", "slow"]);
+}
+
+/// cr-23: a pool built from a `pools` section with `resource_limits` admits
+/// by every dimension: a task over a kind limit is rejected, and one short in
+/// one dimension waits.
+#[tokio::test]
+async fn config_build_pools_applies_resource_limits() {
+    let mut section = pool_config(100);
+    section.resource_limits.insert(ResourceKind::Cpu, 1);
+    let cfg = SchedulerConfig {
+        backends: BTreeMap::new(),
+        pools: BTreeMap::from([("gpu".to_string(), section)]),
+    };
+    let built = build_pools::<String, String, _, _, _, _, _, _, _>(
+        &cfg,
+        |_, c| Ok(InMemoryQueue::<String>::new(c.max_queue_depth)),
+        |_, _| Ok(InMemoryMailbox::<String>::new()),
+        |_, _| Ok(Echo),
+        spawner(),
+    )
+    .expect("valid configuration builds");
+    let pool = &built["gpu"];
+    assert_eq!(pool.active_units_of(ResourceKind::Cpu), Some(0));
+    assert_eq!(pool.active_units_of(ResourceKind::GpuVram), None);
+    let task = |id: u64, slots: u32| ScheduledTask {
+        meta: TaskMetadata {
+            id,
+            mailbox: None,
+            priority: Priority::Normal,
+            cost: ResourceCost::new(ResourceKind::GpuVram, 8).with(ResourceKind::Cpu, slots),
+            deadline_ms: None,
+            created_at_ms: 0,
+            idempotency_key: None,
+            sequence: 0,
+        },
+        payload: String::from("x"),
+    };
+    let error = pool
+        .submit(task(1, 2))
+        .await
+        .expect_err("two slots, limit one");
+    assert!(
+        matches!(
+            error,
+            SchedulerError::CapacityExceeded {
+                requested: 2,
+                available: 1,
+                ..
+            }
+        ),
+        "{error:?}"
+    );
 }
 
 #[tokio::test]

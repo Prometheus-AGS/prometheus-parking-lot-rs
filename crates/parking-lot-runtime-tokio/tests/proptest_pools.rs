@@ -9,6 +9,11 @@
 //!   `CapacityExceeded`, and every other accepted task runs exactly once (no
 //!   task is silently dropped).
 //!
+//! The `vector_` properties repeat these for multi-resource costs (cr-23,
+//! S-19): a pool limits GPU VRAM and CPU slots per kind, the executor
+//! observes the units running in each dimension, and a task short in any one
+//! dimension must wait rather than start.
+//!
 //! Case count: 10,000 per pool by default (about 1 s for `ResourcePool` and
 //! 3 s for the native `WorkerPool` on an M-series laptop, dev profile),
 //! overridable with `PROPTEST_CASES`.
@@ -319,5 +324,292 @@ proptest! {
         (max_units, depth, steps) in scenario(1),
     ) {
         check_worker_pool(workers, max_units, depth, &steps)?;
+    }
+}
+
+// ── cr-23: multi-resource (vector) admission ─────────────────────────────────
+
+/// One generated vector task: VRAM units, CPU slots, work and pause.
+#[derive(Debug, Clone, Copy)]
+struct VStep {
+    vram: u32,
+    slots: u32,
+    priority: Priority,
+    work: u8,
+    pause: u8,
+}
+
+/// Pool limits `(max_units, vram, slots)` plus steps. Costs range up to one
+/// past each kind limit, and `max_units` from the largest kind limit to their
+/// sum, so every dimension is sometimes the binding (or exceeded) one.
+fn vector_scenario(min_depth: usize) -> impl Strategy<Value = (u32, u32, u32, usize, Vec<VStep>)> {
+    (1_u32..=4, 1_u32..=3, min_depth..=5).prop_flat_map(|(vram, slots, depth)| {
+        let step = (0..=vram + 1, 0..=slots + 1, priority(), 0_u8..4, 0_u8..3).prop_map(
+            |(v, c, priority, work, pause)| VStep {
+                vram: v,
+                slots: c,
+                priority,
+                work,
+                pause,
+            },
+        );
+        (
+            vram.max(slots)..=vram + slots,
+            Just(vram),
+            Just(slots),
+            Just(depth),
+            prop::collection::vec(step, 1..24),
+        )
+    })
+}
+
+fn vector_meta(id: u64, step: VStep) -> TaskMetadata {
+    TaskMetadata {
+        cost: ResourceCost::new(ResourceKind::GpuVram, step.vram)
+            .with(ResourceKind::Cpu, step.slots),
+        ..meta(
+            id,
+            Step {
+                cost: 0,
+                priority: step.priority,
+                work: step.work,
+                pause: step.pause,
+            },
+        )
+    }
+}
+
+/// Executor that measures the units running at once in each dimension.
+#[derive(Clone, Default)]
+struct VectorMeter {
+    running: Arc<[AtomicU32; 3]>,
+    peak: Arc<[AtomicU32; 3]>,
+    finished: Arc<AtomicUsize>,
+}
+
+impl VectorMeter {
+    async fn work(&self, cost: &ResourceCost, yields: u8) {
+        let units = [
+            cost.total_units(),
+            cost.units_of(ResourceKind::GpuVram),
+            cost.units_of(ResourceKind::Cpu),
+        ];
+        for (dim, &u) in units.iter().enumerate() {
+            let now = self.running[dim].fetch_add(u, Ordering::SeqCst) + u;
+            self.peak[dim].fetch_max(now, Ordering::SeqCst);
+        }
+        for _ in 0..yields {
+            tokio::task::yield_now().await;
+            std::thread::yield_now();
+        }
+        for (dim, &u) in units.iter().enumerate() {
+            self.running[dim].fetch_sub(u, Ordering::SeqCst);
+        }
+        self.finished.fetch_add(1, Ordering::SeqCst);
+    }
+
+    /// Peak `(total, vram, slots)` running at once.
+    fn peaks(&self) -> [u32; 3] {
+        [0, 1, 2].map(|dim| self.peak[dim].load(Ordering::SeqCst))
+    }
+}
+
+#[async_trait]
+impl TaskExecutor<u8, u8> for VectorMeter {
+    async fn execute(&self, work: u8, meta: TaskMetadata) -> Result<u8, TaskError> {
+        self.work(&meta.cost, work).await;
+        Ok(work)
+    }
+}
+
+#[async_trait]
+impl WorkerExecutor<u8, u8> for VectorMeter {
+    async fn execute(&self, work: u8, meta: TaskMetadata) -> Result<u8, TaskError> {
+        self.work(&meta.cost, work).await;
+        Ok(work)
+    }
+}
+
+const fn over_a_limit(step: VStep, max_units: u32, vram: u32, slots: u32) -> bool {
+    step.vram > vram || step.slots > slots || step.vram + step.slots > max_units
+}
+
+/// `ResourcePool` with per-kind limits on a current-thread runtime: nothing
+/// completes during a `submit`, so a task reported `Running` must have fit in
+/// every dimension just before it, and one short in any dimension must park.
+fn check_vector_resource_pool(
+    (max_units, vram, slots, depth): (u32, u32, u32, usize),
+    steps: &[VStep],
+) -> Result<(), TestCaseError> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .expect("runtime");
+    runtime.block_on(async {
+        let meter = VectorMeter::default();
+        let pool = ResourcePool::<u8, u8, _, _, _, _>::new(
+            PoolLimits {
+                max_units,
+                max_queue_depth: depth,
+                default_timeout: WAIT,
+            },
+            InMemoryQueue::new(depth),
+            InMemoryMailbox::new(),
+            meter.clone(),
+            TokioSpawner,
+        )
+        .with_resource_limit(ResourceKind::GpuVram, vram)
+        .with_resource_limit(ResourceKind::Cpu, slots);
+
+        let mut accepted = 0_usize;
+        for (index, step) in steps.iter().enumerate() {
+            let parked_before = pool.queued_tasks();
+            let total_before = pool.active_units();
+            let vram_before = pool
+                .active_units_of(ResourceKind::GpuVram)
+                .expect("limited");
+            let slots_before = pool.active_units_of(ResourceKind::Cpu).expect("limited");
+            let id = u64::try_from(index).expect("index fits u64");
+            let outcome = pool
+                .submit(ScheduledTask {
+                    meta: vector_meta(id, *step),
+                    payload: step.work,
+                })
+                .await;
+            if over_a_limit(*step, max_units, vram, slots) {
+                prop_assert!(
+                    matches!(outcome, Err(SchedulerError::CapacityExceeded { .. })),
+                    "task over a limit: {step:?} -> {outcome:?}"
+                );
+            } else {
+                let fits_now = total_before + step.vram + step.slots <= max_units
+                    && vram_before + step.vram <= vram
+                    && slots_before + step.slots <= slots;
+                match outcome {
+                    Ok(TaskStatus::Running) => {
+                        prop_assert!(
+                            fits_now,
+                            "started while short in a dimension: {step:?}, in use \
+                             (total {total_before}, vram {vram_before}, slots {slots_before})"
+                        );
+                        accepted += 1;
+                    }
+                    Ok(TaskStatus::Queued) => {
+                        prop_assert!(
+                            !(fits_now && parked_before == 0),
+                            "a task that fit at once was parked"
+                        );
+                        accepted += 1;
+                    }
+                    Err(SchedulerError::QueueFull { .. }) => {
+                        prop_assert!(parked_before >= depth, "QueueFull below depth");
+                    }
+                    other => prop_assert!(false, "unexpected outcome {other:?}"),
+                }
+            }
+            prop_assert!(pool.active_units() <= max_units);
+            prop_assert!(pool.active_units_of(ResourceKind::GpuVram) <= Some(vram));
+            prop_assert!(pool.active_units_of(ResourceKind::Cpu) <= Some(slots));
+            for _ in 0..step.pause {
+                tokio::task::yield_now().await;
+            }
+        }
+
+        let drained = tokio::time::timeout(WAIT, async {
+            while meter.finished.load(Ordering::SeqCst) < accepted {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await;
+        prop_assert!(drained.is_ok(), "an accepted task never ran");
+        prop_assert_eq!(meter.finished.load(Ordering::SeqCst), accepted);
+        let [peak_total, peak_vram, peak_slots] = meter.peaks();
+        prop_assert!(peak_total <= max_units, "total {peak_total} > {max_units}");
+        prop_assert!(peak_vram <= vram, "vram {peak_vram} > {vram}");
+        prop_assert!(peak_slots <= slots, "slots {peak_slots} > {slots}");
+        prop_assert_eq!(pool.queued_tasks(), 0);
+        tokio::task::yield_now().await;
+        prop_assert_eq!(pool.active_units_of(ResourceKind::Cpu), Some(0));
+        Ok(())
+    })
+}
+
+/// Native `WorkerPool` with per-kind limits from its configuration.
+fn check_vector_worker_pool(
+    workers: usize,
+    (max_units, vram, slots, depth): (u32, u32, u32, usize),
+    steps: &[VStep],
+) -> Result<(), TestCaseError> {
+    let meter = VectorMeter::default();
+    let pool = WorkerPool::new(
+        WorkerPoolConfig::new()
+            .with_worker_count(workers)
+            .with_max_units(max_units)
+            .with_max_queue_depth(depth)
+            .with_timeout_ms(20_000)
+            .with_resource_limit(ResourceKind::GpuVram, vram)
+            .with_resource_limit(ResourceKind::Cpu, slots),
+        meter.clone(),
+    )
+    .expect("valid config");
+
+    let mut keys = Vec::new();
+    for (index, step) in steps.iter().enumerate() {
+        let parked_before = pool.stats().queued_tasks;
+        let id = u64::try_from(index).expect("index fits u64");
+        let outcome = pool.submit(step.work, vector_meta(id, *step));
+        if over_a_limit(*step, max_units, vram, slots) {
+            prop_assert!(
+                matches!(outcome, Err(SchedulerError::CapacityExceeded { .. })),
+                "task over a limit: {outcome:?}"
+            );
+        } else {
+            match outcome {
+                Ok(key) => keys.push(key),
+                Err(SchedulerError::QueueFull { .. }) => {
+                    prop_assert!(parked_before >= depth as u64, "QueueFull below depth");
+                }
+                Err(other) => prop_assert!(false, "unexpected error {other}"),
+            }
+        }
+        prop_assert!(pool.active_units_of(ResourceKind::GpuVram) <= Some(vram));
+        prop_assert!(pool.active_units_of(ResourceKind::Cpu) <= Some(slots));
+        if step.pause > 0 {
+            std::thread::yield_now();
+        }
+    }
+    for key in &keys {
+        let value = pool.retrieve(key, WAIT);
+        prop_assert!(value.is_ok(), "accepted task lost: {value:?}");
+    }
+    prop_assert_eq!(meter.finished.load(Ordering::SeqCst), keys.len());
+    let [peak_total, peak_vram, peak_slots] = meter.peaks();
+    prop_assert!(peak_total <= max_units, "total {peak_total} > {max_units}");
+    prop_assert!(peak_vram <= vram, "vram {peak_vram} > {vram}");
+    prop_assert!(peak_slots <= slots, "slots {peak_slots} > {slots}");
+    pool.shutdown();
+    Ok(())
+}
+
+proptest! {
+    #![proptest_config(Config::with_cases(cases(10_000)))]
+
+    #[test]
+    fn vector_resource_pool_admits_by_every_dimension(
+        (max_units, vram, slots, depth, steps) in vector_scenario(0),
+    ) {
+        check_vector_resource_pool((max_units, vram, slots, depth), &steps)?;
+    }
+}
+
+proptest! {
+    #![proptest_config(Config::with_cases(cases(2_000)))]
+
+    #[test]
+    fn vector_worker_pool_admits_by_every_dimension(
+        workers in 1_usize..=3,
+        (max_units, vram, slots, depth, steps) in vector_scenario(1),
+    ) {
+        check_vector_worker_pool(workers, (max_units, vram, slots, depth), &steps)?;
     }
 }

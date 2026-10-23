@@ -63,10 +63,9 @@ pub enum ResourceKind {
 ///
 /// ## Admission
 ///
-/// Pools currently admit by [`total_units`](Self::total_units) against their
-/// scalar `max_units`, which for a one-dimension cost is exactly that
-/// dimension's units. Per-dimension admission against per-dimension limits is
-/// cr-23; it changes admission only, not this type.
+/// A pool admits a cost in every dimension at once (cr-23): its
+/// [`total_units`](Self::total_units) against `max_units`, and its units of
+/// each kind the pool limits against that kind's limit.
 ///
 /// ## Serialization
 ///
@@ -115,8 +114,8 @@ impl ResourceCost {
 
     /// Sum of the units over every dimension, saturating at `u32::MAX`.
     ///
-    /// This is the scalar the pools admit by until per-dimension admission
-    /// (cr-23); for a one-dimension cost it is that dimension's units.
+    /// Pools check it against `max_units`; for a one-dimension cost it is that
+    /// dimension's units.
     #[must_use]
     pub fn total_units(&self) -> u32 {
         self.dims

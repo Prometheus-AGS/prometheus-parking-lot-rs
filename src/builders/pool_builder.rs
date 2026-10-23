@@ -77,18 +77,38 @@ where
         let queue = queue_factory(name, pool_cfg)?;
         let mailbox = mailbox_factory(name, pool_cfg)?;
         let executor = executor_factory(name, pool_cfg)?;
-        let pool = ResourcePool::<P, T, Q, M, E, S>::new(
-            limits,
-            queue,
-            mailbox,
-            executor,
-            spawner.clone(),
+        let pool = with_resource_limits(
+            ResourcePool::<P, T, Q, M, E, S>::new(
+                limits,
+                queue,
+                mailbox,
+                executor,
+                spawner.clone(),
+            ),
+            pool_cfg,
         )
         .with_max_head_skips(pool_cfg.max_head_skips);
         pools.insert(name.clone(), pool);
     }
 
     Ok(pools)
+}
+
+/// Apply a `pools` section's per-kind limits (cr-23) to a freshly built pool.
+fn with_resource_limits<P, T, Q, M, E, S>(
+    pool: ResourcePool<P, T, Q, M, E, S>,
+    pool_cfg: &PoolConfig,
+) -> ResourcePool<P, T, Q, M, E, S>
+where
+    P: TaskPayload,
+    T: Send + Sync + serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,
+{
+    pool_cfg
+        .resource_limits
+        .iter()
+        .fold(pool, |pool, (&kind, &limit)| {
+            pool.with_resource_limit(kind, limit)
+        })
 }
 
 /// The pool limits a `pools` section configures.
@@ -409,12 +429,15 @@ where
         let limits = limits_of(pool_cfg);
         let Some(backend) = pool_cfg.durable_backend() else {
             let mailbox = SharedInMemoryMailbox::new();
-            let pool = ResourcePool::new(
-                limits,
-                InMemoryQueue::new(pool_cfg.max_queue_depth),
-                mailbox.clone(),
-                executor,
-                spawner.clone(),
+            let pool = with_resource_limits(
+                ResourcePool::new(
+                    limits,
+                    InMemoryQueue::new(pool_cfg.max_queue_depth),
+                    mailbox.clone(),
+                    executor,
+                    spawner.clone(),
+                ),
+                pool_cfg,
             )
             .with_max_head_skips(pool_cfg.max_head_skips);
             for hook in hooks {
@@ -583,9 +606,12 @@ where
         for hook in hooks {
             bus.register(hook);
         }
-        let options = DurableOptions::new(section.lease_for())
-            .with_name(name)
-            .with_hooks(bus);
+        let options = cfg.pools[name].resource_limits.iter().fold(
+            DurableOptions::new(section.lease_for())
+                .with_name(name)
+                .with_hooks(bus),
+            |options, (&kind, &limit)| options.with_resource_limit(kind, limit),
+        );
         match section {
             #[cfg(feature = "postgres")]
             crate::config::BackendConfig::Postgres(_) => {
