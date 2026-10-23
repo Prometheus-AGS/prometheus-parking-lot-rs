@@ -9,6 +9,13 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 /// Default number of worker threads (uses CPU count on native, 1 on WASM).
+#[cfg_attr(
+    target_arch = "wasm32",
+    expect(
+        clippy::missing_const_for_fn,
+        reason = "const only when num_cpus is not called"
+    )
+)]
 fn default_worker_count() -> usize {
     #[cfg(not(target_arch = "wasm32"))]
     {

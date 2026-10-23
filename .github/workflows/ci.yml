@@ -117,9 +117,7 @@ jobs:
         run: .github/scripts/check-wasm-graph.sh
       - name: Clippy (wasm32)
         if: matrix.toolchain == env.PINNED_TOOLCHAIN
-        # TODO(handoff cr-38 H3): drop the -A once core's default_worker_count carries a
-        # wasm32-only `expect(clippy::missing_const_for_fn)`; core is linted on this target too.
-        run: cargo clippy --locked --target wasm32-unknown-unknown -p prometheus-parking-lot-wasm --all-targets --all-features -- -D warnings -A clippy::missing_const_for_fn
+        run: cargo clippy --locked --target wasm32-unknown-unknown -p prometheus-parking-lot-wasm --all-targets --all-features -- -D warnings
       - name: Docs (wasm32)
         if: matrix.toolchain == env.PINNED_TOOLCHAIN
         run: cargo doc --locked --no-deps --target wasm32-unknown-unknown -p prometheus-parking-lot-wasm
