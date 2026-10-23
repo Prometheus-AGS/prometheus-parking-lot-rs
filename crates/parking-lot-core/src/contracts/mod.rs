@@ -10,9 +10,9 @@
 //!   suite checks. [`InMemoryLeaseQueue`] and [`InMemoryResultMailbox`] are
 //!   their reference implementations.
 //! - [`TaskQueue`] and [`Mailbox`] (synchronous) are the in-process contracts
-//!   `ResourcePool` still parks tasks and delivers results through. They are
-//!   retired when durable dispatch (cr-49) moves the pool onto the async
-//!   contracts and the backends drop their synchronous implementations.
+//!   the in-memory `ResourcePool` parks tasks and delivers results through. Its
+//!   durable mode, `DurableResourcePool` (cr-49), uses [`LeaseQueue`] and
+//!   [`ResultMailbox`] instead.
 
 pub mod clock;
 #[cfg(any(test, feature = "conformance"))]
