@@ -118,7 +118,8 @@ sequenceDiagram
   does not emit yet (cr-53).
 - The place a notifier plugs in exists: `StorageMailbox<S, N>` (cr-34) stores a
   result first and then hands it to a `Notifier` off the delivery path, with
-  bounded retries. The only built-in notifier is `NoopNotifier`.
+  bounded retries. `NoopNotifier` sends nothing; `IggyNotifier` (below) is
+  the built-in one that publishes.
 
 - `cr-32-iggy-events`: behind the `iggy` feature (crate
   `prometheus-parking-lot-iggy`), `IggyHook` publishes every lifecycle event to
@@ -134,7 +135,7 @@ sequenceDiagram
   so the publisher also skips ids it published recently and consumers
   de-duplicate on the id across restarts.
 
-- `cr-33-stream-replay` (stretch): `IggyStreamSink` publishes a task's streamed
+- `cr-33-stream-replay`: `IggyStreamSink` publishes a task's streamed
   output (for example LLM tokens) as numbered chunks plus an end marker to the
   `stream.chunks` topic, keyed by the idempotency key. A client that
   disconnects mid-stream resumes with `IggyStreamReader::resume` from the last
@@ -143,6 +144,9 @@ sequenceDiagram
   cursor: repeats (a retried publish) are skipped and a missing chunk is an
   error, so a resume has no gap and no duplicate. A full publisher queue slows
   the executor instead of dropping chunks.
+
+Worked examples: [Iggy events](../guides/iggy-events.md) and
+[Streaming replay](../guides/streaming-replay.md).
 
 Iggy is used for events and notifications only, not as mailbox storage and
 not as the work queue.

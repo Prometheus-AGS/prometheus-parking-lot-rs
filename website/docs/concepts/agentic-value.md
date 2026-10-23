@@ -7,8 +7,8 @@ description: Why agentic AI workloads (GPU memory limits, long-running inference
 
 The previous chapters each describe one old, well-understood idea. This chapter
 explains why agentic AI workloads need all of them at once, and which part of
-the library answers which pressure. Worked scenarios with code follow in the
-[Guides](../guides/index.md) (change `cr-47-docs-guides`).
+the library answers which pressure. Each answer links to a
+[guide](../guides/index.md) whose code CI compiles and runs.
 
 ## Four pressures
 
@@ -73,40 +73,55 @@ flowchart TD
   PL -->|"capacity released"| A
   PL -.->|"durable pool"| LQ["Lease queue:<br/>lease, extend, ack"]
   X --> MB["Mailbox:<br/>store the outcome"]
-  MB -.->|"planned"| EV["Event log:<br/>result-ready event"]
+  MB -->|"mailbox.ready"| EV["Event log (Iggy):<br/>result-ready event"]
   EV -.-> GW["Gateway / reconnecting client"]
   GW -->|"consume(key)"| MB
 ```
 
 **GPU memory limit, answered by weighted admission.**
-On `main`, every pool admits through one dispatcher and unit-weighted
-semaphore (`cr-19`) and never exceeds `max_units`. Planned: per-resource
-admission (`cr-23`) and bounded skip-ahead (`cr-20`).
+Every pool admits through one dispatcher and unit-weighted semaphore (`cr-19`)
+and never exceeds `max_units`. A pool can also limit each resource kind on its
+own (`cr-23`), so a request that needs 16 GiB of VRAM and a CPU slot starts only
+when both are free, and a request that could never fit is rejected at once.
+Bounded skip-ahead (`cr-20`) lets a small request use VRAM a large waiting one
+cannot, without starving it. Guide: [GPU inference pool](../guides/gpu-inference-pool.md).
 
 **Long, variable work, answered by budgets and leases.**
-On `main`, every execution is bounded by its deadline or the pool's default
-timeout. A durable pool (`DurableResourcePool`, `cr-49`) extends the lease of
-every task it holds with a heartbeat, so a long task is not mistaken for a dead
-one.
+Every execution is bounded by its deadline or the pool's default timeout. A
+durable pool (`DurableResourcePool`, `cr-49`) extends the lease of every task
+it holds with a heartbeat, so a long task is not mistaken for a dead one.
+Shutdown policies (`cr-29`) drain, cancel and requeue, and report where every
+task went. Guide: [Shutdown and requeue](../guides/shutdown-and-requeue.md).
 
 **Disconnecting clients, answered by the mailbox and notifications.**
-On `main`, outcomes are delivered to a mailbox with consume-once and TTL, in
+Outcomes are delivered to a mailbox address with consume-once and TTL, in
 memory, in Postgres (`PgResultMailbox`, `cr-27`) or in redb
 (`RedbResultMailbox`, `cr-28`). `StorageMailbox` (`cr-34`) stores first and
-notifies off the delivery path. Planned: an Iggy notifier (`cr-32`); until it
-ships, clients poll.
+notifies off the delivery path; `IggyNotifier` (`cr-32`) publishes a
+`mailbox.ready` pointer to Apache Iggy, and `IggyStreamSink` (`cr-33`) lets a
+client that dropped mid-generation resume the token stream with no gap.
+Guides: [Disconnected clients](../guides/disconnected-clients.md),
+[Iggy events](../guides/iggy-events.md),
+[Streaming replay](../guides/streaming-replay.md).
 
 **Expensive work, answered by durable at-least-once delivery and idempotency.**
-On `main`, a pool whose queue and mailbox name a Postgres or redb backend
-persists each task before accepting it, and acks it only after the outcome is
-stored under an idempotency key (`cr-26`, `cr-28`, `cr-49`). A crash at any
-point re-runs the task and leaves exactly one result. The executor itself can
-run twice, so its side effects must be idempotent.
+A pool whose queue and mailbox name a Postgres or redb backend persists each
+task before accepting it, and acks it only after the outcome is stored under an
+idempotency key (`cr-26`, `cr-28`, `cr-49`). A crash at any point re-runs the
+task and leaves exactly one result. The executor itself can run twice, so its
+side effects must be idempotent. Guides:
+[Cloud multi-tenant Postgres](../guides/cloud-postgres.md),
+[Tauri local LLM](../guides/tauri-local-llm.md).
 
-The honest summary for `main`: the capacity guarantee and the bounded execution
-budget hold for every pool. Accepted work survives a crash only in a
+The honest summary: the capacity guarantee and the bounded execution budget
+hold for every pool. Accepted work survives a crash only in a
 `DurableResourcePool`, a separate pool type with its own result contract; the
-worker pools and in-memory pools still lose parked work on restart. Result-ready notifications are not available yet.
+worker pools and in-memory pools still lose parked work on restart. A durable
+pool dispatches strictly in order (no skip-ahead) and polls for work other
+processes enqueue. Lifecycle events are dropped, and counted, when a hook or
+the Iggy server cannot keep up, so they are for observation, not the record of
+truth. And every limit is what the task declares: the library never measures
+the GPU, so an under-declared request can still exhaust it.
 
 ## Why one library
 

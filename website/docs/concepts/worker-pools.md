@@ -125,8 +125,8 @@ scheduler, and hand results back through a channel.
 
 ### Planned
 
-- `cr-53-wasm-parity`: the WASM pool follows the dispatcher changes that are
-  still planned (skip-ahead, per-resource admission, lifecycle events).
+- `cr-53-wasm-parity`: lifecycle events from the WASM pool. It already
+  shares the dispatcher's skip-ahead and per-resource admission.
 
 ## Sources
 

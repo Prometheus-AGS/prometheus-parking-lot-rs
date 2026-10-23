@@ -23,8 +23,7 @@ records what has shipped.
 
 ## How this documentation is built
 
-The site is delivered in three OpenSpec changes. Sections that are not written
-yet are placeholders and say so at the top of the page.
+The site was delivered in three OpenSpec changes.
 
 ```mermaid
 flowchart LR
@@ -36,7 +35,7 @@ flowchart LR
 | --- | --- | --- |
 | Site, theme, search and verification | `cr-45-docs-site` | Merged |
 | [Concepts](./concepts/index.md) | `cr-46-docs-theory` | Merged |
-| [Guides](./guides/index.md) | `cr-47-docs-guides` | Placeholder |
+| [Guides](./guides/index.md) | `cr-47-docs-guides` | Written |
 
 ## Concepts
 
@@ -54,5 +53,20 @@ sources, and say which parts exist on `main` and which are planned:
 - [Event logs](./concepts/event-logs.md): events and notifications.
 - [Agentic value](./concepts/agentic-value.md): why agent workloads need all
   of the above together.
+
+## Guides
+
+The [guides](./guides/index.md) show the library working, one deployment per
+page, each backed by an example program that CI builds and runs:
+[GPU inference pool](./guides/gpu-inference-pool.md),
+[Tauri local LLM](./guides/tauri-local-llm.md),
+[Cloud multi-tenant Postgres](./guides/cloud-postgres.md),
+[Disconnected clients](./guides/disconnected-clients.md),
+[Shutdown and requeue](./guides/shutdown-and-requeue.md),
+[Iggy events](./guides/iggy-events.md) and
+[Streaming replay](./guides/streaming-replay.md). Reference pages cover
+[configuration](./guides/configuration.md),
+[upgrading from 0.2](./guides/upgrading.md) and the
+[API reference](./guides/api-reference.md).
 
 To build or check the site itself, see [Working on this site](./contributing/docs-site.md).
