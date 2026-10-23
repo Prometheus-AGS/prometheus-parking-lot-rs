@@ -284,6 +284,19 @@ where
             Self::Redb(pool) => pool.shutdown(),
         }
     }
+
+    /// Shut down under `policy`; see [`DurableResourcePool::shutdown_with`].
+    pub async fn shutdown_with(
+        &self,
+        policy: crate::core::shutdown::ShutdownPolicy,
+    ) -> crate::core::shutdown::ShutdownReport {
+        match self {
+            #[cfg(feature = "postgres")]
+            Self::Postgres(pool) => pool.shutdown_with(policy).await,
+            #[cfg(feature = "embedded")]
+            Self::Redb(pool) => pool.shutdown_with(policy).await,
+        }
+    }
 }
 
 /// Everything a [`SchedulerConfig`] describes, built.
