@@ -42,6 +42,7 @@
 //! | cost exceeds the pool's total capacity | `Dropped(reason)` | dead-letter |
 //! | delivery still failing after retries | nothing | nack (requeue) |
 //! | pool shut down before the task started | nothing | nack (requeue) |
+//! | cancelled by `shutdown_with` while running | nothing | nack (requeue) |
 //! | process killed at any point | nothing new | expires, redelivered |
 //!
 //! Failures are final, as in the in-memory pool (no automatic retry); they are
@@ -79,6 +80,19 @@
 //! then fails with `LeaseLost` and the entry's current holder resolves it.
 //! Executors with external side effects must be idempotent.
 //!
+//! # Shutdown (cr-29)
+//!
+//! [`shutdown_with`](DurableResourcePool::shutdown_with) stops leasing at
+//! once under every [`ShutdownPolicy`]: tasks never leased stay in the queue,
+//! and a leased task still waiting for capacity is handed back
+//! (`nack(Requeue)`). Running tasks finish within the drain deadline; under
+//! `DrainThenCancel` and `CancelImmediately` the ones still running then are
+//! cancelled (the executor future is dropped), their heartbeat stops and they
+//! are handed back too, so the next pool started on the queue runs them. The
+//! queue is the capture: the durable pool does not use a `CancellationSink`.
+//! A cancelled execution may have had side effects before it was dropped, so
+//! a requeued task can run twice (see the section above).
+//!
 //! # Ordering difference from the in-memory pool
 //!
 //! At most one leased task waits for capacity at a time. A task enqueued at a
@@ -100,8 +114,11 @@ use prometheus_parking_lot_core::{
     TaskMetadata, TaskPayload, TaskStatus, now_ms,
 };
 use tokio::sync::{Notify, oneshot};
+use tokio_util::sync::CancellationToken;
 
 use crate::contain::contain;
+use crate::ledger::{Held, Ledger};
+use crate::shutdown::{ShutdownPolicy, ShutdownReport};
 
 pub use self::options::DurableOptions;
 
@@ -109,6 +126,9 @@ pub use self::options::DurableOptions;
 const ATTEMPTS: u32 = 5;
 /// Delay after the first failed attempt; doubles after each further one.
 const FIRST_BACKOFF: Duration = Duration::from_millis(100);
+/// How long `shutdown_with` waits, after cancelling running tasks, for them
+/// to be handed back (a nack retries for about 1.5 s before giving up).
+const CANCEL_GRACE: Duration = Duration::from_secs(5);
 
 /// A resource pool whose accepted tasks and results live in a durable
 /// [`LeaseQueue`] and [`ResultMailbox`]; see the module documentation for the
@@ -135,6 +155,12 @@ struct Inner<P, T, Q, M, E, S> {
     /// Wakes the dispatcher: a submission, freed capacity, or shutdown.
     wake: Notify,
     shutdown: AtomicBool,
+    /// Fired by `shutdown_with` at the drain deadline (policies that cancel
+    /// stragglers): running tasks stop and are handed back to the queue.
+    cancel: CancellationToken,
+    /// Leased tasks held by this process (and the dispatcher while it runs),
+    /// until resolved; how cancellations ended.
+    ledger: Arc<Ledger>,
     completed: AtomicU64,
     failed: AtomicU64,
     _results: PhantomData<fn() -> T>,
@@ -146,6 +172,8 @@ struct LeasedItem<P> {
     token: LeaseToken,
     attempt: u32,
     heartbeat: Heartbeat,
+    /// Counts the task in the ledger until it is resolved; dropped last.
+    held: Held,
 }
 
 impl<P> Parkable for LeasedItem<P> {
@@ -229,11 +257,18 @@ where
             spawner,
             wake: Notify::new(),
             shutdown: AtomicBool::new(false),
+            cancel: CancellationToken::new(),
+            ledger: Arc::new(Ledger::default()),
             completed: AtomicU64::new(0),
             failed: AtomicU64::new(0),
             _results: PhantomData,
         });
-        inner.spawner.spawn(Arc::clone(&inner).dispatch());
+        // The dispatcher counts as in flight until it has stopped and handed
+        // back what it held, so `shutdown_with` waits for it.
+        let dispatching = Held::new(&inner.ledger);
+        inner
+            .spawner
+            .spawn(Arc::clone(&inner).dispatch(dispatching));
         Ok(Self { inner })
     }
 
@@ -289,6 +324,51 @@ where
         inner.wake.notify_one();
         Ok(TaskStatus::Queued)
     }
+
+    /// Shut the pool down under `policy` and report what happened to the
+    /// tasks this process held.
+    ///
+    /// Leasing stops at once and the leased task waiting for capacity, if
+    /// any, is handed back (`nack(Requeue)`); tasks never leased stay in the
+    /// queue and are not counted. Running tasks finish, deliver and resolve
+    /// their leases until the policy's drain deadline; the call returns as
+    /// soon as nothing is held. Under `DrainThenCancel` and
+    /// `CancelImmediately`, tasks still running at the deadline are cancelled
+    /// and handed back, and the call waits up to 5 s more for that. Every
+    /// handed-back task is in the report's `requeued` (also when the nack
+    /// failed and the lease is left to expire, which redelivers it the same
+    /// way); the next pool started on the queue runs it.
+    ///
+    /// Under `Drain`, a task still running at the deadline keeps running,
+    /// heartbeat included, and resolves its lease when it finishes; it is
+    /// counted as `unsettled`.
+    pub async fn shutdown_with(&self, policy: ShutdownPolicy) -> ShutdownReport {
+        let inner = &self.inner;
+        let ledger = &inner.ledger;
+        let since = ledger.tally();
+        inner.request_shutdown();
+        tracing::info!(
+            pool = inner.options.name(),
+            ?policy,
+            "shutting down durable pool"
+        );
+        let drained = ledger
+            .wait_until(policy.drain_deadline(), |ledger| ledger.in_flight() == 0)
+            .await;
+        if !drained && policy.cancels_stragglers() {
+            inner.cancel.cancel();
+            ledger
+                .wait_until(CANCEL_GRACE, |ledger| ledger.in_flight() == 0)
+                .await;
+        }
+        let report = ledger.report(since);
+        tracing::info!(
+            pool = inner.options.name(),
+            ?report,
+            "durable pool shut down"
+        );
+        report
+    }
 }
 
 impl<P, T, Q, M, E, S> DurableResourcePool<P, T, Q, M, E, S> {
@@ -338,10 +418,11 @@ impl<P, T, Q, M, E, S> DurableResourcePool<P, T, Q, M, E, S> {
         self.inner.failed.load(Ordering::Relaxed)
     }
 
-    /// Stop leasing. Later submissions fail with
-    /// [`SchedulerError::PoolShutdown`]; running tasks finish and resolve their
-    /// leases; a leased task still waiting for capacity is handed back to the
-    /// queue (nack, requeue). Draining policy is cr-29.
+    /// Stop leasing, without waiting. Later submissions fail with
+    /// [`SchedulerError::PoolShutdown`]; running tasks finish and resolve
+    /// their leases; a leased task still waiting for capacity is handed back
+    /// to the queue (nack, requeue). To bound the drain and report on it, use
+    /// [`shutdown_with`](Self::shutdown_with).
     pub fn shutdown(&self) {
         self.inner.request_shutdown();
     }
@@ -382,7 +463,7 @@ where
     /// event that lands between the check and the `notified().await` makes
     /// that await return at once. Work from other processes and expired
     /// leases have no notification; the poll interval bounds their latency.
-    async fn dispatch(self: Arc<Self>) {
+    async fn dispatch(self: Arc<Self>, dispatching: Held) {
         let lease_for = self.options.lease_duration();
         let poll_every = self.options.poll_interval();
         loop {
@@ -411,6 +492,7 @@ where
         }
         self.hand_back_waiting().await;
         tracing::debug!(pool = self.options.name(), "durable dispatcher stopped");
+        drop(dispatching);
     }
 
     /// Room to lease another task: nothing leased is waiting for capacity, and
@@ -432,11 +514,20 @@ where
         } = leased;
         tracing::debug!(task_id = task.meta.id, entry = %token.entry(), attempt, "leased");
         let item = LeasedItem {
+            held: Held::new(&self.ledger),
             heartbeat: self.start_heartbeat(token),
             task,
             token,
             attempt,
         };
+        // Leased while the pool was shutting down: give it straight back.
+        // Acquire: pairs with `request_shutdown`.
+        if self.shutdown.load(Ordering::Acquire) {
+            let inner = Arc::clone(self);
+            self.spawner
+                .spawn(async move { inner.hand_back(item).await });
+            return;
+        }
         let now = now_ms();
         if item.task.ticket().is_expired(now) {
             self.settle_unrun(
@@ -501,37 +592,61 @@ where
     }
 
     /// Execute under the budget, free the units, then deliver and resolve.
+    ///
+    /// A task started after the cancel phase began is handed back without
+    /// running; a running one is raced against the cancel token and handed
+    /// back when it fires.
     async fn run(self: Arc<Self>, item: LeasedItem<P>, permit: Permit) {
         let LeasedItem {
             task,
             token,
             attempt,
             heartbeat,
+            held,
         } = item;
         let ScheduledTask { meta, payload } = task;
         let task_id = meta.id;
+        if self.cancel.is_cancelled() {
+            self.release(permit);
+            self.requeue(task_id, token, heartbeat).await;
+            drop(held);
+            return;
+        }
         let mailbox = meta.mailbox.clone();
         let idempotency_key = self.idempotency_key(&meta, token);
         let budget = self.budget(&meta);
         tracing::debug!(task_id, attempt, ?budget, "executing durable task");
 
         let executor = &self.executor;
-        let contained =
-            contain(
-                async move { tokio::time::timeout(budget, executor.execute(payload, meta)).await },
-            )
-            .await;
+        let cancel = &self.cancel;
+        let contained = contain(async move {
+            tokio::select! {
+                biased;
+                () = cancel.cancelled() => None,
+                ran = tokio::time::timeout(budget, executor.execute(payload, meta)) => Some(ran),
+            }
+        })
+        .await;
         let outcome = match contained {
-            Ok(Ok(outcome)) => outcome,
-            Ok(Err(_elapsed)) => Err(TaskError::Timeout { budget }),
+            Ok(None) => {
+                tracing::warn!(
+                    task_id,
+                    "running durable task cancelled at shutdown; handing it back"
+                );
+                self.release(permit);
+                self.requeue(task_id, token, heartbeat).await;
+                drop(held);
+                return;
+            }
+            Ok(Some(Ok(outcome))) => outcome,
+            Ok(Some(Err(_elapsed))) => Err(TaskError::Timeout { budget }),
             Err(panicked) => Err(TaskError::from(panicked)),
         };
 
         // The units are free once the executor is done; deliver and ack are
         // storage IO and do not hold capacity.
-        let woken = self.dispatcher.complete(permit, now_ms());
-        self.launch(woken);
-        self.wake.notify_one();
+        self.release(permit);
+        self.count_finished();
 
         let (status, payload, resolution) = match outcome {
             Ok(value) => {
@@ -559,6 +674,20 @@ where
             resolution,
         };
         self.settle(settlement, token, heartbeat).await;
+        drop(held);
+    }
+
+    /// Return a permit and start what the freed units admit.
+    fn release(self: &Arc<Self>, permit: Permit) {
+        let woken = self.dispatcher.complete(permit, now_ms());
+        self.launch(woken);
+        self.wake.notify_one();
+    }
+
+    /// Count an execution (or a task that can never run) that reached its
+    /// own outcome.
+    fn count_finished(&self) {
+        self.ledger.finish(1);
     }
 
     /// Settle a leased task that never ran (expired, or too large for the
@@ -568,9 +697,11 @@ where
             task,
             token,
             heartbeat,
+            held,
             ..
         } = item;
         self.failed.fetch_add(1, Ordering::Relaxed);
+        self.count_finished();
         tracing::warn!(task_id = task.meta.id, reason, "durable task cannot run");
         let settlement = Settlement {
             task_id: task.meta.id,
@@ -581,8 +712,10 @@ where
             resolution: Resolution::DeadLetter(reason.to_owned()),
         };
         let inner = Arc::clone(self);
-        self.spawner
-            .spawn(async move { inner.settle(settlement, token, heartbeat).await });
+        self.spawner.spawn(async move {
+            inner.settle(settlement, token, heartbeat).await;
+            drop(held);
+        });
     }
 
     /// Deliver, then resolve the lease. The ordering is the durability
@@ -741,14 +874,54 @@ where
     /// capacity, so another consumer can take it at once.
     async fn hand_back_waiting(&self) {
         for item in self.dispatcher.take_parked() {
-            let LeasedItem {
-                token, heartbeat, ..
-            } = item;
-            drop(heartbeat);
-            if let Err(error) = self.queue.nack(token, NackAction::requeue()).await {
-                tracing::warn!(entry = %token.entry(), %error, "nack at shutdown failed; the lease will expire instead");
+            self.hand_back(item).await;
+        }
+    }
+
+    /// Give a leased task that will not run here back to the queue.
+    async fn hand_back(&self, item: LeasedItem<P>) {
+        let LeasedItem {
+            task,
+            token,
+            heartbeat,
+            held,
+            ..
+        } = item;
+        self.requeue(task.meta.id, token, heartbeat).await;
+        drop(held);
+    }
+
+    /// Stop the heartbeat, then `nack(Requeue)` the lease, retrying a backend
+    /// failure. Counted as requeued in every case: a lost lease is already
+    /// back in the queue (or held by its new consumer), and a nack that keeps
+    /// failing leaves the lease to expire, which redelivers it the same way.
+    async fn requeue(&self, task_id: TaskId, token: LeaseToken, heartbeat: Heartbeat) {
+        drop(heartbeat);
+        let mut backoff = FIRST_BACKOFF;
+        for attempt in 1..=ATTEMPTS {
+            match self.queue.nack(token, NackAction::requeue()).await {
+                Ok(()) => break,
+                Err(SchedulerError::LeaseLost { entry }) => {
+                    tracing::info!(
+                        task_id,
+                        entry,
+                        "lease already lost when handing the task back"
+                    );
+                    break;
+                }
+                Err(error) if attempt < ATTEMPTS => {
+                    tracing::warn!(task_id, attempt, %error, "nack failed; retrying");
+                    tokio::time::sleep(backoff).await;
+                    backoff *= 2;
+                }
+                Err(error) => tracing::warn!(
+                    task_id,
+                    %error,
+                    "nack failed; the lease will expire and the task will be redelivered"
+                ),
             }
         }
+        self.ledger.requeued();
     }
 
     /// The delivery's idempotency key: the caller's key, or one derived from

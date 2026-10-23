@@ -1,22 +1,38 @@
-//! Cancellation capture and replay infrastructure (CR-14).
+//! Cancellation capture and replay infrastructure (CR-14, wired into the
+//! pools by cr-29).
 //!
-//! When a task is cancelled (shutdown straggler, deadline expiry, signal), the
-//! pool captures the task's owned context and hands it to the caller via the
-//! [`CancellationSink`] trait — off the teardown hot path and under a bounded
-//! per-call deadline so it can never hang the application.
+//! When an in-memory pool (`ResourcePool`, the native `WorkerPool`) cancels a
+//! task at shutdown — a queued task left at the drain deadline, or a running
+//! straggler — it captures the task's owned context and hands it to the
+//! caller via the [`CancellationSink`] trait, under a bounded per-call
+//! deadline ([`CancellationConfig::delta`]) so it can never hang the
+//! application. Register a sink with the pool's `with_cancellation_sink`;
+//! without one, the pool uses a [`LoggingCancellationSink`]. The durable pool
+//! does not use a sink: its queue is the capture, and cancelled tasks are
+//! handed back to it (`nack`, requeue). See `crate::shutdown` for the policy
+//! table.
 //!
 //! ## Design: three-layer DLQ pattern
 //!
 //! 1. **Capture** — [`CancelledTask<P>`] bundles the owned payload, metadata,
 //!    reason, and attempt count so the caller can reconstruct/replay the work.
-//! 2. **Bounded handoff** — the pool `try_send`s to a bounded mpsc channel; a
-//!    dedicated drain task calls the sink under `tokio::time::timeout(delta)`.
-//!    A full channel or an overrun falls back to the default sink (log + count).
-//! 3. **Replay routing** — `SinkOutcome::Requeue` triggers a nack on persistent
-//!    backends; `SinkOutcome::Drop` discards; `SinkOutcome::Recorded` signals the
-//!    caller has durably recorded the work for out-of-band replay.
+//! 2. **Bounded handoff** — the pools call the sink under
+//!    `tokio::time::timeout(delta)` from the shutdown path (the native
+//!    `WorkerPool` from a dedicated thread), never while holding a pool lock.
+//!    An overrun or a panic is counted as `unanswered` in the
+//!    `ShutdownReport` and logged at error level. [`CancellationChannel`] is
+//!    the standalone bounded-channel form of this handoff for callers that
+//!    capture their own cancellations.
+//! 3. **Replay routing** — `SinkOutcome::Recorded` signals the caller has
+//!    durably recorded the work for out-of-band replay; `SinkOutcome::Drop`
+//!    discards it. `SinkOutcome::Requeue` cannot be honoured by an in-memory
+//!    pool (it has no queue that outlives the shutdown); it is counted as
+//!    dropped and logged.
 //!
 //! ## Auto-requeue policy (D3)
+//!
+//! Advisory: [`CancelReason::should_auto_requeue`] for callers that replay
+//! tasks themselves. The pools do not retry cancelled tasks.
 //!
 //! | `CancelReason`      | Default action       |
 //! |---------------------|----------------------|
@@ -48,7 +64,7 @@
 //! impl CancellationSink<MyPayload> for MySink {
 //!     async fn on_cancelled(&self, task: CancelledTask<MyPayload>) -> SinkOutcome {
 //!         // Persist to DB or dead-letter store for out-of-band replay
-//!         my_db.insert_dlq(task.idempotency_key(), task.payload).await;
+//!         my_db.insert_dlq(&task.meta, task.payload).await;
 //!         SinkOutcome::Recorded
 //!     }
 //! }
@@ -59,19 +75,23 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use tokio::sync::mpsc;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 use prometheus_parking_lot_core::TaskMetadata;
+
+use crate::contain::contain;
 
 /// Why a task was cancelled.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum CancelReason {
-    /// The pool was shut down while the task was still in the queue.
-    /// Auto-requeued by default (environmental; not the task's fault).
+    /// The pool was shut down while the task was still queued: it never
+    /// started. Auto-requeued by default (environmental; not the task's
+    /// fault).
     QueueShutdown,
-    /// The pool's drain deadline elapsed while this task was still running.
-    /// Auto-requeued by default.
+    /// The pool's drain deadline elapsed while this task was still running
+    /// (also used by `ShutdownPolicy::CancelImmediately`, whose deadline is
+    /// zero). Auto-requeued by default.
     DrainTimeout,
     /// The task's own deadline expired while it was running or queued.
     /// Goes to DLQ only (the task may hang again if auto-requeued).
@@ -96,7 +116,15 @@ impl CancelReason {
 #[derive(Debug)]
 pub struct CancelledTask<P> {
     /// The task payload — owned by the caller after capture.
-    pub payload: P,
+    ///
+    /// Always present for a task that never started
+    /// ([`CancelReason::QueueShutdown`]). For a running task the executor owns
+    /// the payload, so it is present only when the pool kept a copy:
+    /// `ResourcePool` keeps a serialized snapshot of every running task's
+    /// payload while a sink is registered (`with_cancellation_sink`); the
+    /// native `WorkerPool`, whose payloads need be neither `Clone` nor
+    /// serializable, cannot, and passes `None`.
+    pub payload: Option<P>,
     /// Full task metadata including id, priority, cost, deadline, and
     /// `idempotency_key`.
     pub meta: TaskMetadata,
@@ -162,13 +190,20 @@ pub trait CancellationSink<P>: Send + Sync {
     async fn on_cancelled(&self, task: CancelledTask<P>) -> SinkOutcome;
 }
 
-/// Configuration for the cancellation handoff channel.
+/// Configuration for the cancellation handoff.
+///
+/// The pools (`with_cancellation_config`) use only `delta`; the other fields
+/// configure a [`CancellationChannel`] and the advisory retry helpers on
+/// [`CancelledTask`].
 #[derive(Debug, Clone)]
 pub struct CancellationConfig {
-    /// Capacity of the bounded mpsc channel. When full, new cancellations fall
-    /// back to the default sink immediately (never blocks).
+    /// Capacity of the bounded mpsc channel ([`CancellationChannel`] only).
+    /// When full, new cancellations fall back to the default sink immediately
+    /// (never blocks).
     pub channel_capacity: usize,
-    /// Per-call timeout for `on_cancelled`. Overruns fall back to default sink.
+    /// Per-call timeout for `on_cancelled`. A pool counts an overrun as
+    /// `unanswered` in its `ShutdownReport`; a pool's shutdown waits at most
+    /// this long (plus a second) for the sink answers of cancelled stragglers.
     pub delta: Duration,
     /// Maximum number of auto-requeue attempts per task (D4, default 3).
     pub max_attempts: u32,
@@ -203,7 +238,7 @@ impl LoggingCancellationSink {
 }
 
 #[async_trait]
-impl<P: Send + Sync + 'static + std::fmt::Debug> CancellationSink<P> for LoggingCancellationSink {
+impl<P: Send + 'static> CancellationSink<P> for LoggingCancellationSink {
     async fn on_cancelled(&self, task: CancelledTask<P>) -> SinkOutcome {
         warn!(
             pool = %self.pool,
@@ -261,8 +296,37 @@ impl<P: Send + 'static> CancellationSink<P> for RecordingCancellationSink<P> {
     }
 }
 
-/// The live cancellation handoff: a bounded sender used by the pool to push
-/// cancelled tasks off the hot path to a drain task.
+/// Offer `task` to `sink`, bounded by `delta`. `None` when the sink overran
+/// `delta` or panicked; both are logged at error level.
+pub(crate) async fn offer<P: Send + 'static>(
+    sink: &Arc<dyn CancellationSink<P>>,
+    task: CancelledTask<P>,
+    delta: Duration,
+) -> Option<SinkOutcome> {
+    let task_id = task.meta.id;
+    match tokio::time::timeout(delta, contain(sink.on_cancelled(task))).await {
+        Ok(Ok(outcome)) => Some(outcome),
+        Ok(Err(panicked)) => {
+            error!(task_id, %panicked, "cancellation sink panicked; the cancelled task is not recorded");
+            None
+        }
+        Err(_) => {
+            error!(
+                task_id,
+                ?delta,
+                "cancellation sink did not answer within delta; the cancelled task is not recorded"
+            );
+            None
+        }
+    }
+}
+
+/// A standalone bounded handoff to a sink, for callers that capture their own
+/// cancellations.
+///
+/// A bounded sender pushes cancelled tasks off the caller's hot path to a
+/// drain task. The pools do not use it: they call the sink themselves and
+/// count every answer in their `ShutdownReport`.
 ///
 /// Created via [`CancellationChannel::new`].
 pub struct CancellationChannel<P> {
@@ -348,7 +412,7 @@ mod tests {
     #[test]
     fn cancelled_task_should_auto_requeue_respects_max_attempts() {
         let task = CancelledTask {
-            payload: "work",
+            payload: Some("work"),
             meta: make_meta(1),
             reason: CancelReason::DrainTimeout,
             attempt: 2,
@@ -361,7 +425,7 @@ mod tests {
     #[test]
     fn backoff_delay_exponential() {
         let task = CancelledTask {
-            payload: "work",
+            payload: Some("work"),
             meta: make_meta(1),
             reason: CancelReason::DrainTimeout,
             attempt: 2,
@@ -375,7 +439,7 @@ mod tests {
     async fn recording_sink_captures_task() {
         let sink = Arc::new(RecordingCancellationSink::<String>::new());
         let task = CancelledTask {
-            payload: "hello".to_string(),
+            payload: Some("hello".to_string()),
             meta: make_meta(42),
             reason: CancelReason::DrainTimeout,
             attempt: 0,
@@ -396,7 +460,7 @@ mod tests {
         );
 
         let task = CancelledTask {
-            payload: "test".to_string(),
+            payload: Some("test".to_string()),
             meta: make_meta(7),
             reason: CancelReason::QueueShutdown,
             attempt: 0,
@@ -419,7 +483,7 @@ mod tests {
         // Fill the channel
         let ch = CancellationChannel::new(sink as Arc<dyn CancellationSink<String>>, config);
         let make_task = || CancelledTask {
-            payload: "t".to_string(),
+            payload: Some("t".to_string()),
             meta: make_meta(1),
             reason: CancelReason::DrainTimeout,
             attempt: 0,

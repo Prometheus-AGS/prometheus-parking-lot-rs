@@ -149,7 +149,7 @@ jobs:
         run: >
           cargo nextest run --workspace --all-features --locked
           --run-ignored all --no-fail-fast --no-tests=fail
-          -E 'package(prometheus-parking-lot-pg) | test(config_postgres_example_builds_against_pg18) | test(pool_sigkill_)'
+          -E 'package(prometheus-parking-lot-pg) | test(config_postgres_example_builds_against_pg18) | test(pool_sigkill_) | test(shutdown_durable_pg_)'
 
   wasm:
     # cr-38 / S-14. Everything in the wasm crate is cfg(target_arch = "wasm32"), so the

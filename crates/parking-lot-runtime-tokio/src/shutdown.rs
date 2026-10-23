@@ -1,38 +1,40 @@
-//! Graceful shutdown primitives for resource-aware worker pools.
+//! Graceful shutdown for the pools (cr-29), plus the caller-pluggable
+//! shutdown signal (CR-13).
 //!
-//! ## Design: Tokio three-part model
+//! ## Policies
 //!
-//! 1. **When** — determined by the caller (Ctrl-C, SIGTERM, supervisor token, test teardown)
-//! 2. **Tell** — via a [`tokio_util::sync::CancellationToken`] propagated to every worker
-//! 3. **Wait** — via a [`tokio_util::task::TaskTracker`] that drains in-flight work
+//! Every pool has `shutdown_with(policy)`, which stops accepting work, applies
+//! a [`ShutdownPolicy`] and returns a [`ShutdownReport`]. Whatever the policy,
+//! no accepted task is silently dropped: each one reaches its own outcome, is
+//! handed to the pool's `CancellationSink` (in-memory pools) or is handed back
+//! to its durable queue (durable pool).
 //!
-//! ## Caller-pluggable shutdown (CR-13)
+//! | policy | in-memory pool: queued | in-memory pool: running | durable pool: leased, waiting for capacity | durable pool: running |
+//! |---|---|---|---|---|
+//! | `Drain { deadline }` | keeps starting as capacity frees until the deadline; the rest is then cancelled to the sink | runs to its outcome; one still running at the deadline keeps running and is reported `unsettled` | handed back at once | runs to its outcome; past the deadline it keeps running (heartbeat on) and is reported `unsettled` |
+//! | `DrainThenCancel { deadline }` (default) | as `Drain` | runs until the deadline, then is cancelled to the sink | handed back at once | runs until the deadline, then is cancelled and handed back |
+//! | `CancelImmediately` | cancelled to the sink at once | cancelled to the sink at once | handed back at once | cancelled and handed back at once |
 //!
-//! Callers supply an external `CancellationToken` when building a pool, giving them
-//! upstream ownership of *when* shutdown fires. If no token is supplied the pool creates
-//! its own and exposes a [`ShutdownHandle`] for the caller to trigger later.
+//! "Cancelled to the sink" means: the task's mailbox (or result slot) receives
+//! `TaskError::Cancelled`, and a `CancelledTask` is offered to the pool's
+//! `CancellationSink` under its `delta` bound. A durable pool's tasks that
+//! were never leased stay in the durable queue; it stops leasing at once
+//! under every policy. "Handed back" is `LeaseQueue::nack(Requeue)`: the task
+//! runs again on the next start of a pool on that queue.
 //!
-//! Shutdown *policy* — what to do with in-flight work — is a closed [`ShutdownPolicy`]
-//! enum owned by the library. Callers pick a policy; they do **not** supply a callback.
-//! Reactions to individual task cancellations are delivered via the hooks bus and the
-//! `CancellationSink` (CR-07, CR-14), not here.
+//! ## Caller-pluggable signal (CR-13)
 //!
-//! ## Example
+//! Callers decide *when* to shut down: a [`ShutdownHandle`] wraps a
+//! [`tokio_util::sync::CancellationToken`] that a Ctrl-C handler, supervisor
+//! or test can fire; [`wait_for_signal`] waits for Ctrl-C or SIGTERM. The pool
+//! applies the policy when the caller calls its `shutdown_with`:
 //!
 //! ```rust,ignore
-//! use prometheus_parking_lot::core::shutdown::{ShutdownHandle, ShutdownPolicy};
-//! use std::time::Duration;
+//! use prometheus_parking_lot::core::shutdown::{ShutdownPolicy, wait_for_signal};
 //!
-//! // Pool creates its own token; caller gets a handle to trigger later.
-//! let (pool, handle) = WorkerPool::with_shutdown_handle(config, executor)?;
-//!
-//! // Trigger graceful drain from anywhere (Ctrl-C handler, test teardown, etc.)
-//! handle.shutdown_with(ShutdownPolicy::DrainThenCancel {
-//!     deadline: Duration::from_secs(30),
-//! });
-//!
-//! // Or wire up OS signals automatically:
-//! // handle.shutdown_on_signal().await; // ctrl_c + SIGTERM
+//! wait_for_signal().await;
+//! let report = pool.shutdown_with(ShutdownPolicy::default()).await;
+//! assert_eq!(report.unanswered, 0);
 //! ```
 
 use std::time::Duration;
@@ -59,7 +61,8 @@ pub enum ShutdownPolicy {
     /// Wait for in-flight tasks up to `deadline`, then cancel any stragglers.
     ///
     /// This is the **default policy**. Cancelled stragglers are captured and
-    /// handed to the pool's `CancellationSink` for optional replay.
+    /// handed to the pool's `CancellationSink` for optional replay (durable
+    /// pool: handed back to the queue).
     DrainThenCancel {
         /// Maximum time to wait before cancelling remaining tasks.
         deadline: Duration,
@@ -72,12 +75,68 @@ pub enum ShutdownPolicy {
     CancelImmediately,
 }
 
+impl ShutdownPolicy {
+    /// How long the pool waits for accepted work to finish before it cancels
+    /// what is left (zero for [`CancelImmediately`](Self::CancelImmediately)).
+    #[must_use]
+    pub const fn drain_deadline(&self) -> Duration {
+        match self {
+            Self::Drain { deadline } | Self::DrainThenCancel { deadline } => *deadline,
+            Self::CancelImmediately => Duration::ZERO,
+        }
+    }
+
+    /// Whether tasks still running at the drain deadline are cancelled.
+    #[must_use]
+    pub const fn cancels_stragglers(&self) -> bool {
+        !matches!(self, Self::Drain { .. })
+    }
+}
+
 impl Default for ShutdownPolicy {
     fn default() -> Self {
         Self::DrainThenCancel {
             deadline: Duration::from_secs(30),
         }
     }
+}
+
+/// What a pool's `shutdown_with` did, counted from the moment it began.
+///
+/// Every task the pool had accepted and not finished when the shutdown began
+/// is in exactly one of `completed`, `cancelled` or `unsettled` (a durable
+/// pool's tasks that were never leased stay in its queue and are not counted).
+/// `cancelled` splits by what happened next:
+/// `cancelled == recorded + requeued + dropped + unanswered`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ShutdownReport {
+    /// Tasks that reached their own outcome during the shutdown: completed,
+    /// failed or expired.
+    pub completed: u64,
+    /// Tasks cancelled: queued tasks left at the drain deadline, running
+    /// stragglers, and (durable pool) leased tasks handed back.
+    pub cancelled: u64,
+    /// Cancelled tasks the sink answered [`SinkOutcome::Recorded`] for.
+    ///
+    /// [`SinkOutcome::Recorded`]: crate::SinkOutcome::Recorded
+    pub recorded: u64,
+    /// Cancelled tasks handed back to the durable queue (`nack(Requeue)`);
+    /// they run again on the next start of a pool on that queue. Always zero
+    /// for the in-memory pools, which have no queue that outlives them.
+    pub requeued: u64,
+    /// Cancelled tasks the sink answered `Drop` for — including the default
+    /// sink, which logs them — or `Requeue`, which an in-memory pool cannot
+    /// honour (logged at warn level).
+    pub dropped: u64,
+    /// Cancelled tasks whose sink did not answer within
+    /// `CancellationConfig::delta`, or panicked (logged at error level).
+    pub unanswered: u64,
+    /// Accepted tasks still not settled when `shutdown_with` returned: a task
+    /// still running after a `Drain` deadline, an executor that ignored
+    /// cancellation by never yielding, or a sink still being called. They are
+    /// not dropped: each still reaches its outcome or its sink later.
+    pub unsettled: u64,
 }
 
 /// A handle to a worker pool's shutdown mechanism.
@@ -91,7 +150,6 @@ pub struct ShutdownHandle {
 
 impl ShutdownHandle {
     /// Create a new handle wrapping a cancellation token.
-    /// Create a new handle wrapping a cancellation token.
     #[must_use]
     pub const fn new(token: CancellationToken) -> Self {
         Self { token }
@@ -103,21 +161,18 @@ impl ShutdownHandle {
         &self.token
     }
 
-    /// Trigger shutdown with the given policy.
+    /// Fire the shutdown signal.
     ///
-    /// For `Drain` and `DrainThenCancel`, this signals workers to stop
-    /// accepting new tasks; in-flight work continues until the deadline.
-    /// For `CancelImmediately`, all in-flight work is cancelled at once.
-    ///
-    /// This method is non-blocking; it fires the cancellation signal and
-    /// returns immediately. Use [`ShutdownHandle::shutdown_on_signal`] to
-    /// block until the pool is fully drained.
+    /// This only cancels the token, so whoever waits on it learns that
+    /// shutdown was requested; it does not touch a pool. The policy is
+    /// applied by the pool's own `shutdown_with(policy)`, which the waiter
+    /// calls (see the module docs).
     pub fn shutdown_with(&self, _policy: ShutdownPolicy) {
         self.token.cancel();
     }
 
-    /// Block the current thread until a Ctrl-C or SIGTERM is received, then
-    /// trigger shutdown with the given policy.
+    /// Wait until a Ctrl-C or SIGTERM is received, then fire the shutdown
+    /// signal ([`shutdown_with`](Self::shutdown_with)).
     ///
     /// This is the recommended way to wire graceful shutdown in a binary's
     /// `main()` function or integration tests.
@@ -168,6 +223,16 @@ mod tests {
     fn shutdown_policy_default_is_drain_then_cancel() {
         let p = ShutdownPolicy::default();
         assert!(matches!(p, ShutdownPolicy::DrainThenCancel { .. }));
+        assert!(p.cancels_stragglers());
+        assert_eq!(p.drain_deadline(), Duration::from_secs(30));
+        let drain = ShutdownPolicy::Drain {
+            deadline: Duration::from_secs(1),
+        };
+        assert!(!drain.cancels_stragglers());
+        assert_eq!(
+            ShutdownPolicy::CancelImmediately.drain_deadline(),
+            Duration::ZERO
+        );
     }
 
     #[tokio::test]
