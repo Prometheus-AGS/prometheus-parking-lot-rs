@@ -12,10 +12,10 @@ use crate::core::{
 use crate::infra::{InMemoryMailbox, InMemoryQueue};
 use crate::util::MailboxKey;
 
-#[cfg(feature = "postgres")]
-use super::backends::PostgresBackend;
 #[cfg(feature = "embedded")]
 use super::backends::RedbBackend;
+#[cfg(feature = "postgres")]
+use super::backends::{PgmqBackend, PostgresBackend};
 #[cfg(any(feature = "postgres", feature = "embedded"))]
 use crate::core::{MailboxEntry, ResultMailbox, ScheduledTask};
 #[cfg(feature = "embedded")]
@@ -315,6 +315,9 @@ where
     /// One entry per `"type": "postgres"` backend section, by name.
     #[cfg(feature = "postgres")]
     pub postgres: BTreeMap<String, PostgresBackend<P, T>>,
+    /// One entry per `"type": "pgmq"` backend section, by name.
+    #[cfg(feature = "postgres")]
+    pub pgmq: BTreeMap<String, PgmqBackend<P>>,
     /// One entry per `"type": "redb"` backend section, by name.
     #[cfg(feature = "embedded")]
     pub redb: BTreeMap<String, RedbBackend<P, T>>,
@@ -326,8 +329,9 @@ where
 /// The configuration is validated first; nothing is opened for an invalid
 /// one. Then each backend section is opened (Postgres: connect, migrate when
 /// `migrate` is set, open the queue, its listener when `listen` is set, and
-/// the result mailbox; redb: open or create the file and its queue and
-/// mailbox), and each pool section is built, in name order, calling
+/// the result mailbox; pgmq: connect, open the queue, prepare it when
+/// `prepare` is set and open its listener when `listen` is set; redb: open or
+/// create the file and its queue and mailbox), and each pool section is built, in name order, calling
 /// `executor_factory` once per pool:
 ///
 /// - a pool whose `queue` and `mailbox` are `"in_memory"` becomes a
@@ -444,6 +448,8 @@ where
     let Opened {
         #[cfg(feature = "postgres")]
         postgres,
+        #[cfg(feature = "postgres")]
+        pgmq,
         #[cfg(feature = "embedded")]
         redb,
         ..
@@ -454,6 +460,8 @@ where
         durable_pools,
         #[cfg(feature = "postgres")]
         postgres,
+        #[cfg(feature = "postgres")]
+        pgmq,
         #[cfg(feature = "embedded")]
         redb,
     })
@@ -463,6 +471,8 @@ where
 struct Opened<P, T> {
     #[cfg(feature = "postgres")]
     postgres: BTreeMap<String, PostgresBackend<P, T>>,
+    #[cfg(feature = "postgres")]
+    pgmq: BTreeMap<String, PgmqBackend<P>>,
     #[cfg(feature = "embedded")]
     redb: BTreeMap<String, RedbBackend<P, T>>,
     _types: std::marker::PhantomData<fn() -> (P, T)>,
@@ -492,6 +502,8 @@ where
     let mut opened = Opened {
         #[cfg(feature = "postgres")]
         postgres: BTreeMap::new(),
+        #[cfg(feature = "postgres")]
+        pgmq: BTreeMap::new(),
         #[cfg(feature = "embedded")]
         redb: BTreeMap::new(),
         _types: std::marker::PhantomData,
@@ -503,6 +515,13 @@ where
                 opened.postgres.insert(
                     name.clone(),
                     super::backends::open_postgres(name, section).await?,
+                );
+            }
+            #[cfg(feature = "postgres")]
+            crate::config::BackendConfig::Pgmq(section) => {
+                opened.pgmq.insert(
+                    name.clone(),
+                    super::backends::open_pgmq(name, section).await?,
                 );
             }
             #[cfg(feature = "embedded")]
@@ -586,6 +605,11 @@ where
                     options,
                 )?))
             }
+            // `validate` rejects a pool on a backend that cannot drive one.
+            other if !other.can_drive_pool() => Err(SchedulerError::invalid_config(format!(
+                "pools.{name}.queue: backend `{backend}` of type `{}` cannot drive a pool",
+                other.kind()
+            ))),
             #[allow(
                 unreachable_patterns,
                 reason = "reachable only when a backend's feature is off"

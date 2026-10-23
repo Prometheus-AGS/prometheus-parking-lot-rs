@@ -8,10 +8,10 @@
 pub mod backends;
 pub mod pool_builder;
 
-#[cfg(feature = "postgres")]
-pub use backends::PostgresBackend;
 #[cfg(feature = "embedded")]
 pub use backends::RedbBackend;
+#[cfg(feature = "postgres")]
+pub use backends::{PgmqBackend, PostgresBackend};
 #[cfg(any(feature = "postgres", feature = "embedded"))]
 pub use pool_builder::ConfiguredDurablePool;
 pub use pool_builder::{
