@@ -142,7 +142,9 @@ fn rejection_reason(error: &SchedulerError) -> RejectionReason {
         SchedulerError::QueueFull { .. } => RejectionReason::QueueFull,
         SchedulerError::DeadlineExpired { .. } => RejectionReason::DeadlineExpired,
         SchedulerError::PoolShutdown { .. } => RejectionReason::PoolShutdown,
-        SchedulerError::CapacityExceeded { .. } => RejectionReason::CapacityExceeded,
+        SchedulerError::CapacityExceeded { kind, .. } => {
+            RejectionReason::CapacityExceeded { kind: *kind }
+        }
         other => RejectionReason::Custom(other.to_string()),
     }
 }

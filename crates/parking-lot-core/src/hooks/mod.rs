@@ -31,12 +31,25 @@
 //! task redelivered from its queue starts at `Queued`/`Started`: its
 //! `Submitted` was emitted by the process that accepted it.
 //!
+//! One exception to "exactly one terminal event": a parked task removed by
+//! `ResourcePool::prune_expired` (`Dispatcher::prune_expired`) emits *no*
+//! terminal event, because the `TaskQueue` contract does not return the ids
+//! of the tasks it prunes. Changing that contract is tracked for 0.4.0 in
+//! issue #57. A parked task whose deadline passes and that the drain finds
+//! at the head is reported as `Expired` as usual.
+//!
 //! ## Delivery and zero cost when empty
 //!
 //! See [`bus`]: events are queued without blocking and delivered in order on
 //! the bus's own thread, so a slow or panicking hook never stalls dispatch.
 //! With no hook registered, emission is one atomic load and a branch; no
 //! event is built.
+//!
+//! **Not on `wasm32`.** That target has no threads, so the bus calls every
+//! hook inline, on the emitting call: a slow hook stalls the pool, `Queued`
+//! is delivered while the pool holds its dispatch lock (a hook must not call
+//! back into the pool there), and since `wasm32-unknown-unknown` builds abort
+//! on panic, a panicking hook aborts the module rather than being contained.
 //!
 //! ## `AuditSink` backward-compatibility
 //!
@@ -68,6 +81,7 @@
 //! bus.register(std::sync::Arc::new(MetricsHook));
 //! ```
 
+use crate::contracts::ResourceKind;
 use crate::contracts::clock::now_ms;
 
 pub mod audit;
@@ -85,9 +99,15 @@ pub enum RejectionReason {
     DeadlineExpired,
     /// The pool has been shut down.
     PoolShutdown,
-    /// The task costs more units than the pool has in total, so it could
-    /// never start.
-    CapacityExceeded,
+    /// The task needs more units than the pool's limit in some dimension, so
+    /// it could never start: the pool's total units (`kind` is `None`), or
+    /// the limit of the resource kind `kind` (cr-23). The dimension is the
+    /// one `SchedulerError::CapacityExceeded` names.
+    CapacityExceeded {
+        /// The limited kind the task exceeded, or `None` for the pool's
+        /// total.
+        kind: Option<ResourceKind>,
+    },
     /// A custom reason provided by a policy implementation.
     Custom(String),
 }
@@ -314,6 +334,11 @@ impl LifecycleEvent {
 /// scheduling path, one event at a time in emission order. It may block (a
 /// slow hook makes the bus drop events once its queue is full, never stalls
 /// the pool) and a panic is contained and counted.
+///
+/// On `wasm32` none of that holds: there is no delivery thread, so
+/// `on_event` runs inline on the pool's scheduling path (for `Queued`, under
+/// its dispatch lock, so it must not call back into the pool), a slow hook
+/// stalls the pool, and a panic aborts the module. See the [`bus`] docs.
 pub trait Hook: Send + Sync {
     /// Called for each emitted [`LifecycleEvent`], in emission order.
     fn on_event(&self, event: &LifecycleEvent);
