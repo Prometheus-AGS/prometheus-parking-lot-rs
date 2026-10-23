@@ -129,6 +129,18 @@ entry names the OpenSpec change that made it.
   starts and has pgmq. These are
   test and development images, not part of the published crates.
 
+- **Postgres lease queue (cr-26).** `prometheus-parking-lot-pg::PgLeaseQueue` is
+  an async `LeaseQueue` on raw sqlx 0.9 with no ORM and no `block_on`. It leases
+  with `FOR UPDATE SKIP LOCKED` in priority-then-FIFO order, fences leases with
+  the attempt count (a stale token gets `LeaseLost`), supports nack with delay,
+  dead-lettering and `with_max_attempts`, keeps idempotency keys first-write-wins,
+  and wakes idle dispatchers through LISTEN/NOTIFY (`PgLeaseQueue::listener()`,
+  `QueueListener`). `reap_expired` and `spawn_reaper` return expired leases.
+  Migration `004_lease_queue.sql` adds the `pl_lease_queue` table, and
+  `migrate(pool)` applies it. No pool uses it yet (durable dispatch is cr-49).
+- The pg crate's direct sqlx dependency is now 0.9; sea-orm keeps sqlx 0.8 until
+  the Postgres mailbox moves off it (cr-27).
+
 - **Crash-safe embedded queue and mailbox (cr-28, ADR 0004).** With the
   `embedded` feature, `EmbeddedStore::open(path)` opens one redb database file;
   `store.lease_queue::<P>(max_depth)` returns a `RedbLeaseQueue` and
@@ -176,9 +188,10 @@ entry names the OpenSpec change that made it.
 
 ### Known limitations
 
-- The Postgres queue still removes a task when it dequeues it (at-most-once)
-  and bridges async calls with `block_on`; the leasing Postgres backends are
-  cr-26 and cr-27.
+- The synchronous Postgres `TaskQueue` and `Mailbox` still remove a task when
+  it is dequeued (at-most-once) and bridge async calls with `block_on`. The
+  leasing `PgLeaseQueue` (cr-26) replaces the queue once the pools use it
+  (cr-49); the Postgres mailbox moves in cr-27.
 
 ## [0.2.0]
 
