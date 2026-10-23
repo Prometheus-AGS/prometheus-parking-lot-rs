@@ -137,6 +137,10 @@ entry names the OpenSpec change that made it.
 
 ### Added
 
+- **Dependency and semver gates (cr-39).** CI job `udeps` (cargo-shear and
+  cargo-udeps, native and wasm32) fails on unused dependencies; job `semver`
+  runs cargo-semver-checks against the newest `v*.*.*` release tag and is
+  inactive until the first one (`v0.3.0`) exists.
 - **Skip-ahead bin-packing with a starvation guard (cr-20, scenario S-20).**
   When the head of the parked queue does not fit the free units, the
   dispatcher starts the first parked task, in priority-then-FIFO order, that
@@ -419,6 +423,15 @@ entry names the OpenSpec change that made it.
   removed; the redb backends replace them. They were not crash-safe, and their
   files are not migrated. `examples/yaque_pool.rs` is now
   `examples/embedded_pool.rs`.
+- **Unused dependencies (cr-39).** Dropped from the manifests: the `chrono` and
+  `testcontainers-modules` entries of `[workspace.dependencies]` (no member used
+  them) and the `tracing-subscriber`
+  dev-dependency of `prometheus-parking-lot-runtime-tokio`. Build-only: no public
+  API or feature changes. `Cargo.lock` shrinks from 518 to 507 packages.
+- **Duplicate `reqwest` and `flume` (cr-39).** The runtime crate's test-only
+  `reqwest` (0.12) and `flume` (0.11) move to 0.13 and 0.12, the versions the
+  Iggy client already builds. This removes `native-tls`, `openssl-sys` and
+  `hyper-tls` from the lockfile.
 
 ### Fixed
 

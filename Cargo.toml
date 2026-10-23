@@ -36,7 +36,6 @@ prometheus-parking-lot-wasm = { path = "crates/parking-lot-wasm", version = "0.2
 # Third-party version requirements are pinned once, here; crates add features.
 anyhow = "1"
 async-trait = "0.1"
-chrono = "0.4"
 crossbeam-channel = "0.5"
 num_cpus = "1.16"
 parking_lot = "0.12"
@@ -67,15 +66,14 @@ uniffi = { version = "0.32", default-features = false }
 
 # Test and benchmark tooling.
 criterion = "0.8.1"
-flume = "0.11"
+flume = "0.12"
 futures = "0.3"
 loom = "0.7"
 proptest = "1"
-reqwest = "0.12"
+reqwest = "0.13"
 tempfile = "3.14"
 wasm-bindgen-test = "0.3"
 testcontainers = "0.28"
-testcontainers-modules = "0.11"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
