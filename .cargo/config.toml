@@ -12,5 +12,14 @@ ck-pg = "check --workspace --all-targets --locked --features postgres"
 lint-pg = "clippy --workspace --all-targets --locked --features postgres -- -D warnings"
 t-pg = "nextest run --workspace --locked --features postgres"
 
+# `cargo test --target wasm32-unknown-unknown` runs the wasm-bindgen-test suites
+# (crates/parking-lot-wasm/tests) in Node.js through the runner from
+# wasm-bindgen-cli, which must be the version of `wasm-bindgen` in Cargo.lock.
+wasm = "test --locked --target wasm32-unknown-unknown -p prometheus-parking-lot-wasm"
+wasm-ck = "check --locked --target wasm32-unknown-unknown -p prometheus-parking-lot-core -p prometheus-parking-lot-wasm --all-targets"
+
+[target.wasm32-unknown-unknown]
+runner = "wasm-bindgen-test-runner"
+
 [build]
 target-dir = "target"

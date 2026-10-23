@@ -86,6 +86,65 @@ jobs:
         timeout-minutes: 5
         run: cargo +${{ matrix.toolchain }} test --workspace --all-features --locked --doc
 
+  wasm:
+    # cr-38 / S-14. Everything in the wasm crate is cfg(target_arch = "wasm32"), so the
+    # native jobs compile nothing of it: this job is the only one that builds it. Runs
+    # on the pinned toolchain and the MSRV; lints, docs and the graph gate only on the
+    # pinned one. Tests run in Node.js through wasm-bindgen-test-runner.
+    name: Wasm (${{ matrix.toolchain }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain:
+          - "1.99.1" # pinned (rust-toolchain.toml)
+          - "1.95"   # MSRV (workspace.package.rust-version)
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          targets: wasm32-unknown-unknown
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: wasm-${{ matrix.toolchain }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Check the core and wasm crates for wasm32-unknown-unknown
+        run: cargo +${{ matrix.toolchain }} check --locked --target wasm32-unknown-unknown -p prometheus-parking-lot-core -p prometheus-parking-lot-wasm --all-targets
+      - name: Core and wasm dependency graph (no tokio, sqlx, sea-orm, redb, reqwest)
+        if: matrix.toolchain == env.PINNED_TOOLCHAIN
+        run: .github/scripts/check-wasm-graph.sh
+      - name: Clippy (wasm32)
+        if: matrix.toolchain == env.PINNED_TOOLCHAIN
+        # TODO(handoff cr-38 H3): drop the -A once core's default_worker_count carries a
+        # wasm32-only `expect(clippy::missing_const_for_fn)`; core is linted on this target too.
+        run: cargo clippy --locked --target wasm32-unknown-unknown -p prometheus-parking-lot-wasm --all-targets --all-features -- -D warnings -A clippy::missing_const_for_fn
+      - name: Docs (wasm32)
+        if: matrix.toolchain == env.PINNED_TOOLCHAIN
+        run: cargo doc --locked --no-deps --target wasm32-unknown-unknown -p prometheus-parking-lot-wasm
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      # The runner must be the same version as the wasm-bindgen crate in Cargo.lock, or
+      # the test binary is rejected with a schema-version mismatch.
+      - name: wasm-bindgen version from Cargo.lock
+        id: wbg
+        run: |
+          version=$(awk '/^name = "wasm-bindgen"$/ { getline; gsub(/"/, "", $3); print $3; exit }' Cargo.lock)
+          test -n "$version" || { echo "::error::wasm-bindgen is not in Cargo.lock"; exit 1; }
+          echo "wasm-bindgen $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen@${{ steps.wbg.outputs.version }}
+      - name: wasm-bindgen-test (smoke, capacity, priority, budget; Node.js)
+        timeout-minutes: 10
+        # .cargo/config.toml sets wasm-bindgen-test-runner as the wasm32 runner.
+        run: cargo +${{ matrix.toolchain }} test --locked --target wasm32-unknown-unknown -p prometheus-parking-lot-wasm
+
   orphan-tests:
     # cr-35: every .rs file under a tests/ directory must be compiled by a Cargo
     # target. Static check (cargo metadata + `mod` resolution); no build needed.
