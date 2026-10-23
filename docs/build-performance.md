@@ -101,6 +101,10 @@ differ — and each build-dir has a different path.
   it on every pull request; the Platform jobs add only other targets and toolchains. Cache keys:
   `android`, `apple`, `desktop`; `save-if` on `main` as everywhere else.
 - `udeps` job (cr-39): cargo-shear plus cargo-udeps (nightly-2026-10-02), native and wasm32, cache key `udeps`. `semver` job (cr-39): cargo-semver-checks 0.51.0 against the newest release tag, cache key `semver`.
+- `bench` job (cr-40): the four criterion suites in the optimized bench profile, cache key `bench`; criterion
+  results under `bench-results/` (outside `target/`, so `rust-cache` never saves them), the `main` baseline in
+  `actions/cache` keyed `bench-baseline-<sha>`. Locally, the CI configuration of the suites took 3m32s with the
+  bench binaries already built (M1 Max, load average 20 to 30); see `benches/README.md`.
 - No CI timings measured yet; record the first green main run and a cache-hit run here.
 
 ## Mobile and desktop bindings (cr-44)

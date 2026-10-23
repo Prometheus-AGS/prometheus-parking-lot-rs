@@ -140,13 +140,26 @@ tempfile.workspace = true
 testcontainers.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time"] }
 
+# Benchmark suites (cr-40); see benches/README.md. The redb case of
+# `throughput` and `latency` needs the `embedded` feature: run with
+# `--all-features`, as CI does.
 [[bench]]
-name = "queue_bench"
+name = "components"
 harness = false
 required-features = ["tokio-runtime"]
 
 [[bench]]
-name = "skip_ahead_bench"
+name = "throughput"
+harness = false
+required-features = ["tokio-runtime"]
+
+[[bench]]
+name = "latency"
+harness = false
+required-features = ["tokio-runtime"]
+
+[[bench]]
+name = "utilization"
 harness = false
 
 [[example]]
