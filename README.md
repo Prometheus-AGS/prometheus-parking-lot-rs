@@ -8,7 +8,8 @@ priority first and in submission order within a priority, as running tasks
 release their units. A task that costs more than the pool's total capacity is
 rejected at submission instead of blocking the queue forever.
 
-Two pools share one admission core:
+Every pool shares one admission core (a dispatcher and a unit-weighted
+semaphore):
 
 - **`ResourcePool`** runs async executors on a tokio runtime and delivers each
   outcome (value or error) to a **mailbox** keyed by tenant, user and session,
@@ -17,6 +18,14 @@ Two pools share one admission core:
   single-threaded tokio runtime, so CPU- or GPU-bound work never blocks your
   async runtime. Results need not be serializable (a streaming channel is
   fine) and are collected with `retrieve`.
+- **`DurableResourcePool`** is `ResourcePool`'s crash-durable mode: it parks
+  tasks in a Postgres or redb lease queue and delivers results to a durable
+  result mailbox, so accepted work survives a crash (cr-49).
+- On **`wasm32`**, a `WorkerPool` runs executors as async tasks on the browser
+  or Node event loop instead of threads (crate `prometheus-parking-lot-wasm`).
+
+Every pool emits lifecycle events (submitted, queued, started, then one
+terminal event) to hooks you register, off the dispatch path (cr-31).
 
 Every execution runs under a budget: the task's deadline or the pool's default
 timeout, whichever is nearer. Work still running at its budget is cancelled and
@@ -30,13 +39,15 @@ migration notes.
 
 | Guarantee | Today |
 | --- | --- |
-| Admitted units never exceed `max_units` | Yes, for both pools: one dispatcher and one unit-weighted semaphore, covered by loom and property tests. |
+| Admitted units never exceed `max_units` | Yes, for every pool (`ResourcePool`, `DurableResourcePool`, native and WASM `WorkerPool`): one dispatcher and one unit-weighted semaphore, covered by loom and property tests. |
 | Priority, then FIFO | Yes, among the tasks that fit. A smaller task that fits starts ahead of a large head that does not, at most `max_head_skips` times (default 8) before the head gets the capacity reserved (cr-20); `0` keeps strict head-of-line order. Durable pools dispatch strictly in order. |
-| Execution budgets | Yes, for both pools. |
+| Execution budgets | Yes, for every pool (JS timers on WASM). |
 | Multi-resource admission | Costs are already vectors, but pools admit by the sum of units against one `max_units`; per-dimension limits are cr-23. |
-| Executor panics | Contained, for `ResourcePool` and the native `WorkerPool` (cr-21): the outcome is `TaskError::ExecutorPanicked`, the task's units are released and parked work starts; a `WorkerPool` worker killed by a panic is replaced. |
+| Executor panics | Contained, for `ResourcePool`, `DurableResourcePool` and the native `WorkerPool` (cr-21): the outcome is `TaskError::ExecutorPanicked`, the task's units are released and parked work starts; a `WorkerPool` worker killed by a panic is replaced. On WASM a panic aborts the module (`panic=abort` on stable Rust). |
 | Accepted work survives a crash | **Yes, for `ResourcePool` on a durable backend** (cr-49): configure a pool's `queue` and `mailbox` as `{"backend": "<name>"}` (or start a `DurableResourcePool` directly) on Postgres (`PgLeaseQueue`, `PgResultMailbox`) or redb (`RedbLeaseQueue`, `RedbResultMailbox`). `submit` returns only after the task is committed to the lease queue; the task's lease is extended while it waits or runs and is acked only after its outcome is stored in the result mailbox, so a process killed at any point (tested with `SIGKILL` mid-execution and between execution and the mailbox write, on PG 18 and redb) has the task re-run after the lease expires and exactly one result consumable. The executor itself can run more than once for one task (at-least-once); make side effects idempotent. In-memory pools and the `WorkerPool` still lose parked work on a crash. |
 | No silent loss at shutdown | **Yes, for all three pools** (cr-29): `shutdown_with(ShutdownPolicy)` (default `DrainThenCancel { deadline: 30 s }`) returns a `ShutdownReport` in which every accepted task either completed, was cancelled, or is still running (`unsettled`). The in-memory pools hand each cancelled task to a `CancellationSink` (its mailbox or result slot gets `TaskError::Cancelled`); the durable pool hands it back to its queue (`nack`, requeue), and a restarted pool runs it (tested on PG 18 and redb). A running task cancelled by the native `WorkerPool` reaches the sink without its payload. |
+| Lifecycle events | Yes, for `ResourcePool`, `DurableResourcePool` and the native `WorkerPool` (cr-31): every task emits `Submitted`, then `Queued` if it parks, `Started` if it runs, and exactly one terminal event (`Completed`, `Failed`, `Rejected`, `Cancelled`, `Expired` or `Requeued`). Hooks run on a background thread fed by a bounded queue, so a slow or panicking hook never stalls dispatch; when that queue is full, events are dropped and counted. With no hook registered, emission costs one atomic load. The WASM pool does not emit yet (cr-53). |
+| Result notifications | `StorageMailbox` stores a result first, then notifies off the delivery path with bounded retries; a failing notifier never loses or fails a stored result (cr-34). `IggyNotifier` (feature `iggy`) publishes `mailbox.ready` to Apache Iggy (cr-32). |
 
 ## Crates and features
 
@@ -48,16 +59,16 @@ re-exports the rest.
 | `prometheus_parking_lot` | Facade: re-exports, scheduler configuration (`config`), pool builders (`builders`) |
 | `prometheus-parking-lot-core` | Runtime-free contracts and types, the dispatcher and semaphore, hooks and audit types, in-memory backends. No async runtime, IO or database dependency. |
 | `prometheus-parking-lot-runtime-tokio` | `ResourcePool` and its crash-durable mode `DurableResourcePool`, the native `WorkerPool`, shutdown, cancellation, `TokioSpawner` |
-| `prometheus-parking-lot-pg` | Postgres lease queue, result mailbox and audit sink on raw sqlx, plus migrations |
+| `prometheus-parking-lot-pg` | Postgres lease queue (`PgLeaseQueue`), the same contract over the pgmq extension (`PgmqLeaseQueue`), result mailbox (`PgResultMailbox`) and audit sink, on raw sqlx, plus migrations. Tested on PostgreSQL 17 and 18. |
 | `prometheus-parking-lot-embedded` | Crash-safe redb lease queue and result mailbox for desktop and single-node use (`EmbeddedStore`, `RedbLeaseQueue`, `RedbResultMailbox`; ADR 0004). Needs a tokio runtime. A `DurableResourcePool` runs on it (cr-49). |
 | `prometheus-parking-lot-iggy` | Apache Iggy events and notifications (`IggyHook`, `IggyNotifier`; cr-32). Lifecycle events and `mailbox.ready` go to Iggy through a bounded off-path publisher with deterministic UUIDv5 message ids; Iggy is not mailbox storage or the work queue. Needs a tokio runtime and an Iggy 0.9 server. |
 | `prometheus-parking-lot-ffi` | UniFFI (Kotlin, Swift) bindings over the embedded queue and mailbox for Android and iOS; not published. See `bindings/README.md`; `bindings/tauri-desktop` is a Tauri 2 example whose queue survives an app restart. |
-| `prometheus-parking-lot-wasm` | `WorkerPool` for `wasm32` (async tasks instead of threads); building it for `wasm32-unknown-unknown` is cr-38 |
+| `prometheus-parking-lot-wasm` | `WorkerPool` for `wasm32-unknown-unknown` on the shared dispatcher, with `spawn_local` and JS-timer budgets (cr-38). Built and tested in CI. |
 
 | Facade feature | Enables | Default |
 | --- | --- | --- |
 | `tokio-runtime` | `ResourcePool`, `DurableResourcePool`, native `WorkerPool`, shutdown, cancellation, `TokioSpawner`, `builders`, `runtime` | yes |
-| `postgres` | `infra::queue::PgLeaseQueue`, `infra::mailbox::PgResultMailbox`, `core::PostgresAuditSink` | no |
+| `postgres` | `infra::queue::{PgLeaseQueue, PgmqLeaseQueue, QueueListener}`, `infra::mailbox::PgResultMailbox`, `infra::PgPool`, `core::PostgresAuditSink` | no |
 | `embedded` | `infra::EmbeddedStore`, `infra::queue::RedbLeaseQueue`, `infra::mailbox::RedbResultMailbox` | no |
 | `iggy` | `infra::events::{IggyHook, IggyNotifier, IggyOptions}`, `config::IggyBackendConfig` (`"type": "iggy"`) | no |
 
@@ -397,8 +408,10 @@ async fn main() {
 ## Configuration
 
 `config::SchedulerConfig::from_json_str` parses and validates a JSON file of
-named `pools` (limits and execution budget) and optional named durable
-`backends` (Postgres or redb, with their parameters).
+named `pools` (limits and execution budget) and optional named `backends`
+with their parameters: `"type": "postgres"` or `"redb"` (durable backends a pool
+can run on), `"pgmq"` (opens a `PgmqLeaseQueue` for direct use; no pool runs on
+it) and `"iggy"` (event publishing options; feature `iggy`).
 `builders::build_pools_from_scheduler_config` builds every pool and opens
 every backend; `builders::build_pools` builds in-memory pools from queue and
 mailbox factories you supply instead.
@@ -414,13 +427,22 @@ drives at most one pool, and a pool with one half in memory is rejected. One
 example per backend, each loaded and built by the test suite:
 [`in-memory.json`](examples/configs/in-memory.json),
 [`postgres.json`](examples/configs/postgres.json),
-[`redb.json`](examples/configs/redb.json).
+[`redb.json`](examples/configs/redb.json),
+[`pgmq.json`](examples/configs/pgmq.json),
+[`iggy.json`](examples/configs/iggy.json).
 
 ## Documentation
 
+- [Documentation site](https://prometheus-ags.github.io/prometheus-parking-lot-rs/):
+  concepts (parking lots, admission, leases, mailboxes, worker pools, event
+  logs) and their current state on `main`.
 - [docs/API.md](docs/API.md): map of the public API by module and feature.
 - [docs/adr/](docs/adr/): design decisions (workspace split, core contracts,
-  backend contracts).
+  backend contracts, embedded backend).
+- [bindings/README.md](bindings/README.md): Android and iOS bindings and the
+  Tauri desktop example.
+- [docs/runbooks/postgres18.md](docs/runbooks/postgres18.md): running the
+  Postgres backends on PostgreSQL 18.
 - [CHANGELOG.md](CHANGELOG.md): what changed, with migration notes.
 - [docs/README.md](docs/README.md): index of the rest.
 - Rustdoc: `cargo doc --workspace --no-deps --all-features --open`.
