@@ -100,6 +100,7 @@ differ — and each build-dir has a different path.
   crate is also a root-workspace member, so `ci.yml`'s fmt, clippy, nextest, docs, deny and MSRV legs cover
   it on every pull request; the Platform jobs add only other targets and toolchains. Cache keys:
   `android`, `apple`, `desktop`; `save-if` on `main` as everywhere else.
+- `udeps` job (cr-39): cargo-shear plus cargo-udeps (nightly-2026-10-02), native and wasm32, cache key `udeps`. `semver` job (cr-39): cargo-semver-checks 0.51.0 against the newest release tag, cache key `semver`.
 - No CI timings measured yet; record the first green main run and a cache-hit run here.
 
 ## Mobile and desktop bindings (cr-44)
@@ -132,6 +133,38 @@ repository's `target/`; intermediates stay in the per-workspace build-dir).
 `rust-cache` for the root workspace also covers the generator's artifacts (they land in the same `target/`);
 the `desktop` job passes `workspaces: "bindings/tauri-desktop -> ../../target"` so the Tauri lockfile is part
 of its key.
+
+## Dependency hygiene (cr-39)
+
+Measured 2026-10-23, 1.99.1, macOS. The machine was under heavy load from other agents (load average
+above 200), so the wall times are noise-dominated; the package counts are exact.
+
+| Item | Before | After |
+|---|---|---|
+| Packages in the root `Cargo.lock` | 518 | 507 |
+| Compiled units, `cargo check --workspace --all-targets --all-features`, fresh target dir (`.rmeta` files) | 451 | 445 |
+| Crates with two versions in the graph (`cargo tree --workspace --all-features -d`) | 24 | 22 |
+| Cold `cargo check --workspace --all-targets --all-features --locked`, sccache off, wall / user CPU | 89.8s / 532s | 103.2s / 537s |
+
+The cold-build time did not move measurably: the removed packages are small. The wall-time difference is
+load, not the change (user CPU is within 1%). What did change: `reqwest` 0.12 (a dev-dependency of the
+tokio runtime crate, used only by an import in a parked test) pulled `native-tls`, `openssl-sys` and
+`hyper-tls`; aligning it with the `reqwest` 0.13 that the `iggy` client already builds removed those, and
+so a system OpenSSL requirement on Linux, plus a second `flume`.
+
+Gate: the `udeps` job runs `cargo shear` (static; also finds unused `[workspace.dependencies]` entries)
+and `cargo-udeps` on a dated nightly, natively and for `wasm32-unknown-unknown`. Re-run locally with
+`cargo shear` and `cargo +nightly-2026-10-02 udeps --workspace --exclude prometheus-parking-lot-wasm
+--all-targets --all-features --locked`. The wasm crate is excluded natively because its whole body is
+`cfg(target_arch = "wasm32")`: udeps reports its `prometheus-parking-lot-core` dependency unused on the host
+(false positive); the wasm32 pass checks it. `cargo-machete` was also run and agreed on the two real
+findings but flags `tauri-build` (used by `build.rs`) and is not in CI.
+
+The `semver` job compares against the newest `v*.*.*` tag (`.github/scripts/semver-check.sh`). No
+version of any crate in this workspace is on crates.io (checked 2026-10-23), so the 0.2.0 sources are not
+a release baseline; the gate passes with a notice until `v0.3.0` exists (cr-52), then fails on a breaking
+change that is not accompanied by a version bump. Cost with `--workspace`, host-only rustdoc builds: about
+1m on a loaded machine.
 
 ## Disk hygiene
 

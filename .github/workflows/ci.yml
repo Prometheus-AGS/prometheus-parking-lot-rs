@@ -19,6 +19,10 @@ env:
   RUST_BACKTRACE: 1
   # rust-toolchain.toml pins the same version; keep both in step (cr-41).
   PINNED_TOOLCHAIN: "1.99.1"
+  # cargo-udeps needs a nightly compiler. Dated, so the job does not move under us;
+  # bump deliberately (cr-39). Tool versions: cargo-udeps 0.1.61, cargo-shear 1.14.0,
+  # cargo-semver-checks 0.51.0 (pinned in the jobs below).
+  UDEPS_NIGHTLY: "nightly-2026-10-02"
 
 # Every cargo invocation is --locked (Cargo.lock is committed) and --workspace
 # (the repository root is both the facade package and the workspace root).
@@ -242,6 +246,73 @@ jobs:
         timeout-minutes: 10
         # .cargo/config.toml sets wasm-bindgen-test-runner as the wasm32 runner.
         run: cargo +${{ matrix.toolchain }} test --locked --target wasm32-unknown-unknown -p prometheus-parking-lot-wasm
+
+  udeps:
+    # cr-39. Unused dependencies fail the build. cargo-udeps compiles every target with
+    # all features on a dated nightly; the wasm-only dependencies are only compiled for
+    # wasm32, so the wasm crate is excluded from the native pass and covered by its own
+    # wasm32 pass (natively its whole body is cfg(target_arch = "wasm32"), which makes
+    # udeps report its core dependency as unused: a false positive of the host target).
+    # cargo-shear is the fast static pass: it also catches [workspace.dependencies]
+    # entries no member uses, which udeps cannot see. The standalone binding
+    # workspaces (not root members) are checked by shear here and udeps for the
+    # bindgen and queue-service workspaces; the Tauri shell is shear-only (a udeps
+    # build of Tauri is minutes of compile for a two-line manifest).
+    name: Unused dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.UDEPS_NIGHTLY }}
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: udeps
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          workspaces: |
+            .
+            bindings/uniffi-bindgen
+            bindings/tauri-desktop
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-udeps@0.1.61,cargo-shear@1.14.0
+      - name: cargo shear (root workspace and the standalone binding workspaces)
+        run: |
+          cargo shear
+          (cd bindings/uniffi-bindgen && cargo shear)
+          (cd bindings/tauri-desktop && cargo shear)
+      - name: cargo udeps (native, all targets, all features)
+        run: cargo +${{ env.UDEPS_NIGHTLY }} udeps --workspace --exclude prometheus-parking-lot-wasm --all-targets --all-features --locked
+      - name: cargo udeps (wasm32, core and wasm)
+        run: cargo +${{ env.UDEPS_NIGHTLY }} udeps --locked --target wasm32-unknown-unknown -p prometheus-parking-lot-core -p prometheus-parking-lot-wasm --all-targets
+      - name: cargo udeps (bindgen and Tauri queue-service workspaces)
+        run: |
+          (cd bindings/uniffi-bindgen && cargo +${{ env.UDEPS_NIGHTLY }} udeps --locked --all-targets)
+          (cd bindings/tauri-desktop && cargo +${{ env.UDEPS_NIGHTLY }} udeps --locked -p parking-lot-tauri-queue-service --all-targets)
+
+  semver:
+    # cr-39. cargo-semver-checks against the newest release tag (script header explains
+    # why the baseline is a tag and not the registry). fetch-depth 0 and tags: the
+    # baseline is a git revision. Inactive (passes with a notice) until v0.3.0 exists.
+    name: Semver checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.PINNED_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: semver
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-semver-checks@0.51.0
+      - run: .github/scripts/semver-check.sh
 
   orphan-tests:
     # cr-35: every .rs file under a tests/ directory must be compiled by a Cargo
