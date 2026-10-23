@@ -104,7 +104,6 @@ sequenceDiagram
 
 ### What exists on `main`
 
-- There is **no Iggy integration** on `main`.
 - `ResourcePool` accepts an `AuditSink` and records `enqueue`, `start`,
   `wake`, `complete`, `fail`, `timeout`, `expire` and `cancel` events through
   it.
@@ -121,15 +120,23 @@ sequenceDiagram
   result first and then hands it to a `Notifier` off the delivery path, with
   bounded retries. The only built-in notifier is `NoopNotifier`.
 
+- `cr-32-iggy-events`: behind the `iggy` feature (crate
+  `prometheus-parking-lot-iggy`), `IggyHook` publishes every lifecycle event to
+  the `lifecycle` topic, partitioned by tenant (or by pool when no tenant is
+  set), and `IggyNotifier` publishes `mailbox.ready` after a result is stored.
+  Message ids are UUIDv5 values derived from the idempotency key, so a retried
+  publish carries the same id. Both publish from a bounded background queue:
+  `on_event` only enqueues, and when the server is slow or down the queue fills
+  and further events are dropped and counted instead of delaying dispatch.
+  Tested against a pinned `apache/iggy:0.9.0` server: a subscriber receives
+  `mailbox.ready` for each completed task and replays from an earlier offset.
+  Iggy 0.9 deduplicates retried requests per client rather than by message id,
+  so the publisher also skips ids it published recently and consumers
+  de-duplicate on the id across restarts.
+
 ### Planned
 
-- `cr-32-iggy-events`: behind an `iggy` feature, an Iggy hook (lifecycle
-  events, partitioned by tenant) and an Iggy notifier (`mailbox.ready`), with
-  message ids derived from the idempotency key so retried publishes
-  deduplicate, published from a bounded background channel rather than inline.
-  Acceptance: a subscriber against a pinned Iggy server receives
-  `mailbox.ready` and replays from an offset.
-- `cr-33-stream-replay` (stretch): streaming-token replay for clients that
+- `cr-33-stream-replay (stretch): streaming-token replay for clients that
   disconnect mid-stream.
 
 Iggy is used for events and notifications only, not as mailbox storage and

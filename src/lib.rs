@@ -191,8 +191,17 @@ pub mod util;
 /// The in-memory backends come from `prometheus-parking-lot-core`; the
 /// Postgres backends (feature `postgres`) from `prometheus-parking-lot-pg`; the
 /// embedded redb-backed backends (feature `embedded`) from
-/// `prometheus-parking-lot-embedded`.
+/// `prometheus-parking-lot-embedded`; Apache Iggy events and notifications
+/// (feature `iggy`) from `prometheus-parking-lot-iggy`.
 pub mod infra {
+    /// Apache Iggy lifecycle events (`IggyHook`) and `mailbox.ready`
+    /// notifications (`IggyNotifier`). Events and notification only: not a
+    /// mailbox store and not a work queue.
+    #[cfg(feature = "iggy")]
+    pub mod events {
+        pub use prometheus_parking_lot_iggy::*;
+    }
+
     /// Queue backends.
     pub mod queue {
         pub use prometheus_parking_lot_core::contracts::memory_queue as memory;

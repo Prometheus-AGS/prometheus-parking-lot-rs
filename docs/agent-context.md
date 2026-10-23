@@ -38,6 +38,7 @@ crates/parking-lot-runtime-tokio/  ResourcePool, DurableResourcePool (durable_po
 crates/parking-lot-pg/        PgLeaseQueue, PgmqLeaseQueue, PgResultMailbox (raw sqlx 0.9), audit sink,
                               migrations/, PG 17/18 testcontainers helper
 crates/parking-lot-embedded/  redb EmbeddedStore, RedbLeaseQueue, RedbResultMailbox (ADR 0004)
+crates/parking-lot-iggy/      IggyHook, IggyNotifier, bounded off-path Iggy publisher; Docker-gated iggy_ tests (ADR 0001)
 crates/parking-lot-wasm/      wasm32 WorkerPool (built for wasm32 only; cr-38)
 crates/parking-lot-ffi/       UniFFI Kotlin/Swift bindings over the embedded store (not published; cr-44)
 bindings/                     binding generator, Kotlin/Swift smoke tests, Tauri 2 desktop example
@@ -45,7 +46,7 @@ tests/, benches/, examples/   full-stack tests, criterion (queue_bench), example
 docker/                       parking-lot-pg:18 and :17 images (Postgres + pgmq)
 ```
 
-Facade features: `tokio-runtime` (default), `postgres`, `embedded`; the wasm
+Facade features: `tokio-runtime` (default), `postgres`, `embedded`, `iggy`; the wasm
 crate is selected by target. Core crate feature: `conformance`. Design
 references: `docs/adr/`, `docs/API.md`, `README.md`, `docs/ARCHITECTURE.md`.
 

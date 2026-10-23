@@ -10,6 +10,7 @@ members = [
     "crates/parking-lot-runtime-tokio",
     "crates/parking-lot-pg",
     "crates/parking-lot-embedded",
+    "crates/parking-lot-iggy",
     "crates/parking-lot-wasm",
     "crates/parking-lot-ffi",
 ]
@@ -29,6 +30,7 @@ prometheus-parking-lot-core = { path = "crates/parking-lot-core", version = "0.2
 prometheus-parking-lot-runtime-tokio = { path = "crates/parking-lot-runtime-tokio", version = "0.2.0" }
 prometheus-parking-lot-pg = { path = "crates/parking-lot-pg", version = "0.2.0" }
 prometheus-parking-lot-embedded = { path = "crates/parking-lot-embedded", version = "0.2.0" }
+prometheus-parking-lot-iggy = { path = "crates/parking-lot-iggy", version = "0.2.0" }
 prometheus-parking-lot-wasm = { path = "crates/parking-lot-wasm", version = "0.2.0" }
 
 # Third-party version requirements are pinned once, here; crates add features.
@@ -47,6 +49,9 @@ tokio = "1"
 tokio-util = "0.7"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+# Apache Iggy client, pinned exactly: Iggy is pre-1.0 and crosses wire breaks (plan section 8).
+iggy = "=0.11.0"
+uuid = "1"
 
 # wasm32-unknown-unknown only (crates/parking-lot-wasm). wasm-bindgen-cli in CI is
 # pinned to the wasm-bindgen version in Cargo.lock (see .github/workflows/ci.yml).
@@ -112,12 +117,15 @@ tokio-runtime = ["dep:prometheus-parking-lot-runtime-tokio"]
 postgres = ["dep:prometheus-parking-lot-pg"]
 # Embedded redb-backed lease queue and result mailbox (ADR 0004).
 embedded = ["dep:prometheus-parking-lot-embedded"]
+# Apache Iggy lifecycle events and mailbox notifications (IggyHook, IggyNotifier).
+iggy = ["dep:prometheus-parking-lot-iggy"]
 
 [dependencies]
 prometheus-parking-lot-core.workspace = true
 prometheus-parking-lot-runtime-tokio = { workspace = true, optional = true }
 prometheus-parking-lot-pg = { workspace = true, optional = true }
 prometheus-parking-lot-embedded = { workspace = true, optional = true }
+prometheus-parking-lot-iggy = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true

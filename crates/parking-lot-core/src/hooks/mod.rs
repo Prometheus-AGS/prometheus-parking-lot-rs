@@ -289,6 +289,23 @@ impl LifecycleEvent {
             | Self::Requeued { task_id, .. } => *task_id,
         }
     }
+
+    /// Name of the pool that emitted the event.
+    #[must_use]
+    pub fn pool(&self) -> &str {
+        match self {
+            Self::Submitted { pool, .. }
+            | Self::Queued { pool, .. }
+            | Self::Started { pool, .. }
+            | Self::Completed { pool, .. }
+            | Self::Failed { pool, .. }
+            | Self::Rejected { pool, .. }
+            | Self::Cancelled { pool, .. }
+            | Self::Evicted { pool, .. }
+            | Self::Expired { pool, .. }
+            | Self::Requeued { pool, .. } => pool,
+        }
+    }
 }
 
 /// A lifecycle observer. Implement this to react to pool events.

@@ -530,6 +530,10 @@ where
                     .redb
                     .insert(name.clone(), super::backends::open_redb(name, section)?);
             }
+            // An events backend opens nothing here: the application builds its
+            // hook and notifier from `IggyBackendConfig::options`, because they
+            // are handed to pools and mailboxes the builder does not own.
+            crate::config::BackendConfig::Iggy(_) => {}
             #[allow(
                 unreachable_patterns,
                 reason = "reachable only when a backend's feature is off"

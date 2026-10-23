@@ -50,6 +50,7 @@ re-exports the rest.
 | `prometheus-parking-lot-runtime-tokio` | `ResourcePool` and its crash-durable mode `DurableResourcePool`, the native `WorkerPool`, shutdown, cancellation, `TokioSpawner` |
 | `prometheus-parking-lot-pg` | Postgres lease queue, result mailbox and audit sink on raw sqlx, plus migrations |
 | `prometheus-parking-lot-embedded` | Crash-safe redb lease queue and result mailbox for desktop and single-node use (`EmbeddedStore`, `RedbLeaseQueue`, `RedbResultMailbox`; ADR 0004). Needs a tokio runtime. A `DurableResourcePool` runs on it (cr-49). |
+| `prometheus-parking-lot-iggy` | Apache Iggy events and notifications (`IggyHook`, `IggyNotifier`; cr-32). Lifecycle events and `mailbox.ready` go to Iggy through a bounded off-path publisher with deterministic UUIDv5 message ids; Iggy is not mailbox storage or the work queue. Needs a tokio runtime and an Iggy 0.9 server. |
 | `prometheus-parking-lot-ffi` | UniFFI (Kotlin, Swift) bindings over the embedded queue and mailbox for Android and iOS; not published. See `bindings/README.md`; `bindings/tauri-desktop` is a Tauri 2 example whose queue survives an app restart. |
 | `prometheus-parking-lot-wasm` | `WorkerPool` for `wasm32` (async tasks instead of threads); building it for `wasm32-unknown-unknown` is cr-38 |
 
@@ -58,6 +59,7 @@ re-exports the rest.
 | `tokio-runtime` | `ResourcePool`, `DurableResourcePool`, native `WorkerPool`, shutdown, cancellation, `TokioSpawner`, `builders`, `runtime` | yes |
 | `postgres` | `infra::queue::PgLeaseQueue`, `infra::mailbox::PgResultMailbox`, `core::PostgresAuditSink` | no |
 | `embedded` | `infra::EmbeddedStore`, `infra::queue::RedbLeaseQueue`, `infra::mailbox::RedbResultMailbox` | no |
+| `iggy` | `infra::events::{IggyHook, IggyNotifier, IggyOptions}`, `config::IggyBackendConfig` (`"type": "iggy"`) | no |
 
 The core crate has one feature, `conformance`, which publishes the test suite
 every queue and mailbox backend must pass.

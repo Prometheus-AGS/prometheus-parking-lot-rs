@@ -40,6 +40,11 @@ Requirements (openspec `crate-structure`):
 `parking-lot-iggy` and `parking-lot-ffi` are not created here; cr-31/cr-32 and cr-44
 create them, with their own features, when they have code.
 
+*Amendment (cr-32):* `crates/parking-lot-iggy` now exists as `prometheus-parking-lot-iggy`
+(published): `IggyHook` and `IggyNotifier` over the Apache Iggy client (`iggy` 0.11, pinned
+exactly), owned by events-engineer and enabled through the facade's `iggy` feature. It
+depends on tokio and the Iggy client; the core graph is unchanged (`check-wasm-graph.sh`).
+
 *Amendment (cr-44):* `crates/parking-lot-ffi` now exists as `prometheus-parking-lot-ffi`
 (not published): UniFFI Kotlin/Swift bindings over the embedded backend, owned by
 platform-engineer. The binding generator and the Tauri example live in standalone

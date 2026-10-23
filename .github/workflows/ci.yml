@@ -25,6 +25,8 @@ env:
 # The Postgres suites (crates/parking-lot-pg/tests) and the facade's Postgres config
 # test need Docker and are #[ignore]d: the `test` job compiles them but skips them,
 # and the `postgres` job (cr-36) runs them with --run-ignored on PG 17 and PG 18.
+# The Iggy suite (crates/parking-lot-iggy/tests) is #[ignore]d the same way and the
+# `iggy` job (cr-32) runs it against the digest-pinned apache/iggy server.
 
 jobs:
   fmt:
@@ -150,6 +152,39 @@ jobs:
           cargo nextest run --workspace --all-features --locked
           --run-ignored all --no-fail-fast --no-tests=fail
           -E 'package(prometheus-parking-lot-pg) | test(config_postgres_example_builds_against_pg18) | test(config_pgmq_example_opens_the_queue_against_pg18) | test(pool_sigkill_) | test(shutdown_durable_pg_)'
+
+  iggy:
+    # cr-32 / S-11. The Docker-gated Iggy tests: a subscriber receives mailbox.ready
+    # and replays from an offset, one idempotency key gives one message id, and a
+    # paused server adds no dispatch latency. The `test` job skips them because they
+    # are #[ignore]d. The server image is pinned by tag and digest in
+    # crates/parking-lot-iggy/tests/support/mod.rs (IGGY_TAG); testcontainers pulls it.
+    name: Iggy events
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.PINNED_TOOLCHAIN }}
+      # Same flags, features and toolchain as the `test` job's pinned leg, so this
+      # job restores the cache that job saves on main and saves nothing itself.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test-${{ env.PINNED_TOOLCHAIN }}
+          save-if: "false"
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+      # Build first so the timeout below bounds test execution, not a cold compile.
+      - name: Build tests
+        run: cargo nextest run -p prometheus-parking-lot-iggy --all-features --locked --no-run
+      - name: Docker-gated Iggy tests
+        timeout-minutes: 15
+        # --no-tests=fail: a filter that matches nothing is a failure, not a pass.
+        run: >
+          cargo nextest run -p prometheus-parking-lot-iggy --all-features --locked
+          --run-ignored all --no-fail-fast --no-tests=fail -E 'test(iggy_)'
 
   wasm:
     # cr-38 / S-14. Everything in the wasm crate is cfg(target_arch = "wasm32"), so the

@@ -46,9 +46,13 @@ use super::error::ConfigError;
 ///   "max_depth": 10000, "lease_secs": 30, "max_attempts": 5, "listen": true, "prepare": true }
 /// ```
 ///
+/// ```json
+/// { "type": "iggy", "connection_string": "iggy://app:secret@iggy:8090", "stream": "parking-lot" }
+/// ```
+///
 /// Every section parses whatever features are enabled; validation rejects a
 /// backend whose crate feature (`postgres` for `postgres` and `pgmq`,
-/// `embedded` for `redb`) is off.
+/// `embedded` for `redb`, `iggy` for `iggy`) is off.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
@@ -63,6 +67,11 @@ pub enum BackendConfig {
     /// `postgres`). A queue only: no pool can run on it (see the
     /// [module docs](self)).
     Pgmq(PgmqBackendConfig),
+    /// Apache Iggy lifecycle events and `mailbox.ready` notifications (feature
+    /// `iggy`). Events only: no pool runs on it and it stores nothing; the
+    /// application builds an `IggyHook` and an `IggyNotifier` from
+    /// [`IggyBackendConfig::options`].
+    Iggy(IggyBackendConfig),
 }
 
 impl BackendConfig {
@@ -73,6 +82,7 @@ impl BackendConfig {
             Self::Postgres(_) => "postgres",
             Self::Redb(_) => "redb",
             Self::Pgmq(_) => "pgmq",
+            Self::Iggy(_) => "iggy",
         }
     }
 
@@ -83,6 +93,8 @@ impl BackendConfig {
             Self::Postgres(cfg) => Duration::from_secs(cfg.lease_secs),
             Self::Redb(cfg) => Duration::from_secs(cfg.lease_secs),
             Self::Pgmq(cfg) => Duration::from_secs(cfg.lease_secs),
+            // No queue, so no lease.
+            Self::Iggy(_) => Duration::ZERO,
         }
     }
 
@@ -97,6 +109,7 @@ impl BackendConfig {
             Self::Postgres(cfg) => cfg.validate(path),
             Self::Redb(cfg) => cfg.validate(path),
             Self::Pgmq(cfg) => cfg.validate(path),
+            Self::Iggy(cfg) => cfg.validate(path),
         }
     }
 
@@ -106,7 +119,7 @@ impl BackendConfig {
     pub(crate) const fn can_drive_pool(&self) -> bool {
         match self {
             Self::Postgres(_) | Self::Redb(_) => true,
-            Self::Pgmq(_) => false,
+            Self::Pgmq(_) | Self::Iggy(_) => false,
         }
     }
 }
@@ -311,6 +324,158 @@ impl fmt::Debug for PgmqBackendConfig {
             .field("max_attempts", &self.max_attempts)
             .field("listen", &self.listen)
             .field("prepare", &self.prepare)
+            .finish()
+    }
+}
+
+/// Parameters of the Apache Iggy events backend.
+///
+/// Only `connection_string` is required; every other field has the default of
+/// the `prometheus-parking-lot-iggy` crate's `IggyOptions::new`. `Debug` hides
+/// the password in `connection_string`.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(not(parking_lot_negative_control = "s-22"), serde(deny_unknown_fields))]
+pub struct IggyBackendConfig {
+    /// Iggy connection string, e.g. `iggy://user:password@host:8090` (see
+    /// [`PostgresBackendConfig::url`] on keeping passwords out of files).
+    pub connection_string: String,
+    /// Stream that holds the topics; created when missing.
+    #[serde(default = "default_iggy_stream")]
+    pub stream: String,
+    /// Topic for lifecycle events; created when missing.
+    #[serde(default = "default_iggy_lifecycle_topic")]
+    pub lifecycle_topic: String,
+    /// Topic for `mailbox.ready` notifications; created when missing.
+    #[serde(default = "default_iggy_mailbox_topic")]
+    pub mailbox_topic: String,
+    /// Partitions of a topic this crate creates.
+    #[serde(default = "default_iggy_partitions")]
+    pub partitions: u32,
+    /// Tenant that partitions lifecycle events; absent: the pool name does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant: Option<String>,
+    /// Events buffered while the server is slow or down; more are dropped and
+    /// counted.
+    #[serde(default = "default_iggy_queue_capacity")]
+    pub queue_capacity: usize,
+    /// Longest one publish attempt may take, in milliseconds.
+    #[serde(default = "default_iggy_send_timeout_ms")]
+    pub send_timeout_ms: u64,
+    /// Attempts per message, including the first.
+    #[serde(default = "default_iggy_max_attempts")]
+    pub max_attempts: u32,
+    /// Recently published message ids remembered to skip repeats; `0` disables.
+    #[serde(default = "default_iggy_dedup_window")]
+    pub dedup_window: usize,
+}
+
+fn default_iggy_stream() -> String {
+    "parking-lot".to_owned()
+}
+fn default_iggy_lifecycle_topic() -> String {
+    "lifecycle".to_owned()
+}
+fn default_iggy_mailbox_topic() -> String {
+    "mailbox.ready".to_owned()
+}
+const fn default_iggy_partitions() -> u32 {
+    4
+}
+const fn default_iggy_queue_capacity() -> usize {
+    1024
+}
+const fn default_iggy_send_timeout_ms() -> u64 {
+    2000
+}
+const fn default_iggy_max_attempts() -> u32 {
+    5
+}
+const fn default_iggy_dedup_window() -> usize {
+    4096
+}
+
+impl IggyBackendConfig {
+    fn validate(&self, path: &str) -> Result<(), ConfigError> {
+        if !cfg!(feature = "iggy") {
+            return Err(ConfigError::invalid(
+                format!("{path}.type"),
+                "backend type `iggy` requires the `iggy` feature of prometheus_parking_lot",
+            ));
+        }
+        let text = [
+            ("connection_string", &self.connection_string),
+            ("stream", &self.stream),
+            ("lifecycle_topic", &self.lifecycle_topic),
+            ("mailbox_topic", &self.mailbox_topic),
+        ];
+        for (field, value) in text {
+            if value.trim().is_empty() {
+                return Err(ConfigError::invalid(
+                    format!("{path}.{field}"),
+                    "must not be empty",
+                ));
+            }
+        }
+        let positive = [
+            ("partitions", u64::from(self.partitions)),
+            ("queue_capacity", self.queue_capacity as u64),
+            ("send_timeout_ms", self.send_timeout_ms),
+            ("max_attempts", u64::from(self.max_attempts)),
+        ];
+        for (field, value) in positive {
+            if value == 0 {
+                return Err(ConfigError::invalid(
+                    format!("{path}.{field}"),
+                    "must be greater than 0",
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// The publisher settings this section describes, for
+    /// `IggyHook::start` and `IggyNotifier::start`.
+    #[cfg(feature = "iggy")]
+    #[must_use]
+    pub fn options(&self) -> prometheus_parking_lot_iggy::IggyOptions {
+        use prometheus_parking_lot_iggy::{IggyOptions, RetryPolicy};
+
+        let defaults = RetryPolicy::default();
+        let mut options = IggyOptions::new(self.connection_string.clone())
+            .with_stream(self.stream.clone())
+            .with_partitions(self.partitions)
+            .with_queue_capacity(self.queue_capacity)
+            .with_send_timeout(Duration::from_millis(self.send_timeout_ms))
+            .with_retry(RetryPolicy::new(
+                self.max_attempts,
+                defaults.initial_backoff,
+                defaults.max_backoff,
+            ))
+            .with_dedup_window(self.dedup_window)
+            .with_topics(self.lifecycle_topic.clone(), self.mailbox_topic.clone());
+        if let Some(tenant) = &self.tenant {
+            options = options.with_tenant(tenant.clone());
+        }
+        options
+    }
+}
+
+impl fmt::Debug for IggyBackendConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("IggyBackendConfig")
+            .field(
+                "connection_string",
+                &redact_password(&self.connection_string),
+            )
+            .field("stream", &self.stream)
+            .field("lifecycle_topic", &self.lifecycle_topic)
+            .field("mailbox_topic", &self.mailbox_topic)
+            .field("partitions", &self.partitions)
+            .field("tenant", &self.tenant)
+            .field("queue_capacity", &self.queue_capacity)
+            .field("send_timeout_ms", &self.send_timeout_ms)
+            .field("max_attempts", &self.max_attempts)
+            .field("dedup_window", &self.dedup_window)
             .finish()
     }
 }
