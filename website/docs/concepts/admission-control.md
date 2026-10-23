@@ -113,36 +113,38 @@ introduced the term or the technique, so this chapter does not attribute it.
 
 ### What exists on `main`
 
-- **Unit-weighted admission.** `ResourcePool::submit` reserves units with a
-  compare-and-swap that refuses to go past `max_units` (and uses checked
-  addition, so it cannot overflow). Capacity is claimed only while the queue
-  lock is held.
+- **Unit-weighted admission.** Every pool (`ResourcePool`, the native and
+  WASM `WorkerPool`s and the durable `DurableResourcePool`) admits through one
+  `Dispatcher` that owns a `UnitSemaphore` (cr-19). A task costing `u` units is
+  admitted only while `in_use + u <= max_units`, by a single compare-and-swap
+  on one packed atomic. The worker pools also bound admitted tasks by their
+  worker count, so an admitted task always has a worker.
 - **Early refusal.** A cost greater than `max_units` returns
   `SchedulerError::CapacityExceeded`; a task whose `deadline_ms` has already
   passed returns `SchedulerError::DeadlineExpired`; a full queue returns
   `SchedulerError::QueueFull`, which `is_retryable` reports as retryable.
-- **Strict priority, then FIFO.** The in-memory queue is a binary heap ordered
-  by `Priority` (`Low`, `Normal`, `High`, `Critical`), then by a submission
-  sequence number that the pool stamps on each task. Equal-priority tasks
-  therefore start in submission order, even when submitted in the same
-  millisecond.
-- **No skip-ahead.** A submission starts immediately only when the queue is
-  empty. When a task finishes, queued tasks start in order while the head fits;
-  a head that does not fit stops dispatch. Large tasks are never starved, at the
+- **Strict priority, then FIFO.** The parked queue is ordered by `Priority`
+  (`Low`, `Normal`, `High`, `Critical`), then by a submission sequence number
+  that the pool stamps on each task. Equal-priority tasks therefore start in
+  submission order, even when submitted in the same millisecond. The durable
+  queues approximate this order, not exactly: `PgLeaseQueue` can lease in
+  commit order when concurrent enqueues commit out of id order, pgmq orders by
+  priority lane only, and a durable pool lets a later higher-priority task
+  wait behind the one leased task already waiting for capacity.
+- **No skip-ahead.** A submission starts immediately only when nothing is
+  parked ahead of it. When a task finishes, queued tasks start in order while
+  the head fits; a head that does not fit stops dispatch. Large tasks are never starved, at the
   cost of idle capacity behind a large head.
 - **Deadlines in the queue.** A queued task found expired when it reaches the
   head is not started; its mailbox receives `TaskStatus::Expired`.
   `prune_expired` removes expired tasks in bulk.
 - **One number per task.** `ResourceCost` can describe several resource kinds
-  (`Cpu`, `GpuVram`, `Io`, `Mixed`), but `ResourcePool` admits on the **sum**
-  of a task's units across kinds against a single `max_units`.
+  (`Cpu`, `GpuVram`, `Io`, `Mixed`), but the pools admit on the **sum** of a
+  task's units across kinds against a single `max_units`.
 - **No aging.** Under sustained high-priority load, `Low` tasks wait.
 
 ### Planned
 
-- `cr-19-dispatcher-semaphore`: one unit-weighted semaphore and priority
-  dispatcher shared by every pool, including the native `WorkerPool`, which
-  today counts units but does not gate on them.
 - `cr-20-skip-ahead`: fitting tasks may start behind a non-fitting head, and
   the head must start within a configured number of dispatch cycles (the
   backfilling trade-off above).

@@ -88,44 +88,65 @@ and a pool is not an actor. It takes two specific ideas:
 | Address | Process identifier | `MailboxKey` (tenant, user, session) |
 | Read | `receive` with pattern matching | `consume(key)`: take and remove, at most once |
 | Lifetime | Lives as long as the process | Optional TTL, removed by `evict_expired` |
-| Survives restart | No | Only with a persistent backend |
+| Survives restart | No | With the Postgres or redb mailbox |
 
 ## How this library applies it
 
 ### What exists on `main`
 
-- **The `Mailbox` trait** has `deliver`, `deliver_with_ttl`, `consume`
-  (consume-once: a successful consume removes the entry) and `evict_expired`.
-  Its documentation requires backends with notifiers to store the result
-  before notifying, so a notifier failure cannot lose a stored result.
+There are two mailbox contracts. The synchronous `Mailbox` trait is what the
+in-memory `ResourcePool` writes to. The async `ResultMailbox` trait (cr-25, ADR
+0003) is what the durable backends implement and what `DurableResourcePool`
+writes to: `deliver` (with an optional idempotency key and TTL), `consume`,
+`peek` and `evict_expired`. A delivery with a key is first-write-wins, and the
+key is remembered after the result is consumed, so a redelivered task cannot
+create a second result.
+
 - **`ResourcePool` delivers every outcome** for tasks that carry a mailbox key:
-  `Completed` with the value, `Failed(TaskError)` with no payload (including a
-  `Timeout` when a task exceeded its budget), and `Expired` for a queued task
-  whose deadline passed before it could start.
-- **`InMemoryMailbox`** implements the whole trait: consume-once, TTL and
-  eviction. It does not survive a restart.
-- **`PostgresMailbox`** (table `pl_mailbox_messages`) implements only
-  `deliver`. `consume` and `evict_expired` fall back to the trait defaults
-  (`None` and `0`), so results stored there cannot yet be read back through the
-  trait. It also uses `block_on`, which panics inside a Tokio runtime.
-- **`YaqueMailbox`** is a file-backed mailbox in the embedded crate.
-- **The native `WorkerPool`** uses its own in-process result slots, read with
-  `retrieve` or `retrieve_async`, rather than the `Mailbox` trait.
-- There is **no notifier** on `main`: nothing tells a client that its result
-  is ready. Clients poll with `consume`.
+  `Completed` with the value, `Failed(TaskError)` with no payload (including
+  `Timeout` when a task exceeded its budget and `ExecutorPanicked` when the
+  executor panicked, cr-21), and `Expired` for a queued task whose deadline
+  passed before it could start. A task the in-memory `ResourcePool` cancels
+  at shutdown receives `Failed(TaskError::Cancelled)` (cr-29); a durable pool
+  delivers nothing for it and requeues it instead.
+- **`InMemoryMailbox`** implements the whole synchronous trait: consume-once,
+  TTL and eviction. **`InMemoryResultMailbox`** is the reference
+  `ResultMailbox`. Neither survives a restart.
+- **`PgResultMailbox`** (cr-27, table `pl_result_mailbox`, raw `sqlx`) is
+  readable through the trait. `consume` is one `DELETE ... RETURNING` on a row
+  locked with `FOR UPDATE SKIP LOCKED`, so a result reaches exactly one
+  consumer. A duplicate delivery keeps the first write through
+  `INSERT ... ON CONFLICT`. TTLs use database time, with `evict_expired` and a
+  background sweeper (`spawn_sweeper`).
+- **`RedbResultMailbox`** (cr-28) is the embedded mailbox, in the same redb
+  file as the embedded queue. Every delivery, consume and eviction is one
+  durable redb transaction.
+- **`DurableResourcePool`** (cr-49) delivers to a `ResultMailbox` with an
+  idempotency key before it acks the queue entry, so a crash between execution
+  and delivery leads to a redelivery, and the first-write-wins key keeps
+  exactly one result. See [Leases and delivery](./leases.md).
+- **Storage plus notifier.** `StorageMailbox<S, N>` (cr-34) is a
+  `ResultMailbox` that stores in `S` first and notifies only after the result
+  is stored (a first-write-wins duplicate does not notify). The notification
+  runs off the delivery path through `BackgroundNotifier`, which retries a
+  failing notifier a bounded number of times with capped exponential backoff
+  (`RetryPolicy`). A notifier
+  failure is logged and counted (`NotifyStats`); it never fails or undoes a
+  stored result.
+- **No concrete notifier ships yet.** The only built-in `Notifier` is
+  `NoopNotifier`. Clients poll with `consume`.
+- **The worker pools** keep results in their own in-process slots rather than
+  in a mailbox, and these slots do not survive a restart. The native
+  `WorkerPool` is read with `retrieve` or `retrieve_async`; unretrieved results
+  are evicted after a TTL (`WorkerPool::with_result_ttl`, cr-22), a later
+  retrieve reports `SchedulerError::ResultExpired`, and a timed-out retrieve
+  leaves the result in its slot. The WASM `WorkerPool` has only
+  `retrieve_async` and no result TTL.
 
 ### Planned
 
-- `cr-27-pg-mailbox`: Postgres consume-once (`DELETE ... RETURNING`), TTL
-  eviction and first-write-wins on the idempotency key.
-- `cr-34-mailbox-composition`: a mailbox built from storage plus an optional
-  notifier, where a notifier failure never loses the stored result.
 - `cr-32-iggy-events`: an Iggy notifier that publishes a "result ready" event
   (see [Event logs](./event-logs.md)).
-- `cr-22-result-slots`: async result slots with a TTL for the worker pools.
-- `cr-21-panic-containment`: a panicking executor becomes
-  `TaskError::ExecutorPanicked` in the mailbox, in the spirit of "failures are
-  values".
 
 ## Sources
 

@@ -88,29 +88,45 @@ scheduler, and hand results back through a channel.
   application's Tokio runtime with its work-stealing scheduler. Every execution
   is bounded by `tokio::time::timeout` using the task's deadline or the pool's
   `default_timeout`; when the budget elapses, the executor future is dropped,
-  which cancels it at its next await point.
+  which cancels it at its next await point. `DurableResourcePool` (cr-49) runs
+  tasks the same way.
 - **The native `WorkerPool`** spawns `worker_count` dedicated OS threads. Each
   thread runs its own single-threaded Tokio runtime and blocks on its task, so
   CPU or GPU-bound work does not stall the application's async runtime.
-  Workers take tasks from one shared bounded FIFO channel (crossbeam). There is
-  no work stealing between workers, and none is needed: a single shared queue
-  already keeps every idle worker busy.
-- **What the worker pools do not do yet.** The native `WorkerPool` counts
-  units but does not gate admission on `max_units`, and it ignores priority
-  (the channel is FIFO). The WASM pool sizes its semaphore by `worker_count`,
-  not by units. An executor panic is not caught.
+  Admission goes through the shared dispatcher (cr-19): it enforces
+  `max_units`, serves parked tasks by priority, then submission order, and
+  bounds admitted tasks by `worker_count`, so an admitted task always has a
+  worker. Workers take admitted tasks from one shared channel (crossbeam).
+  There is no work stealing between workers, and none is needed: a single
+  shared queue already keeps every idle worker busy. Every execution runs
+  under a budget (the task's deadline or `default_timeout_ms`, whichever is
+  nearer); a task still running at its budget fails with `TaskError::Timeout`.
+- **Panic containment (cr-21).** In `ResourcePool` and the native
+  `WorkerPool`, an executor panic becomes `TaskError::ExecutorPanicked`, its
+  units are released and parked work starts. A worker thread killed by a
+  panic is replaced, so the pool keeps its worker count.
+- **Shutdown policies (cr-29).** Every native pool has
+  `shutdown_with(ShutdownPolicy) -> ShutdownReport`: `Drain`,
+  `DrainThenCancel` (the default) or `CancelImmediately`. Submissions are
+  refused at once and accepted work keeps running until the deadline. In
+  `ResourcePool` and the native `WorkerPool`, the rest is then cancelled
+  (under `Drain`, only the queued tasks), recorded with `TaskError::Cancelled`
+  and offered to a `CancellationSink`, and the report accounts for every
+  accepted task. `DurableResourcePool` stops leasing, hands the leased task
+  waiting for capacity and every cancelled straggler back to its queue
+  (`nack(Requeue)`), and reports a straggler still running under `Drain` as
+  unsettled; tasks it never leased stay in the queue and are not counted.
+- **The WASM `WorkerPool` (cr-38)** admits through the same dispatcher and runs
+  each admitted task with `wasm_bindgen_futures::spawn_local`; the browser
+  event loop is the scheduler, and there is no Tokio runtime and no thread.
+  Budgets use JS timers. An executor panic cannot be caught on
+  `wasm32-unknown-unknown`: it aborts the module, so executors there must
+  return errors, not panic.
 
 ### Planned
 
-- `cr-19-dispatcher-semaphore`: a single dispatcher in front of every pool,
-  admitting by a unit-weighted semaphore in priority order, and feeding the
-  native workers instead of letting submitters write to their channel
-  directly.
-- `cr-21-panic-containment`: `catch_unwind` around execution, capacity released
-  by a guard even during a panic, and dead workers replaced.
-- `cr-29-shutdown-cancellation`: shutdown policies (drain, drain then cancel,
-  cancel now) applied by both pools.
-- `cr-53-wasm-parity`: the WASM pool follows the dispatcher changes.
+- `cr-53-wasm-parity`: the WASM pool follows the dispatcher changes that are
+  still planned (skip-ahead, per-resource admission, lifecycle events).
 
 ## Sources
 

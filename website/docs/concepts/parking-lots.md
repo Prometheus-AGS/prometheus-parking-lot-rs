@@ -129,22 +129,27 @@ sequenceDiagram
 
 ## What the library does today
 
-On `main`, `ResourcePool` (crate `prometheus-parking-lot-runtime-tokio`)
-implements the work-parking lot:
+On `main`, every pool parks work through one `Dispatcher` (cr-19, crate
+`prometheus-parking-lot-core`). The dispatcher owns the parked queue and a
+unit-weighted `UnitSemaphore`, so admission, parking and waking happen under
+one lock with no lost wakeup. `ResourcePool`, the native `WorkerPool`
+(`prometheus-parking-lot-runtime-tokio`) and the WASM `WorkerPool` (cr-38) all
+admit through it:
 
-- `submit` claims capacity only while it holds the queue lock, and starts the
-  task immediately only when the queue is empty and the cost fits. Otherwise
-  the task is parked and `submit` returns `TaskStatus::Queued`.
+- `submit` starts the task immediately only when nothing is parked ahead of it
+  and its cost fits the free units. Otherwise the task is parked and `submit`
+  returns `TaskStatus::Queued`.
 - A task whose cost exceeds the pool's total capacity is rejected with
   `SchedulerError::CapacityExceeded`: parked at the head of the queue it would
   block every task behind it forever.
-- When a task finishes, its units are released and the pool starts queued tasks
-  in queue order while the head fits. A head that does not fit is put back
-  under the same lock, so it keeps its place.
+- When a task finishes, its units are returned and the dispatcher starts parked
+  tasks by priority, then submission order, while the head fits. A head that
+  does not fit keeps its place and stops dispatch.
 
-The native `WorkerPool` does not apply this admission test yet: it counts units
-but does not gate on `max_units`. A unit-weighted semaphore and dispatcher
-shared by every pool is planned in `cr-19-dispatcher-semaphore`.
+The parking lot is in memory unless the pool is durable. `DurableResourcePool`
+(cr-49) keeps every accepted task in a durable lease queue (Postgres or redb)
+and leases the head into the same dispatcher, so parked work survives a
+restart. See [Leases and delivery](./leases.md).
 
 ## Sources
 

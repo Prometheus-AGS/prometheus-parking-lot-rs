@@ -1,6 +1,6 @@
 ---
 title: Leases and delivery
-description: Leases, at-least-once delivery, SKIP LOCKED queues in Postgres, pgmq, idempotency and the outbox pattern, and where the library stands on durable delivery.
+description: Leases, at-least-once delivery, SKIP LOCKED queues in Postgres, pgmq, idempotency and the outbox pattern, and how the library's durable lease queues and durable dispatch apply them.
 ---
 
 # Leases and delivery
@@ -89,7 +89,7 @@ contention with multiple consumers accessing a queue-like table"
 sequenceDiagram
   participant W1 as Worker 1
   participant W2 as Worker 2
-  participant DB as pl_queue_jobs
+  participant DB as pl_lease_queue
   W1->>DB: lock first ready row, FOR UPDATE SKIP LOCKED
   DB-->>W1: row 17 (now locked)
   W2->>DB: same query
@@ -105,7 +105,7 @@ SQS-like queue inside Postgres: messages are read with a visibility timeout,
 stay in the queue until explicitly deleted or archived, and can be archived for
 retention and replay ([pgmq README](https://github.com/pgmq/pgmq);
 [pgmq documentation](https://pgmq.github.io/pgmq/)). It has no priority levels
-of its own; the project plan uses one queue per priority.
+of its own, so this library's pgmq backend uses one pgmq queue per priority.
 
 ### Idempotency and the outbox
 
@@ -130,47 +130,81 @@ then notify.
 
 ### What exists on `main`
 
-The library does **not** provide leases or crash-durable delivery yet. Be
-precise about what each backend does today:
+Every durable queue implements one async contract, `LeaseQueue` (cr-25, ADR
+0003): `enqueue`, `lease`, `ack`, `nack` (requeue, optionally after a delay,
+or dead-letter), `extend` and `depth`. A lease returns a fenced `LeaseToken`:
+once the lease has expired and another consumer has claimed the entry, the old
+token gets `SchedulerError::LeaseLost` instead of acking someone else's work.
+Idempotency keys are first-write-wins at enqueue. Every backend runs the same
+conformance suite (the core crate's `conformance` feature).
 
-- **`InMemoryQueue`** loses everything on restart, by design.
-- **`PostgresQueue`** (SeaORM, table `pl_queue_jobs`) deletes the row inside
-  the dequeue transaction, before the task runs. A crash after dequeue loses
-  the task: this is at-most-once delivery. The table already has `locked_by`,
-  `locked_at` and `attempts` columns, but nothing uses them. The module comment
-  mentions `SKIP LOCKED`, but the query takes a plain `FOR UPDATE` lock, so
-  concurrent dequeuers wait on the same head row. The backend also bridges to
-  async code with `block_on`, which panics when called from inside a Tokio
-  runtime.
-- **`YaqueQueue`** is a JSON-lines file queue (not the `yaque` crate). It is
-  FIFO only and rewrites the file on every dequeue without an atomic rename or
-  `fsync`, so it is not crash-safe.
-- **Idempotency.** `TaskMetadata` has an optional `idempotency_key`, and
-  `InMemoryMailbox` has a first-write-wins index for it, but the `Mailbox`
-  trait's `deliver` does not pass the key, so deduplication is not reached
-  through the pool today.
-- **Ordering of result and completion.** `ResourcePool` releases capacity and
-  then writes the outcome to the mailbox. A failed mailbox write is logged, not
-  retried.
+- **`InMemoryLeaseQueue`** is the reference implementation, with a
+  `DeadLetter` list. It loses everything on restart, by design. The older
+  synchronous `InMemoryQueue` still parks the in-memory `ResourcePool`'s work
+  and is not durable either.
+- **`PgLeaseQueue`** (cr-26, crate `prometheus-parking-lot-pg`, table
+  `pl_lease_queue`) is written on raw `sqlx` with no ORM and no `block_on`. It
+  claims with `FOR UPDATE SKIP LOCKED` in priority, then enqueue-id order, so
+  several dispatchers never claim the same entry and never wait on each
+  other's head row. Two enqueues that commit out of id order can be leased in
+  commit order. An entry is ready when its `not_before` has passed (nack with a delay)
+  or its lease has expired. The fence is the attempt count, and
+  `with_max_attempts` dead-letters an entry that keeps failing. Idle
+  dispatchers can wait on `LISTEN`/`NOTIFY` (`PgLeaseQueue::listener`);
+  `reap_expired` and `spawn_reaper` return expired leases in bulk.
+- **`PgmqLeaseQueue`** (cr-30) is the same contract over the pgmq extension,
+  through plain SQL: one pgmq queue per priority, the visibility timeout as the
+  lease, `read_ct` as the fence, and a pgmq dead-letter queue. It has
+  one-second lease granularity and no reaper, and the configuration schema
+  cannot select it yet.
+- **`RedbLeaseQueue`** (cr-28, crate `prometheus-parking-lot-embedded`, ADR
+  0004) is the embedded queue for desktop and single-node use. `EmbeddedStore`
+  opens one redb file that holds both the queue and the result mailbox. Every
+  operation is one redb write transaction, committed durably before the call
+  returns, so a crash leaves each operation fully applied or not applied. It
+  honours priority, then FIFO.
+- **Durable dispatch.** `DurableResourcePool` (cr-49) is the crash-durable mode
+  of `ResourcePool` on any `LeaseQueue` and `ResultMailbox`. `submit` returns
+  `Queued` only after `enqueue` has stored the task. A dispatcher leases the
+  head while a unit is free and admits it through the same dispatcher and
+  unit-weighted semaphore as the in-memory pool. A heartbeat calls `extend`
+  every third of the lease by default, so a long task is not mistaken for a
+  dead one. The outcome is delivered to the mailbox with an idempotency key
+  (the task's own key, or `"<pool name>:entry:<queue entry id>"`), and **only
+  then** is the lease acked (success) or dead-lettered (executor error, panic,
+  timeout, expired deadline, cost above capacity). This is the outbox order
+  above: store the result, then let go of the work.
+- **What that guarantees.** A process killed at any point leaves the task
+  leased; the lease expires and the queue redelivers it. Because the mailbox
+  keeps the first write for a key, the client sees exactly one result.
+  Execution is still at-least-once: the executor can run again after a crash,
+  a lost lease or a failed ack, so executors with external side effects must
+  be idempotent. Scenario S-16 (`-E "test(pool_sigkill_)"`) kills a pool
+  process with `SIGKILL` mid-execution and between execution and the mailbox
+  write, on Postgres 18 and redb, and requires exactly one result after a
+  restart.
+- **Configuration.** A pool whose `queue` and `mailbox` both name a `postgres`
+  or `redb` backend is built as a durable pool by
+  `build_pools_from_scheduler_config` (cr-37, cr-49) and returned as a
+  `ConfiguredDurablePool` in `BuiltScheduler::durable_pools`, not among the
+  in-memory pools. Its results are read from the backend's `ResultMailbox`.
+  Pools on `"in_memory"` keep the in-memory behaviour.
 
-### Planned
+What is still not durable: the native and WASM `WorkerPool`s and an in-memory
+`ResourcePool` lose parked work on restart. In the in-memory `ResourcePool`,
+capacity is released before the outcome is written to the mailbox, and a
+failed mailbox write is logged, not retried.
 
-- `cr-25-backend-contracts`: an async `TaskQueue` with `lease`, `ack`, `nack`
-  and `extend`, plus an async mailbox and a conformance suite.
-- `cr-26-pg-lease-queue`: a Postgres lease queue on raw `sqlx` that claims with
-  `FOR UPDATE SKIP LOCKED`, supports `not_before` backoff, wakes idle
-  dispatchers with `LISTEN`/`NOTIFY`, and reclaims expired leases. Acceptance:
-  a `kill -9` mid-task leads to redelivery after the lease expires, and several
-  dispatchers never claim the same task.
-- `cr-27-pg-mailbox`: consume-once (`DELETE ... RETURNING`), TTL eviction and
-  first-write-wins idempotency (`ON CONFLICT`).
-- `cr-28-embedded-redb-queue`: a crash-safe embedded queue on redb that
-  honours priority.
-- `cr-30-pgmq-sql-backend`: pgmq through SQL, one queue per priority.
-- `cr-49-durable-dispatch`: pools persist accepted work through the durable
-  queue, extend the lease while a task runs, and **acknowledge only after the
-  mailbox write**, so a crash between execution and delivery causes a
-  redelivery instead of a loss.
+### Known limits of durable dispatch
+
+- A durable pool lets at most one leased task wait for capacity. A task
+  enqueued later at a higher priority waits behind it instead of overtaking it
+  as it would in the in-memory pool.
+- An idle durable pool notices work enqueued by another process, and expired
+  leases, by polling (`DurableOptions::with_poll_interval`, 500 ms by default).
+  It does not use the Postgres `QueueListener` yet.
+- A task that kills its process is redelivered on every restart; cap it with
+  the backend's attempt limit (for example `PgLeaseQueue::with_max_attempts`).
 
 ## Sources
 
