@@ -148,10 +148,10 @@ of its key.
 |---|---|---|
 | `SCCACHE_BASEDIRS` covering `/Volumes/T7/rust/cargo-build` and the worktree parent | Path-independent cache keys → dependency hits across worktrees | sccache 0.18 has the variable; Rust effect unverified |
 | `CARGO_INCREMENTAL=0` in agent shells | Lets sccache cache this crate across worktrees, at the cost of incremental speed | Measure rebuild time both ways |
-| `[profile.dev.build-override] opt-level = 0` | Faster build-script/proc-macro compiles | May slow sqlx/sea-orm macro expansion; measure |
+| `[profile.dev.build-override] opt-level = 0` | Faster build-script/proc-macro compiles | sea-orm is gone and the sqlx `macros` feature is off (raw queries), so the cost falls on serde/thiserror/uniffi derives; measure |
 | `split-debuginfo = "unpacked"` (macOS default) vs current `"off"` | Link time / disk | Unverified on macOS |
-| Workspace split (core / pg / embedded / iggy / ffi / wasm) | Smaller rebuild scope; natural ownership | ADR by tech-lead |
-| CI: `Swatinem/rust-cache@v2` with `save-if: main`, `--locked`, `CARGO_INCREMENTAL=0` | Reproducible cached CI | Planned (CR-39 / M0) |
+| Workspace split (core / pg / embedded / iggy / ffi / wasm) | Smaller rebuild scope; natural ownership | Done: ADR 0001 (cr-48); core, runtime-tokio, pg, embedded, wasm and ffi crates exist; no iggy crate yet |
+| CI: `Swatinem/rust-cache@v2` with `save-if: main`, `--locked`, `CARGO_INCREMENTAL=0` | Reproducible cached CI | Adopted in `.github/workflows/ci.yml` (cr-42) |
 
 Sources: Rust blog build-dir layout v2 (2026-03-13); sccache README v0.18.0; cargo
 issues #5931, #5026, #4282, #16147, #16804; Swatinem/rust-cache.

@@ -1,8 +1,15 @@
-> **Status (2026-10-22):** design reference, not a description of shipped behaviour.
+> **Status (2026-10-23):** design reference, not a description of shipped behaviour.
 > Strict priority-then-FIFO admission through one dispatcher and a unit-weighted semaphore
 > shipped in cr-19. Skip-ahead bin-packing with a starvation guard (cr-20) and per-dimension
-> multi-resource admission (cr-23) are planned and not implemented. The OCC/lease claim maps
-> to the async `LeaseQueue` contract (ADR 0003), whose durable backends are cr-26 and cr-28.
+> multi-resource admission (cr-23) are planned and not implemented. The OCC claim in section
+> 4.1 is not how the shipped queues claim work: `PgLeaseQueue` (cr-26) claims with
+> `FOR UPDATE SKIP LOCKED` and fences each lease with its attempt count, `PgmqLeaseQueue`
+> (cr-30) uses pgmq's visibility timeout, and `RedbLeaseQueue` (cr-28) is a single-process
+> embedded store. All implement the async `LeaseQueue` contract (ADR 0003). The "Backing
+> Store" is Postgres or redb, and a task is written to it only when its pool is durable
+> (`DurableResourcePool`, cr-49): a durable pool stores every accepted task, not only the
+> ones that park, before `submit` returns. The "Spin is Virtual" buffer in Part 2 does not
+> exist. The JSONL file queue this document called Yaque was removed in cr-28.
 
 This analysis breaks down the **Parking Lot Algorithm** from its theoretical roots in concurrency control to its practical application in distributed systems, specifically tailored for your `prometheus_parking_lot` crate.
 
@@ -42,7 +49,7 @@ Your crate, `prometheus_parking_lot`, elevates this low-level concurrency patter
 
 1. **The "Resource" is Macro:** Instead of a CPU register or memory address, your resources are **GPU VRAM** or **Worker Slots**.
 2. **The "Spin" is Virtual:** We don't busy-wait the CPU. Instead, we might "spin" effectively by keeping a request in an in-memory buffer for a few milliseconds before committing it to the persistent DB queue (optimization for bursty traffic).
-3. **The "Parking Lot" is Durable:** Your "Global Hashtable" is replaced by **Postgres/Yaque**. A task "parking" means it is serialized to disk. "Unparking" is the Scheduler waking up and pulling the next job.
+3. **The "Parking Lot" is Durable:** Your "Global Hashtable" is replaced by **Postgres or an embedded redb file**. A task "parking" means it is serialized to disk. "Unparking" is the Scheduler waking up and pulling the next job.
 
 ------
 
@@ -78,7 +85,7 @@ When a client submits a `ScheduledTask`:
     * **Check:** Capacity is full.
     * **Action:** The task is **Parked**.
         * It is serialized.
-        * It is written to the **Backing Store** (Postgres/Yaque).
+        * It is written to the **Backing Store** (Postgres or redb).
         * The client receives a `Ticket` (TaskId) instead of a result.
     * **Latency:** Milliseconds (I/O bound).
 
@@ -103,7 +110,7 @@ stateDiagram-v2
     
     state "Parking Lot (Queue)" as Parked {
         Postgres_Table
-        Yaque_File
+        Redb_File
     }
     
     Parked --> Ready : Capacity Freed

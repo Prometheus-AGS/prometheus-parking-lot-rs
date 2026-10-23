@@ -11,7 +11,7 @@ This crate acts as a **smart task scheduler** (specifically implementing a "park
 *   **The "Parking Lot":** When capacity is full, tasks wait in a prioritized queue rather than failing or crashing the system.
 *   **Wake-up Logic:** As soon as a running task finishes and frees up resources, the scheduler automatically wakes up the next highest-priority task from the queue.
 *   **Mailbox Delivery:** If a client (user/frontend) disconnects while a long task is running, the result is saved in a "Mailbox" so they can retrieve it later, ensuring no work is wasted.
-*   **Configuration-Driven:** The behavior (Queue type, Capacity limits) is defined in a simple JSON/YAML config file, allowing the same code to run in different environments without recompiling.
+*   **Configuration-Driven:** The behavior (Queue type, Capacity limits) is defined in a JSON config file (`config::SchedulerConfig`), allowing the same code to run in different environments without recompiling.
 
 ### 2. The "Why": Solving the AI Resource Problem
 
@@ -25,13 +25,13 @@ You are building this because standard async programming (like `tokio::spawn`) i
 2.  **Durability & Persistence:**
     *   *Standard approach:* If you restart a server, in-memory tasks are lost.
     *   *Your problem:* AI tasks are expensive and time-consuming. You don't want to lose the queue just because the server rebooted or the app crashed.
-    *   *Solution:* You are implementing **Persistent Queues** using **Postgres/Pgmq** (for Cloud) and **Yaque** (for Desktop/Local), ensuring the queue survives restarts.
+    *   *Solution:* **Durable lease queues** on **Postgres** (`PgLeaseQueue`) for the cloud and an embedded **redb** file (`RedbLeaseQueue`) for desktop and local use. A pool configured on either backend is built as a `DurableResourcePool` (cr-49) and keeps accepted work across restarts and crashes. `PgmqLeaseQueue` (cr-30) implements the same queue contract over pgmq, but configuration cannot select it yet and durable pools are validated only on `PgLeaseQueue` and redb.
 
 3.  **Unified Architecture (Write Once, Run Anywhere):**
     *   *Your problem:* You are deploying "Prometheus" agents in vastly different environments: Cloud servers, Desktop apps (Tauri), and potentially Web browsers.
     *   *Solution:* By abstracting the "Queue" and "Mailbox" behind traits, the **same scheduler logic** works everywhere. You just swap the backend config:
         *   **Cloud:** Uses Postgres for high-scale queuing.
-        *   **Desktop:** Uses Yaque (file-backed) for local queuing without needing a database server.
+        *   **Desktop:** Uses an embedded redb file for local queuing without needing a database server.
 
 ### 3. Technical Architecture Breakdown
 
@@ -43,9 +43,8 @@ You have moved through several iterations to arrive at a **Feature-Based Clean A
     *   Defines the rules: `Capacity > Usage ? Run : Queue`.
 
 *   **Infrastructure (Adapters):**
-    *   **Yaque:** A Rust-native, file-based queue optimized for the **Tauri/Desktop** use case. It allows persistent queuing without requiring the user to install Postgres.
-    *   **Postgres / Pgmq:** An adapter for **Cloud** deployments that leverages your existing database for queuing and locking.
-    *   **SeaORM:** Used to interact with custom tables for the "Mailbox" (storage of results).
+    *   **redb (embedded):** `EmbeddedStore` opens one crash-safe redb file holding `RedbLeaseQueue` and `RedbResultMailbox`, for the **Tauri/Desktop** use case (cr-28, ADR 0004). It allows persistent queuing without requiring the user to install Postgres. The same store is exposed to Kotlin and Swift through UniFFI bindings (cr-44).
+    *   **Postgres:** `PgLeaseQueue` (cr-26) and `PgResultMailbox` (cr-27) on raw sqlx, for **Cloud** deployments that already run a database; `PgmqLeaseQueue` (cr-30) is the same queue contract over pgmq. Tested on PostgreSQL 17 and 18 (cr-36).
 
 *   **Builders & Config:**
     *   A single scheduler configuration file (`config::SchedulerConfig`, examples in `examples/configs/`) declares the pools and opens the durable backends.

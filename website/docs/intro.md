@@ -13,8 +13,11 @@ go to a mailbox, so a client that disconnects can collect them later.
 
 The library is being reworked in the **correctness-and-durability** phase. Its
 goals are that weighted capacity is never exceeded, that accepted work is never
-silently lost, and that results reach clients that disconnected. Until a goal
-ships, treat it as a goal; the
+silently lost, and that results reach clients that disconnected. On `main`,
+every pool enforces weighted capacity, and a pool configured on a Postgres or
+redb backend (built as a `DurableResourcePool`) keeps accepted work and its
+result across a crash. The worker pools and in-memory pools do not survive a
+restart yet. The
 [changelog](https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/blob/main/CHANGELOG.md)
 records what has shipped.
 
