@@ -39,10 +39,10 @@ migration notes.
 
 | Guarantee | Today |
 | --- | --- |
-| Admitted units never exceed `max_units` | Yes, for every pool (`ResourcePool`, `DurableResourcePool`, native and WASM `WorkerPool`): one dispatcher and one unit-weighted semaphore, covered by loom and property tests. |
+| Admitted units never exceed `max_units` | Yes, for every pool (`ResourcePool`, `DurableResourcePool`, native and WASM `WorkerPool`): one dispatcher and one unit-weighted semaphore, covered by loom and property tests. With per-kind limits, no limited kind exceeds its limit either. |
 | Priority, then FIFO | Yes, among the tasks that fit. A smaller task that fits starts ahead of a large head that does not, at most `max_head_skips` times (default 8) before the head gets the capacity reserved (cr-20); `0` keeps strict head-of-line order. Durable pools dispatch strictly in order. |
 | Execution budgets | Yes, for every pool (JS timers on WASM). |
-| Multi-resource admission | Costs are already vectors, but pools admit by the sum of units against one `max_units`; per-dimension limits are cr-23. |
+| Multi-resource admission | Yes, for every pool (cr-23): give a pool per-kind limits (`resource_limits`, e.g. `{"gpu_vram": 24, "cpu": 4}`) and a task starts only when its cost fits `max_units` (the total) and every limited kind at once; a task needing 8 units of VRAM and one CPU slot waits while VRAM is free but no slot is. A task over any one limit is rejected with `CapacityExceeded`. Without `resource_limits`, admission is by the total alone. Covered by a loom model (`loom_vector`) and property tests. |
 | Executor panics | Contained, for `ResourcePool`, `DurableResourcePool` and the native `WorkerPool` (cr-21): the outcome is `TaskError::ExecutorPanicked`, the task's units are released and parked work starts; a `WorkerPool` worker killed by a panic is replaced. On WASM a panic aborts the module (`panic=abort` on stable Rust). |
 | Accepted work survives a crash | **Yes, for `ResourcePool` on a durable backend** (cr-49): configure a pool's `queue` and `mailbox` as `{"backend": "<name>"}` (or start a `DurableResourcePool` directly) on Postgres (`PgLeaseQueue`, `PgResultMailbox`) or redb (`RedbLeaseQueue`, `RedbResultMailbox`). `submit` returns only after the task is committed to the lease queue; the task's lease is extended while it waits or runs and is acked only after its outcome is stored in the result mailbox, so a process killed at any point (tested with `SIGKILL` mid-execution and between execution and the mailbox write, on PG 18 and redb) has the task re-run after the lease expires and exactly one result consumable. The executor itself can run more than once for one task (at-least-once); make side effects idempotent. In-memory pools and the `WorkerPool` still lose parked work on a crash. |
 | No silent loss at shutdown | **Yes, for all three pools** (cr-29): `shutdown_with(ShutdownPolicy)` (default `DrainThenCancel { deadline: 30 s }`) returns a `ShutdownReport` in which every accepted task either completed, was cancelled, or is still running (`unsettled`). The in-memory pools hand each cancelled task to a `CancellationSink` (its mailbox or result slot gets `TaskError::Cancelled`); the durable pool hands it back to its queue (`nack`, requeue), and a restarted pool runs it (tested on PG 18 and redb). A running task cancelled by the native `WorkerPool` reaches the sink without its payload. |
@@ -419,7 +419,15 @@ mailbox factories you supply instead.
 The schema is strict: an unknown or misspelled field fails to load, and the
 error names it. A pool's optional `max_head_skips` (default 8) bounds how often
 a parked task that does not fit may be passed by smaller tasks that do before
-the pool reserves capacity for it; `0` keeps strict head-of-line order. A pool whose `queue` and `mailbox` are `"in_memory"` parks
+the pool reserves capacity for it; `0` keeps strict head-of-line order. A
+pool's optional `resource_limits` maps resource kinds (`cpu`, `gpu_vram`,
+`io`, `mixed`) to the units each may hold at once, e.g.
+`"resource_limits": {"gpu_vram": 24, "cpu": 4}`: a task then starts only when
+its cost fits `max_units`, which bounds the total over every kind, and every
+listed kind at once (cr-23). Each limit must be greater than zero and at most
+`max_units`; a kind not listed is bounded by `max_units` alone, and an empty or
+absent map admits by the total, as before. `WorkerPoolConfig` takes the same
+field. A pool whose `queue` and `mailbox` are `"in_memory"` parks
 tasks and delivers results in memory. A pool whose `queue` and `mailbox` both
 name a backend (`{"backend": "local"}`) is built as a `DurableResourcePool` on
 it (cr-49): accepted tasks and their results survive a crash. Each backend
