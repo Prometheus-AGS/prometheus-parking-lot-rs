@@ -38,7 +38,7 @@ if [ -z "$lib_version" ] || [ "$lib_version" != "$gen_version" ]; then
   exit 1
 fi
 
-cargo build --locked "${cargo_profile_flag[@]}" -p prometheus-parking-lot-ffi
+cargo build --locked ${cargo_profile_flag[@]+"${cargo_profile_flag[@]}"} -p prometheus-parking-lot-ffi
 
 target_dir=$(cargo metadata --format-version 1 --no-deps --locked | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
 case "$(uname -s)" in

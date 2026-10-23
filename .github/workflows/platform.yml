@@ -86,9 +86,9 @@ jobs:
         run: |
           set -euo pipefail
           so=target/aarch64-linux-android/debug/libparking_lot_ffi.so
-          file "$so" | tee /dev/stderr | grep -q "ARM aarch64"
+          file "$so" | tee /dev/stderr | grep "ARM aarch64" > /dev/null
           readelf="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
-          "$readelf" --dyn-syms --wide "$so" | grep -q "uniffi_parking_lot_ffi_fn_func_open_store"
+          "$readelf" --dyn-syms --wide "$so" | grep "uniffi_parking_lot_ffi_fn_func_open_store" > /dev/null
           # Informational: Google Play needs 16 KB page alignment for apps targeting Android 15+.
           "$readelf" -l "$so" | grep LOAD
       - name: Install kotlinc (pinned, checksum-verified)
