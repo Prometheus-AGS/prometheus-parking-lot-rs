@@ -147,6 +147,10 @@ name = "queue_bench"
 harness = false
 required-features = ["tokio-runtime"]
 
+[[bench]]
+name = "skip_ahead_bench"
+harness = false
+
 [[example]]
 name = "postgres_pool"
 required-features = ["postgres"]

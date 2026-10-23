@@ -85,8 +85,8 @@ for the job at the head of the queue
 
 ```mermaid
 flowchart TD
-  F["4 units free.<br/>Head needs 6, next task needs 2."] --> T["Strict order, today:<br/>both wait until 6 units are free"]
-  F --> K["Bounded skip-ahead, planned in cr-20:<br/>the 2-unit task starts now"]
+  F["4 units free.<br/>Head needs 6, next task needs 2."] --> T["Strict order (max_head_skips = 0):<br/>both wait until 6 units are free"]
+  F --> K["Bounded skip-ahead, the default (cr-20):<br/>the 2-unit task starts now"]
   K --> N["After N skips:<br/>hold freed capacity for the head"]
 ```
 
@@ -131,10 +131,20 @@ introduced the term or the technique, so this chapter does not attribute it.
   commit order when concurrent enqueues commit out of id order, pgmq orders by
   priority lane only, and a durable pool lets a later higher-priority task
   wait behind the one leased task already waiting for capacity.
-- **No skip-ahead.** A submission starts immediately only when nothing is
-  parked ahead of it. When a task finishes, queued tasks start in order while
-  the head fits; a head that does not fit stops dispatch. Large tasks are never starved, at the
-  cost of idle capacity behind a large head.
+- **Bounded skip-ahead (cr-20).** A submission starts immediately only when
+  nothing is parked ahead of it. When a task finishes, queued tasks start in
+  order while the head fits. When the head does not fit, the first parked task
+  that does starts in its place, so among the tasks that can start, priority
+  then FIFO order still holds. After a head has been skipped `max_head_skips`
+  times (default 8) the dispatcher reserves the capacity for it: nothing else
+  starts until the head has. The head therefore starts within
+  `max_head_skips` dispatch cycles of reaching the head, and no later than
+  the moment the tasks running then, plus the at most `max_head_skips` tasks
+  started in its place, have finished. `max_head_skips = 0` restores strict
+  head-of-line order. This is backfilling with a count-based reservation
+  rather than EASY's time-based one: the scheduler does not know run times.
+  `ResourcePool` looks at most 64 parked tasks deep; a durable pool holds one
+  leased task waiting for capacity and so dispatches strictly in order.
 - **Deadlines in the queue.** A queued task found expired when it reaches the
   head is not started; its mailbox receives `TaskStatus::Expired`.
   `prune_expired` removes expired tasks in bulk.
@@ -145,9 +155,6 @@ introduced the term or the technique, so this chapter does not attribute it.
 
 ### Planned
 
-- `cr-20-skip-ahead`: fitting tasks may start behind a non-fitting head, and
-  the head must start within a configured number of dispatch cycles (the
-  backfilling trade-off above).
 - `cr-23-multi-resource`: per-dimension admission, so a task needing 8 GB of
   VRAM and 1 worker slot waits when either is short.
 

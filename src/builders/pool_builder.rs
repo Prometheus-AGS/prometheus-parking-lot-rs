@@ -83,7 +83,8 @@ where
             mailbox,
             executor,
             spawner.clone(),
-        );
+        )
+        .with_max_head_skips(pool_cfg.max_head_skips);
         pools.insert(name.clone(), pool);
     }
 
@@ -414,7 +415,8 @@ where
                 mailbox.clone(),
                 executor,
                 spawner.clone(),
-            );
+            )
+            .with_max_head_skips(pool_cfg.max_head_skips);
             for hook in hooks {
                 pool.hooks().register(hook);
             }

@@ -113,6 +113,27 @@ impl UnitSemaphore {
         permits_of(self.state.load(Ordering::Acquire))
     }
 
+    /// Units free for one more holder: `Some(max_units - units_in_use)` while
+    /// a permit is free, `None` when every permit is out.
+    ///
+    /// The dispatcher reads it under its dispatch lock to choose a skip-ahead
+    /// candidate (cr-20); the claim itself is still [`try_acquire`]'s CAS.
+    /// `Relaxed` is enough: units are claimed only by `try_acquire` under the
+    /// dispatch lock, and every earlier claim is sequenced before an unlock
+    /// that synchronizes-with this caller's lock, so by write-read coherence
+    /// the load returns that claim's value or a later one. Later values only
+    /// return units (a permit dropped outside the lock), so a stale read can
+    /// only under-report the free units, which makes the choice conservative,
+    /// never wrong: the CAS re-checks the real state.
+    ///
+    /// [`try_acquire`]: Self::try_acquire
+    #[must_use]
+    pub fn available_units(&self) -> Option<u32> {
+        let state = self.state.load(Ordering::Relaxed);
+        (permits_of(state) < self.max_permits)
+            .then(|| self.max_units.saturating_sub(units_of(state)))
+    }
+
     /// Claim `units` units and one permit if both fit; otherwise claim
     /// nothing and return `None`.
     ///

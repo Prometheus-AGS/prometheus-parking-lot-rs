@@ -219,3 +219,57 @@ async fn worker_pool_shutdown_cancels_waiting_tasks() {
     );
     shutdown.await.expect("shutdown thread");
 }
+
+/// Skip-ahead (cr-20) on the native pool: with `max_head_skips` 2, two
+/// one-unit tasks start beside a running blocker while a four-unit head
+/// waits; the guard then holds the third back, and the head starts before it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn starvation_worker_pool_skips_ahead_within_the_bound() {
+    let executor = GatedExecutor::new();
+    let pool = WorkerPool::new(
+        WorkerPoolConfig::new()
+            .with_worker_count(4)
+            .with_max_units(4)
+            .with_max_queue_depth(16)
+            .with_max_head_skips(2),
+        executor.clone(),
+    )
+    .expect("valid config");
+
+    let mut keys = vec![
+        pool.submit("blocker", meta(Priority::Normal, 2))
+            .expect("ok"),
+    ];
+    keys.push(pool.submit("large", meta(Priority::High, 4)).expect("ok"));
+    for name in ["small-1", "small-2", "small-3"] {
+        keys.push(pool.submit(name, meta(Priority::Normal, 1)).expect("ok"));
+    }
+    let stats = pool.skip_ahead_stats();
+    assert_eq!((stats.skipped, stats.reservations), (2, 1), "{stats:?}");
+    let pool_stats = pool.stats();
+    assert_eq!(pool_stats.used_units, 4);
+    assert_eq!(pool_stats.queued_tasks, 2, "the head and small-3 wait");
+
+    // Release blocker, small-1 and small-2: all four units free up for the
+    // head, which starts before small-3.
+    executor.gate.add_permits(3);
+    let deadline = tokio::time::Instant::now() + WAIT;
+    while executor.order.lock().len() < 4 {
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "the head never started"
+        );
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    executor.gate.add_permits(2);
+    for key in &keys {
+        pool.retrieve_async(key, WAIT).await.expect("task ran");
+    }
+    let order = executor.order.lock().clone();
+    let mut first_three = order[..3].to_vec();
+    first_three.sort_unstable();
+    assert_eq!(first_three, vec!["blocker", "small-1", "small-2"]);
+    assert_eq!(&order[3..], &["large", "small-3"]);
+    assert!(executor.peak_units.load(Ordering::SeqCst) <= 4);
+    pool.shutdown();
+}

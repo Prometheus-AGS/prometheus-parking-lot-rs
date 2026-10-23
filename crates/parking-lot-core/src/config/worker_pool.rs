@@ -42,6 +42,11 @@ const fn default_max_queue_depth() -> usize {
     1000
 }
 
+/// Default skip-ahead bound (cr-20): the dispatcher's default.
+const fn default_max_head_skips() -> u32 {
+    crate::dispatch::DEFAULT_MAX_HEAD_SKIPS
+}
+
 /// Default execution budget (and native default result TTL) in milliseconds: 2 minutes.
 const fn default_timeout_ms() -> u64 {
     120_000
@@ -107,6 +112,15 @@ pub struct WorkerPoolConfig {
     /// It does not bound `retrieve` itself: `retrieve` takes its own timeout.
     #[serde(default = "default_timeout_ms")]
     pub default_timeout_ms: u64,
+
+    /// Skip-ahead bound (cr-20): how many times a parked task that does not
+    /// fit the free units may be passed by a smaller parked task that does,
+    /// before the pool reserves capacity for it and starts nothing else until
+    /// it has started. `0` keeps strict head-of-line order.
+    ///
+    /// Default: 8 (`prometheus_parking_lot_core::dispatch::DEFAULT_MAX_HEAD_SKIPS`).
+    #[serde(default = "default_max_head_skips")]
+    pub max_head_skips: u32,
 }
 
 impl Default for WorkerPoolConfig {
@@ -117,6 +131,7 @@ impl Default for WorkerPoolConfig {
             max_units: default_max_units(),
             max_queue_depth: default_max_queue_depth(),
             default_timeout_ms: default_timeout_ms(),
+            max_head_skips: default_max_head_skips(),
         }
     }
 }
@@ -161,6 +176,14 @@ impl WorkerPoolConfig {
     #[must_use]
     pub const fn with_timeout_ms(mut self, timeout_ms: u64) -> Self {
         self.default_timeout_ms = timeout_ms;
+        self
+    }
+
+    /// Set the skip-ahead bound; see
+    /// [`max_head_skips`](Self::max_head_skips). `0` turns skip-ahead off.
+    #[must_use]
+    pub const fn with_max_head_skips(mut self, max_head_skips: u32) -> Self {
+        self.max_head_skips = max_head_skips;
         self
     }
 

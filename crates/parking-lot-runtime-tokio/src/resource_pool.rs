@@ -13,12 +13,18 @@
 //! [`TaskQueue`] backend behind a
 //! [`TaskQueueAdapter`]).
 //! A submission starts immediately only when nothing is parked and its cost
-//! fits; parked tasks start strictly in queue order — highest priority first,
-//! FIFO within a priority by the submission sequence the dispatcher stamps —
-//! and a head that does not fit is never taken out of the queue. A task whose
-//! cost exceeds the pool's total capacity is rejected at submission, because
-//! parked at the head of the queue it would block every task behind it
-//! forever.
+//! fits; parked tasks start in queue order — highest priority first, FIFO
+//! within a priority by the submission sequence the dispatcher stamps — and a
+//! head that does not fit is never taken out of the queue. While the head does
+//! not fit, a parked task behind it that does may start in its place
+//! (skip-ahead, cr-20), at most
+//! [`max_head_skips`](ResourcePool::with_max_head_skips) times per head; then
+//! the pool reserves capacity for the head. The lookup behind the head sees
+//! the first
+//! [`ADAPTER_LOOKAHEAD`](prometheus_parking_lot_core::dispatch::ADAPTER_LOOKAHEAD)
+//! parked tasks. A task whose cost exceeds the
+//! pool's total capacity is rejected at submission, because parked at the head
+//! of the queue it would block every task behind it forever.
 //!
 //! A running task owns its semaphore permit; completion returns the permit
 //! through the dispatcher, which starts whatever the freed units admit under
@@ -85,7 +91,9 @@ use crate::events::Events;
 use crate::ledger::{Ledger, SettleOnDrop};
 use crate::shutdown::{ShutdownPolicy, ShutdownReport};
 
-use prometheus_parking_lot_core::dispatch::{Dispatched, Dispatcher, Grant, TaskQueueAdapter};
+use prometheus_parking_lot_core::dispatch::{
+    Dispatched, Dispatcher, Grant, SkipAheadStats, TaskQueueAdapter,
+};
 use prometheus_parking_lot_core::semaphore::{Permit, UnitSemaphore};
 use prometheus_parking_lot_core::{
     AuditSink, Clock, Hook, HookBus, Mailbox, MailboxKey, PoolLimits, ScheduledTask,
@@ -217,6 +225,23 @@ where
     pub fn with_clock(self, clock: impl Clock + 'static) -> Self {
         *self.inner.clock.write() = Arc::new(clock);
         self
+    }
+
+    /// How many times a parked head that does not fit may be skipped by
+    /// smaller tasks that do before the pool reserves capacity for it (cr-20).
+    /// `0` keeps strict head-of-line order. Default:
+    /// [`DEFAULT_MAX_HEAD_SKIPS`](prometheus_parking_lot_core::dispatch::DEFAULT_MAX_HEAD_SKIPS).
+    #[must_use]
+    pub fn with_max_head_skips(self, max_head_skips: u32) -> Self {
+        self.inner.dispatcher.set_max_head_skips(max_head_skips);
+        self
+    }
+
+    /// Skip-ahead counters: tasks started ahead of a blocked head, and heads
+    /// the starvation guard reserved capacity for.
+    #[must_use]
+    pub fn skip_ahead_stats(&self) -> SkipAheadStats {
+        self.inner.dispatcher.skip_ahead_stats()
     }
 
     /// Hand tasks cancelled at shutdown to `sink` (default: a

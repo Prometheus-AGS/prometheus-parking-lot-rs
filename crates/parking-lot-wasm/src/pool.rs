@@ -7,7 +7,9 @@
 //!   same one the native pool uses. It enforces `max_units` (audit C1: the 0.2
 //!   WASM pool ignored it), serves parked tasks by priority then submission
 //!   order, and bounds admitted tasks by `worker_count`, so `max_queue_depth`
-//!   bounds exactly the tasks waiting.
+//!   bounds exactly the tasks waiting. A parked task that fits may skip ahead
+//!   of a head that does not, at most `WorkerPoolConfig::max_head_skips`
+//!   times per head (cr-20).
 //! - **Local tasks**: an admitted task runs on
 //!   `wasm_bindgen_futures::spawn_local`. There is no tokio runtime and no
 //!   thread; the browser event loop is the scheduler.
@@ -261,7 +263,8 @@ where
                 POOL_NAME,
                 UnitSemaphore::with_max_permits(config.max_units, worker_permits),
                 config.max_queue_depth,
-            ),
+            )
+            .with_max_head_skips(config.max_head_skips),
             results: Results::new(),
             counters: PoolCounters::default(),
             clock: RwLock::new(Arc::new(WasmClock::new())),

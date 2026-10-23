@@ -126,8 +126,38 @@ entry names the OpenSpec change that made it.
   `LifecycleEvent` gains `Expired` and `Requeued`, and `RejectionReason`
   gains `CapacityExceeded` (both enums are `#[non_exhaustive]`).
 
+- **Skip-ahead is on by default (cr-20).** The in-memory pools no longer
+  stop at a parked head that does not fit: a smaller parked task that fits
+  starts in its place, at most 8 times per head (see Added). Set
+  `max_head_skips` to `0` (`PoolConfig`, `WorkerPoolConfig`,
+  `ResourcePool::with_max_head_skips`, `Dispatcher::with_max_head_skips`) for
+  the previous strict head-of-line order. `PoolConfig` and `WorkerPoolConfig`
+  gain the public field `max_head_skips` (optional in JSON, default 8), so a
+  struct literal of either must now set it.
+
 ### Added
 
+- **Skip-ahead bin-packing with a starvation guard (cr-20, scenario S-20).**
+  When the head of the parked queue does not fit the free units, the
+  dispatcher starts the first parked task, in priority-then-FIFO order, that
+  does. After a head has been skipped `max_head_skips` times the dispatcher
+  reserves the capacity for it and starts nothing else until it has started,
+  so a head starts within `max_head_skips` dispatch cycles of becoming the
+  head, and no later than the drain after the last completion among the
+  tasks running when it became the head and the at most `max_head_skips`
+  tasks started in its place (proof in the `dispatch::dispatcher` module
+  docs). Applies to `ResourcePool` (looking at most `ADAPTER_LOOKAHEAD`, 64,
+  parked tasks deep), the native `WorkerPool` and the WASM `WorkerPool`; a
+  `DurableResourcePool` keeps strict order (it holds one leased task waiting
+  for capacity, so there is nothing to skip to). Counters:
+  `ResourcePool::skip_ahead_stats`, `WorkerPool::skip_ahead_stats`
+  (native), `Dispatcher::skip_ahead_stats`. Skips are not lifecycle events.
+  New in the core crate: `ParkedQueue::fitting`/`take` (default: no
+  skip-ahead), `UnitSemaphore::available_units`, `DEFAULT_MAX_HEAD_SKIPS`,
+  `SkipAheadStats`, `ADAPTER_LOOKAHEAD`. `PriorityQueue` is now an ordered
+  map, and `take_all` returns items in dispatch order. Benchmark:
+  `cargo bench --bench skip_ahead_bench` (utilization 0.947 with the default
+  against 0.917 under strict order on a 95%-loaded mixed workload).
 - **Apache Iggy events and notifications (cr-32).** New crate
   `prometheus-parking-lot-iggy`, behind the facade's `iggy` feature
   (`infra::events`): `IggyHook` publishes every lifecycle event to a `lifecycle`

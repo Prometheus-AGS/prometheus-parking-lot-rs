@@ -12,8 +12,9 @@
 //!   limit holds exactly (no TOCTOU) and a park cannot interleave with a drain.
 //! - **drain**: while the head exists: an expired head is popped and reported;
 //!   a head that fits is popped and started; a head that does not fit stays
-//!   where it is and the drain stops. The head is never popped to be looked at
-//!   and pushed back (audit C4).
+//!   where it is, and the drain tries to *skip ahead* of it (below). The drain
+//!   stops when neither the head nor a skip-ahead candidate can start. The
+//!   head is never popped to be looked at and pushed back (audit C4).
 //! - **complete**: return the finished item's permit *under the dispatch
 //!   lock*, then drain.
 //!
@@ -29,6 +30,80 @@
 //! observer emits is ordered before the item's "started" event. The pools
 //! emit through a non-blocking `HookBus`, so the observer adds no wait under
 //! the lock.
+//!
+//! ## Skip-ahead and the starvation guard (cr-20)
+//!
+//! Strict head-of-line order leaves units idle while a large head waits for
+//! them. When the head does not fit, the drain instead starts the first
+//! parked item, in priority-then-FIFO order, that is not expired and fits the
+//! free units (and a free permit): among the items that *can* start, priority
+//! and FIFO order still hold. Each such start is a *skip* of the head.
+//!
+//! The *starvation guard* bounds the skips. The dispatcher counts the skips of
+//! the current head, keyed by its sequence number (the count restarts when a
+//! different item becomes the head). Once the head has been skipped
+//! `max_head_skips` times the dispatcher *reserves* the capacity for it: it
+//! starts nothing else until the head has started, so the units that running
+//! work returns accumulate for the head. `max_head_skips == 0` turns
+//! skip-ahead off (strict head-of-line order). The default is
+//! [`DEFAULT_MAX_HEAD_SKIPS`]; see there for the choice.
+//!
+//! A queue that does not implement [`ParkedQueue::fitting`] keeps strict
+//! order whatever `max_head_skips` says.
+//!
+//! ### The bound
+//!
+//! Let an item `H` become the head, and suppose it stays the head until it
+//! starts: no item that must be served before it (a strictly higher priority)
+//! is parked meanwhile, and it is not expired, pruned or taken. Write
+//! `N = max_head_skips`, `R` for the items running when `H` became the head
+//! and `S` for the items started while `H` is the head and has not started.
+//!
+//! 1. **`|S| <= N`.** `H` is among the first `N + 1` items the dispatcher
+//!    starts after it became the head: it starts within `N` dispatch cycles,
+//!    counting one cycle per started item.
+//! 2. **`H` starts no later than the drain that follows the last completion
+//!    among `R` and `S`.** In wall-clock terms its wait is covered by the run
+//!    times of at most `|R| + N` items: at most `(|R| + N) * B` when no item
+//!    runs longer than `B`, and in practice far less, as they run in
+//!    parallel.
+//!
+//! *Proof.* (1) Every start happens under the dispatch lock, in the fast path
+//! of [`submit`](Dispatcher::submit) or in the drain. The fast path starts an
+//! item only when nothing is parked, and `H` is parked. In the drain, an item
+//! other than the head starts only as a skip, which requires the head's skip
+//! count to be below `N` and increments it. The count is keyed by `H`'s
+//! sequence and restarts only when the head's sequence differs, which would
+//! contradict `H` staying the head. So at most `N` items start in place of
+//! `H`.
+//!
+//! (2) While `H` is the head, every item holding a permit is in `R` or `S`
+//! (by (1), nothing else starts). `H`'s cost is at most `max_units` (larger
+//! items are rejected at submission), so `H` fits as soon as no permit is
+//! held. Every completion returns its permit under the dispatch lock and then
+//! drains ([`complete`](Dispatcher::complete); a permit dropped any other way
+//! is followed by [`poke`](Dispatcher::poke) in the pools), and that drain
+//! reads `H` as the head and starts it once it fits; so `H` starts no later
+//! than the drain after the last completion in `R` and `S`. For the
+//! wall-clock form: `H` does not fit only while some permit is held, so from
+//! the moment `H` became the head until it starts, some item of `R` or `S` is
+//! running at every instant, and that interval is no longer than the sum of
+//! their run times. The pools bound a run time by the execution budget where
+//! they can stop the executor (the async pools drop its future); a native
+//! worker running blocking code holds its units until it returns. ∎
+//!
+//! The bound is per head. A strictly higher-priority arrival overtakes `H` as
+//! it would under strict order, and is then bounded the same way; `H`'s count
+//! restarts when it is the head again.
+//!
+//! Skips and reservations are counted in [`SkipAheadStats`] rather than
+//! emitted as lifecycle events: the cr-31 event sequence (`Submitted`,
+//! `Queued`, `Started`, one terminal event) has no place for them.
+//!
+//! Negative control S-20: under
+//! `--cfg parking_lot_negative_control="s-20"` the guard never engages
+//! (unbounded skip-ahead), and the `starvation_` tests must then find a head
+//! that starves.
 //!
 //! ## Capacity invariant
 //!
@@ -66,7 +141,61 @@ use crate::contracts::SchedulerError;
 use crate::semaphore::sync::{Arc, Mutex};
 use crate::semaphore::{Permit, UnitSemaphore};
 
-use super::parked::{Parkable, ParkedQueue, PriorityQueue};
+use super::parked::{Parkable, ParkedQueue, PriorityQueue, Ticket};
+
+/// Default for [`Dispatcher::max_head_skips`]: a blocked head may be skipped
+/// 8 times before the dispatcher reserves capacity for it.
+///
+/// The guard trades head latency for utilization. A skip only ever starts
+/// work that fits *now*, so the cost to the head is the run time of the
+/// skipped work that still holds units when the head could otherwise have
+/// started: with `k` small items running side by side, roughly `N / k`
+/// small-item run times on top of what strict order would make it wait (see
+/// the module docs for the exact bound). Eight skips let the small work that
+/// fits beside a waiting head fill its gap for a couple of turnovers, which is
+/// where the utilization gain comes from, while keeping the added head wait to
+/// a few small-item run times. On the mixed workload of
+/// `benches/skip_ahead_bench.rs` (16 units, about 95% offered load) 8 skips
+/// reach a utilization of 0.947 against 0.917 for strict order and 0.949
+/// unbounded; 2 and 4 skips reach 0.932 and 0.945.
+pub const DEFAULT_MAX_HEAD_SKIPS: u32 = 8;
+
+/// Skip-ahead counters of a [`Dispatcher`] (cr-20), since it was built.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SkipAheadStats {
+    /// Items started in place of a head that did not fit.
+    pub skipped: u64,
+    /// Heads for which the starvation guard engaged: they were skipped
+    /// `max_head_skips` times and the dispatcher then reserved capacity for
+    /// them.
+    pub reservations: u64,
+}
+
+/// The head that is being skipped, and how often.
+#[derive(Debug, Clone, Copy)]
+struct BlockedHead {
+    /// The head's sequence number (unique per dispatcher).
+    sequence: u64,
+    /// Items started in its place so far.
+    skips: u32,
+    /// Whether the guard has engaged for it (counted once).
+    reserved: bool,
+}
+
+/// Whether a head skipped `skips` times may not be skipped again.
+#[cfg(not(parking_lot_negative_control = "s-20"))]
+const fn guard_engaged(skips: u32, max_head_skips: u32) -> bool {
+    skips >= max_head_skips
+}
+
+/// Negative control S-20: the starvation guard never engages, so skip-ahead
+/// is unbounded and a large head can wait forever behind a stream of small
+/// items.
+#[cfg(parking_lot_negative_control = "s-20")]
+const fn guard_engaged(skips: u32, max_head_skips: u32) -> bool {
+    let _ = (skips, max_head_skips);
+    false
+}
 
 /// An admitted item and the permit it runs under.
 #[derive(Debug)]
@@ -127,6 +256,12 @@ struct State<Q> {
     /// Last sequence stamped; the next item gets `last_sequence + 1`, so the
     /// first is 1 and 0 stays "unsequenced".
     last_sequence: u64,
+    /// Skips allowed per head before capacity is reserved for it; 0 turns
+    /// skip-ahead off.
+    max_head_skips: u32,
+    /// The current head, while it does not fit.
+    blocked: Option<BlockedHead>,
+    stats: SkipAheadStats,
 }
 
 /// Priority dispatcher over a unit-weighted semaphore. See the module docs.
@@ -166,9 +301,41 @@ impl<T, Q> Dispatcher<T, Q> {
             state: Mutex::new(State {
                 queue,
                 last_sequence: 0,
+                max_head_skips: DEFAULT_MAX_HEAD_SKIPS,
+                blocked: None,
+                stats: SkipAheadStats::default(),
             }),
             _items: PhantomData,
         }
+    }
+
+    /// Set how many times a head that does not fit may be skipped before
+    /// capacity is reserved for it (cr-20; see the module docs). `0` turns
+    /// skip-ahead off: strict head-of-line order. Default:
+    /// [`DEFAULT_MAX_HEAD_SKIPS`].
+    #[must_use]
+    pub fn with_max_head_skips(self, max_head_skips: u32) -> Self {
+        self.set_max_head_skips(max_head_skips);
+        self
+    }
+
+    /// [`with_max_head_skips`](Self::with_max_head_skips) on a shared
+    /// dispatcher. Takes effect at the next drain; a head already skipped at
+    /// least `max_head_skips` times gets its reservation at once.
+    pub fn set_max_head_skips(&self, max_head_skips: u32) {
+        self.state.lock().max_head_skips = max_head_skips;
+    }
+
+    /// Skips allowed per head before capacity is reserved for it.
+    #[must_use]
+    pub fn max_head_skips(&self) -> u32 {
+        self.state.lock().max_head_skips
+    }
+
+    /// Skip-ahead counters since the dispatcher was built.
+    #[must_use]
+    pub fn skip_ahead_stats(&self) -> SkipAheadStats {
+        self.state.lock().stats
     }
 
     /// Total units.
@@ -396,15 +563,88 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
                 }
                 continue;
             }
-            let Some(permit) = UnitSemaphore::try_acquire(&self.semaphore, ticket.units) else {
+            if let Some(permit) = UnitSemaphore::try_acquire(&self.semaphore, ticket.units) {
+                match state.queue.pop_head() {
+                    Some(item) => dispatched.started.push(Grant { item, permit }),
+                    None => break,
+                }
+                continue;
+            }
+            if !self.skip_ahead_locked(state, &ticket, now_ms, &mut dispatched) {
                 break;
-            };
-            match state.queue.pop_head() {
-                Some(item) => dispatched.started.push(Grant { item, permit }),
-                None => break,
             }
         }
         dispatched
+    }
+
+    /// One skip of `head`, which does not fit: start the first parked item
+    /// that does, unless the starvation guard reserves capacity for the head.
+    /// Returns whether an item started. Callers hold the dispatch lock.
+    ///
+    /// The candidate is admitted before it is removed, so an item whose
+    /// permit cannot be had stays parked (as in the head path).
+    fn skip_ahead_locked(
+        &self,
+        state: &mut State<Q>,
+        head: &Ticket,
+        now_ms: u128,
+        dispatched: &mut Dispatched<T>,
+    ) -> bool {
+        if state.max_head_skips == 0 {
+            return false;
+        }
+        let mut blocked = match state.blocked {
+            Some(blocked) if blocked.sequence == head.sequence => blocked,
+            _ => BlockedHead {
+                sequence: head.sequence,
+                skips: 0,
+                reserved: false,
+            },
+        };
+        if guard_engaged(blocked.skips, state.max_head_skips) {
+            if !blocked.reserved {
+                blocked.reserved = true;
+                state.stats.reservations += 1;
+                tracing::debug!(
+                    pool = %self.pool,
+                    sequence = head.sequence,
+                    skips = blocked.skips,
+                    "starvation guard: reserving capacity for the head"
+                );
+            }
+            state.blocked = Some(blocked);
+            return false;
+        }
+        state.blocked = Some(blocked);
+        let Some(free_units) = self.semaphore.available_units() else {
+            return false;
+        };
+        let candidate = match state.queue.fitting(free_units, now_ms) {
+            Ok(Some(candidate)) => candidate,
+            Ok(None) => return false,
+            Err(error) => {
+                // Nothing was removed; the next submit/complete retries.
+                tracing::error!(pool = %self.pool, %error, "parked queue unreadable for skip-ahead");
+                return false;
+            }
+        };
+        let Some(permit) = UnitSemaphore::try_acquire(&self.semaphore, candidate.units) else {
+            return false;
+        };
+        // Dropping `permit` on the `None` path returns its units under the
+        // dispatch lock.
+        let Some(item) = state.queue.take(&candidate) else {
+            return false;
+        };
+        if candidate != *head {
+            // A permit dropped outside the lock can make the head itself the
+            // candidate; that start is not a skip.
+            blocked.skips = blocked.skips.saturating_add(1);
+            state.blocked = Some(blocked);
+            state.stats.skipped += 1;
+        }
+        dispatched.started.push(Grant { item, permit });
+        true
     }
 }
 
@@ -481,8 +721,9 @@ mod tests {
     }
 
     #[test]
-    fn head_that_does_not_fit_blocks_and_stays_parked() {
-        let dispatcher = Dispatcher::in_memory("test", UnitSemaphore::new(4), 8);
+    fn strict_order_head_that_does_not_fit_blocks_and_stays_parked() {
+        let dispatcher =
+            Dispatcher::in_memory("test", UnitSemaphore::new(4), 8).with_max_head_skips(0);
         let blocker = dispatcher
             .submit(item("blocker", Priority::Normal, 2), 0)
             .expect("ok");
@@ -490,8 +731,8 @@ mod tests {
             .submit(item("big", Priority::High, 4), 0)
             .expect("ok");
         assert!(!big.started);
-        // Strict order (skip-ahead is cr-20): the small task waits behind the
-        // big head even though it would fit.
+        // Skip-ahead off: the small task waits behind the big head even
+        // though it would fit.
         let small = dispatcher
             .submit(item("small", Priority::Low, 1), 0)
             .expect("ok");
@@ -500,6 +741,138 @@ mod tests {
         let mut grants = blocker.dispatched.started;
         let woken = dispatcher.complete(grants.pop().expect("blocker").permit, 0);
         assert_eq!(names(&woken.started), vec!["big"]);
+        assert_eq!(dispatcher.skip_ahead_stats(), SkipAheadStats::default());
+    }
+
+    /// The head that does not fit stays parked while a smaller item skips
+    /// ahead of it; the head starts as soon as it fits.
+    #[test]
+    fn starvation_skip_ahead_starts_a_fitting_item_behind_the_head() {
+        let dispatcher = Dispatcher::in_memory("test", UnitSemaphore::new(4), 8);
+        assert_eq!(dispatcher.max_head_skips(), DEFAULT_MAX_HEAD_SKIPS);
+        let blocker = dispatcher
+            .submit(item("blocker", Priority::Normal, 2), 0)
+            .expect("ok");
+        let big = dispatcher
+            .submit(item("big", Priority::High, 4), 0)
+            .expect("ok");
+        assert!(!big.started);
+        let small = dispatcher
+            .submit(item("small", Priority::Low, 1), 0)
+            .expect("ok");
+        assert!(small.started, "the small item fits beside the blocker");
+        assert_eq!(dispatcher.parked(), 1);
+        assert_eq!(dispatcher.units_in_use(), 3);
+        let mut running = blocker.dispatched.started;
+        running.extend(small.dispatched.started);
+        let mut woken = Vec::new();
+        for grant in running {
+            woken.extend(dispatcher.complete(grant.permit, 0).started);
+        }
+        assert_eq!(names(&woken), vec!["big"]);
+        assert_eq!(dispatcher.skip_ahead_stats().skipped, 1);
+    }
+
+    /// Among the items behind the head, the ones that fit start in priority,
+    /// then FIFO, order.
+    #[test]
+    fn starvation_skip_ahead_keeps_priority_order_among_fitting_items() {
+        let dispatcher = Dispatcher::in_memory("test", UnitSemaphore::new(6), 16);
+        let x1 = dispatcher
+            .submit(item("x1", Priority::Normal, 4), 0)
+            .expect("ok");
+        let x2 = dispatcher
+            .submit(item("x2", Priority::Normal, 2), 0)
+            .expect("ok");
+        for (name, priority, units) in [
+            ("head", Priority::Critical, 5),
+            ("normal-3", Priority::Normal, 3),
+            ("low-1", Priority::Low, 1),
+            ("normal-1a", Priority::Normal, 1),
+            ("high-1", Priority::High, 1),
+            ("normal-1b", Priority::Normal, 1),
+        ] {
+            let admission = dispatcher
+                .submit(item(name, priority, units), 0)
+                .expect("ok");
+            assert!(!admission.started, "nothing fits while x1 and x2 run");
+        }
+        let mut grants = x1.dispatched.started;
+        let woken = dispatcher.complete(grants.pop().expect("x1").permit, 0);
+        // 4 units free, the head needs 5: the fitting items start in
+        // priority-then-FIFO order until the units run out.
+        assert_eq!(names(&woken.started), vec!["high-1", "normal-3"]);
+        let mut grants = x2.dispatched.started;
+        let woken = dispatcher.complete(grants.pop().expect("x2").permit, 0);
+        assert_eq!(names(&woken.started), vec!["normal-1a", "normal-1b"]);
+        assert_eq!(dispatcher.parked(), 2, "the head and low-1 wait");
+        assert_eq!(dispatcher.skip_ahead_stats().skipped, 4);
+    }
+
+    /// Skips are taken in priority-then-FIFO order among the fitting items,
+    /// passing over one that does not fit.
+    #[test]
+    fn starvation_skip_ahead_order_passes_over_items_that_do_not_fit() {
+        let dispatcher = Dispatcher::in_memory("test", UnitSemaphore::new(4), 16);
+        let blocker = dispatcher
+            .submit(item("blocker", Priority::Normal, 2), 0)
+            .expect("ok");
+        let _ = dispatcher
+            .submit(item("head", Priority::Critical, 4), 0)
+            .expect("ok");
+        let mut started = Vec::new();
+        for (name, priority, units) in [
+            ("normal-2", Priority::Normal, 3),
+            ("low-1", Priority::Low, 1),
+            ("high-1", Priority::High, 1),
+        ] {
+            let admission = dispatcher
+                .submit(item(name, priority, units), 0)
+                .expect("ok");
+            started.extend(names(&admission.dispatched.started));
+        }
+        // normal-2 (3 units) never fits beside the blocker; low-1 then
+        // high-1 fit, each skipping ahead as it arrives.
+        assert_eq!(started, vec!["low-1", "high-1"]);
+        assert_eq!(dispatcher.parked(), 2);
+        drop(blocker);
+    }
+
+    /// After `max_head_skips` skips the guard reserves capacity for the head:
+    /// items that fit keep waiting until the head has started.
+    #[test]
+    fn starvation_guard_reserves_capacity_after_max_skips() {
+        let dispatcher =
+            Dispatcher::in_memory("test", UnitSemaphore::new(4), 16).with_max_head_skips(2);
+        let blocker = dispatcher
+            .submit(item("blocker", Priority::Normal, 1), 0)
+            .expect("ok");
+        let _ = dispatcher
+            .submit(item("head", Priority::Normal, 4), 0)
+            .expect("ok");
+        let mut started = Vec::new();
+        for name in ["s1", "s2", "s3"] {
+            let admission = dispatcher
+                .submit(item(name, Priority::Normal, 1), 0)
+                .expect("ok");
+            started.extend(admission.dispatched.started);
+        }
+        assert_eq!(names(&started), vec!["s1", "s2"]);
+        let stats = dispatcher.skip_ahead_stats();
+        assert_eq!((stats.skipped, stats.reservations), (2, 1));
+        // One unit is free, s3 fits, but the head is reserved.
+        assert_eq!(dispatcher.units_in_use(), 3);
+        assert_eq!(dispatcher.parked(), 2);
+        let mut woken = Vec::new();
+        let mut running = blocker.dispatched.started;
+        running.extend(started);
+        for grant in running {
+            woken.extend(dispatcher.complete(grant.permit, 0).started);
+        }
+        assert_eq!(names(&woken), vec!["head"]);
+        let mut running = woken;
+        let after = dispatcher.complete(running.pop().expect("head").permit, 0);
+        assert_eq!(names(&after.started), vec!["s3"]);
     }
 
     #[test]

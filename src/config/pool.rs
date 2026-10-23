@@ -70,6 +70,18 @@ pub struct PoolConfig {
     pub queue: StorageConfig,
     /// Where task outcomes are delivered.
     pub mailbox: StorageConfig,
+    /// Skip-ahead bound (cr-20): how many times a parked task that does not
+    /// fit the free units may be passed by a smaller parked task that does,
+    /// before the pool reserves capacity for it. `0` keeps strict head-of-line
+    /// order. Optional; default 8. A pool on a durable backend dispatches
+    /// strictly head-of-line and does not use it.
+    #[serde(default = "default_max_head_skips")]
+    pub max_head_skips: u32,
+}
+
+/// Default for [`PoolConfig::max_head_skips`]: the dispatcher's default.
+const fn default_max_head_skips() -> u32 {
+    prometheus_parking_lot_core::dispatch::DEFAULT_MAX_HEAD_SKIPS
 }
 
 /// Root scheduler configuration.
