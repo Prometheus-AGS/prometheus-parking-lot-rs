@@ -1,0 +1,110 @@
+name: Docs examples
+
+# cr-47: every code sample in the guides is compiled and run from a real source
+# file. The guides' Rust blocks are excerpts of examples/*.rs (checked by
+# .github/scripts/check-doc-snippets.py); this workflow builds every example and
+# runs each one: the server-free ones directly, the Postgres ones against the
+# project image (parking-lot-pg:18) and the Iggy ones against the server version
+# the Iggy tests pin. One job, so the all-features build happens once.
+
+on:
+  push:
+    branches: ["main", "kbd/**"]
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: docs-examples-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  RUST_BACKTRACE: 1
+  # Keep in step with ci.yml and rust-toolchain.toml.
+  PINNED_TOOLCHAIN: "1.99.1"
+  # Same tag and digest as crates/parking-lot-iggy/tests/support/mod.rs (IGGY_TAG).
+  IGGY_IMAGE: "apache/iggy:0.9.0@sha256:b35fc2841964f2962a5f164d33b3ae3a9de99a66920defd3cd8a1c039470602d"
+  DATABASE_URL: "postgresql://postgres:postgres@127.0.0.1:5433/postgres"
+  IGGY_URL: "iggy://iggy:iggy@127.0.0.1:8090"
+
+jobs:
+  examples:
+    name: Build and run the guide examples
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - name: Guide code blocks are excerpts of examples
+        run: python3 .github/scripts/check-doc-snippets.py
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.PINNED_TOOLCHAIN }}
+      # Same flags, features and toolchain as ci.yml's pinned `test` leg: restore
+      # the cache it saves on main and save nothing here.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test-${{ env.PINNED_TOOLCHAIN }}
+          save-if: "false"
+      - uses: docker/setup-buildx-action@v4
+      # The layer cache scope ci.yml's `postgres` job fills for PG 18.
+      - name: Build parking-lot-pg:18 (layer cache)
+        uses: docker/build-push-action@v7
+        with:
+          context: docker
+          file: docker/postgres18/Dockerfile
+          tags: parking-lot-pg:18
+          load: true
+          push: false
+          cache-from: type=gha,scope=parking-lot-pg-18
+      - name: Start Postgres 18 and Iggy 0.9
+        # Iggy advertises the address clients reconnect to, so the container
+        # port equals the host port (see the Iggy test support module).
+        run: |
+          docker run -d --name pg -e POSTGRES_PASSWORD=postgres -p 5433:5432 parking-lot-pg:18
+          docker run -d --name iggy -p 8090:8090 \
+            -e IGGY_ROOT_USERNAME=iggy -e IGGY_ROOT_PASSWORD=iggy \
+            -e IGGY_TCP_ADDRESS=0.0.0.0:8090 -e IGGY_NODE_ADVERTISED_ADDRESS=localhost \
+            -e IGGY_HTTP_ENABLED=false -e IGGY_QUIC_ENABLED=false -e IGGY_WEBSOCKET_ENABLED=false \
+            -e IGGY_SHARDING_CPU_ALLOCATION=1 -e IGGY_SHARDING_PIN_CORES=false \
+            --cap-add SYS_NICE --security-opt seccomp=unconfined --ulimit memlock=-1:-1 \
+            "$IGGY_IMAGE"
+      # Compiles while the servers start.
+      - name: Build every example
+        run: cargo build --examples --workspace --all-features --locked
+      - name: Wait for the servers
+        run: |
+          timeout 120 bash -c 'until docker exec pg pg_isready -U postgres >/dev/null 2>&1; do sleep 1; done'
+          timeout 120 bash -c 'until docker logs iggy 2>&1 | grep -q "Client listener (TCP) accepting"; do sleep 1; done'
+      - name: Run the server-free examples
+        timeout-minutes: 5
+        run: |
+          for example in gpu_inference_pool disconnected_client shutdown_requeue embedded_pool; do
+            echo "::group::$example"
+            cargo run --example "$example" --all-features --locked
+            echo "::endgroup::"
+          done
+      - name: Run the Postgres examples
+        timeout-minutes: 5
+        run: |
+          for example in postgres_pool postgres_tenants; do
+            echo "::group::$example"
+            cargo run --example "$example" --all-features --locked
+            echo "::endgroup::"
+          done
+      - name: Run the Iggy examples
+        timeout-minutes: 5
+        run: |
+          for example in iggy_events iggy_stream_replay; do
+            echo "::group::$example"
+            cargo run --example "$example" --all-features --locked
+            echo "::endgroup::"
+          done
+      - name: Server logs
+        if: failure()
+        run: |
+          docker logs pg 2>&1 | tail -50
+          docker logs iggy 2>&1 | tail -50

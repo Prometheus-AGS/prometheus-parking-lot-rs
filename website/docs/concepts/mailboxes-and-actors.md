@@ -133,8 +133,11 @@ create a second result.
   (`RetryPolicy`). A notifier
   failure is logged and counted (`NotifyStats`); it never fails or undoes a
   stored result.
-- **No concrete notifier ships yet.** The only built-in `Notifier` is
-  `NoopNotifier`. Clients poll with `consume`.
+- **Notifiers.** With the `iggy` feature, `IggyNotifier` (cr-32) publishes a
+  `mailbox.ready` pointer to Apache Iggy after each stored result; without one
+  (`NoopNotifier`), clients poll with `consume`. A durable pool built from the
+  configuration has no notifier; start the pool with a `StorageMailbox` to add
+  one ([Iggy events](../guides/iggy-events.md)).
 - **The worker pools** keep results in their own in-process slots rather than
   in a mailbox, and these slots do not survive a restart. The native
   `WorkerPool` is read with `retrieve` or `retrieve_async`; unretrieved results
@@ -143,10 +146,7 @@ create a second result.
   leaves the result in its slot. The WASM `WorkerPool` has only
   `retrieve_async` and no result TTL.
 
-### Planned
-
-- `cr-32-iggy-events`: an Iggy notifier that publishes a "result ready" event
-  (see [Event logs](./event-logs.md)).
+Worked examples: [Disconnected clients](../guides/disconnected-clients.md).
 
 ## Sources
 

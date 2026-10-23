@@ -13,7 +13,7 @@ is marked as planned and names its OpenSpec change.
 | [API.md](API.md) | Map of the public API by module, with features |
 | [CHANGELOG](../CHANGELOG.md) | What changed in each release, including migration notes |
 | [WHAT_WHY.md](WHAT_WHY.md) | Why the crate exists: the problem and the intended guarantees |
-| [Docs site](../website/docs/intro.md) | Concept chapters (theory and history); guides arrive with cr-47 |
+| [Docs site](../website/docs/intro.md) | Concept chapters (theory and history) and [guides](../website/docs/guides/index.md) per deployment, each backed by a program in [`examples/`](../examples/) that CI builds and runs |
 
 ## Design
 
@@ -42,7 +42,7 @@ is marked as planned and names its OpenSpec change.
 
 - Sample scheduler configurations, one per backend:
   [`examples/configs/`](../examples/configs/) (`in-memory.json`,
-  `postgres.json`, `redb.json`), parsed by
+  `postgres.json`, `redb.json`, `pgmq.json`, `iggy.json`), parsed by
   `config::SchedulerConfig::from_json_str` and built by
   `builders::build_pools_from_scheduler_config`. The test suite loads and
   builds every one of them.

@@ -144,6 +144,17 @@ entry names the OpenSpec change that made it.
 
 ### Added
 
+- **Scenario guides and examples (cr-47).** The docs site gains guides for a
+  GPU inference pool, a Tauri local LLM, a multi-tenant Postgres service,
+  disconnected clients, shutdown and requeue, Iggy events, streaming replay,
+  configuration, upgrading from 0.2 and the API reference (docs.rs from the
+  0.3.0 release). Each is backed by a new example: `gpu_inference_pool`,
+  `disconnected_client`, `shutdown_requeue` (no server), `postgres_tenants`
+  (PostgreSQL), `iggy_events` and `iggy_stream_replay` (Iggy 0.9). Every Rust
+  block on the site must be a verbatim excerpt of an example
+  (`.github/scripts/check-doc-snippets.py`), and the `Docs examples` workflow
+  builds every example and runs each one, the Postgres and Iggy ones against
+  containers.
 - **Benchmark suites and CI job (cr-40).** Four criterion suites replace
   `queue_bench` and `skip_ahead_bench`: `components` (semaphore, dispatcher,
   queue, mailbox, hooks), `throughput` (tasks per second through

@@ -170,6 +170,32 @@ required-features = ["postgres"]
 name = "embedded_pool"
 required-features = ["embedded"]
 
+# Scenario guides (cr-47, website/docs/guides/). Each guide's Rust code is copied
+# from one of these files; .github/scripts/check-doc-snippets.py checks it is.
+[[example]]
+name = "gpu_inference_pool"
+required-features = ["tokio-runtime"]
+
+[[example]]
+name = "disconnected_client"
+required-features = ["tokio-runtime", "embedded"]
+
+[[example]]
+name = "shutdown_requeue"
+required-features = ["tokio-runtime", "embedded"]
+
+[[example]]
+name = "postgres_tenants"
+required-features = ["tokio-runtime", "postgres"]
+
+[[example]]
+name = "iggy_events"
+required-features = ["tokio-runtime", "embedded", "iggy"]
+
+[[example]]
+name = "iggy_stream_replay"
+required-features = ["tokio-runtime", "iggy"]
+
 [lints]
 workspace = true
 
