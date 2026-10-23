@@ -1,30 +1,53 @@
-//! WASM implementation of `WorkerPool` using async tasks.
+//! The WASM `WorkerPool`: the shared dispatcher driving local async tasks.
 //!
-//! This implementation uses tokio async tasks instead of OS threads,
-//! providing cooperative multitasking suitable for WASM environments.
+//! # Design
 //!
-//! # Design Principles
+//! - **One dispatcher**: admission goes through the core
+//!   [`Dispatcher`](prometheus_parking_lot_core::dispatch::Dispatcher), the
+//!   same one the native pool uses. It enforces `max_units` (audit C1: the 0.2
+//!   WASM pool ignored it), serves parked tasks by priority then submission
+//!   order, and bounds admitted tasks by `worker_count`, so `max_queue_depth`
+//!   bounds exactly the tasks waiting.
+//! - **Local tasks**: an admitted task runs on
+//!   `wasm_bindgen_futures::spawn_local`. There is no tokio runtime and no
+//!   thread; the browser event loop is the scheduler.
+//! - **Bounded execution**: every execution runs under a budget (the task's
+//!   deadline or the pool's default timeout, whichever is nearer), measured by
+//!   a JS `setTimeout`. A task still running at its budget is dropped at its
+//!   next await point, its units are released and its result is
+//!   [`TaskError::Timeout`].
+//! - **No polling**: results use a oneshot per waiting retriever.
+//! - **Clean shutdown**: parked tasks are failed with [`TaskError::Cancelled`]
+//!   rather than dropped silently.
 //!
-//! - **No polling**: Uses oneshot channels for result notification
-//! - **Async-native**: All operations are async, no blocking
-//! - **Semaphore-based concurrency**: Efficient permit-based limiting
+//! # Panics abort the module
+//!
+//! `wasm32-unknown-unknown` is built with `panic=abort` on stable Rust, so an
+//! executor panic cannot be caught: it traps and the whole module is dead.
+//! The panic containment of the native pools (`TaskError::ExecutorPanicked`)
+//! does not exist here. Executors must return errors, not panic.
 
-use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
-use parking_lot::{Mutex, RwLock};
-use tokio::sync::{Semaphore, oneshot};
-use tracing::{debug, error, info, warn};
+use parking_lot::RwLock;
+use tracing::{debug, info, warn};
+use wasm_bindgen_futures::spawn_local;
 
 use prometheus_parking_lot_core::config::WorkerPoolConfig;
 use prometheus_parking_lot_core::dispatch::{
-    PoolCounters, generate_mailbox_key, mailbox_key_to_string,
+    Dispatched, Dispatcher, Grant, PoolCounters, WorkerTask, generate_mailbox_key,
+    mailbox_key_to_string,
 };
+use prometheus_parking_lot_core::semaphore::UnitSemaphore;
 use prometheus_parking_lot_core::{
-    MailboxKey, PoolStats, SchedulerError, TaskError, TaskMetadata, WorkerExecutor,
+    Clock, MailboxKey, PoolStats, SchedulerError, TaskError, TaskMetadata, WorkerExecutor,
 };
+
+use crate::clock::WasmClock;
+use crate::results::{Claim, Results};
+use crate::time::{Elapsed, timeout};
 
 /// Pool name used in errors (pools are not named yet).
 const POOL_NAME: &str = "worker_pool";
@@ -32,7 +55,8 @@ const POOL_NAME: &str = "worker_pool";
 /// What a worker stores for one task: the executor's value or its error.
 type TaskOutcome<R> = Result<R, TaskError>;
 
-/// The error for a result slot that does not exist.
+/// The error for a result slot that does not exist (never created, already
+/// retrieved, or removed after a timeout).
 fn result_not_found(key: &MailboxKey) -> SchedulerError {
     SchedulerError::ResultNotFound {
         key: Some(mailbox_key_to_string(key)),
@@ -46,153 +70,165 @@ fn pool_shutdown() -> SchedulerError {
     }
 }
 
-/// Result entry state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ResultState {
-    /// Waiting for result.
-    Pending,
-    /// Result is ready.
-    Ready,
+/// The error for a task that will not run because the pool shut down.
+fn shutdown_cancelled() -> TaskError {
+    TaskError::Cancelled {
+        reason: "worker pool shut down".into(),
+    }
 }
 
-/// Result storage entry with oneshot notification.
-struct ResultEntry<R> {
-    /// The result value (once available).
-    result: Option<R>,
-    /// State of this entry.
-    state: ResultState,
-    /// Oneshot sender for async notification.
-    notify_tx: Option<oneshot::Sender<()>>,
+/// State shared by the pool handle and its running tasks.
+struct Shared<P, R, E> {
+    /// Pool configuration.
+    config: WorkerPoolConfig,
+    /// Admission, the parked queue and the semaphore.
+    dispatcher: Dispatcher<WorkerTask<P>>,
+    /// Result slots with oneshot notification.
+    results: Results<TaskOutcome<R>>,
+    /// Submitted/completed/failed counters (running and parked come from the
+    /// dispatcher).
+    counters: PoolCounters,
+    /// Time source for deadlines and budgets.
+    clock: RwLock<Arc<dyn Clock>>,
+    /// Shutdown flag.
+    shutdown: AtomicBool,
+    /// The executor; each task runs on a clone.
+    executor: E,
 }
 
-/// Result storage for the worker pool.
-struct ResultStorage<R> {
-    /// Map from mailbox key to result entry.
-    entries: RwLock<HashMap<String, Mutex<ResultEntry<R>>>>,
-}
+impl<P, R, E> Shared<P, R, E>
+where
+    P: Send + 'static,
+    R: Send + 'static,
+    E: WorkerExecutor<P, R>,
+{
+    fn now_ms(&self) -> u128 {
+        self.clock.read().now_ms()
+    }
 
-impl<R> ResultStorage<R> {
-    fn new() -> Self {
-        Self {
-            entries: RwLock::new(HashMap::new()),
+    /// Resolve the execution budget for one task: the task's deadline when it
+    /// is nearer than the pool's default timeout, otherwise the default. No
+    /// path is unbounded; an already-passed deadline gives a zero budget.
+    #[cfg(not(parking_lot_negative_control = "s-4"))]
+    fn budget(&self, meta: &TaskMetadata) -> Duration {
+        let default = self.config.default_timeout();
+        let Some(deadline) = meta.deadline_ms else {
+            return default;
+        };
+        let remaining = deadline.saturating_sub(self.now_ms());
+        Duration::from_millis(u64::try_from(remaining).unwrap_or(u64::MAX)).min(default)
+    }
+
+    /// Negative control S-4: the budget is not applied (effectively
+    /// unbounded), so the wedged-executor test must fail.
+    #[cfg(parking_lot_negative_control = "s-4")]
+    fn budget(&self, meta: &TaskMetadata) -> Duration {
+        let _ = (meta, &self.config);
+        Duration::from_secs(u64::from(u32::MAX))
+    }
+
+    /// Record a task's outcome in its result slot and count it.
+    fn finish(&self, key: &MailboxKey, outcome: TaskOutcome<R>) {
+        let counter = if outcome.is_ok() {
+            &self.counters.completed_tasks
+        } else {
+            &self.counters.failed_tasks
+        };
+        counter.fetch_add(1, Ordering::Relaxed);
+        self.results.store(&mailbox_key_to_string(key), outcome);
+    }
+
+    /// Start every admitted task on the local executor and fail every task
+    /// found expired at the head of the queue.
+    fn launch(self: &Arc<Self>, dispatched: Dispatched<WorkerTask<P>>) {
+        let Dispatched { started, expired } = dispatched;
+        for task in expired {
+            warn!(
+                task_id = task.meta.id,
+                "queued task expired before it could start"
+            );
+            self.finish(&task.mailbox_key, Err(TaskError::DeadlineExpired));
+        }
+        for admitted in started {
+            spawn_local(Arc::clone(self).run(admitted));
         }
     }
 
-    /// Create a slot for a result and return a oneshot receiver for notification.
-    fn create_slot(&self, key: &MailboxKey) -> oneshot::Receiver<()> {
-        let (tx, rx) = oneshot::channel();
-        let key_str = mailbox_key_to_string(key);
+    /// Fail every parked task (shutdown): nothing parked is dropped silently.
+    fn cancel_parked(&self) {
+        for task in self.dispatcher.take_parked() {
+            self.finish(&task.mailbox_key, Err(shutdown_cancelled()));
+        }
+    }
 
-        let entry = ResultEntry {
-            result: None,
-            state: ResultState::Pending,
-            notify_tx: Some(tx),
+    /// Run one admitted task under its budget, then return its permit and
+    /// start whatever that admits.
+    async fn run(self: Arc<Self>, admitted: Grant<WorkerTask<P>>) {
+        let Grant { item: task, permit } = admitted;
+        let WorkerTask {
+            payload,
+            meta,
+            mailbox_key,
+        } = task;
+        let task_id = meta.id;
+
+        let outcome = if self.shutdown.load(Ordering::Acquire) {
+            // Acquire pairs with the Release in `shutdown()`: the pool is
+            // shutting down, so the task is failed rather than started.
+            Err(shutdown_cancelled())
+        } else {
+            let budget = self.budget(&meta);
+            debug!(task_id, ?budget, "WASM worker executing task");
+            // On elapse the executor future is dropped, which cancels it at
+            // its next await point.
+            timeout(budget, self.executor.execute(payload, meta))
+                .await
+                .unwrap_or_else(|Elapsed| {
+                    warn!(
+                        task_id,
+                        ?budget,
+                        "task exceeded its budget and was cancelled"
+                    );
+                    Err(TaskError::Timeout { budget })
+                })
         };
 
-        let mut entries = self.entries.write();
-        entries.insert(key_str, Mutex::new(entry));
-
-        rx
-    }
-
-    /// Store a result and notify any waiters.
-    fn store(&self, key: &MailboxKey, result: R) {
-        let key_str = mailbox_key_to_string(key);
-
-        let entries = self.entries.read();
-        if let Some(entry_mutex) = entries.get(&key_str) {
-            let mut entry = entry_mutex.lock();
-            entry.result = Some(result);
-            entry.state = ResultState::Ready;
-            // Notify waiter if any
-            if let Some(tx) = entry.notify_tx.take() {
-                let _ = tx.send(());
-            }
-        }
-    }
-
-    /// Try to retrieve a result immediately.
-    fn try_retrieve(&self, key: &MailboxKey) -> Option<R> {
-        let key_str = mailbox_key_to_string(key);
-
-        let entries = self.entries.read();
-        if let Some(entry_mutex) = entries.get(&key_str) {
-            let mut entry = entry_mutex.lock();
-            if entry.state == ResultState::Ready {
-                return entry.result.take();
-            }
-        }
-        None
-    }
-
-    /// Remove a result entry entirely.
-    fn remove(&self, key: &MailboxKey) -> Option<R> {
-        let key_str = mailbox_key_to_string(key);
-
-        let mut entries = self.entries.write();
-        if let Some(entry_mutex) = entries.remove(&key_str) {
-            let mut entry = entry_mutex.lock();
-            entry.result.take()
-        } else {
-            None
-        }
-    }
-
-    /// Get the oneshot receiver for a key (for async waiting).
-    fn get_notify_rx(&self, key: &MailboxKey) -> Option<oneshot::Receiver<()>> {
-        let key_str = mailbox_key_to_string(key);
-
-        let entries = self.entries.read();
-        if let Some(entry_mutex) = entries.get(&key_str) {
-            let mut entry = entry_mutex.lock();
-            // Create new receiver if needed
-            if entry.notify_tx.is_none() && entry.state == ResultState::Pending {
-                let (tx, rx) = oneshot::channel();
-                entry.notify_tx = Some(tx);
-                return Some(rx);
-            }
-        }
-        None
+        // Return the units before publishing the outcome, so a caller that
+        // has retrieved the result already sees them released.
+        let woken = self.dispatcher.complete(permit, self.now_ms());
+        self.finish(&mailbox_key, outcome);
+        self.launch(woken);
     }
 }
 
-/// Worker pool using async tasks for WASM environments.
+/// Worker pool for WASM: the shared dispatcher driving `spawn_local` tasks.
 ///
-/// This implementation uses tokio async tasks with a semaphore for concurrency
-/// control. Unlike the native implementation, there are no blocking APIs since
-/// WASM cannot block.
+/// Same admission and result semantics as the native pool in
+/// `prometheus-parking-lot-runtime-tokio`, without the blocking APIs (WASM
+/// cannot block) and without panic containment (see the module docs: panics
+/// abort the module).
+///
+/// # Design
+///
+/// - **Capacity**: a task runs only while the units of all running tasks,
+///   including it, fit in `max_units`, and at most `worker_count` tasks run.
+///   Others wait in a priority queue (at most `max_queue_depth`), highest
+///   priority first, FIFO within a priority.
+/// - **Budgets**: each execution is bounded by the task's deadline or
+///   `default_timeout_ms`, whichever is nearer.
+/// - **Executor futures must be `Send`** (the `WorkerExecutor` contract), so
+///   a raw JS timer future cannot be awaited inside one; use
+///   [`sleep`](crate::sleep).
 pub struct WorkerPool<P, R, E>
 where
     P: Send + 'static,
     R: Send + 'static,
     E: WorkerExecutor<P, R>,
 {
-    /// Pool configuration.
-    config: WorkerPoolConfig,
-
-    /// Executor for task execution.
-    executor: E,
-
-    /// Semaphore for concurrency control.
-    semaphore: Arc<Semaphore>,
-
-    /// Result storage with notification support.
-    results: Arc<ResultStorage<TaskOutcome<R>>>,
-
-    /// Pool statistics counters (lock-free).
-    counters: Arc<PoolCounters>,
-
-    /// Active resource units (lock-free).
-    active_units: Arc<AtomicU32>,
-
-    /// Shutdown flag (lock-free).
-    shutdown: Arc<AtomicBool>,
-
+    /// State shared with the running tasks.
+    shared: Arc<Shared<P, R, E>>,
     /// Task ID counter (lock-free).
     task_id_counter: AtomicU64,
-
-    /// Phantom data for payload type.
-    _payload: std::marker::PhantomData<P>,
 }
 
 impl<P, R, E> WorkerPool<P, R, E>
@@ -203,225 +239,212 @@ where
 {
     /// Create a new worker pool with the given configuration and executor.
     ///
-    /// On WASM, this creates a pool of async tasks limited by a semaphore.
+    /// Time is read from [`WasmClock`] until [`with_clock`](Self::with_clock)
+    /// replaces it.
     ///
     /// # Errors
     ///
     /// Returns [`SchedulerError::InvalidConfig`] if the configuration is invalid.
     pub fn new(config: WorkerPoolConfig, executor: E) -> Result<Self, SchedulerError> {
         config.validate().map_err(SchedulerError::invalid_config)?;
-
-        let semaphore = Arc::new(Semaphore::new(config.worker_count));
-        let results = Arc::new(ResultStorage::new());
-        let counters = Arc::new(PoolCounters::default());
-        let active_units = Arc::new(AtomicU32::new(0));
-        let shutdown = Arc::new(AtomicBool::new(false));
+        let worker_permits = u32::try_from(config.worker_count).unwrap_or(u32::MAX);
 
         info!(
             worker_count = config.worker_count,
             max_units = config.max_units,
             max_queue_depth = config.max_queue_depth,
-            "WorkerPool (WASM) initialized with async tasks"
+            "WorkerPool (WASM) initialized on the shared dispatcher"
         );
 
-        Ok(Self {
-            config,
+        let shared = Arc::new(Shared {
+            dispatcher: Dispatcher::in_memory(
+                POOL_NAME,
+                UnitSemaphore::with_max_permits(config.max_units, worker_permits),
+                config.max_queue_depth,
+            ),
+            results: Results::new(),
+            counters: PoolCounters::default(),
+            clock: RwLock::new(Arc::new(WasmClock::new())),
+            shutdown: AtomicBool::new(false),
             executor,
-            semaphore,
-            results,
-            counters,
-            active_units,
-            shutdown,
+            config,
+        });
+        Ok(Self {
+            shared,
             task_id_counter: AtomicU64::new(0),
-            _payload: std::marker::PhantomData,
         })
     }
 
-    /// Submit a task asynchronously.
+    /// Read time from `clock` instead of [`WasmClock`]: deadline checks at
+    /// submission and at the head of the queue, and execution budgets.
     ///
-    /// # Returns
-    ///
-    /// Returns a `MailboxKey` that can be used to retrieve the result.
+    /// Budgets are still measured by the JS timer; the clock decides how much
+    /// of a task's deadline remains when it starts.
+    #[must_use]
+    pub fn with_clock(self, clock: impl Clock + 'static) -> Self {
+        *self.shared.clock.write() = Arc::new(clock);
+        self
+    }
+
+    /// Submit a task asynchronously. Admission never waits; this is
+    /// [`submit`](Self::submit) behind an async signature.
     ///
     /// # Errors
     ///
-    /// - [`SchedulerError::QueueFull`] if the task queue is full
-    /// - [`SchedulerError::PoolShutdown`] if the pool has been shut down
+    /// As [`submit`](Self::submit).
+    #[expect(
+        clippy::unused_async,
+        clippy::unused_async_trait_impl,
+        reason = "public async API kept for callers; admission is non-blocking (the trait-impl variant misfires on an inherent method)"
+    )]
     pub async fn submit_async(
         &self,
         payload: P,
         meta: TaskMetadata,
     ) -> Result<MailboxKey, SchedulerError> {
-        if self.shutdown.load(Ordering::Acquire) {
+        self.submit(payload, meta)
+    }
+
+    /// Submit a task (non-blocking).
+    ///
+    /// The task starts at once when nothing is parked, its cost fits the free
+    /// units and a worker slot is free; otherwise it waits in the priority
+    /// queue. It runs on the browser event loop, so it makes progress only
+    /// while the caller yields.
+    ///
+    /// # Returns
+    ///
+    /// A `MailboxKey` to retrieve the result with.
+    ///
+    /// # Errors
+    ///
+    /// - [`SchedulerError::PoolShutdown`] if the pool has been shut down
+    /// - [`SchedulerError::DeadlineExpired`] if the task's deadline has already
+    ///   passed by the pool's clock
+    /// - [`SchedulerError::CapacityExceeded`] if the task costs more units than
+    ///   the pool has in total (it could never run)
+    /// - [`SchedulerError::QueueFull`] if the task must wait and
+    ///   `max_queue_depth` tasks are already waiting
+    pub fn submit(&self, payload: P, meta: TaskMetadata) -> Result<MailboxKey, SchedulerError> {
+        let shared = &self.shared;
+        // Acquire pairs with the Release in `shutdown()`.
+        if shared.shutdown.load(Ordering::Acquire) {
             return Err(pool_shutdown());
         }
-
-        // Check queue depth
-        let current_queued = self.counters.queued_tasks.load(Ordering::Relaxed);
-        if current_queued >= self.config.max_queue_depth as u64 {
-            warn!("Worker pool queue is full");
-            return Err(SchedulerError::queue_full(
-                POOL_NAME,
-                usize::try_from(current_queued).unwrap_or(usize::MAX),
-                self.config.max_queue_depth,
-            ));
+        let now_ms = shared.now_ms();
+        if meta.deadline_ms.is_some_and(|deadline| now_ms > deadline) {
+            return Err(SchedulerError::DeadlineExpired { task_id: meta.id });
         }
 
-        // Generate unique task ID and mailbox key
+        // Relaxed: the counter only needs unique values.
         let task_id = self.task_id_counter.fetch_add(1, Ordering::Relaxed);
         let mailbox_key = generate_mailbox_key(task_id);
+        let slot = mailbox_key_to_string(&mailbox_key);
+        shared.results.create(&slot);
 
-        // Create result slot with notification
-        let _notify_rx = self.results.create_slot(&mailbox_key);
-
-        // Update counters
-        self.counters
+        let task = WorkerTask {
+            payload,
+            meta,
+            mailbox_key: mailbox_key.clone(),
+        };
+        let admission = match shared.dispatcher.submit(task, now_ms) {
+            Ok(admission) => admission,
+            Err(error) => {
+                shared.results.remove(&slot);
+                warn!(%error, "worker pool rejected task");
+                return Err(error);
+            }
+        };
+        shared
+            .counters
             .submitted_tasks
             .fetch_add(1, Ordering::Relaxed);
-        self.counters.queued_tasks.fetch_add(1, Ordering::Relaxed);
+        debug!(
+            task_id,
+            started = admission.started,
+            "task submitted to WASM worker pool"
+        );
+        shared.launch(admission.dispatched);
 
-        // Clone refs for the spawned task
-        let semaphore = Arc::clone(&self.semaphore);
-        let results = Arc::clone(&self.results);
-        let counters = Arc::clone(&self.counters);
-        let active_units = Arc::clone(&self.active_units);
-        let shutdown = Arc::clone(&self.shutdown);
-        let executor = self.executor.clone();
-        let task_cost = meta.cost.total_units();
-        let key_clone = mailbox_key.clone();
-
-        // Spawn async task
-        tokio::spawn(async move {
-            // Acquire semaphore permit (efficient async wait, no polling)
-            let _permit = match semaphore.acquire().await {
-                Ok(permit) => permit,
-                Err(_) => {
-                    // Semaphore closed
-                    counters.queued_tasks.fetch_sub(1, Ordering::Relaxed);
-                    return;
-                }
-            };
-
-            // Check shutdown
-            if shutdown.load(Ordering::Acquire) {
-                counters.queued_tasks.fetch_sub(1, Ordering::Relaxed);
-                return;
-            }
-
-            // Update counters
-            counters.queued_tasks.fetch_sub(1, Ordering::Relaxed);
-            counters.active_tasks.fetch_add(1, Ordering::Relaxed);
-            active_units.fetch_add(task_cost, Ordering::Relaxed);
-
-            debug!(task_id = task_id, "WASM worker executing task");
-
-            // Execute the task
-            let result = executor.execute(payload, meta).await;
-
-            debug!(task_id = task_id, "WASM worker completed task");
-
-            let finished = if result.is_ok() {
-                &counters.completed_tasks
-            } else {
-                &counters.failed_tasks
-            };
-
-            // Store result and notify waiters
-            results.store(&key_clone, result);
-
-            // Update counters
-            counters.active_tasks.fetch_sub(1, Ordering::Relaxed);
-            active_units.fetch_sub(task_cost, Ordering::Relaxed);
-            finished.fetch_add(1, Ordering::Relaxed);
-        });
-
-        debug!(task_id = task_id, "Task submitted to WASM worker pool");
+        // A shutdown that raced this submission may have emptied the parked
+        // queue before this task was parked; fail anything parked since.
+        // Acquire pairs with the Release in `shutdown()`.
+        if shared.shutdown.load(Ordering::Acquire) {
+            shared.cancel_parked();
+        }
         Ok(mailbox_key)
     }
 
     /// Retrieve a result asynchronously with timeout.
     ///
-    /// This method waits for the result to become available or times out.
-    /// Uses oneshot channel for efficient notification - NO POLLING.
+    /// Waits for the result or the timeout (a JS timer). No polling: the
+    /// worker that finishes the task wakes the waiter.
     ///
     /// # Errors
     ///
     /// - [`SchedulerError::Task`] carrying the [`TaskError`] when the executor
-    ///   failed
+    ///   failed, ran past its budget ([`TaskError::Timeout`]), expired while
+    ///   queued or was cancelled at shutdown
     /// - [`SchedulerError::Timeout`] if the result is not available within the
-    ///   timeout
+    ///   timeout (the slot is then discarded)
     /// - [`SchedulerError::ResultNotFound`] if the mailbox key is invalid
     pub async fn retrieve_async(
         &self,
         key: &MailboxKey,
-        timeout: Duration,
+        timeout_after: Duration,
     ) -> Result<R, SchedulerError> {
-        // First, try immediate retrieval (fast path)
-        if let Some(outcome) = self.results.try_retrieve(key) {
-            self.results.remove(key);
-            return outcome.map_err(SchedulerError::Task);
-        }
-
-        // Get notification receiver
-        let notify_rx = self.results.get_notify_rx(key);
-
-        let Some(notify_rx) = notify_rx else {
-            // No entry or already ready - try again
-            if let Some(outcome) = self.results.try_retrieve(key) {
-                self.results.remove(key);
-                return outcome.map_err(SchedulerError::Task);
-            }
-            return Err(result_not_found(key));
+        let results = &self.shared.results;
+        let slot = mailbox_key_to_string(key);
+        let notified = match results.claim(&slot) {
+            Claim::Ready(outcome) => return outcome.map_err(SchedulerError::Task),
+            Claim::Missing => return Err(result_not_found(key)),
+            Claim::Wait(notified) => notified,
         };
 
-        // Wait for notification with timeout (NO POLLING)
-        match tokio::time::timeout(timeout, notify_rx).await {
-            Ok(Ok(())) => {
-                // Notified - result should be available
-                let outcome = self
-                    .results
-                    .remove(key)
-                    .ok_or_else(|| result_not_found(key))?;
-                outcome.map_err(SchedulerError::Task)
-            }
-            Ok(Err(_)) => {
-                // Channel closed without result
-                self.results.remove(key);
-                Err(SchedulerError::internal(
-                    "result notification channel closed",
-                ))
-            }
-            Err(_) => {
-                // Timeout
-                self.results.remove(key);
-                Err(SchedulerError::Timeout { task_id: None })
-            }
+        let waited = timeout(timeout_after, notified).await;
+        // The slot goes on every path: a retrieved or timed-out result is gone.
+        let outcome = results.remove(&slot);
+        match waited {
+            Ok(_) => outcome
+                .ok_or_else(|| {
+                    SchedulerError::internal("result notification ended without an outcome")
+                })?
+                .map_err(SchedulerError::Task),
+            Err(_elapsed) => Err(SchedulerError::Timeout { task_id: None }),
         }
     }
 
     /// Get current pool statistics.
+    ///
+    /// `failed_tasks` counts executor errors, timeouts, expired deadlines and
+    /// shutdown cancellations.
     #[must_use]
     pub fn stats(&self) -> PoolStats {
-        let mut stats = self
+        let shared = &self.shared;
+        let mut stats = shared
             .counters
-            .snapshot(self.config.worker_count, self.config.max_units);
-        stats.used_units = self.active_units.load(Ordering::Relaxed);
+            .snapshot(shared.config.worker_count, shared.config.max_units);
+        stats.used_units = shared.dispatcher.units_in_use();
+        stats.active_tasks = u64::from(shared.dispatcher.running());
+        stats.queued_tasks = u64::try_from(shared.dispatcher.parked()).unwrap_or(u64::MAX);
         stats
     }
 
     /// Shut down the pool.
     ///
-    /// This signals all workers to stop. Active tasks will complete,
-    /// but new submissions will be rejected.
+    /// New submissions are refused, tasks still waiting in the queue are
+    /// failed with [`TaskError::Cancelled`], admitted tasks that have not
+    /// started are failed the same way, and running tasks finish (within
+    /// their budgets).
     pub fn shutdown(&self) {
-        if self.shutdown.swap(true, Ordering::AcqRel) {
+        let shared = &self.shared;
+        // AcqRel: Release publishes the flag to the Acquire loads in
+        // `submit`/`run`; Acquire makes a second caller see the first.
+        if shared.shutdown.swap(true, Ordering::AcqRel) {
             return; // Already shut down
         }
-
         info!("Shutting down WASM worker pool");
-        // Close semaphore to prevent new permits
-        self.semaphore.close();
-        info!("WASM worker pool shut down signaled");
+        shared.cancel_parked();
     }
 }
 
@@ -433,106 +456,5 @@ where
 {
     fn drop(&mut self) {
         self.shutdown();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use async_trait::async_trait;
-    use prometheus_parking_lot_core::{ResourceCost, ResourceKind};
-    use std::sync::atomic::AtomicUsize;
-
-    /// Test executor.
-    #[derive(Clone)]
-    struct TestExecutor {
-        execution_count: Arc<AtomicUsize>,
-    }
-
-    #[async_trait]
-    impl WorkerExecutor<String, String> for TestExecutor {
-        async fn execute(&self, payload: String, _meta: TaskMetadata) -> Result<String, TaskError> {
-            self.execution_count.fetch_add(1, Ordering::Relaxed);
-            tokio::time::sleep(Duration::from_millis(10)).await;
-            Ok(format!("Result: {}", payload))
-        }
-    }
-
-    fn make_meta(id: u64) -> TaskMetadata {
-        TaskMetadata {
-            id,
-            mailbox: None,
-            priority: prometheus_parking_lot_core::Priority::Normal,
-            cost: ResourceCost::new(ResourceKind::Cpu, 1),
-            deadline_ms: None,
-            created_at_ms: 0,
-
-            idempotency_key: None,
-            sequence: 0,
-        }
-    }
-
-    #[tokio::test]
-    async fn test_wasm_worker_pool_basic() {
-        let executor = TestExecutor {
-            execution_count: Arc::new(AtomicUsize::new(0)),
-        };
-
-        let config = WorkerPoolConfig::new()
-            .with_worker_count(2)
-            .with_max_queue_depth(10);
-
-        let pool = WorkerPool::new(config, executor.clone()).unwrap();
-
-        // Submit a task
-        let key = pool
-            .submit_async("hello".to_string(), make_meta(1))
-            .await
-            .unwrap();
-
-        // Retrieve result
-        let result = pool
-            .retrieve_async(&key, Duration::from_secs(5))
-            .await
-            .unwrap();
-        assert_eq!(result, "Result: hello");
-
-        // Check execution count
-        assert_eq!(executor.execution_count.load(Ordering::Relaxed), 1);
-    }
-
-    #[tokio::test]
-    async fn test_wasm_worker_pool_multiple_tasks() {
-        let executor = TestExecutor {
-            execution_count: Arc::new(AtomicUsize::new(0)),
-        };
-
-        let config = WorkerPoolConfig::new()
-            .with_worker_count(4)
-            .with_max_queue_depth(100);
-
-        let pool = WorkerPool::new(config, executor.clone()).unwrap();
-
-        // Submit multiple tasks
-        let mut keys = Vec::new();
-        for i in 0..10 {
-            let key = pool
-                .submit_async(format!("task-{}", i), make_meta(i))
-                .await
-                .unwrap();
-            keys.push(key);
-        }
-
-        // Retrieve all results
-        for (i, key) in keys.iter().enumerate() {
-            let result = pool
-                .retrieve_async(key, Duration::from_secs(10))
-                .await
-                .unwrap();
-            assert_eq!(result, format!("Result: task-{}", i));
-        }
-
-        // Check execution count
-        assert_eq!(executor.execution_count.load(Ordering::Relaxed), 10);
     }
 }
