@@ -30,6 +30,7 @@
 //! ```
 
 mod native;
+mod slots;
 
 pub use native::WorkerPool;
 pub use prometheus_parking_lot_core::PoolStats;
