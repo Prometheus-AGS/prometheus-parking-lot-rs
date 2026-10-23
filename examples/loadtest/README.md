@@ -1,6 +1,6 @@
 # Load Test Harness (Manual)
 
-- Use `examples/configs/in-memory.json` as a baseline. Pools run in memory until durable dispatch (cr-49); `postgres.json` and `redb.json` open the durable backends alongside them.
+- Use `examples/configs/in-memory.json` as a baseline. `postgres.json` and `redb.json` run their pool durably (cr-49), so a load test on them measures the durable path (persist before accept, ack after delivery).
 - Write a small driver (e.g., in Rust or a script) that submits 10k tasks with mixed priorities and deadlines, then polls status/mailbox.
 - Measure:
   - 0 over-capacity starts (SC-001)
