@@ -24,6 +24,14 @@ Paths below are facade paths unless a crate is named.
 `ResourcePool`: `new`, `with_audit`, `with_clock`, `submit`, `prune_expired`,
 `active_units`, `running_tasks`, `queued_tasks`, `shutdown`.
 
+`DurableResourcePool` (crash-durable mode on a `LeaseQueue` and a
+`ResultMailbox`, cr-49; top-level `DurableResourcePool`, `DurableOptions`):
+`start(limits, queue, mailbox, executor, spawner, options)`, `submit` (returns
+once the task is persisted), `queue`, `mailbox`, `options`, `active_units`,
+`running_tasks`, `completed_tasks`, `failed_tasks`, `shutdown`.
+`DurableOptions::new(lease_for)` with `with_heartbeat_interval`,
+`with_poll_interval`, `with_result_ttl`, `with_name`.
+
 `WorkerPool`: `new`, `with_clock`, `submit` / `submit_async`, `retrieve` /
 `retrieve_async`, `stats`, `shutdown`.
 
@@ -35,14 +43,17 @@ Paths below are facade paths unless a crate is named.
 | `PoolConfig { max_units, max_queue_depth, default_timeout_secs, queue, mailbox }`, `StorageConfig` (`"in_memory"` or `{ "backend": name }`) | `config::*` | always |
 | `BackendConfig` (`"type": "postgres"` / `"redb"`), `PostgresBackendConfig`, `RedbBackendConfig` | `config::*` | always (validation requires `postgres` / `embedded`) |
 | `ConfigError` (`Parse` names an unknown or missing field; `Invalid { field, reason }` with a dotted path) | `config::ConfigError` | always |
-| `build_pools_from_scheduler_config(cfg, executor_factory, spawner)` → `BuiltScheduler { pools, postgres, redb }` | `builders::*` | `tokio-runtime` |
+| `build_pools_from_scheduler_config(cfg, executor_factory, spawner)` → `BuiltScheduler { pools, durable_pools, postgres, redb }` | `builders::*` | `tokio-runtime` |
+| `ConfiguredDurablePool` (`Postgres` / `Redb` variants; `submit`, `consume`, `shutdown`) | `builders::*` | `postgres` or `embedded` |
 | `ConfiguredPool { pool, mailbox }`, `SharedInMemoryMailbox` (`take`) | `builders::*` | `tokio-runtime` |
 | `PostgresBackend { queue, mailbox, listener, lease_for }`, `RedbBackend { store, queue, mailbox, lease_for }` | `builders::*` | `postgres`, `embedded` |
 | `build_pools(cfg, queue_factory, mailbox_factory, executor_factory, spawner)` | `builders::build_pools` | `tokio-runtime` |
 
-Pools built from configuration park and deliver in memory; a pool whose
-`queue` or `mailbox` names a durable backend is rejected until durable
-dispatch (cr-49). Example files: `examples/configs/`.
+A pool whose `queue` and `mailbox` are `"in_memory"` becomes a `ResourcePool`
+(`BuiltScheduler::pools`); one whose `queue` and `mailbox` both name a backend
+becomes a started `DurableResourcePool` on it (`BuiltScheduler::durable_pools`,
+a `ConfiguredDurablePool` with `submit`, `consume` and `shutdown`; cr-49).
+`build_pools` rejects durable pool sections. Example files: `examples/configs/`.
 
 ## Tasks and executors
 
@@ -67,7 +78,8 @@ Both are `#[non_exhaustive]`. See ADR 0002 for the mapping from the 0.2
 
 ## Storage contracts
 
-Two generations coexist until durable dispatch (cr-49), per ADR 0003.
+Two generations coexist, per ADR 0003: the in-memory `ResourcePool` uses the
+synchronous pair, `DurableResourcePool` (cr-49) the async pair.
 
 | Contract | Kind | Implementations |
 | --- | --- | --- |
@@ -76,7 +88,7 @@ Two generations coexist until durable dispatch (cr-49), per ADR 0003.
 | `LeaseQueue<P>` | async, leasing (`enqueue`, `lease`, `ack`, `nack`, `extend`, `depth`) | `infra::queue::InMemoryLeaseQueue` (reference); `infra::queue::RedbLeaseQueue` from `infra::EmbeddedStore` (`embedded`, crash-safe); `infra::queue::PgLeaseQueue` (`postgres`) |
 | `ResultMailbox<T>` + `Notifier<T>` | async, idempotent (`deliver`, `consume`, `peek`, `evict_expired`) | `infra::mailbox::InMemoryResultMailbox` (reference); `infra::mailbox::RedbResultMailbox` (`embedded`, crash-safe); `infra::mailbox::PgResultMailbox` (`postgres`); `StorageMailbox<S, N>` composes storage and notifier |
 
-The async contracts live in `core::backend` and are not yet used by any pool.
+The async contracts live in `core::backend`; `DurableResourcePool` runs on them.
 The backend conformance suite is `prometheus_parking_lot_core::conformance`
 behind that crate's `conformance` feature.
 

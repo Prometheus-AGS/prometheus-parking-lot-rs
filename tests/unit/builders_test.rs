@@ -101,6 +101,41 @@ async fn run_one_task_per_pool(built: &Built) {
     }
 }
 
+/// Submit one task to every built durable pool and consume its outcome
+/// through `consume`, which reads the backend's result mailbox.
+#[cfg(any(feature = "postgres", feature = "embedded"))]
+async fn run_one_task_per_durable_pool<C, F>(built: &Built, consume: C)
+where
+    C: Fn(MailboxKey) -> F,
+    F: std::future::Future<Output = Option<(TaskStatus, Option<String>)>>,
+{
+    assert!(!built.durable_pools.is_empty(), "no durable pool was built");
+    for (id, (name, pool)) in (1..).zip(&built.durable_pools) {
+        let key = MailboxKey {
+            tenant: "config-test".into(),
+            user_id: None,
+            session_id: Some(name.clone()),
+        };
+        let accepted = pool
+            .submit(task(id, &key, name))
+            .await
+            .unwrap_or_else(|e| panic!("submit to durable pool `{name}`: {e}"));
+        assert_eq!(accepted, TaskStatus::Queued, "accepted once persisted");
+        let mut outcome = None;
+        for _ in 0..1_000 {
+            outcome = consume(key.clone()).await;
+            if outcome.is_some() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        let (status, value) =
+            outcome.unwrap_or_else(|| panic!("no outcome from durable pool `{name}`"));
+        assert_eq!(status, TaskStatus::Completed, "pool `{name}`");
+        assert_eq!(value, Some(name.to_uppercase()), "pool `{name}`");
+    }
+}
+
 // ── build_pools (caller-supplied factories) ─────────────────────────────────
 
 #[tokio::test]
@@ -153,6 +188,26 @@ async fn config_build_pools_rejects_invalid_config_before_calling_any_factory() 
     assert_eq!(queue_calls.get(), 0, "validation runs before any factory");
 }
 
+#[cfg(feature = "embedded")]
+#[tokio::test]
+async fn config_build_pools_leaves_durable_pools_to_the_config_builder() {
+    let cfg = read_example("redb.json");
+    let result = build_pools::<String, String, _, _, _, _, _, _, _>(
+        &cfg,
+        |_, c| Ok(InMemoryQueue::<String>::new(c.max_queue_depth)),
+        |_, _| Ok(InMemoryMailbox::<String>::new()),
+        |_, _| Ok(Echo),
+        spawner(),
+    );
+    let Err(SchedulerError::InvalidConfig { message }) = result else {
+        panic!("a pool on a durable backend must not be built on in-memory factories");
+    };
+    assert!(
+        message.contains("build_pools_from_scheduler_config"),
+        "{message}"
+    );
+}
+
 // ── build_pools_from_scheduler_config: the documented examples ──────────────
 
 #[tokio::test]
@@ -169,9 +224,9 @@ async fn config_in_memory_example_builds_pools_that_run_tasks() {
 
 #[cfg(feature = "embedded")]
 #[tokio::test]
-async fn config_redb_example_builds_its_pools_and_opens_the_store() {
+async fn config_redb_example_builds_a_durable_pool_on_the_store() {
     use prometheus_parking_lot::config::BackendConfig;
-    use prometheus_parking_lot::core::{Enqueued, LeaseQueue};
+    use prometheus_parking_lot::core::{LeaseQueue, ResultMailbox};
 
     let dir = tempfile::tempdir().expect("tempdir");
     let mut cfg = read_example("redb.json");
@@ -185,32 +240,34 @@ async fn config_redb_example_builds_its_pools_and_opens_the_store() {
         .await
         .expect("redb example builds");
     assert!(file.exists(), "the store file is created");
-    run_one_task_per_pool(&built).await;
+    assert!(built.pools.is_empty(), "the example's pool is durable");
+    let names: Vec<_> = built.durable_pools.keys().cloned().collect();
+    assert_eq!(names, ["tauri_local_llm"]);
 
-    // The opened backend carries the section's parameters and works.
+    // The pool persists, runs and delivers into the configured store: the
+    // outcome is consumed from the opened backend's own mailbox handle.
     let local = &built.redb["local"];
     assert_eq!(local.lease_for, Duration::from_secs(300));
     assert_eq!(local.queue.max_depth(), 1000);
-    let key = MailboxKey {
-        tenant: "config-test".into(),
-        user_id: None,
-        session_id: None,
-    };
-    let enqueued = local
-        .queue
-        .enqueue(task(1, &key, "durable"))
-        .await
-        .expect("enqueue");
-    assert!(matches!(enqueued, Enqueued::Accepted(_)));
-    let leased = local
-        .queue
-        .lease(1, local.lease_for)
-        .await
-        .expect("lease")
-        .pop()
-        .expect("one task ready");
-    assert_eq!(leased.task.payload, "durable");
-    local.queue.ack(leased.token).await.expect("ack");
+    run_one_task_per_durable_pool(&built, |key| async move {
+        local
+            .mailbox
+            .consume(&key)
+            .await
+            .expect("consume")
+            .map(|entry| (entry.status, entry.payload))
+    })
+    .await;
+    // The ack follows the delivery; give it a moment to land.
+    let mut live = usize::MAX;
+    for _ in 0..200 {
+        live = local.queue.depth().await.expect("depth").live();
+        if live == 0 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    assert_eq!(live, 0, "the pool acked its task");
 }
 
 #[cfg(feature = "embedded")]
@@ -240,15 +297,13 @@ mod postgres {
     use std::time::Duration;
 
     use prometheus_parking_lot::config::BackendConfig;
-    use prometheus_parking_lot::core::{
-        Delivery, DeliveryOutcome, Enqueued, LeaseQueue, ResultMailbox, TaskStatus,
-    };
+    use prometheus_parking_lot::core::{LeaseQueue, ResultMailbox};
     use prometheus_parking_lot::util::MailboxKey;
     use testcontainers::core::{ContainerPort, WaitFor};
     use testcontainers::runners::AsyncRunner;
     use testcontainers::{ContainerAsync, GenericImage, ImageExt};
 
-    use super::{Built, Echo, build_pools_from_scheduler_config, read_example, spawner, task};
+    use super::{Built, Echo, build_pools_from_scheduler_config, read_example, spawner};
 
     /// Postgres major version of the project image (`docker/postgres18`).
     const PG_MAJOR: &str = "18";
@@ -314,55 +369,36 @@ mod postgres {
                 Err(_) => tokio::time::sleep(Duration::from_millis(250)).await,
             }
         };
-        super::run_one_task_per_pool(&built).await;
+        assert!(built.pools.is_empty(), "the example's pool is durable");
+        let names: Vec<_> = built.durable_pools.keys().cloned().collect();
+        assert_eq!(names, ["llm_inference"]);
 
-        // The opened backend carries the section's parameters and works:
-        // `migrate` created both schemas, `listen` opened a listener.
+        // The opened backend carries the section's parameters: `migrate`
+        // created both schemas, `listen` opened a listener.
         let cloud = &built.postgres["cloud"];
         assert_eq!(cloud.queue.queue_name(), "inference");
         assert_eq!(cloud.queue.max_depth(), 10_000);
         assert_eq!(cloud.lease_for, Duration::from_secs(300));
         assert!(cloud.listener.is_some(), "listen: true opens a listener");
+        assert_eq!(cloud.mailbox.name(), "inference");
+
+        // The pool persists, runs and delivers into the configured database:
+        // the outcome is consumed from the opened backend's mailbox handle,
+        // exactly once, and the queue is drained.
+        super::run_one_task_per_durable_pool(&built, |key| async move {
+            cloud
+                .mailbox
+                .consume(&key)
+                .await
+                .expect("consume")
+                .map(|entry| (entry.status, entry.payload))
+        })
+        .await;
         let key = MailboxKey {
             tenant: "config-test".into(),
             user_id: None,
-            session_id: None,
+            session_id: Some("llm_inference".to_owned()),
         };
-        let enqueued = cloud
-            .queue
-            .enqueue(task(1, &key, "durable"))
-            .await
-            .expect("enqueue");
-        assert!(matches!(enqueued, Enqueued::Accepted(_)));
-        let leased = cloud
-            .queue
-            .lease(1, cloud.lease_for)
-            .await
-            .expect("lease")
-            .pop()
-            .expect("one task ready");
-        assert_eq!(leased.task.payload, "durable");
-
-        // The result mailbox shares the pool: deliver the outcome, then
-        // consume it exactly once.
-        assert_eq!(cloud.mailbox.name(), "inference");
-        let delivery = Delivery::new(
-            key.clone(),
-            1,
-            TaskStatus::Completed,
-            Some("DURABLE".to_owned()),
-        );
-        let outcome = cloud.mailbox.deliver(delivery).await.expect("deliver");
-        assert_eq!(outcome, DeliveryOutcome::Stored);
-        cloud.queue.ack(leased.token).await.expect("ack");
-        let entry = cloud
-            .mailbox
-            .consume(&key)
-            .await
-            .expect("consume")
-            .expect("the delivered outcome");
-        assert_eq!(entry.status, TaskStatus::Completed);
-        assert_eq!(entry.payload.as_deref(), Some("DURABLE"));
         assert!(
             cloud
                 .mailbox
@@ -372,5 +408,15 @@ mod postgres {
                 .is_none(),
             "an outcome is consumed once"
         );
+        // The ack follows the delivery; give it a moment to land.
+        let mut live = usize::MAX;
+        for _ in 0..200 {
+            live = cloud.queue.depth().await.expect("depth").live();
+            if live == 0 {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert_eq!(live, 0, "the pool acked its task");
     }
 }

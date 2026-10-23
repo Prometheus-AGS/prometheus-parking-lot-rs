@@ -130,7 +130,7 @@ classDiagram
    - `SeaOrmQueue`: Durable Postgres table.
    - `YaqueQueue`: Durable local file-based queue (for Desktop).
 3. **Mailbox (Trait):** Abstraction for result storage. It handles the "late pickup" pattern where a mobile client might disconnect before an LLM finishes generation.
-   - **Durable backend contracts (ADR 0003):** `LeaseQueue` (async enqueue with idempotent acceptance, `lease` with fenced `LeaseToken`s, `ack`, `nack` requeue/dead-letter, `extend` heartbeat, redelivery on lease expiry) and `ResultMailbox` (async, first-write-wins on the idempotency key remembered past consume, consume-once, TTL), with `Notifier` and the `StorageMailbox<S, N>` composition. Every backend passes the conformance suite published by the core crate's `conformance` feature; `InMemoryLeaseQueue` and `InMemoryResultMailbox` are the reference implementations. The synchronous `TaskQueue`/`Mailbox` above remain the in-process contracts of `ResourcePool` until durable dispatch (cr-49) moves it onto these. See [ADR 0003](adr/0003-backend-contracts.md).
+   - **Durable backend contracts (ADR 0003):** `LeaseQueue` (async enqueue with idempotent acceptance, `lease` with fenced `LeaseToken`s, `ack`, `nack` requeue/dead-letter, `extend` heartbeat, redelivery on lease expiry) and `ResultMailbox` (async, first-write-wins on the idempotency key remembered past consume, consume-once, TTL), with `Notifier` and the `StorageMailbox<S, N>` composition. Every backend passes the conformance suite published by the core crate's `conformance` feature; `InMemoryLeaseQueue` and `InMemoryResultMailbox` are the reference implementations. The synchronous `TaskQueue`/`Mailbox` above remain the in-process contracts of the in-memory `ResourcePool`; its durable mode, `DurableResourcePool` (cr-49), runs on these. See [ADR 0003](adr/0003-backend-contracts.md).
 4. **TaskExecutor (Trait):** The user-supplied logic. This is where the actual Agent code (e.g., "Run Llama-3 inference") lives. It returns `Result<T, TaskError>`; a failure is recorded, never mistaken for a result.
 
 ------
@@ -217,11 +217,12 @@ The codebase is a Cargo workspace organized so the core logic never depends on s
 Pools and durable backends are described in a JSON configuration
 (`config::SchedulerConfig`) and built by
 `builders::build_pools_from_scheduler_config`. The schema rejects unknown
-fields. Pools park tasks and deliver results in memory; durable backends
-(Postgres, redb) are opened from their own sections and used through the
-`LeaseQueue` and `ResultMailbox` contracts until durable dispatch (cr-49) lets
-a pool run on them, which is why a pool's `queue` and `mailbox` can only be
-`"in_memory"` today.
+fields. Durable backends (Postgres, redb) are opened from their own sections.
+A pool whose `queue` and `mailbox` are `"in_memory"` parks tasks and delivers
+results in memory; a pool whose `queue` and `mailbox` both name a backend runs
+as a `DurableResourcePool` on that backend's `LeaseQueue` and `ResultMailbox`
+(durable dispatch, cr-49): persist before accept, lease with a heartbeat,
+deliver, then ack. Each backend drives at most one pool.
 
 ```json
 {

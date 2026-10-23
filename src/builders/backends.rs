@@ -1,10 +1,11 @@
 //! Opening the durable backends named in the `backends` configuration section.
 //!
 //! Each opened backend is returned as a handle holding the contract objects
-//! the section configured. Pools do not use them yet (durable dispatch is
-//! change `cr-49`); applications use them directly through
-//! [`LeaseQueue`](crate::core::LeaseQueue) and
-//! [`ResultMailbox`](crate::core::ResultMailbox).
+//! the section configured. A pool configured on the backend runs on these
+//! same objects (durable dispatch, change `cr-49`); applications can also use
+//! them directly through [`LeaseQueue`](crate::core::LeaseQueue) and
+//! [`ResultMailbox`](crate::core::ResultMailbox), for example to consume the
+//! pool's results.
 
 #[cfg(any(feature = "postgres", feature = "embedded"))]
 use std::time::Duration;
