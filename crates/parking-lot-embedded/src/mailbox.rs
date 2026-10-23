@@ -13,6 +13,12 @@
 //! consumers can never both receive it, and a crash leaves the entry either
 //! still stored or consumed, never lost without having been returned (the
 //! returned value only exists after the commit).
+//!
+//! If the stored payload no longer decodes as `T` (for example after a type
+//! change between deploys), `consume` removes that entry in the same transaction
+//! and returns the decode error once; the next `consume` of the key sees the
+//! entries behind it. This matches the Postgres mailbox. `peek` only reads: it
+//! returns the error and leaves the entry for `consume` to discard.
 
 use std::future::Future;
 use std::marker::PhantomData;
@@ -169,10 +175,11 @@ fn consume_tx<T: DeserializeOwned>(
     let context = "embedded::mailbox::consume";
     let key = key_text(key)?;
     let txn = db.begin_write().map_err(backend(context))?;
-    let (taken, changed) = {
+    let (taken, changed, decode_error) = {
         let mut entries = txn.open_table(ENTRIES).map_err(backend(context))?;
         let mut remove = Vec::new();
         let mut taken = None;
+        let mut decode_error = None;
         for item in entries
             .range::<(&str, u64)>((key.as_str(), 0)..=(key.as_str(), u64::MAX))
             .map_err(backend(context))?
@@ -181,9 +188,13 @@ fn consume_tx<T: DeserializeOwned>(
             let (_, sequence) = entry_key.value();
             remove.push(sequence);
             if !is_expired(expiry_of(bytes.value())?, now) {
-                let stored: Stored<T> =
-                    serde_json::from_slice(bytes.value()).map_err(backend(context))?;
-                taken = Some(stored);
+                // An entry that no longer decodes (a type change between
+                // deploys) is removed with the rest, like the Postgres
+                // mailbox, so the error is reported once, not on every call.
+                match serde_json::from_slice::<Stored<T>>(bytes.value()) {
+                    Ok(stored) => taken = Some(stored),
+                    Err(error) => decode_error = Some(error),
+                }
                 break;
             }
         }
@@ -192,10 +203,13 @@ fn consume_tx<T: DeserializeOwned>(
                 .remove((key.as_str(), *sequence))
                 .map_err(backend(context))?;
         }
-        (taken, !remove.is_empty())
+        (taken, !remove.is_empty(), decode_error)
     };
     if changed {
         commit(txn, "consume")?;
+    }
+    if let Some(error) = decode_error {
+        return Err(backend(context)(error));
     }
     Ok(taken.map(Stored::into_entry))
 }

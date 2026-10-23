@@ -215,3 +215,35 @@ pub async fn wait_for_messages(
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
 }
+
+/// The first copy of each message id, in read order per partition.
+///
+/// Delivery is at-least-once: a send that reached the server but timed out on
+/// the client is retried and stored twice under the same id. Consumers (and
+/// tests asserting order or counts) de-duplicate by id.
+pub fn distinct_by_id(messages: Vec<Read>) -> Vec<Read> {
+    let mut seen = std::collections::BTreeSet::new();
+    messages
+        .into_iter()
+        .filter(|m| seen.insert((m.partition, m.id)))
+        .collect()
+}
+
+/// Poll `topic` until it holds `expected` distinct message ids (or 30 s pass),
+/// returning the de-duplicated messages.
+pub async fn wait_for_distinct_messages(
+    client: &IggyClient,
+    stream: &str,
+    topic: &str,
+    partitions: u32,
+    expected: usize,
+) -> TestResult<Vec<Read>> {
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        let messages = distinct_by_id(read_topic(client, stream, topic, partitions, 0).await?);
+        if messages.len() >= expected || Instant::now() > deadline {
+            return Ok(messages);
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+}
