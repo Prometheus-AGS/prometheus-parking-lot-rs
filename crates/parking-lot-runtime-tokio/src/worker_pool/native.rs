@@ -547,7 +547,7 @@ where
         }
     }
 
-    /// A worker thread stopped serving. SeqCst: `shutdown_with` waits for
+    /// A worker thread stopped serving. `SeqCst`: `shutdown_with` waits for
     /// `live_workers` to reach zero through the ledger (see `crate::ledger`).
     fn worker_exited(&self) {
         self.live_workers.fetch_sub(1, Ordering::SeqCst);
@@ -598,7 +598,7 @@ fn spawn_sink_thread<P: Send + 'static>(
                 while let Some(cancelled) = rx.recv().await {
                     let task_id = cancelled.meta.id;
                     let answer = offer(&sink, cancelled, delta).await;
-                    ledger.end_capture(task_id, answer);
+                    ledger.end_capture(task_id, answer.as_ref());
                     ledger.settle(1);
                 }
             });

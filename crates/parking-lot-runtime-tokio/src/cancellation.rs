@@ -321,10 +321,12 @@ pub(crate) async fn offer<P: Send + 'static>(
     }
 }
 
-/// A standalone bounded handoff to a sink: a bounded sender that pushes
-/// cancelled tasks off the caller's hot path to a drain task. The pools do not
-/// use it (they call the sink themselves and count every answer in their
-/// `ShutdownReport`); it is for callers that capture their own cancellations.
+/// A standalone bounded handoff to a sink, for callers that capture their own
+/// cancellations.
+///
+/// A bounded sender pushes cancelled tasks off the caller's hot path to a
+/// drain task. The pools do not use it: they call the sink themselves and
+/// count every answer in their `ShutdownReport`.
 ///
 /// Created via [`CancellationChannel::new`].
 pub struct CancellationChannel<P> {

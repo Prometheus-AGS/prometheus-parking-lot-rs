@@ -43,7 +43,7 @@ use crate::shutdown::ShutdownReport;
 
 /// Accepted, settled and cancelled task counts for one pool.
 #[derive(Debug, Default)]
-pub(crate) struct Ledger {
+pub struct Ledger {
     /// Accepted and not yet settled (durable pool: leased in this process,
     /// plus the dispatcher itself while it runs).
     in_flight: AtomicU64,
@@ -63,7 +63,7 @@ pub(crate) struct Ledger {
 
 /// A snapshot of the cumulative tallies, to report the difference later.
 #[derive(Debug, Clone, Copy, Default)]
-pub(crate) struct Tally {
+pub struct Tally {
     finished: u64,
     cancelled: u64,
     recorded: u64,
@@ -75,12 +75,12 @@ pub(crate) struct Tally {
 impl Ledger {
     /// Count an accepted task. `SeqCst`: see the module docs (submission vs
     /// shutdown).
-    pub(crate) fn accept(&self) {
+    pub fn accept(&self) {
         self.in_flight.fetch_add(1, Ordering::SeqCst);
     }
 
     /// Settle `n` accepted tasks.
-    pub(crate) fn settle(&self, n: u64) {
+    pub fn settle(&self, n: u64) {
         if n == 0 {
             return;
         }
@@ -90,12 +90,12 @@ impl Ledger {
 
     /// Count `n` tasks that reached their own outcome. Settling them is the
     /// caller's separate step.
-    pub(crate) fn finish(&self, n: u64) {
+    pub fn finish(&self, n: u64) {
         self.finished.fetch_add(n, Ordering::Relaxed);
     }
 
     /// A cancelled task is being handed to the sink.
-    pub(crate) fn begin_capture(&self) {
+    pub fn begin_capture(&self) {
         self.capturing.fetch_add(1, Ordering::SeqCst);
     }
 
@@ -103,7 +103,7 @@ impl Ledger {
     ///
     /// An in-memory pool has nothing to requeue into once it shuts down, so a
     /// `Requeue` answer is counted as dropped and logged.
-    pub(crate) fn end_capture(&self, task_id: u64, answer: Option<SinkOutcome>) {
+    pub fn end_capture(&self, task_id: u64, answer: Option<&SinkOutcome>) {
         let tally = match answer {
             Some(SinkOutcome::Recorded) => &self.recorded,
             Some(SinkOutcome::Requeue) => {
@@ -124,30 +124,30 @@ impl Ledger {
     }
 
     /// A cancelled durable task was handed back to its queue (nack, requeue).
-    pub(crate) fn requeued(&self) {
+    pub fn requeued(&self) {
         self.requeued.fetch_add(1, Ordering::Relaxed);
         self.cancelled.fetch_add(1, Ordering::Relaxed);
     }
 
     /// Wake a waiting shutdown after a change it may be waiting for (a worker
     /// exiting, a counter moving). `SeqCst` load: see the module docs.
-    pub(crate) fn poke(&self) {
+    pub fn poke(&self) {
         if self.watching.load(Ordering::SeqCst) {
             self.changed.notify_waiters();
         }
     }
 
-    pub(crate) fn in_flight(&self) -> u64 {
+    pub fn in_flight(&self) -> u64 {
         self.in_flight.load(Ordering::SeqCst)
     }
 
-    pub(crate) fn capturing(&self) -> u64 {
+    pub fn capturing(&self) -> u64 {
         self.capturing.load(Ordering::SeqCst)
     }
 
     /// Wait until `done` holds or `bound` elapses; returns whether it holds.
     /// `done` is checked after each change the ledger is poked for.
-    pub(crate) async fn wait_until(&self, bound: Duration, done: impl Fn(&Self) -> bool) -> bool {
+    pub async fn wait_until(&self, bound: Duration, done: impl Fn(&Self) -> bool) -> bool {
         // SeqCst: see the module docs (counter change vs waiter).
         self.watching.store(true, Ordering::SeqCst);
         let deadline = tokio::time::Instant::now() + bound;
@@ -164,7 +164,7 @@ impl Ledger {
         }
     }
 
-    pub(crate) fn tally(&self) -> Tally {
+    pub fn tally(&self) -> Tally {
         Tally {
             finished: self.finished.load(Ordering::Relaxed),
             cancelled: self.cancelled.load(Ordering::Relaxed),
@@ -176,7 +176,7 @@ impl Ledger {
     }
 
     /// What happened since `since`, with the tasks still unsettled now.
-    pub(crate) fn report(&self, since: Tally) -> ShutdownReport {
+    pub fn report(&self, since: Tally) -> ShutdownReport {
         let now = self.tally();
         ShutdownReport {
             completed: now.finished - since.finished,
@@ -192,10 +192,10 @@ impl Ledger {
 
 /// One accepted task held by the durable pool; settles it when dropped
 /// (including by unwinding), so no path out of the pool can leave it counted.
-pub(crate) struct Held(Arc<Ledger>);
+pub struct Held(Arc<Ledger>);
 
 impl Held {
-    pub(crate) fn new(ledger: &Arc<Ledger>) -> Self {
+    pub fn new(ledger: &Arc<Ledger>) -> Self {
         ledger.accept();
         Self(Arc::clone(ledger))
     }
@@ -209,7 +209,7 @@ impl Drop for Held {
 
 /// Settles one task of `ledger` when dropped (the in-memory pools' running
 /// tasks, so the unwinding path settles too).
-pub(crate) struct SettleOnDrop<'a>(pub(crate) &'a Ledger);
+pub struct SettleOnDrop<'a>(pub &'a Ledger);
 
 impl Drop for SettleOnDrop<'_> {
     fn drop(&mut self) {
@@ -221,8 +221,21 @@ impl Drop for SettleOnDrop<'_> {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn wait_until_sees_a_settle_from_another_task() {
+    /// A runtime with the timer only (no IO driver), so miri can run these.
+    fn timer_runtime() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_time()
+            .build()
+            .expect("runtime")
+    }
+
+    #[test]
+    fn wait_until_sees_a_settle_from_another_thread() {
+        timer_runtime().block_on(wait_until_sees_a_settle());
+    }
+
+    async fn wait_until_sees_a_settle() {
         let ledger = Arc::new(Ledger::default());
         ledger.accept();
         let settler = Arc::clone(&ledger);
@@ -241,15 +254,13 @@ mod tests {
         assert_eq!((report.completed, report.unsettled), (1, 0));
     }
 
-    #[tokio::test]
-    async fn wait_until_times_out_and_reports_unsettled() {
+    #[test]
+    fn wait_until_times_out_and_reports_unsettled() {
         let ledger = Ledger::default();
         ledger.accept();
-        assert!(
-            !ledger
-                .wait_until(Duration::from_millis(20), |l| l.in_flight() == 0)
-                .await
-        );
+        let settled = timer_runtime()
+            .block_on(ledger.wait_until(Duration::from_millis(20), |l| l.in_flight() == 0));
+        assert!(!settled);
         assert_eq!(ledger.report(Tally::default()).unsettled, 1);
     }
 
@@ -263,7 +274,7 @@ mod tests {
             None,
         ] {
             ledger.begin_capture();
-            ledger.end_capture(1, answer);
+            ledger.end_capture(1, answer.as_ref());
         }
         let report = ledger.report(Tally::default());
         assert_eq!(

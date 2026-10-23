@@ -43,7 +43,7 @@
 //! receives [`TaskError::Cancelled`] and a [`CancelledTask`] goes to the
 //! pool's [`CancellationSink`]. A running straggler's payload is restored from
 //! a JSON snapshot the pool keeps while a sink is registered. The pool's
-//! [`Ledger`] counts accepted tasks until each is settled, so the returned
+//! ledger counts accepted tasks until each is settled, so the returned
 //! [`ShutdownReport`] accounts for every one of them.
 
 use std::marker::PhantomData;
@@ -717,7 +717,7 @@ where
         };
         self.ledger.begin_capture();
         let answer = offer(&sink, cancelled, delta).await;
-        self.ledger.end_capture(task_id, answer);
+        self.ledger.end_capture(task_id, answer.as_ref());
     }
 
     /// A JSON copy of a running task's payload, kept only while a sink is

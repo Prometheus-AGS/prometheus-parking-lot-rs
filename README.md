@@ -360,7 +360,7 @@ fn task(id: u64, ms: u64) -> ScheduledTask<u64> {
 
 #[tokio::main]
 async fn main() {
-    let sink = Arc::new(RecordingCancellationSink::new());
+    let sink = Arc::new(RecordingCancellationSink::<u64>::new());
     let pool = ResourcePool::new(
         PoolLimits {
             max_units: 1,

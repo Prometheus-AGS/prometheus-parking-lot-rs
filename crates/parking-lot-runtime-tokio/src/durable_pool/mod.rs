@@ -324,6 +324,51 @@ where
         inner.wake.notify_one();
         Ok(TaskStatus::Queued)
     }
+
+    /// Shut the pool down under `policy` and report what happened to the
+    /// tasks this process held.
+    ///
+    /// Leasing stops at once and the leased task waiting for capacity, if
+    /// any, is handed back (`nack(Requeue)`); tasks never leased stay in the
+    /// queue and are not counted. Running tasks finish, deliver and resolve
+    /// their leases until the policy's drain deadline; the call returns as
+    /// soon as nothing is held. Under `DrainThenCancel` and
+    /// `CancelImmediately`, tasks still running at the deadline are cancelled
+    /// and handed back, and the call waits up to 5 s more for that. Every
+    /// handed-back task is in the report's `requeued` (also when the nack
+    /// failed and the lease is left to expire, which redelivers it the same
+    /// way); the next pool started on the queue runs it.
+    ///
+    /// Under `Drain`, a task still running at the deadline keeps running,
+    /// heartbeat included, and resolves its lease when it finishes; it is
+    /// counted as `unsettled`.
+    pub async fn shutdown_with(&self, policy: ShutdownPolicy) -> ShutdownReport {
+        let inner = &self.inner;
+        let ledger = &inner.ledger;
+        let since = ledger.tally();
+        inner.request_shutdown();
+        tracing::info!(
+            pool = inner.options.name(),
+            ?policy,
+            "shutting down durable pool"
+        );
+        let drained = ledger
+            .wait_until(policy.drain_deadline(), |ledger| ledger.in_flight() == 0)
+            .await;
+        if !drained && policy.cancels_stragglers() {
+            inner.cancel.cancel();
+            ledger
+                .wait_until(CANCEL_GRACE, |ledger| ledger.in_flight() == 0)
+                .await;
+        }
+        let report = ledger.report(since);
+        tracing::info!(
+            pool = inner.options.name(),
+            ?report,
+            "durable pool shut down"
+        );
+        report
+    }
 }
 
 impl<P, T, Q, M, E, S> DurableResourcePool<P, T, Q, M, E, S> {
@@ -380,51 +425,6 @@ impl<P, T, Q, M, E, S> DurableResourcePool<P, T, Q, M, E, S> {
     /// [`shutdown_with`](Self::shutdown_with).
     pub fn shutdown(&self) {
         self.inner.request_shutdown();
-    }
-
-    /// Shut the pool down under `policy` and report what happened to the
-    /// tasks this process held.
-    ///
-    /// Leasing stops at once and the leased task waiting for capacity, if
-    /// any, is handed back (`nack(Requeue)`); tasks never leased stay in the
-    /// queue and are not counted. Running tasks finish, deliver and resolve
-    /// their leases until the policy's drain deadline; the call returns as
-    /// soon as nothing is held. Under `DrainThenCancel` and
-    /// `CancelImmediately`, tasks still running at the deadline are cancelled
-    /// and handed back, and the call waits up to 5 s more for that. Every
-    /// handed-back task is in the report's `requeued` (also when the nack
-    /// failed and the lease is left to expire, which redelivers it the same
-    /// way); the next pool started on the queue runs it.
-    ///
-    /// Under `Drain`, a task still running at the deadline keeps running,
-    /// heartbeat included, and resolves its lease when it finishes; it is
-    /// counted as `unsettled`.
-    pub async fn shutdown_with(&self, policy: ShutdownPolicy) -> ShutdownReport {
-        let inner = &self.inner;
-        let ledger = &inner.ledger;
-        let since = ledger.tally();
-        inner.request_shutdown();
-        tracing::info!(
-            pool = inner.options.name(),
-            ?policy,
-            "shutting down durable pool"
-        );
-        let drained = ledger
-            .wait_until(policy.drain_deadline(), |ledger| ledger.in_flight() == 0)
-            .await;
-        if !drained && policy.cancels_stragglers() {
-            inner.cancel.cancel();
-            ledger
-                .wait_until(CANCEL_GRACE, |ledger| ledger.in_flight() == 0)
-                .await;
-        }
-        let report = ledger.report(since);
-        tracing::info!(
-            pool = inner.options.name(),
-            ?report,
-            "durable pool shut down"
-        );
-        report
     }
 }
 

@@ -138,7 +138,8 @@ impl SharedMailbox {
         tokio::time::timeout(WAIT, async {
             loop {
                 let notified = self.delivered.notified();
-                if let Some(message) = self.inner.lock().consume(key).expect("consume") {
+                let message = self.inner.lock().consume(key).expect("consume");
+                if let Some(message) = message {
                     return message;
                 }
                 notified.await;
@@ -345,10 +346,10 @@ async fn shutdown_resource_pool_drain_accounts_for_every_task() {
     let queued = accounting.captures_with(&CancelReason::QueueShutdown);
     assert!(!queued.is_empty(), "{accounting:?}");
     assert!(queued.iter().all(|(_, has_payload)| *has_payload));
-    assert!(
-        accounting
-            .captures_with(&CancelReason::DrainTimeout)
-            .is_empty()
+    assert_eq!(
+        accounting.captures_with(&CancelReason::DrainTimeout),
+        Vec::<(u64, bool)>::new(),
+        "Drain cancels no running task"
     );
 }
 

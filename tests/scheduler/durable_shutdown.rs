@@ -319,9 +319,9 @@ mod redb {
         type Queue = RedbLeaseQueue<String>;
         type Mailbox = RedbResultMailbox<String>;
 
-        async fn open(&self) -> (Self::Queue, Self::Mailbox) {
+        fn open(&self) -> impl Future<Output = (Self::Queue, Self::Mailbox)> + Send {
             let store = EmbeddedStore::open(&self.file).expect("open the store");
-            (store.lease_queue::<String>(100), store.result_mailbox())
+            std::future::ready((store.lease_queue::<String>(100), store.result_mailbox()))
         }
     }
 
