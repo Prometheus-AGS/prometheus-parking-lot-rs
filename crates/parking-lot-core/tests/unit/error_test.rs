@@ -1,27 +1,45 @@
-//! Tests for error types
+//! Tests for the scheduler error types' messages and retry classification.
 
-use prometheus_parking_lot::core::SchedulerError;
+use prometheus_parking_lot_core::SchedulerError;
 
 #[test]
-fn test_queue_full_error() {
-    let err = SchedulerError::QueueFull("test_pool".to_string());
-    assert_eq!(format!("{}", err), "queue full: test_pool");
+fn queue_full_message_names_pool_and_depth() {
+    let err = SchedulerError::queue_full("test_pool", 5, 5);
+    assert_eq!(
+        err.to_string(),
+        "queue full for pool 'test_pool': depth 5/5"
+    );
+    assert!(err.is_retryable());
 }
 
 #[test]
-fn test_capacity_exceeded_error() {
-    let err = SchedulerError::CapacityExceeded;
-    assert_eq!(format!("{}", err), "capacity exceeded");
+fn capacity_exceeded_message_names_request_and_pool() {
+    let err = SchedulerError::CapacityExceeded {
+        pool: "gpu".to_string(),
+        requested: 9,
+        available: 8,
+    };
+    assert_eq!(
+        err.to_string(),
+        "capacity exceeded: need 9 units, pool 'gpu' has 8"
+    );
+    assert!(!err.is_retryable());
 }
 
 #[test]
-fn test_deadline_expired_error() {
-    let err = SchedulerError::DeadlineExpired;
-    assert_eq!(format!("{}", err), "deadline expired");
+fn deadline_expired_message_names_task() {
+    let err = SchedulerError::DeadlineExpired { task_id: 7 };
+    assert_eq!(err.to_string(), "deadline expired for task 7");
 }
 
 #[test]
-fn test_backend_error() {
-    let err = SchedulerError::Backend("connection failed".to_string());
-    assert_eq!(format!("{}", err), "backend error: connection failed");
+fn backend_error_keeps_its_source() {
+    use std::error::Error;
+
+    let err = SchedulerError::backend("connect", std::io::Error::other("connection failed"));
+    assert_eq!(
+        err.to_string(),
+        "backend error in 'connect': connection failed"
+    );
+    assert!(err.source().is_some());
 }

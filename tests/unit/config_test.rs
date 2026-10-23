@@ -1,6 +1,8 @@
 //! Tests for configuration validation
 
-use prometheus_parking_lot::config::{PoolConfig, SchedulerConfig, RuntimeConfig, QueueBackendConfig, MailboxBackendConfig};
+use prometheus_parking_lot::config::{
+    MailboxBackendConfig, PoolConfig, QueueBackendConfig, RuntimeConfig, SchedulerConfig,
+};
 
 #[test]
 fn test_pool_config_validation() {
@@ -57,15 +59,18 @@ fn test_pool_config_invalid_timeout() {
 #[test]
 fn test_scheduler_config_validation() {
     let mut pools = std::collections::HashMap::new();
-    pools.insert("pool1".to_string(), PoolConfig {
-        max_units: 100,
-        max_queue_depth: 50,
-        default_timeout_secs: 60,
-        queue: QueueBackendConfig::InMemory,
-        mailbox: MailboxBackendConfig::InMemory,
-        runtime: RuntimeConfig::Native,
-    });
-    
+    pools.insert(
+        "pool1".to_string(),
+        PoolConfig {
+            max_units: 100,
+            max_queue_depth: 50,
+            default_timeout_secs: 60,
+            queue: QueueBackendConfig::InMemory,
+            mailbox: MailboxBackendConfig::InMemory,
+            runtime: RuntimeConfig::Native,
+        },
+    );
+
     let config = SchedulerConfig { pools };
     assert!(config.validate().is_ok());
 }
@@ -92,7 +97,7 @@ fn test_scheduler_config_from_json() {
             }
         }
     }"#;
-    
+
     let config = SchedulerConfig::from_json_str(json);
     assert!(config.is_ok());
 }
