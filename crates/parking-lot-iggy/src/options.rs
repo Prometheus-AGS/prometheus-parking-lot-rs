@@ -23,7 +23,9 @@ pub struct IggyOptions {
     /// Topic for streamed task output ([`IggyStreamSink`](crate::IggyStreamSink)).
     /// Created when missing.
     pub stream_topic: String,
-    /// Partitions of a topic this crate creates.
+    /// Partitions of a topic this crate creates. A topic that already exists
+    /// keeps its own count, and streams use that real count (read from the
+    /// server), not this one.
     pub partitions: u32,
     /// Tenant that partitions the lifecycle events of an [`IggyHook`](crate::IggyHook);
     /// when `None` the pool name is the partition key.
@@ -36,6 +38,10 @@ pub struct IggyOptions {
     pub retry: RetryPolicy,
     /// Recently published ids remembered to skip repeats; `0` disables.
     pub dedup_window: usize,
+    /// How long the server keeps messages of a topic this crate creates;
+    /// `None` keeps them until the server's size limits remove them. Only
+    /// applies when the topic is created: an existing topic keeps its expiry.
+    pub retention: Option<Duration>,
 }
 
 impl IggyOptions {
@@ -57,6 +63,7 @@ impl IggyOptions {
             send_timeout: Duration::from_secs(2),
             retry: RetryPolicy::default(),
             dedup_window: 4096,
+            retention: None,
         }
     }
 
@@ -118,6 +125,18 @@ impl IggyOptions {
         self
     }
 
+    /// Have the server expire messages of created topics after `retention`.
+    ///
+    /// The default keeps messages indefinitely (`IggyExpiry::NeverExpire`), so
+    /// a long-lived deployment must size the server's disk, or set this, or
+    /// remove old messages itself. Applies to topics this crate creates; an
+    /// existing topic keeps the expiry it was created with.
+    #[must_use]
+    pub const fn with_retention(mut self, retention: Duration) -> Self {
+        self.retention = Some(retention);
+        self
+    }
+
     /// Partition count of created topics (at least 1).
     #[must_use]
     pub const fn with_partitions(mut self, partitions: u32) -> Self {
@@ -140,11 +159,14 @@ impl fmt::Debug for IggyOptions {
             .field("send_timeout", &self.send_timeout)
             .field("retry", &self.retry)
             .field("dedup_window", &self.dedup_window)
+            .field("retention", &self.retention)
             .finish()
     }
 }
 
-/// `scheme://user:password@host` with the password replaced.
+/// `scheme://user:password@host` with the password replaced. A userinfo with
+/// no colon is a personal access token (`iggy://<token>@host:port`), a secret
+/// in its entirety, so all of it is replaced.
 fn redact(connection_string: &str) -> String {
     let Some((scheme, rest)) = connection_string.split_once("://") else {
         return connection_string.to_owned();
@@ -153,9 +175,25 @@ fn redact(connection_string: &str) -> String {
         return connection_string.to_owned();
     };
     credentials.split_once(':').map_or_else(
-        || connection_string.to_owned(),
+        || format!("{scheme}://***@{host}"),
         |(user, _)| format!("{scheme}://{user}:***@{host}"),
     )
+}
+
+/// Check that the Iggy client can parse `connection_string`, without
+/// connecting.
+///
+/// A string the client rejects makes every publish fail, which the off-path
+/// publisher reports only as counted failures; configuration loading calls this
+/// so the mistake is found at startup.
+///
+/// # Errors
+///
+/// The client's reason, which never includes the credentials.
+pub fn validate_connection_string(connection_string: &str) -> Result<(), String> {
+    iggy::prelude::IggyClient::from_connection_string(connection_string)
+        .map(drop)
+        .map_err(|error| error.to_string())
 }
 
 #[cfg(test)]
@@ -163,10 +201,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn connection_strings_are_parsed_without_connecting() {
+        assert!(validate_connection_string("iggy://app:s3cret@127.0.0.1:8090").is_ok());
+        assert!(validate_connection_string("iggy://pat-token@127.0.0.1:8090").is_ok());
+        for bad in ["", "not-a-url", "iggy://127.0.0.1:8090", "iggy://a:b@host"] {
+            assert!(validate_connection_string(bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
     fn debug_hides_the_password() {
         let options = IggyOptions::new("iggy://app:s3cret@iggy.internal:8090");
         let shown = format!("{options:?}");
         assert!(!shown.contains("s3cret"), "{shown}");
         assert!(shown.contains("app:***@iggy.internal:8090"), "{shown}");
+    }
+
+    #[test]
+    fn debug_hides_a_personal_access_token() {
+        // iggy 0.11 accepts `iggy://<token>@host:port`: one credential, no colon.
+        let options = IggyOptions::new("iggy://pat-s3cret-token@iggy.internal:8090");
+        let shown = format!("{options:?}");
+        assert!(!shown.contains("s3cret"), "{shown}");
+        assert!(shown.contains("***@iggy.internal:8090"), "{shown}");
     }
 }

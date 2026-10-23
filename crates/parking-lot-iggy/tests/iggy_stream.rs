@@ -20,7 +20,7 @@ use std::time::Duration;
 
 use prometheus_parking_lot_iggy::{
     IggyOptions, IggyStreamReader, IggyStreamSink, ResumePoint, StreamCursor, StreamError,
-    StreamItem, StreamOutcome,
+    StreamItem, StreamOutcome, partition_for,
 };
 use support::{IggyServer, TestResult, read_topic};
 
@@ -218,5 +218,95 @@ async fn iggy_stream_missing_chunk_is_reported_as_a_gap() -> TestResult<()> {
             got: 4
         })
     );
+    Ok(())
+}
+
+/// Create `topic` of `stream` with exactly `partitions` partitions, as an
+/// operator (or an earlier deployment) would have.
+async fn precreate_topic(
+    server: &IggyServer,
+    stream: &str,
+    topic: &str,
+    partitions: u32,
+) -> TestResult<()> {
+    use iggy::prelude::{DirectConfig, IggyExpiry, MaxTopicSize};
+    let client = server.client().await?;
+    let producer = client
+        .producer(stream, topic)?
+        .direct(DirectConfig::builder().build())
+        .create_stream_if_not_exists()
+        .create_topic_if_not_exists(
+            partitions,
+            IggyExpiry::NeverExpire,
+            MaxTopicSize::ServerDefault,
+        )
+        .build();
+    producer.init().await?;
+    drop(producer);
+    Ok(())
+}
+
+/// The topic already exists with fewer partitions than the options say (or the
+/// writer and reader were configured differently): the stream must still be
+/// written and read, because both use the topic's real partition count.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "needs Docker: starts a pinned apache/iggy container"]
+async fn iggy_stream_uses_the_topics_real_partition_count() -> TestResult<()> {
+    let server = IggyServer::start().await?;
+    precreate_topic(&server, "narrow", "stream.chunks", 2).await?;
+    // A key whose hash lands outside the 2 real partitions when taken mod 4.
+    let key = (0..1000)
+        .map(|n| format!("job-{n}"))
+        .find(|k| partition_for(k, 4) >= 2)
+        .ok_or("no key")?;
+
+    let sink = IggyStreamSink::start(&options(&server, "narrow", 4))?;
+    let mut writer = sink.writer(key.clone());
+    for seq in 1..=3 {
+        writer.send(token(seq)).await?;
+    }
+    writer.finish(StreamOutcome::Completed).await?;
+    assert!(sink.flush(FLUSH).await, "sink drained");
+    assert!(!writer.is_poisoned(), "{:?}", sink.stats());
+    assert_eq!(sink.stats().failed, 0, "{:?}", sink.stats());
+
+    // The reader is configured with yet another count.
+    let reader = IggyStreamReader::connect(&options(&server, "narrow", 8)).await?;
+    let mut cursor = reader.open(&key);
+    let items = take(&mut cursor, usize::MAX).await?;
+    assert_eq!(seqs(&items), vec![1, 2, 3, 4]);
+    Ok(())
+}
+
+/// An offset hint beyond the end of the stream is not detected as a gap: the
+/// cursor has nothing to compare it with and waits. The documentation says so;
+/// the sequence number, not the hint, is the safe cursor.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "needs Docker: starts a pinned apache/iggy container"]
+async fn iggy_stream_offset_hint_past_the_end_waits_instead_of_reporting() -> TestResult<()> {
+    let server = IggyServer::start().await?;
+    let options = options(&server, "hint", 1);
+    let sink = IggyStreamSink::start(&options)?;
+    let mut writer = sink.writer("job-hint");
+    writer.send(token(1)).await?;
+    writer.finish(StreamOutcome::Completed).await?;
+    assert!(sink.flush(FLUSH).await);
+
+    let reader = IggyStreamReader::connect(&options).await?;
+    let mut cursor = reader.resume(
+        "job-hint",
+        ResumePoint {
+            after_seq: 0,
+            offset: Some(1_000),
+        },
+    );
+    let waited = tokio::time::timeout(Duration::from_secs(3), cursor.next()).await;
+    assert!(
+        waited.is_err(),
+        "a hint past the end waits (no Gap, no data): {waited:?}"
+    );
+    // Without the hint the same stream reads fine.
+    let mut cursor = reader.resume("job-hint", ResumePoint::default());
+    assert_eq!(seqs(&take(&mut cursor, usize::MAX).await?), vec![1, 2]);
     Ok(())
 }

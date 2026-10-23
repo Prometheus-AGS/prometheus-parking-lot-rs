@@ -376,3 +376,97 @@ async fn wait_published(notifier: &IggyNotifier, count: usize) {
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
 }
+
+/// Task ids are caller-supplied and may repeat (the README example uses 0 for
+/// every task): lifecycle events that differ only by repeating ids must all be
+/// published, each with its own message id.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "needs Docker: starts a pinned apache/iggy container"]
+async fn iggy_repeated_task_ids_do_not_collapse_lifecycle_events() -> TestResult<()> {
+    let server = IggyServer::start().await?;
+    let hook = IggyHook::start(&options(&server, "repeat"))?;
+    let bus = HookBus::new();
+    bus.register(Arc::new(hook.clone()));
+    for _ in 0..10 {
+        // Same task id, pool, kind and (almost always) the same millisecond.
+        emit_completed(&bus, 0, "gpu", 5);
+    }
+    flush_bus(&bus, Duration::from_secs(10)).await?;
+    assert!(hook.flush(FLUSH).await);
+
+    let client = server.client().await?;
+    let messages =
+        wait_for_distinct_messages(&client, "repeat", "lifecycle", PARTITIONS, 10).await?;
+    assert_eq!(messages.len(), 10, "ten events, ten distinct ids");
+    assert_eq!(hook.stats().deduplicated, 0, "{:?}", hook.stats());
+    Ok(())
+}
+
+/// Without an idempotency key the `mailbox.ready` id must still tell two
+/// results apart when task ids repeat.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "needs Docker: starts a pinned apache/iggy container"]
+async fn iggy_mailbox_ready_without_a_key_survives_repeated_task_ids() -> TestResult<()> {
+    use prometheus_parking_lot_core::{MailboxEntry, Notifier};
+
+    let server = IggyServer::start().await?;
+    let notifier = IggyNotifier::start(&options(&server, "nokey"))?;
+    let key = mailbox_key("acme");
+    for delivered_at in 1..=3_u128 {
+        let entry = MailboxEntry::new(0, TaskStatus::Completed, Some(1_u8), None, delivered_at);
+        notifier.notify(&key, &entry).await?;
+    }
+    assert!(notifier.flush(FLUSH).await);
+
+    let client = server.client().await?;
+    let messages =
+        wait_for_distinct_messages(&client, "nokey", "mailbox.ready", PARTITIONS, 3).await?;
+    assert_eq!(messages.len(), 3, "three results, three distinct ids");
+    assert_eq!(notifier.stats().deduplicated, 0, "{:?}", notifier.stats());
+    Ok(())
+}
+
+/// A retention set in the options reaches a topic the crate creates; the
+/// default creates a topic that never expires.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "needs Docker: starts a pinned apache/iggy container"]
+async fn iggy_retention_option_sets_the_topic_expiry() -> TestResult<()> {
+    use iggy::prelude::{Identifier, IggyExpiry, TopicClient};
+
+    let server = IggyServer::start().await?;
+    let kept =
+        IggyHook::start(&options(&server, "retained").with_retention(Duration::from_secs(3600)))?;
+    let forever = IggyNotifier::start(&options(&server, "retained"))?;
+    let bus = HookBus::new();
+    bus.register(Arc::new(kept.clone()));
+    emit_completed(&bus, 1, "gpu", 1);
+    flush_bus(&bus, Duration::from_secs(10)).await?;
+    assert!(kept.flush(FLUSH).await);
+    {
+        use prometheus_parking_lot_core::{MailboxEntry, Notifier};
+        let entry = MailboxEntry::new(1, TaskStatus::Completed, Some(1_u8), Some("k".into()), 1);
+        forever.notify(&mailbox_key("acme"), &entry).await?;
+        assert!(forever.flush(FLUSH).await);
+    }
+
+    let client = server.client().await?;
+    let stream = Identifier::from_str_value("retained")?;
+    let expiry = |topic: &str| {
+        let client = &client;
+        let stream = stream.clone();
+        let topic = Identifier::from_str_value(topic);
+        async move {
+            let details = client.get_topic(&stream, &topic?).await?;
+            Ok::<_, Box<dyn std::error::Error + Send + Sync>>(details.map(|t| t.message_expiry))
+        }
+    };
+    assert_eq!(
+        expiry("lifecycle").await?,
+        Some(IggyExpiry::ExpireDuration(Duration::from_secs(3600).into()))
+    );
+    assert_eq!(
+        expiry("mailbox.ready").await?,
+        Some(IggyExpiry::NeverExpire)
+    );
+    Ok(())
+}

@@ -125,8 +125,10 @@ sequenceDiagram
   `prometheus-parking-lot-iggy`), `IggyHook` publishes every lifecycle event to
   the `lifecycle` topic, partitioned by tenant (or by pool when no tenant is
   set), and `IggyNotifier` publishes `mailbox.ready` after a result is stored.
-  Message ids are UUIDv5 values derived from the idempotency key, so a retried
-  publish carries the same id. Both publish from a bounded background queue:
+  Message ids are UUIDv5 values: `mailbox.ready` derives from the idempotency
+  key (a result without one gets a distinct id), a lifecycle event gets its own,
+  so repeated task ids never collapse events; a retried publish carries the same
+  id. Both publish from a bounded background queue:
   `on_event` only enqueues, and when the server is slow or down the queue fills
   and further events are dropped and counted instead of delaying dispatch.
   Tested against a pinned `apache/iggy:0.9.0` server: a subscriber receives

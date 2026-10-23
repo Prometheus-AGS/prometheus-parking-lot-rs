@@ -155,7 +155,9 @@ it from a secret store; `Debug` output hides it). The other fields and their def
 `stream` (`parking-lot`), `lifecycle_topic` (`lifecycle`), `mailbox_topic`
 (`mailbox.ready`), `stream_topic` (`stream.chunks`), `partitions` (4),
 `tenant` (absent: partition by pool), `queue_capacity` (1024),
-`send_timeout_ms` (2000), `max_attempts` (5), `dedup_window` (4096). `IggyBackendConfig::options()` turns the section into
+`send_timeout_ms` (2000), `max_attempts` (5), `dedup_window` (4096),
+`retention_secs` (absent: messages are kept until the server's limits remove
+them; size the disk or set it). The connection string is parsed during validation. `IggyBackendConfig::options()` turns the section into
 the `IggyOptions` that the hook, the notifier and the
 [streaming replay](./streaming-replay.md) sink and reader take. See
 [Iggy events](./iggy-events.md).

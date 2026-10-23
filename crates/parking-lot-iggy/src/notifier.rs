@@ -5,10 +5,11 @@ use std::future::Future;
 use prometheus_parking_lot_core::{MailboxEntry, MailboxKey, Notifier, SchedulerError};
 use serde_json::json;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use tokio::runtime::Handle;
 
-use crate::ids::mailbox_ready_id;
+use crate::ids::{instance_nonce, mailbox_ready_id};
 use crate::options::IggyOptions;
 use crate::publisher::{Envelope, Publisher, PublisherStats};
 
@@ -16,9 +17,10 @@ use crate::publisher::{Envelope, Publisher, PublisherStats};
 ///
 /// The message is a pointer, not the result: the mailbox key, task id, status,
 /// idempotency key and a `result_ref` to read the entry from the mailbox
-/// storage. Its id is the `UUIDv5` of the idempotency key (or of the task's
-/// address when it has none), so a re-notification of the same result carries
-/// the same id. Partitioned by tenant.
+/// storage. Its id is the `UUIDv5` of the idempotency key, so a re-notification
+/// of the same result carries the same id. A result without an idempotency key
+/// gets a distinct id per notification (task ids are caller-supplied and can
+/// repeat). Partitioned by tenant.
 ///
 /// `notify` only queues the message. Used through a
 /// [`BackgroundNotifier`](prometheus_parking_lot_core::mailbox::BackgroundNotifier)
@@ -27,6 +29,8 @@ use crate::publisher::{Envelope, Publisher, PublisherStats};
 #[derive(Debug, Clone)]
 pub struct IggyNotifier {
     publisher: Arc<Publisher>,
+    nonce: u128,
+    sequence: Arc<AtomicU64>,
 }
 
 impl IggyNotifier {
@@ -44,6 +48,8 @@ impl IggyNotifier {
     pub fn start_on(handle: &Handle, options: &IggyOptions) -> Self {
         Self {
             publisher: Arc::new(Publisher::start(handle, options, &options.mailbox_topic)),
+            nonce: instance_nonce(),
+            sequence: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -77,10 +83,17 @@ impl<T: Sync> Notifier<T> for IggyNotifier {
         entry: &MailboxEntry<T>,
     ) -> impl Future<Output = Result<(), SchedulerError>> + Send {
         let reference = result_ref(key);
-        let stable_key = entry
-            .idempotency_key
-            .clone()
-            .unwrap_or_else(|| format!("task:{}:{reference}", entry.task_id));
+        // Without an idempotency key nothing identifies the result: task ids
+        // are caller-supplied and can repeat. Each notification then gets its
+        // own id (this notifier's nonce and sequence), so none is mistaken for
+        // a repeat; set an idempotency key to have repeats recognized.
+        let stable_key = entry.idempotency_key.clone().unwrap_or_else(|| {
+            let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
+            format!(
+                "task:{}:{reference}:{:?}:{}:{:x}:{sequence}",
+                entry.task_id, entry.status, entry.delivered_at_ms, self.nonce
+            )
+        });
         let body = json!({
             "event": "mailbox.ready",
             "mailbox_key": {

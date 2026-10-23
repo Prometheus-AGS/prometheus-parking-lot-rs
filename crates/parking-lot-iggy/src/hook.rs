@@ -3,10 +3,11 @@
 use prometheus_parking_lot_core::{Hook, LifecycleEvent};
 use serde_json::{Value, json};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use tokio::runtime::Handle;
 
-use crate::ids::message_id;
+use crate::ids::{instance_nonce, message_id};
 use crate::options::IggyOptions;
 use crate::publisher::{Envelope, Publisher, PublisherStats};
 
@@ -14,13 +15,20 @@ use crate::publisher::{Envelope, Publisher, PublisherStats};
 ///
 /// `on_event` serializes the event and queues it; the network is touched only
 /// by the publisher's own task. Messages are partitioned by the configured
-/// tenant, or by pool name, and carry a deterministic id of the pool, the
-/// task's stable key (its idempotency key, else its task id), the event kind
-/// and the event time.
+/// tenant, or by pool name. Every event gets its own message id (a `UUIDv5` of
+/// this hook's instance nonce and the event's sequence number), because task
+/// ids and idempotency keys are caller-supplied and can repeat; a publisher
+/// retry resends the same message with the same id. The hook does not apply the
+/// publisher's repeat-skipping window to events.
 #[derive(Debug, Clone)]
 pub struct IggyHook {
     publisher: Arc<Publisher>,
     tenant: Option<String>,
+    /// Makes the ids of this hook's messages differ from every other hook's,
+    /// including one in an earlier run of the process.
+    nonce: u128,
+    /// Numbers the events of this hook.
+    sequence: Arc<AtomicU64>,
 }
 
 impl IggyHook {
@@ -39,6 +47,8 @@ impl IggyHook {
         Self {
             publisher: Arc::new(Publisher::start(handle, options, &options.lifecycle_topic)),
             tenant: options.tenant.clone(),
+            nonce: instance_nonce(),
+            sequence: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -57,9 +67,20 @@ impl IggyHook {
 impl Hook for IggyHook {
     fn on_event(&self, event: &LifecycleEvent) {
         let (stable_key, body) = describe(event);
+        // Task ids and idempotency keys are caller-supplied and may repeat, and
+        // two events of one task can share a millisecond, so nothing in the
+        // event identifies it. The id is therefore per published event (this
+        // hook's nonce and sequence): a publisher retry resends the same
+        // envelope, so it keeps the same id, and a consumer de-duplicates on it.
+        let sequence = self.sequence.fetch_add(1, Ordering::Relaxed);
         let id = message_id(
             "lifecycle",
-            &format!("{}\u{1f}{}\u{1f}{stable_key}", event.pool(), event.kind()),
+            &format!(
+                "{:x}\u{1f}{sequence}\u{1f}{}\u{1f}{}\u{1f}{stable_key}",
+                self.nonce,
+                event.pool(),
+                event.kind()
+            ),
         );
         let key = self
             .tenant
@@ -67,7 +88,9 @@ impl Hook for IggyHook {
             .unwrap_or_else(|| event.pool().to_owned());
         let payload = serde_json::to_vec(&body).unwrap_or_default();
         // A full queue is counted by the publisher; nothing else to do here.
-        let _ = self.publisher.enqueue(Envelope::new(id, key, payload));
+        let _ = self
+            .publisher
+            .enqueue(Envelope::new(id, key, payload).without_dedup());
     }
 }
 

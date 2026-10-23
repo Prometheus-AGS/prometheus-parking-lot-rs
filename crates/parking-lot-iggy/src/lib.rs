@@ -37,13 +37,27 @@
 //!
 //! # Message ids
 //!
-//! Every message carries a deterministic 128-bit id, a `UUIDv5` of the task's
-//! stable key (the idempotency key, or a key derived from the task), so a
-//! retried publish carries the same id ([`ids`]). Iggy 0.9 deduplicates retried
-//! requests per client rather than by message id, so the publisher also keeps a
-//! bounded window of recently published ids and skips repeats
-//! ([`PublisherStats::deduplicated`]); a consumer that must be exactly-once
-//! across publisher restarts de-duplicates on the message id.
+//! Every message carries a 128-bit `UUIDv5` id, and a retried publish resends
+//! the same message with the same id ([`ids`]). Task ids are caller-supplied and
+//! can repeat, so ids are built so distinct events never share one: a
+//! `mailbox.ready` id derives from the idempotency key (a result without one
+//! gets a distinct id per notification), a lifecycle event gets its own id, and
+//! a stream chunk's id derives from its key and sequence number.
+//!
+//! Message de-duplication is not the server's: the Iggy 0.9 *server* (this crate
+//! uses the 0.11 *client*) deduplicates retried requests per client rather than
+//! by message id, so a send that reached the server but timed out is stored
+//! twice. The publisher keeps a bounded window of recently published ids and
+//! skips repeats for `mailbox.ready` and stream chunks
+//! ([`PublisherStats::deduplicated`]); lifecycle events bypass it. A consumer
+//! that must be exactly-once, or compares counts, de-duplicates on the message
+//! id.
+//!
+//! # Topics
+//!
+//! Topics are created when missing, with no expiry unless
+//! [`IggyOptions::retention`] is set, so size the server's disk or set it. An
+//! existing topic keeps its own expiry and partition count.
 //!
 //! The crate depends on Tokio and the Iggy client; the core crate stays
 //! runtime-free.
@@ -58,7 +72,7 @@ pub mod stream;
 
 pub use hook::IggyHook;
 pub use notifier::IggyNotifier;
-pub use options::IggyOptions;
+pub use options::{IggyOptions, validate_connection_string};
 pub use publisher::{Publisher, PublisherStats};
 pub use runtime::{TokioHandleSpawner, TokioSleeper};
 pub use stream::{

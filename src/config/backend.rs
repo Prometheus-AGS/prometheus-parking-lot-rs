@@ -383,6 +383,11 @@ pub struct IggyBackendConfig {
     /// Recently published message ids remembered to skip repeats; `0` disables.
     #[serde(default = "default_iggy_dedup_window")]
     pub dedup_window: usize,
+    /// Seconds the server keeps messages of a topic this crate creates. Absent:
+    /// keep them until the server's own limits remove them, so size the
+    /// server's disk or set this. An existing topic keeps its expiry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retention_secs: Option<u64>,
 }
 
 fn default_iggy_stream() -> String {
@@ -436,6 +441,21 @@ impl IggyBackendConfig {
                 ));
             }
         }
+        #[cfg(feature = "iggy")]
+        if let Err(reason) =
+            prometheus_parking_lot_iggy::validate_connection_string(&self.connection_string)
+        {
+            return Err(ConfigError::invalid(
+                format!("{path}.connection_string"),
+                format!("the Iggy client cannot parse it: {reason}"),
+            ));
+        }
+        if self.retention_secs == Some(0) {
+            return Err(ConfigError::invalid(
+                format!("{path}.retention_secs"),
+                "must be greater than 0 (omit it to keep messages)",
+            ));
+        }
         let positive = [
             ("partitions", u64::from(self.partitions)),
             ("queue_capacity", self.queue_capacity as u64),
@@ -478,6 +498,9 @@ impl IggyBackendConfig {
         if let Some(tenant) = &self.tenant {
             options = options.with_tenant(tenant.clone());
         }
+        if let Some(secs) = self.retention_secs {
+            options = options.with_retention(Duration::from_secs(secs));
+        }
         options
     }
 }
@@ -487,7 +510,7 @@ impl fmt::Debug for IggyBackendConfig {
         f.debug_struct("IggyBackendConfig")
             .field(
                 "connection_string",
-                &redact_password(&self.connection_string),
+                &redact_iggy_credentials(&self.connection_string),
             )
             .field("stream", &self.stream)
             .field("lifecycle_topic", &self.lifecycle_topic)
@@ -499,6 +522,7 @@ impl fmt::Debug for IggyBackendConfig {
             .field("send_timeout_ms", &self.send_timeout_ms)
             .field("max_attempts", &self.max_attempts)
             .field("dedup_window", &self.dedup_window)
+            .field("retention_secs", &self.retention_secs)
             .finish()
     }
 }
@@ -519,18 +543,50 @@ fn validate_common(path: &str, max_depth: usize, lease_secs: u64) -> Result<(), 
     Ok(())
 }
 
-/// `scheme://user:password@host` → `scheme://user:***@host`.
+/// `scheme://user:password@host` → `scheme://user:***@host`, and the value of
+/// any `password` query parameter (`?password=...`) → `***`. A userinfo with no
+/// colon is only a user name here and is kept.
 fn redact_password(url: &str) -> String {
-    let Some((scheme, rest)) = url.split_once("://") else {
-        return url.to_owned();
+    redact_url(url, false)
+}
+
+/// Like [`redact_password`], for an Iggy connection string, where a userinfo
+/// with no colon is a personal access token (`iggy://<token>@host:port`) and is
+/// replaced whole.
+fn redact_iggy_credentials(url: &str) -> String {
+    redact_url(url, true)
+}
+
+fn redact_url(url: &str, bare_userinfo_is_secret: bool) -> String {
+    let (base, query) = match url.split_once('?') {
+        Some((base, query)) => (base, Some(query)),
+        None => (url, None),
     };
-    let Some((userinfo, host)) = rest.rsplit_once('@') else {
-        return url.to_owned();
+    let mut out = match base.split_once("://") {
+        Some((scheme, rest)) => match rest.rsplit_once('@') {
+            Some((userinfo, host)) => match userinfo.split_once(':') {
+                Some((user, _)) => format!("{scheme}://{user}:***@{host}"),
+                None if bare_userinfo_is_secret => format!("{scheme}://***@{host}"),
+                None => base.to_owned(),
+            },
+            None => base.to_owned(),
+        },
+        None => base.to_owned(),
     };
-    match userinfo.split_once(':') {
-        Some((user, _)) => format!("{scheme}://{user}:***@{host}"),
-        None => url.to_owned(),
+    if let Some(query) = query {
+        let masked: Vec<String> = query
+            .split('&')
+            .map(|pair| match pair.split_once('=') {
+                Some((key, _)) if key.to_ascii_lowercase().contains("password") => {
+                    format!("{key}=***")
+                }
+                _ => pair.to_owned(),
+            })
+            .collect();
+        out.push('?');
+        out.push_str(&masked.join("&"));
     }
+    out
 }
 
 #[cfg(test)]
@@ -548,5 +604,22 @@ mod tests {
             "postgres://app@db/app"
         );
         assert_eq!(redact_password("not a url"), "not a url");
+        assert_eq!(
+            redact_password("postgres://app@db/app?sslmode=require&password=q&x=1"),
+            "postgres://app@db/app?sslmode=require&password=***&x=1"
+        );
+    }
+
+    #[test]
+    fn redacts_an_iggy_personal_access_token() {
+        use super::redact_iggy_credentials as redact;
+        assert_eq!(
+            redact("iggy://pat-s3cret@iggy:8090"),
+            "iggy://***@iggy:8090"
+        );
+        assert_eq!(
+            redact("iggy://app:s3cret@iggy:8090?tls=true"),
+            "iggy://app:***@iggy:8090?tls=true"
+        );
     }
 }
