@@ -39,7 +39,8 @@
 //!
 //! # Payloads
 //!
-//! Bytes (`ByteArray` / `Data`), never interpreted. See [`payload`].
+//! Bytes (`ByteArray` / `Data`), never interpreted; stored as hex text (see
+//! `bindings/README.md`).
 //!
 //! # Generating the bindings
 //!

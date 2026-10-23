@@ -90,7 +90,48 @@ differ — and each build-dir has a different path.
   `wasm-<toolchain>`. `wasm-bindgen-test-runner` is installed prebuilt (`taiki-e/install-action`, no
   compile) at the version of `wasm-bindgen` in `Cargo.lock`; a runner of another version rejects the
   test binary.
+- `deny` runs with `--workspace` (cr-44). Without it cargo-deny walks only the facade package's graph, so
+  a crate the facade does not depend on (the FFI crate) was never checked.
+- `Platform` workflow (`.github/workflows/platform.yml`, cr-44), separate from `ci.yml` and behind a
+  workflow-level `paths` filter (plus push to `main`, a weekly schedule and manual dispatch): `android`
+  (ubuntu: `cargo ndk` for arm64-v8a and x86_64, then Kotlin generation and a JVM smoke test), `apple`
+  (macOS: iOS device and simulator builds, then Swift generation and a host smoke test), `desktop` (macOS:
+  the Tauri example's fmt, clippy and restart test) and `bindgen` (the generator's fmt and deny). The FFI
+  crate is also a root-workspace member, so `ci.yml`'s fmt, clippy, nextest, docs, deny and MSRV legs cover
+  it on every pull request; the Platform jobs add only other targets and toolchains. Cache keys:
+  `android`, `apple`, `desktop`; `save-if` on `main` as everywhere else.
 - No CI timings measured yet; record the first green main run and a cache-hit run here.
+
+## Mobile and desktop bindings (cr-44)
+
+Measured 2026-10-23 on the same Mac as above, 1.99.1, other agents building concurrently (upper bounds).
+
+| Item | Value |
+|---|---|
+| New packages in the root `Cargo.lock` | 14 (13 third-party: `uniffi*`, `toml` and friends, `camino`, `fs-err`, `siphasher`, `static_assertions`) |
+| Cold dev build of those 13 crates plus `prometheus-parking-lot-ffi` (`--timings`, fresh target dir) | 46 CPU-seconds of 304 for the whole `ffi` lib graph; 54s wall for the graph |
+| `cargo ck` (warm) after the crate was added | 6.8s |
+| `cargo clippy --workspace --all-targets --all-features`, warm, after the last edit | 5.2s |
+| `cargo nextest run --workspace --all-features`, 256 tests (10 are the FFI crate's, 5 of them restart tests) | 6.7s of test time; 1m41s wall including the build |
+| `cargo ndk -t arm64-v8a build -p ...-ffi`, cold dependencies (NDK 28) | 1m38s |
+| `cargo ndk -t arm64-v8a -t x86_64 build`, x86_64 leg after arm64 was built | 20s |
+| `cargo build --target aarch64-apple-ios` / `aarch64-apple-ios-sim`, cold dependencies | 24s / 41s |
+| `bindings/generate.sh` (host library, generator already built, Kotlin and Swift) | 43s, of which the host library build was 18s |
+| `bindings/uniffi-bindgen`, cold build | 1m42s (clap, askama and the generators) |
+| `bindings/tauri-desktop`, `cargo check` cold (Tauri 2.12 on macOS) | 2m57s |
+| `bindings/tauri-desktop`, `cargo test` of the restart tests, warm | 2.7s |
+| Debug `libparking_lot_ffi.so` (aarch64 android) / `.a` (ios) | 22 MB / 60 MB (unstripped, with debug info) |
+
+Why the generator and the Tauri example are outside the root workspace: the generator brings clap and
+askama, Tauri brings several hundred crates. Inside the root workspace every `--workspace` job (clippy,
+nextest, docs, coverage, the MSRV leg) would compile them; standing alone they cost the main build nothing
+and are built only by `bindings/generate.sh` and the Platform workflow. The price is two more `Cargo.lock`
+files to keep current and a duplicated `target/` namespace (`.cargo/config.toml` sends all of them to the
+repository's `target/`; intermediates stay in the per-workspace build-dir).
+
+`rust-cache` for the root workspace also covers the generator's artifacts (they land in the same `target/`);
+the `desktop` job passes `workspaces: "bindings/tauri-desktop -> ../../target"` so the Tauri lockfile is part
+of its key.
 
 ## Disk hygiene
 
