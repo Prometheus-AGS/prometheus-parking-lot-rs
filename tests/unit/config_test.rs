@@ -23,6 +23,7 @@ const fn pool(max_units: u32) -> PoolConfig {
         default_timeout_secs: 60,
         queue: StorageConfig::InMemory,
         mailbox: StorageConfig::InMemory,
+        max_head_skips: 8,
     }
 }
 
