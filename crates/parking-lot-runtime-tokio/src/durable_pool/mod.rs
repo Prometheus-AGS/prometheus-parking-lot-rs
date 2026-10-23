@@ -138,7 +138,7 @@ use std::time::{Duration, Instant};
 use prometheus_parking_lot_core::dispatch::{Dispatched, Dispatcher, Grant, Parkable, Ticket};
 use prometheus_parking_lot_core::semaphore::{Permit, UnitSemaphore, UnitVector};
 use prometheus_parking_lot_core::{
-    Delivery, LeaseQueue, LeaseToken, LeasedTask, MailboxKey, NackAction, PoolLimits,
+    Delivery, LeaseQueue, LeaseToken, LeasedTask, MailboxKey, NackAction, PoolLimits, ResourceKind,
     ResultMailbox, ScheduledTask, SchedulerError, Spawn, TaskError, TaskExecutor, TaskId,
     TaskMetadata, TaskPayload, TaskStatus, now_ms,
 };
@@ -246,6 +246,8 @@ enum Terminal {
     /// It costs `requested` units in some dimension, more than the pool's
     /// limit there (`available`).
     TooLarge {
+        /// The exceeded dimension: a limited kind, or `None` for the total.
+        kind: Option<ResourceKind>,
         /// Units requested in the exceeded dimension.
         requested: u32,
         /// The pool's limit in that dimension.
@@ -614,6 +616,7 @@ where
             return;
         }
         if let Err(SchedulerError::CapacityExceeded {
+            kind,
             requested,
             available,
             ..
@@ -622,11 +625,13 @@ where
             .check_capacity(&UnitVector::from_cost(&item.task.meta.cost))
         {
             let reason =
-                format!("cost of {requested} units exceeds the pool's limit of {available} units");
+                SchedulerError::capacity_exceeded(self.options.name(), kind, requested, available)
+                    .to_string();
             self.settle_unrun(
                 item,
                 TaskStatus::Dropped(reason.clone()),
                 Terminal::TooLarge {
+                    kind,
                     requested,
                     available,
                 },
@@ -914,17 +919,19 @@ where
             (Terminal::Expired, _) => events.expired(task_id),
             (
                 Terminal::TooLarge {
+                    kind,
                     requested,
                     available,
                 },
                 _,
             ) => {
                 if events.bus.is_active() {
-                    let error = SchedulerError::CapacityExceeded {
-                        pool: self.options.name().to_owned(),
-                        requested: *requested,
-                        available: *available,
-                    };
+                    let error = SchedulerError::capacity_exceeded(
+                        self.options.name(),
+                        *kind,
+                        *requested,
+                        *available,
+                    );
                     events.rejected(task_id, &error);
                 }
             }

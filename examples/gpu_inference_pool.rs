@@ -126,7 +126,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // A 30 GiB request can never fit 24 GiB of VRAM, although its total (31)
     // is within the pool's 40: rejected at submission, not parked.
     let err = pool.submit(request(4, "34b", 30)).await.unwrap_err();
-    assert!(matches!(err, SchedulerError::CapacityExceeded { .. }));
+    assert!(matches!(
+        err,
+        SchedulerError::CapacityExceeded {
+            kind: Some(ResourceKind::GpuVram),
+            ..
+        }
+    ));
     println!("34b request rejected: {err}");
 
     wait_for(|| pool.running_tasks() == 2).await;

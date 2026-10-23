@@ -350,6 +350,18 @@ impl<T, Q> Dispatcher<T, Q> {
         Ok(())
     }
 
+    /// The pool name used in errors and logs.
+    #[must_use]
+    pub fn pool_name(&self) -> &str {
+        &self.pool
+    }
+
+    /// Rename the pool (errors and logs). Pools call it while they are being
+    /// built, before anything is submitted.
+    pub fn set_pool_name(&mut self, pool: impl Into<String>) {
+        self.pool = pool.into();
+    }
+
     /// Set how many times a head that does not fit may be skipped before
     /// capacity is reserved for it (cr-20; see the module docs). `0` turns
     /// skip-ahead off: strict head-of-line order. Default:
@@ -410,28 +422,18 @@ impl<T, Q> Dispatcher<T, Q> {
     ///
     /// # Errors
     ///
-    /// [`SchedulerError::CapacityExceeded`] with the requested units and the
-    /// limit of the first dimension exceeded (the total first, then kinds in
-    /// `ResourceKind` order).
+    /// [`SchedulerError::CapacityExceeded`] naming the first dimension
+    /// exceeded (the total first, then kinds in `ResourceKind` order: `kind`
+    /// is `None` for the total), the units requested there and its limit.
     pub fn check_capacity(&self, demand: &UnitVector) -> Result<(), SchedulerError> {
         match self.semaphore.exceeded_limit(demand) {
             None => Ok(()),
-            Some((kind, requested, available)) => {
-                if let Some(kind) = kind {
-                    tracing::debug!(
-                        pool = %self.pool,
-                        ?kind,
-                        requested,
-                        limit = available,
-                        "demand exceeds the pool's limit in one dimension"
-                    );
-                }
-                Err(SchedulerError::CapacityExceeded {
-                    pool: self.pool.clone(),
-                    requested,
-                    available,
-                })
-            }
+            Some((kind, requested, available)) => Err(SchedulerError::capacity_exceeded(
+                self.pool.clone(),
+                kind,
+                requested,
+                available,
+            )),
         }
     }
 
@@ -1052,6 +1054,7 @@ mod tests {
         assert!(matches!(
             dispatcher.submit(vitem("wide", Priority::Normal, 4, 3), 0),
             Err(SchedulerError::CapacityExceeded {
+                kind: Some(ResourceKind::Cpu),
                 requested: 3,
                 available: 2,
                 ..
@@ -1060,6 +1063,7 @@ mod tests {
         assert!(matches!(
             dispatcher.submit(vitem("big", Priority::Normal, 17, 1), 0),
             Err(SchedulerError::CapacityExceeded {
+                kind: Some(ResourceKind::GpuVram),
                 requested: 17,
                 available: 16,
                 ..

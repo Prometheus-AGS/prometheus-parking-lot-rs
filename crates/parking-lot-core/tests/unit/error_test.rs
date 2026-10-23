@@ -1,6 +1,6 @@
 //! Tests for the scheduler error types' messages and retry classification.
 
-use prometheus_parking_lot_core::SchedulerError;
+use prometheus_parking_lot_core::{ResourceKind, SchedulerError};
 
 #[test]
 fn queue_full_message_names_pool_and_depth() {
@@ -14,16 +14,17 @@ fn queue_full_message_names_pool_and_depth() {
 
 #[test]
 fn capacity_exceeded_message_names_request_and_pool() {
-    let err = SchedulerError::CapacityExceeded {
-        pool: "gpu".to_string(),
-        requested: 9,
-        available: 8,
-    };
+    let err = SchedulerError::capacity_exceeded("gpu", None, 9, 8);
     assert_eq!(
         err.to_string(),
         "capacity exceeded: need 9 units, pool 'gpu' has 8"
     );
     assert!(!err.is_retryable());
+    let err = SchedulerError::capacity_exceeded("gpu", Some(ResourceKind::Cpu), 3, 2);
+    assert_eq!(
+        err.to_string(),
+        "capacity exceeded: need 3 cpu units, pool 'gpu' has 2"
+    );
 }
 
 #[test]

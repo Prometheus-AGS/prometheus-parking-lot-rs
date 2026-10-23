@@ -21,7 +21,8 @@ Paths below are facade paths unless a crate is named.
 | `ShutdownHandle`, `ShutdownPolicy`, `ShutdownReport`, `wait_for_signal` | `core::shutdown` (`ShutdownReport` also top level) | `tokio-runtime` |
 | `CancellationSink`, `CancelledTask`, `CancelReason`, `SinkOutcome`, `CancellationConfig`, the logging and recording sinks, `CancellationChannel` | `core::cancellation` | `tokio-runtime` |
 
-`ResourcePool`: `new`, `with_audit`, `with_clock`, `with_cancellation_sink`,
+`ResourcePool`: `new`, `with_name` (default `resource_pool`; config-built
+pools take their key in `pools`), `name`, `with_audit`, `with_clock`, `with_cancellation_sink`,
 `with_cancellation_config`, `submit`, `prune_expired`, `active_units`,
 `running_tasks`, `queued_tasks`, `shutdown` (refuse new work only),
 `shutdown_with(policy)` (async; returns a `ShutdownReport`, cr-29).
@@ -77,7 +78,7 @@ a `ConfiguredDurablePool` with `submit`, `consume` and `shutdown`; cr-49).
 
 | Item | Covers |
 | --- | --- |
-| `SchedulerError` | Admission (`QueueFull`, `CapacityExceeded`, `DeadlineExpired`, `PoolShutdown`), `InvalidConfig`, `Backend`, `Timeout` (a wait for a result), `ResultNotFound`, `LeaseLost`, `Internal`, and `Task(TaskError)` |
+| `SchedulerError` | Admission (`QueueFull`, `CapacityExceeded { pool, kind, requested, available }` — `kind` is the limited `ResourceKind` that did not fit, `None` for the total; the variant is `#[non_exhaustive]`, build it with `SchedulerError::capacity_exceeded` — `DeadlineExpired`, `PoolShutdown`), `InvalidConfig`, `Backend`, `Timeout` (a wait for a result), `ResultNotFound`, `LeaseLost`, `Internal`, and `Task(TaskError)` |
 | `TaskError` | How one task failed: `Executor { message, retryable }`, `ExecutorPanicked`, `Timeout { budget }`, `Cancelled { reason }`, `DeadlineExpired` |
 
 Both are `#[non_exhaustive]`. See ADR 0002 for the mapping from the 0.2

@@ -95,7 +95,13 @@ The cost is a vector: VRAM and one CPU slot.
     // A 30 GiB request can never fit 24 GiB of VRAM, although its total (31)
     // is within the pool's 40: rejected at submission, not parked.
     let err = pool.submit(request(4, "34b", 30)).await.unwrap_err();
-    assert!(matches!(err, SchedulerError::CapacityExceeded { .. }));
+    assert!(matches!(
+        err,
+        SchedulerError::CapacityExceeded {
+            kind: Some(ResourceKind::GpuVram),
+            ..
+        }
+    ));
     println!("34b request rejected: {err}");
 ```
 
@@ -103,7 +109,7 @@ The run prints:
 
 ```text
 7b request: Running
-34b request rejected: capacity exceeded: need 30 units, pool 'resource_pool' has 24
+34b request rejected: capacity exceeded: need 30 gpu_vram units, pool 'inference' has 24
 running 2 | queued 1 | vram Some(22)/24 | cpu Some(2)/4 | skip-ahead SkipAheadStats { skipped: 1, reservations: 0 }
 request 1: [13b] PROMPT 1
 request 2: [13b] PROMPT 2
@@ -119,7 +125,9 @@ request 3: [7b] PROMPT 3
   reserves the capacity for it and starts nothing else until it has started
   (`reservations` counts those). `0` keeps strict head-of-line order.
 - **Never-fits is an error.** A request over any one limit returns
-  `CapacityExceeded` at once instead of blocking the queue behind it.
+  `CapacityExceeded` at once instead of blocking the queue behind it. The error
+  names the pool (its key in `pools`) and the kind that did not fit (`kind`;
+  `None` when the total is what was exceeded).
 
 Read per-kind usage with `pool.active_units_of(ResourceKind::GpuVram)` and the
 skip counters with `pool.skip_ahead_stats()`.
@@ -136,7 +144,5 @@ skip counters with `pool.skip_ahead_stats()`.
   ([Cloud Postgres](./cloud-postgres.md), [Tauri local LLM](./tauri-local-llm.md));
   a durable pool applies the same per-kind limits but dispatches in strict
   order, without skip-ahead.
-- The error text names the pool `resource_pool` and the number of units, not
-  the configured name or the kind that did not fit.
 
 Concepts: [Admission control](../concepts/admission-control.md).
