@@ -118,12 +118,14 @@ minor). The release PR (release-plz) does the bump.
 cargo publish --workspace --exclude prometheus-parking-lot-ffi --dry-run --locked
 ```
 
-`--dry-run` packages and verifies and stops before the upload. **Before any crate is on the registry the
-dry run only gets as far as `prometheus-parking-lot-core`:** that crate dry-runs fully, and every dependent
-fails with "no matching package named `prometheus-parking-lot-core` found" until core is really uploaded,
-because the verify step resolves its dependencies from the registry. That is expected for the first release;
-`cargo package --workspace` (above) is the check that covers the whole set. As each tier is published, the
-dry run advances one tier.
+`--dry-run` packages and verifies every crate and stops each one before the upload. With `--workspace`
+cargo resolves the sibling crates through a local overlay, so the whole set dry-runs cleanly before anything
+is on the registry (checked 2026-10-23: all seven crates reach "aborting upload due to dry run").
+
+The per-crate form does not: `cargo publish -p prometheus-parking-lot-runtime-tokio --dry-run` fails with
+"no matching package named `prometheus-parking-lot-core` found" until core is really uploaded, because a
+single-package verify resolves its dependencies from the registry. Only `-p prometheus-parking-lot-core`
+dry-runs on its own. That is expected for the first release; use the `--workspace` form for the dry run.
 
 ### 5.2 Publish (operator approval required)
 
