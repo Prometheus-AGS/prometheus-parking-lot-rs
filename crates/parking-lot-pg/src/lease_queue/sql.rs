@@ -24,9 +24,18 @@
 //!   re-claim won, `attempts` changed and the stale token matches nothing, which
 //!   is reported as `LeaseLost`. If the ack won, the entry is gone and the
 //!   re-claim finds nothing. Fencing needs no extra read.
-//! - **`reap`** is one `UPDATE` over expired leases; it conflicts with `extend`
-//!   only on the row lock, and `extend` requires the lease unexpired while
-//!   `reap` requires it expired, so a row qualifies for at most one of them.
+//! - **`reap`** is one `UPDATE` over expired leases, whose rows are picked by
+//!   an `ORDER BY id ... FOR UPDATE SKIP LOCKED` sub-select. It conflicts with
+//!   `extend` only on the row lock, and `extend` requires the lease unexpired
+//!   while `reap` requires it expired, so a row qualifies for at most one of
+//!   them. A row some other statement holds is left for the next pass, so the
+//!   reaper never waits.
+//! - **The `lease` statement's attempts-exhausted sweep** picks its rows the
+//!   same way (`ORDER BY id ... FOR UPDATE SKIP LOCKED`), so neither half of
+//!   `lease` ever waits for a row lock. Without it, a `lease` and a reaper pass
+//!   locking the same expired rows in different scan orders could wait on each
+//!   other (deadlock), and a lease would wait behind any open transaction that
+//!   touched such a row.
 //! - **`enqueue`** takes a per-queue transaction-scoped advisory lock, then
 //!   checks the idempotency key and the live count and inserts. The lock makes
 //!   the check-then-insert atomic among enqueuers of the same queue, so
@@ -126,8 +135,12 @@ pub(super) static STATEMENTS: LazyLock<Statements> = LazyLock::new(|| {
             UPDATE {TABLE}
                SET state = 'dead', lease_expires_at = NULL,
                    dead_reason = 'max attempts (' || $4::int || ') exceeded'
-             WHERE queue_name = $1 AND $4::int IS NOT NULL AND attempts >= $4::int
-               AND {leasable}
+             WHERE id IN (
+                   SELECT id FROM {TABLE}
+                    WHERE queue_name = $1 AND $4::int IS NOT NULL AND attempts >= $4::int
+                      AND {leasable}
+                    ORDER BY id
+                    {ROW_LOCK})
          ), next AS (
             SELECT id FROM {TABLE}
              WHERE queue_name = $1
@@ -169,7 +182,11 @@ pub(super) static STATEMENTS: LazyLock<Statements> = LazyLock::new(|| {
                    dead_reason = CASE WHEN $2::int IS NOT NULL AND attempts >= $2::int
                                       THEN 'max attempts (' || $2::int || ') exceeded' END,
                    lease_expires_at = NULL
-             WHERE queue_name = $1 AND state = 'leased' AND {EXPIRED}
+             WHERE id IN (
+                   SELECT id FROM {TABLE}
+                    WHERE queue_name = $1 AND state = 'leased' AND {EXPIRED}
+                    ORDER BY id
+                    {ROW_LOCK})
          RETURNING state
          )
          SELECT count(*) FILTER (WHERE state = 'ready'),

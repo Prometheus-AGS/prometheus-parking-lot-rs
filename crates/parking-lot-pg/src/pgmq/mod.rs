@@ -288,7 +288,20 @@ impl<P> PgmqLeaseQueue<P> {
         Ok(())
     }
 
-    /// Dead-letter a message this call just leased.
+    /// Dead-letter a message this call just leased. A failure is logged, not
+    /// returned: the tasks this call already leased must reach the caller, or
+    /// they would sit invisible until their leases ran out. The message that
+    /// could not be dead-lettered stays leased and is delivered again (and
+    /// dead-lettered again) when its lease expires.
+    async fn dead_letter_or_log(&self, lane: usize, msg_id: i64, read_ct: i32, reason: String) {
+        if let Err(error) = self.dead_letter_leased(lane, msg_id, read_ct, reason).await {
+            tracing::warn!(
+                %error, queue = &*self.queue_name, msg_id,
+                "could not dead-letter a leased message; it stays leased until its lease expires"
+            );
+        }
+    }
+
     async fn dead_letter_leased(
         &self,
         lane: usize,
@@ -420,8 +433,7 @@ where
                         && i64::from(read_ct) > limit
                     {
                         let reason = format!("max attempts ({limit}) exceeded");
-                        self.dead_letter_leased(lane, msg_id, read_ct, reason)
-                            .await?;
+                        self.dead_letter_or_log(lane, msg_id, read_ct, reason).await;
                         continue;
                     }
                     match decode_task::<P>(row) {
@@ -435,8 +447,7 @@ where
                         Err(reason) => {
                             // Not retryable: redelivery would fail the same way.
                             let reason = format!("undecodable task: {reason}");
-                            self.dead_letter_leased(lane, msg_id, read_ct, reason)
-                                .await?;
+                            self.dead_letter_or_log(lane, msg_id, read_ct, reason).await;
                         }
                     }
                 }

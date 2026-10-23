@@ -37,6 +37,7 @@ use prometheus_parking_lot_core::{
     ResourceKind, ScheduledTask, SchedulerError, TaskMetadata, lease_queue_conformance,
 };
 use prometheus_parking_lot_pg::{PgLeaseQueue, Wake};
+use sqlx::Connection;
 use sqlx::postgres::PgPoolOptions;
 use support::{PgContainer, TestResult, pg_major};
 
@@ -499,5 +500,76 @@ async fn undecodable_entry_does_not_wedge_the_queue() -> TestResult<()> {
     assert_eq!(leased[0].task.payload, "good");
     let depth = queue.depth().await?;
     assert_eq!(depth.dead_lettered, 1, "{depth:?}");
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "needs Docker: starts a parking-lot-pg container"]
+async fn failed_dead_letter_does_not_discard_leased_tasks() -> TestResult<()> {
+    let pg = start().await?;
+    let queue = PgLeaseQueue::<String>::new(pg.pool.clone(), "dl-fails", 100);
+    let meta = serde_json::to_value(task(Priority::Critical, "", None).meta)?;
+    sqlx::query(
+        "INSERT INTO pl_lease_queue (queue_name, priority, meta, payload)
+         VALUES ('dl-fails', 3, $1, '42'::jsonb)",
+    )
+    .bind(meta)
+    .execute(&pg.pool)
+    .await?;
+    let _ = queue.enqueue(task(Priority::Low, "good", None)).await?;
+    // Writing a dead letter fails (as it would on a full disk or a revoked grant).
+    sqlx::raw_sql(
+        "CREATE FUNCTION pl_test_no_dead() RETURNS trigger LANGUAGE plpgsql AS $$
+         BEGIN RAISE EXCEPTION 'dead letters are not writable'; END $$;
+         CREATE TRIGGER pl_test_no_dead BEFORE UPDATE ON pl_lease_queue
+             FOR EACH ROW WHEN (NEW.state = 'dead') EXECUTE FUNCTION pl_test_no_dead();",
+    )
+    .execute(&pg.pool)
+    .await?;
+
+    let leased = queue.lease(10, Duration::from_secs(60)).await?;
+    assert_eq!(
+        leased.len(),
+        1,
+        "the good task was leased and must be returned"
+    );
+    assert_eq!(leased[0].task.payload, "good");
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "needs Docker: starts a parking-lot-pg container"]
+async fn lease_and_reaper_skip_expired_rows_another_session_holds() -> TestResult<()> {
+    let pg = start().await?;
+    let queue =
+        PgLeaseQueue::<String>::new(pg.pool.clone(), "locked-rows", 100).with_max_attempts(1);
+    let _ = queue.enqueue(task(Priority::Normal, "spent", None)).await?;
+    let lease_for = Duration::from_secs(1);
+    assert_eq!(queue.lease(1, lease_for).await?.len(), 1);
+    tokio::time::sleep(lease_for + Duration::from_millis(500)).await;
+
+    // The entry is expired and out of attempts: both `lease` (its sweep of
+    // exhausted entries) and the reaper want to dead-letter it. Another session
+    // holds the row.
+    let mut holder = sqlx::PgConnection::connect(&pg.url).await?;
+    sqlx::query("BEGIN").execute(&mut holder).await?;
+    sqlx::query("SELECT id FROM pl_lease_queue WHERE queue_name = 'locked-rows' FOR UPDATE")
+        .execute(&mut holder)
+        .await?;
+
+    let bound = Duration::from_secs(3);
+    let leased = tokio::time::timeout(bound, queue.lease(1, lease_for))
+        .await
+        .expect("lease waited for a row lock another session holds")?;
+    assert!(leased.is_empty());
+    let reaped = tokio::time::timeout(bound, queue.reap_expired())
+        .await
+        .expect("the reaper waited for a row lock another session holds")?;
+    assert_eq!((reaped.requeued, reaped.dead_lettered), (0, 0));
+
+    // Once the row is free the next call gives up on it.
+    sqlx::query("ROLLBACK").execute(&mut holder).await?;
+    assert!(queue.lease(1, lease_for).await?.is_empty());
+    assert_eq!(queue.depth().await?.dead_lettered, 1);
     Ok(())
 }

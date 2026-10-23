@@ -309,14 +309,22 @@ where
                 }
                 Err(reason) => {
                     // Not retryable: redelivery would fail the same way.
-                    sqlx::query(DEAD_LETTER_UNDECODABLE)
+                    // A failed dead-letter write is logged, not returned: the
+                    // tasks this call already leased must reach the caller.
+                    // The entry stays leased and is reclaimed when it expires.
+                    if let Err(error) = sqlx::query(DEAD_LETTER_UNDECODABLE)
                         .bind(&*self.queue_name)
                         .bind(id)
                         .bind(i32::try_from(attempts).unwrap_or(i32::MAX))
                         .bind(format!("undecodable task: {reason}"))
                         .execute(&self.pool)
                         .await
-                        .map_err(backend("dead-letter undecodable task"))?;
+                    {
+                        tracing::warn!(
+                            %error, queue = &*self.queue_name, id,
+                            "could not dead-letter an undecodable entry; it stays leased until its lease expires"
+                        );
+                    }
                 }
             }
         }
