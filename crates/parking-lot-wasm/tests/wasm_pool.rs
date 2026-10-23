@@ -398,3 +398,84 @@ fn js_now() -> u64 {
         js_sys::Date::now() as u64
     }
 }
+
+// ---------------------------------------------------------------------------
+// Skip-ahead (cr-20) and vector admission through the dispatcher (cr-53)
+// ---------------------------------------------------------------------------
+
+/// Run the skip-ahead scenario and return the order tasks started in.
+///
+/// 4 units. Task 0 (2 units) runs long and leaves 2 free. Task 1 (3 units)
+/// is the head and cannot fit. Tasks 2, 3 and 4 (1 unit, short) can.
+async fn skip_scenario(max_head_skips: u32) -> (Vec<u64>, u64, u64) {
+    let executor = Tracking::default();
+    let pool = WorkerPool::new(
+        config(8, 4, 16, 5_000).with_max_head_skips(max_head_skips),
+        executor.clone(),
+    )
+    .expect("pool");
+    let mut keys = Vec::new();
+    keys.push(pool.submit(60, meta(0, Priority::Normal, 2)).expect("0"));
+    keys.push(pool.submit(5, meta(1, Priority::Normal, 3)).expect("1"));
+    for id in 2..=4 {
+        keys.push(
+            pool.submit(5, meta(id, Priority::Normal, 1))
+                .expect("small"),
+        );
+    }
+    for key in &keys {
+        pool.retrieve_async(key, LONG).await.expect("result");
+    }
+    let stats = pool.skip_ahead_stats();
+    let started = executor.started.lock().clone();
+    (started, stats.skipped, stats.reservations)
+}
+
+/// Small tasks start in place of a head that does not fit, at most
+/// `max_head_skips` times; then capacity is reserved for the head, so the
+/// next small task waits behind it.
+#[wasm_bindgen_test]
+async fn skip_ahead_is_bounded_by_the_starvation_guard() {
+    let (started, skipped, reservations) = skip_scenario(2).await;
+    assert_eq!(
+        started,
+        vec![0, 2, 3, 1, 4],
+        "two small tasks skip the head, the head starts before the third"
+    );
+    assert_eq!((skipped, reservations), (2, 1));
+}
+
+/// `max_head_skips: 0` is strict head-of-line: nothing starts in place of a
+/// head that does not fit.
+#[wasm_bindgen_test]
+async fn skip_ahead_off_is_strict_head_of_line() {
+    let (started, skipped, reservations) = skip_scenario(0).await;
+    assert_eq!(started, vec![0, 1, 2, 3, 4]);
+    assert_eq!(skipped, 0);
+    assert_eq!(reservations, 0);
+}
+
+/// A full dimension parks its next task without blocking another dimension:
+/// the CPU task starts in place of the parked VRAM head.
+#[wasm_bindgen_test]
+async fn a_full_dimension_does_not_block_another() {
+    let executor = Tracking::default();
+    let pool = WorkerPool::new(
+        config(4, 100, 8, 5_000).with_resource_limit(ResourceKind::GpuVram, 2),
+        executor.clone(),
+    )
+    .expect("pool");
+    let vram = |id: u64| TaskMetadata {
+        cost: ResourceCost::new(ResourceKind::GpuVram, 2),
+        ..meta(id, Priority::Normal, 0)
+    };
+    let keys = [
+        pool.submit(40, vram(0)).expect("v0"),
+        pool.submit(5, vram(1)).expect("v1"),
+        pool.submit(5, meta(2, Priority::Normal, 1)).expect("cpu"),
+    ];
+    for key in &keys {
+        pool.retrieve_async(key, LONG).await.expect("result");
+    }
+    assert_eq!(*executor.started.lock(), vec![0, 2, 1]);
+}
