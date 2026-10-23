@@ -18,6 +18,16 @@
 //!   a JS `setTimeout`. A task still running at its budget is dropped at its
 //!   next await point, its units are released and its result is
 //!   [`TaskError::Timeout`].
+//! - **Lifecycle events** (cr-53): hooks registered with
+//!   [`WorkerPool::with_hook`] see, per task (keyed by
+//!   [`TaskMetadata::id`]), the same sequence as the native pools:
+//!   `Submitted` first in `submit`; `Rejected` when `submit` refuses it;
+//!   `Queued` under the dispatch lock when it parks; `Started` when its
+//!   executor is about to run (`worker_id` is always 0: there are no
+//!   workers); then one terminal event: `Completed`/`Failed` when the
+//!   executor returns, is cut off at its budget or ends (before its units are
+//!   returned), `Expired` when it reached the head after its deadline, or
+//!   `Cancelled` when a shutdown captured it. Hooks run inline.
 //! - **No polling**: results use a oneshot per waiting retriever.
 //! - **Clean shutdown**: parked tasks are failed with [`TaskError::Cancelled`]
 //!   rather than dropped silently.
@@ -39,15 +49,17 @@ use wasm_bindgen_futures::spawn_local;
 
 use prometheus_parking_lot_core::config::WorkerPoolConfig;
 use prometheus_parking_lot_core::dispatch::{
-    Dispatched, Dispatcher, Grant, PoolCounters, WorkerTask, generate_mailbox_key,
+    Dispatched, Dispatcher, Grant, PoolCounters, SkipAheadStats, WorkerTask, generate_mailbox_key,
     mailbox_key_to_string,
 };
 use prometheus_parking_lot_core::semaphore::UnitSemaphore;
 use prometheus_parking_lot_core::{
-    Clock, MailboxKey, PoolStats, SchedulerError, TaskError, TaskMetadata, WorkerExecutor,
+    Clock, Hook, HookBus, MailboxKey, PoolStats, SchedulerError, TaskError, TaskMetadata,
+    WorkerExecutor,
 };
 
 use crate::clock::WasmClock;
+use crate::events::Events;
 use crate::results::{Claim, Results};
 use crate::time::{Elapsed, timeout};
 
@@ -94,6 +106,8 @@ struct Shared<P, R, E> {
     clock: RwLock<Arc<dyn Clock>>,
     /// Shutdown flag.
     shutdown: AtomicBool,
+    /// Lifecycle-event hooks (cr-53); delivery is inline on this target.
+    hooks: HookBus,
     /// The executor; each task runs on a clone.
     executor: E,
 }
@@ -106,6 +120,14 @@ where
 {
     fn now_ms(&self) -> u128 {
         self.clock.read().now_ms()
+    }
+
+    fn events(&self) -> Events<'_> {
+        Events {
+            bus: &self.hooks,
+            pool: POOL_NAME,
+            clock: &self.clock,
+        }
     }
 
     /// Resolve the execution budget for one task: the task's deadline when it
@@ -149,6 +171,7 @@ where
                 task_id = task.meta.id,
                 "queued task expired before it could start"
             );
+            self.events().expired(task.meta.id);
             self.finish(&task.mailbox_key, Err(TaskError::DeadlineExpired));
         }
         for admitted in started {
@@ -159,6 +182,7 @@ where
     /// Fail every parked task (shutdown): nothing parked is dropped silently.
     fn cancel_parked(&self) {
         for task in self.dispatcher.take_parked() {
+            self.events().cancelled(&task.meta);
             self.finish(&task.mailbox_key, Err(shutdown_cancelled()));
         }
     }
@@ -174,16 +198,20 @@ where
         } = task;
         let task_id = meta.id;
 
+        let events = self.events();
         let outcome = if self.shutdown.load(Ordering::Acquire) {
             // Acquire pairs with the Release in `shutdown()`: the pool is
             // shutting down, so the task is failed rather than started.
+            events.cancelled(&meta);
             Err(shutdown_cancelled())
         } else {
             let budget = self.budget(&meta);
             debug!(task_id, ?budget, "WASM worker executing task");
+            events.started(task_id);
+            let started = events.timer();
             // On elapse the executor future is dropped, which cancels it at
             // its next await point.
-            timeout(budget, self.executor.execute(payload, meta))
+            let outcome = timeout(budget, self.executor.execute(payload, meta))
                 .await
                 .unwrap_or_else(|Elapsed| {
                     warn!(
@@ -192,7 +220,9 @@ where
                         "task exceeded its budget and was cancelled"
                     );
                     Err(TaskError::Timeout { budget })
-                })
+                });
+            events.finished(task_id, &outcome, started);
+            outcome
         };
 
         // Return the units before publishing the outcome, so a caller that
@@ -271,6 +301,7 @@ where
             counters: PoolCounters::default(),
             clock: RwLock::new(Arc::new(WasmClock::new())),
             shutdown: AtomicBool::new(false),
+            hooks: HookBus::new(),
             executor,
             config,
         });
@@ -289,6 +320,30 @@ where
     pub fn with_clock(self, clock: impl Clock + 'static) -> Self {
         *self.shared.clock.write() = Arc::new(clock);
         self
+    }
+
+    /// Register a lifecycle hook (cr-53); see the module docs for the events.
+    /// There are no threads on this target: hooks run inline, on the call
+    /// that causes the transition, so they must be quick and must not call
+    /// back into the pool.
+    #[must_use]
+    pub fn with_hook(self, hook: Arc<dyn Hook>) -> Self {
+        self.shared.hooks.register(hook);
+        self
+    }
+
+    /// The pool's hook bus: register more hooks at any time or read its
+    /// counters.
+    #[must_use]
+    pub fn hooks(&self) -> &HookBus {
+        &self.shared.hooks
+    }
+
+    /// Skip-ahead counters (cr-20): tasks started in place of a head that
+    /// did not fit, and heads for which the starvation guard engaged.
+    #[must_use]
+    pub fn skip_ahead_stats(&self) -> SkipAheadStats {
+        self.shared.dispatcher.skip_ahead_stats()
     }
 
     /// Submit a task asynchronously. Admission never waits; this is
@@ -332,13 +387,20 @@ where
     ///   `max_queue_depth` tasks are already waiting
     pub fn submit(&self, payload: P, meta: TaskMetadata) -> Result<MailboxKey, SchedulerError> {
         let shared = &self.shared;
+        let events = shared.events();
+        let id = meta.id;
+        events.submitted(&meta);
         // Acquire pairs with the Release in `shutdown()`.
         if shared.shutdown.load(Ordering::Acquire) {
-            return Err(pool_shutdown());
+            let error = pool_shutdown();
+            events.rejected(id, &error);
+            return Err(error);
         }
         let now_ms = shared.now_ms();
         if meta.deadline_ms.is_some_and(|deadline| now_ms > deadline) {
-            return Err(SchedulerError::DeadlineExpired { task_id: meta.id });
+            let error = SchedulerError::DeadlineExpired { task_id: id };
+            events.rejected(id, &error);
+            return Err(error);
         }
 
         // Relaxed: the counter only needs unique values.
@@ -352,11 +414,15 @@ where
             meta,
             mailbox_key: mailbox_key.clone(),
         };
-        let admission = match shared.dispatcher.submit(task, now_ms) {
+        let admission = match shared
+            .dispatcher
+            .submit_with(task, now_ms, |depth| events.queued(id, depth))
+        {
             Ok(admission) => admission,
             Err(error) => {
                 shared.results.remove(&slot);
                 warn!(%error, "worker pool rejected task");
+                events.rejected(id, &error);
                 return Err(error);
             }
         };
