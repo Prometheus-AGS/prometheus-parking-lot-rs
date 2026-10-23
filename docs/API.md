@@ -1,288 +1,78 @@
-# Prometheus Parking Lot - API Specification
+# API overview
 
-> **Status:** Living Document  
-> **Last Updated:** 2024-12-06  
-> **Version:** 0.1.0-draft
+A map of the public API at 0.3.0 (unreleased). The rustdoc is the reference;
+build it with `cargo doc --workspace --no-deps --all-features --open`. Compiled
+examples are in the [README](../README.md). Design decisions are in
+[`adr/`](adr/).
 
----
+Most applications depend only on the facade crate `prometheus_parking_lot`.
+Paths below are facade paths unless a crate is named.
 
-## Module Structure
+## Pools
 
-```rust
-pub mod prometheus_parking_lot {
-    // Core synchronization primitives
-    pub struct Mutex<T>;
-    pub struct MutexGuard<'a, T>;
-    
-    pub struct RwLock<T>;
-    pub struct RwLockReadGuard<'a, T>;
-    pub struct RwLockWriteGuard<'a, T>;
-    
-    pub struct Condvar;
-    
-    // Advanced types (Phase 2)
-    pub struct Once;
-    pub struct OnceCell<T>;
-    pub struct ReentrantMutex<T>;
-    pub struct FairMutex<T>;
-    
-    // Re-exports from lock_api
-    pub use lock_api::{MappedMutexGuard, MappedRwLockReadGuard, MappedRwLockWriteGuard};
-}
-```
+| Item | Path | Feature |
+| --- | --- | --- |
+| `ResourcePool<P, T, Q, M, E, S>`: async parking-lot scheduler over a `TaskQueue`, a `Mailbox`, a `TaskExecutor` and a `Spawn` | `core::ResourcePool` | `tokio-runtime` (default) |
+| `WorkerPool<P, R, E>`: dedicated OS worker threads (native) for CPU/GPU-bound work over a `WorkerExecutor` | `WorkerPool`, `core::WorkerPool` | `tokio-runtime` on native; wasm32 by target |
+| `PoolLimits { max_units, max_queue_depth, default_timeout }` | `core::PoolLimits` | always |
+| `WorkerPoolConfig` (builder: `with_worker_count`, `with_max_units`, `with_max_queue_depth`, `with_timeout_ms`) | `config::WorkerPoolConfig` | always |
+| `PoolStats` | `core::PoolStats` | always |
+| `TokioSpawner` (`new(handle)`, `with_worker_threads(n)`) | `runtime::TokioSpawner` | `tokio-runtime` |
+| `ShutdownHandle`, `ShutdownPolicy`, `wait_for_signal` | `core::shutdown` | `tokio-runtime` |
+| Cancellation channel and sinks | `core::cancellation` | `tokio-runtime` |
 
----
+`ResourcePool`: `new`, `with_audit`, `with_clock`, `submit`, `prune_expired`,
+`active_units`, `running_tasks`, `queued_tasks`, `shutdown`.
 
-## Mutex<T>
+`WorkerPool`: `new`, `with_clock`, `submit` / `submit_async`, `retrieve` /
+`retrieve_async`, `stats`, `shutdown`.
 
-### Type Definition
+## Tasks and executors
 
-```rust
-/// A mutual exclusion primitive useful for protecting shared data.
-///
-/// This mutex will block threads waiting for the lock to become available.
-/// Unlike `std::sync::Mutex`, this type does not implement poisoning.
-///
-/// # Examples
-///
-/// ```
-/// use prometheus_parking_lot::Mutex;
-/// use std::sync::Arc;
-/// use std::thread;
-///
-/// let mutex = Arc::new(Mutex::new(0));
-/// let mut handles = vec![];
-///
-/// for _ in 0..10 {
-///     let mutex = Arc::clone(&mutex);
-///     let handle = thread::spawn(move || {
-///         let mut num = mutex.lock();
-///         *num += 1;
-///     });
-///     handles.push(handle);
-/// }
-///
-/// for handle in handles {
-///     handle.join().unwrap();
-/// }
-///
-/// assert_eq!(*mutex.lock(), 10);
-/// ```
-pub struct Mutex<T: ?Sized> {
-    // Internal implementation
-}
-```
+| Item | Path |
+| --- | --- |
+| `TaskExecutor<P, T>`: `async fn execute(&self, P, TaskMetadata) -> Result<T, TaskError>` (serializable results) | `core::TaskExecutor` |
+| `WorkerExecutor<P, R>`: same shape, result need not be serializable | `core::WorkerExecutor` |
+| `TaskPayload` (blanket: `Send + Sync + Serialize + DeserializeOwned + 'static`) | `core::TaskPayload` |
+| `TaskMetadata`, `ScheduledTask<P>`, `TaskStatus`, `SubmissionSequence` | `core::*` |
+| `ResourceCost`, `ResourceKind`, `Priority`, `MailboxKey`, `TaskId` | `util::*` |
+| `Clock`, `SystemClock`, `TestClock`, `now_ms` | `core::clock`, `util::*` |
 
-### Methods
+## Errors
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `new` | `const fn new(value: T) -> Mutex<T>` | Creates a new unlocked mutex |
-| `lock` | `fn lock(&self) -> MutexGuard<'_, T>` | Acquires the lock, blocking if necessary |
-| `try_lock` | `fn try_lock(&self) -> Option<MutexGuard<'_, T>>` | Attempts to acquire without blocking |
-| `get_mut` | `fn get_mut(&mut self) -> &mut T` | Returns mutable reference (requires &mut self) |
-| `into_inner` | `fn into_inner(self) -> T` | Consumes mutex, returns data |
-| `is_locked` | `fn is_locked(&self) -> bool` | Checks if currently locked |
+| Item | Covers |
+| --- | --- |
+| `SchedulerError` | Admission (`QueueFull`, `CapacityExceeded`, `DeadlineExpired`, `PoolShutdown`), `InvalidConfig`, `Backend`, `Timeout` (a wait for a result), `ResultNotFound`, `LeaseLost`, `Internal`, and `Task(TaskError)` |
+| `TaskError` | How one task failed: `Executor { message, retryable }`, `ExecutorPanicked`, `Timeout { budget }`, `Cancelled { reason }`, `DeadlineExpired` |
 
-### Trait Implementations
+Both are `#[non_exhaustive]`. See ADR 0002 for the mapping from the 0.2
+`PoolError`.
 
-- `Send` if `T: Send`
-- `Sync` if `T: Send`
-- `Default` if `T: Default`
-- `Debug`
-- `From<T>`
+## Storage contracts
 
----
+Two generations coexist until durable dispatch (cr-49), per ADR 0003.
 
-## RwLock<T>
+| Contract | Kind | Implementations |
+| --- | --- | --- |
+| `TaskQueue<P>` | synchronous, in-process; what `ResourcePool` parks tasks in today | `infra::InMemoryQueue`; `infra::queue::PostgresQueue` (`postgres`) |
+| `Mailbox<T>` | synchronous; where `ResourcePool` delivers outcomes today | `infra::InMemoryMailbox`; `infra::mailbox::PostgresMailbox` (`postgres`) |
+| `LeaseQueue<P>` | async, leasing (`enqueue`, `lease`, `ack`, `nack`, `extend`, `depth`) | `infra::queue::InMemoryLeaseQueue` (reference); `infra::queue::RedbLeaseQueue` from `infra::EmbeddedStore` (`embedded`, crash-safe); Postgres in cr-26 |
+| `ResultMailbox<T>` + `Notifier<T>` | async, idempotent (`deliver`, `consume`, `peek`, `evict_expired`) | `infra::mailbox::InMemoryResultMailbox` (reference); `infra::mailbox::RedbResultMailbox` (`embedded`, crash-safe); Postgres in cr-27; `StorageMailbox<S, N>` composes storage and notifier |
 
-### Type Definition
+The async contracts live in `core::backend` and are not yet used by any pool.
+The backend conformance suite is `prometheus_parking_lot_core::conformance`
+behind that crate's `conformance` feature.
 
-```rust
-/// A reader-writer lock.
-///
-/// This type of lock allows a number of readers or at most one writer
-/// at any point in time.
-///
-/// # Examples
-///
-/// ```
-/// use prometheus_parking_lot::RwLock;
-///
-/// let lock = RwLock::new(5);
-///
-/// // Multiple readers can hold the lock simultaneously
-/// {
-///     let r1 = lock.read();
-///     let r2 = lock.read();
-///     assert_eq!(*r1, 5);
-///     assert_eq!(*r2, 5);
-/// }
-///
-/// // Only one writer can hold the lock
-/// {
-///     let mut w = lock.write();
-///     *w += 1;
-///     assert_eq!(*w, 6);
-/// }
-/// ```
-pub struct RwLock<T: ?Sized> {
-    // Internal implementation
-}
-```
+## Hooks and audit
 
-### Methods
+`core::hooks` (`Hook`, `HookBus`, `LifecycleEvent`, `TracingHook`,
+`RecordingHook`) and `core::audit` (`AuditSink`, `AuditEvent`,
+`InMemoryAuditSink`; `PostgresAuditSink` with `postgres`).
 
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `new` | `const fn new(value: T) -> RwLock<T>` | Creates a new unlocked RwLock |
-| `read` | `fn read(&self) -> RwLockReadGuard<'_, T>` | Acquires a read lock |
-| `write` | `fn write(&self) -> RwLockWriteGuard<'_, T>` | Acquires a write lock |
-| `try_read` | `fn try_read(&self) -> Option<RwLockReadGuard<'_, T>>` | Attempts to acquire read lock |
-| `try_write` | `fn try_write(&self) -> Option<RwLockWriteGuard<'_, T>>` | Attempts to acquire write lock |
-| `get_mut` | `fn get_mut(&mut self) -> &mut T` | Returns mutable reference |
-| `into_inner` | `fn into_inner(self) -> T` | Consumes lock, returns data |
+## Scheduling internals (core crate only)
 
----
-
-## Condvar
-
-### Type Definition
-
-```rust
-/// A condition variable.
-///
-/// Condition variables represent the ability to block a thread such that
-/// it consumes no CPU time while waiting for an event to occur.
-///
-/// # Examples
-///
-/// ```
-/// use prometheus_parking_lot::{Mutex, Condvar};
-/// use std::sync::Arc;
-/// use std::thread;
-///
-/// let pair = Arc::new((Mutex::new(false), Condvar::new()));
-/// let pair2 = Arc::clone(&pair);
-///
-/// thread::spawn(move || {
-///     let (lock, cvar) = &*pair2;
-///     let mut started = lock.lock();
-///     *started = true;
-///     cvar.notify_one();
-/// });
-///
-/// let (lock, cvar) = &*pair;
-/// let mut started = lock.lock();
-/// while !*started {
-///     cvar.wait(&mut started);
-/// }
-/// ```
-pub struct Condvar {
-    // Internal implementation
-}
-```
-
-### Methods
-
-| Method | Signature | Description |
-|--------|-----------|-------------|
-| `new` | `const fn new() -> Condvar` | Creates a new condition variable |
-| `wait` | `fn wait<T>(&self, guard: &mut MutexGuard<'_, T>)` | Blocks until notified |
-| `wait_while` | `fn wait_while<T, F>(&self, guard: &mut MutexGuard<'_, T>, condition: F)` | Blocks while condition is true |
-| `notify_one` | `fn notify_one(&self)` | Wakes up one waiting thread |
-| `notify_all` | `fn notify_all(&self)` | Wakes up all waiting threads |
-
----
-
-## Guard Types
-
-### MutexGuard<'a, T>
-
-```rust
-/// An RAII guard returned by Mutex::lock.
-///
-/// When this structure is dropped, the lock will be released.
-pub struct MutexGuard<'a, T: ?Sized> {
-    // Internal implementation
-}
-
-impl<T: ?Sized> Deref for MutexGuard<'_, T> {
-    type Target = T;
-}
-
-impl<T: ?Sized> DerefMut for MutexGuard<'_, T> {}
-```
-
-### RwLockReadGuard<'a, T>
-
-```rust
-/// An RAII guard for read access to an RwLock.
-pub struct RwLockReadGuard<'a, T: ?Sized> {
-    // Internal implementation
-}
-
-impl<T: ?Sized> Deref for RwLockReadGuard<'_, T> {
-    type Target = T;
-}
-```
-
-### RwLockWriteGuard<'a, T>
-
-```rust
-/// An RAII guard for write access to an RwLock.
-pub struct RwLockWriteGuard<'a, T: ?Sized> {
-    // Internal implementation  
-}
-
-impl<T: ?Sized> Deref for RwLockWriteGuard<'_, T> {
-    type Target = T;
-}
-
-impl<T: ?Sized> DerefMut for RwLockWriteGuard<'_, T> {}
-```
-
----
-
-## Error Handling
-
-This crate **does not use poisoning**. Methods that can fail return `Option`:
-
-| Method | Return Type | Failure Case |
-|--------|-------------|--------------|
-| `try_lock` | `Option<MutexGuard>` | Lock already held |
-| `try_read` | `Option<RwLockReadGuard>` | Write lock held |
-| `try_write` | `Option<RwLockWriteGuard>` | Any lock held |
-
----
-
-## Feature Flags
-
-| Feature | Description | Default |
-|---------|-------------|---------|
-| `std` | Enable standard library support | ✅ Yes |
-| `nightly` | Enable nightly-only optimizations | ❌ No |
-
----
-
-## Safety Guarantees
-
-1. **No Data Races**: All types are `Send + Sync` only when safe
-2. **No Deadlocks**: Single-lock operations cannot deadlock
-3. **No Undefined Behavior**: All code is safe Rust (no `unsafe` unless documented)
-4. **Memory Safety**: Guards ensure locks are released on drop
-
----
-
-## Comparison with std::sync
-
-| Feature | prometheus_parking_lot | std::sync |
-|---------|----------------------|-----------|
-| Poisoning | ❌ No | ✅ Yes |
-| Lock size | 1 byte | 40+ bytes |
-| `const fn new` | ✅ Yes | ✅ Yes (Rust 1.63+) |
-| Performance | Faster (uncontended) | Baseline |
-
----
-
-*This is a living document. Update as API evolves.*
+`prometheus_parking_lot_core::dispatch` (`Dispatcher`, `Admission`,
+`Dispatched`, `Grant`, `Ticket`, `Parkable`, `ParkedQueue`, `PriorityQueue`,
+`TaskQueueAdapter`) and `prometheus_parking_lot_core::semaphore`
+(`UnitSemaphore`, `Permit`) are what both pools admit through. The facade does
+not re-export them.

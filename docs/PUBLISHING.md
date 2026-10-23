@@ -1,5 +1,12 @@
 # Publishing `prometheus_parking_lot` to crates.io — Playbook
 
+> **Status (2026-10-22):** written for the 0.2 single crate. The manifest example below
+> predates the workspace split (ADR 0001): the repository is now a workspace of
+> `prometheus-parking-lot-*` crates plus the `prometheus_parking_lot` facade, each with an
+> `include` allowlist, edition 2024 and MSRV 1.95. The 0.3.0 release process (release-plz,
+> git-cliff, crates.io trusted publishing in dependency order) is cr-52 and replaces this
+> playbook. Until then, use it for its checklists, not its manifest.
+
 A repeatable runbook for releasing this crate publicly on [crates.io](https://crates.io)
 with first-class [docs.rs](https://docs.rs) documentation. Follow it top to bottom for the
 first release; for subsequent releases, start at **§5 Release**.
@@ -127,7 +134,7 @@ cargo package --all-features             # build the .crate without uploading
 
 ### 5.1 Version & changelog
 - [ ] Bump `version` per [SemVer](https://semver.org/): pre-1.0 → breaking changes bump **minor**
-- [ ] Update `docs/CHANGELOG.md` (Keep a Changelog format); move Unreleased → the new version
+- [ ] Update the root `CHANGELOG.md` (Keep a Changelog format); move Unreleased → the new version
 - [ ] Commit: `chore(release): vX.Y.Z`
 
 ### 5.2 Dry run (mandatory)

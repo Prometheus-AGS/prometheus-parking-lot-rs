@@ -22,7 +22,7 @@ improvise what it would have said.
 | Deadlock, hang, or race being debugged | `concurrency-debugging`, `rust-debugging` |
 | Tests: async, testcontainers, property, loom/miri | `rust-testing`; review with `rust-testing-code-review` |
 | Serde config models (`src/config`) | `serde-code-review` |
-| sqlx / SeaORM / pgmq backends (`src/infra`) | `sqlx-code-review` |
+| sqlx / SeaORM / pgmq backends (`crates/parking-lot-pg`) | `sqlx-code-review` |
 | Code review of a Rust diff | `rust-code-review` (+ the domain reviewer above) |
 | Security / panic-DoS / concurrency-hazard audit | `rust-review` |
 | Benchmark regression or scheduler throughput | `rust-profiling`, `flamegraphs` |
@@ -75,7 +75,7 @@ Pinned: `existential-birds/beagle@d1a74899fbfec74974d1818e4cac7c3d54d44b65` (Apa
 | `tokio-async-code-review` | beagle | Diffs touching `spawn`, `spawn_blocking`, `select!`, `CancellationToken`, `JoinHandle`, runtime shutdown. | Check cancel safety, blocking-in-async, and un-joined tasks — the exact class of the CR-01/CR-02 hang. |
 | `rust-testing-code-review` | beagle | Reviewing tests, especially concurrency tests. | Its `concurrency-testing` reference covers loom and miri harnesses. |
 | `serde-code-review` | beagle | Changes to `src/config` models or JSON task payloads. | Enum tagging, `deny_unknown_fields`, defaults, validate-on-deserialize. |
-| `sqlx-code-review` | beagle | Changes to `src/infra/queue` or `src/infra/mailbox` Postgres code, or `migrations/`. | Query safety, transactions, `FOR UPDATE SKIP LOCKED` dequeue, pool usage. |
+| `sqlx-code-review` | beagle | Changes to `crates/parking-lot-pg` queue or mailbox code, or `crates/parking-lot-pg/migrations/`. | Query safety, transactions, `FOR UPDATE SKIP LOCKED` dequeue, pool usage. |
 | `rust-async-internals` | low-level-dev-skills | A hang, lost wakeup, or executor starvation needs a mechanism-level explanation. | Read before changing waker/condvar interaction in `worker_pool/`. |
 | `memory-model` | low-level-dev-skills | Any change to atomics, `Ordering`, `parking_lot_core` park/unpark, or condvar use. | Name the happens-before edge before choosing an ordering; do not default to `SeqCst`. |
 | `rust-sanitizers-miri` | low-level-dev-skills | Verifying concurrency changes. | `cargo +nightly miri test <filter>` on single-threaded paths; ThreadSanitizer for real threads. Nightly only — never part of the stable CI gate. |

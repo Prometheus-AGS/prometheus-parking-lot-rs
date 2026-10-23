@@ -1,3 +1,9 @@
+> **Status (2026-10-22):** design reference, not a description of shipped behaviour.
+> Strict priority-then-FIFO admission through one dispatcher and a unit-weighted semaphore
+> shipped in cr-19. Skip-ahead bin-packing with a starvation guard (cr-20) and per-dimension
+> multi-resource admission (cr-23) are planned and not implemented. The OCC/lease claim maps
+> to the async `LeaseQueue` contract (ADR 0003), whose durable backends are cr-26 and cr-28.
+
 This analysis breaks down the **Parking Lot Algorithm** from its theoretical roots in concurrency control to its practical application in distributed systems, specifically tailored for your `prometheus_parking_lot` crate.
 
 ### **Part 1: Analysis of the Parking Lot Algorithm**
