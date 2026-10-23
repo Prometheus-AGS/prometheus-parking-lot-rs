@@ -45,6 +45,28 @@
 //! a JSON snapshot the pool keeps while a sink is registered. The pool's
 //! ledger counts accepted tasks until each is settled, so the returned
 //! [`ShutdownReport`] accounts for every one of them.
+//!
+//! ## Lifecycle events (cr-31)
+//!
+//! Hooks registered with [`with_hook`](ResourcePool::with_hook) (or on
+//! [`hooks`](ResourcePool::hooks)) observe, per task, keyed by
+//! [`TaskMetadata::id`]:
+//!
+//! | event | emitted |
+//! |---|---|
+//! | `Submitted` | first thing in `submit`, before any check |
+//! | `Rejected` | `submit` refuses the task (shutdown, deadline passed, cost over capacity, queue full, backend error) |
+//! | `Queued` | the dispatcher parks it, under the dispatch lock |
+//! | `Started` | the spawned task is about to call the executor (`worker_id` 0) |
+//! | `Completed` / `Failed` | the executor returned a value / an error, panicked or ran past its budget (before the units are returned) |
+//! | `Expired` | it reached the head of the queue after its deadline |
+//! | `Cancelled` | `shutdown_with` cancelled it (queued: no `Started`; running straggler) |
+//!
+//! A panic that escapes the executor containment reports `Failed` from the
+//! backstop unless the terminal event was already emitted. Not covered:
+//! tasks removed by [`prune_expired`](ResourcePool::prune_expired), whose ids
+//! the `TaskQueue` contract does not return (they get no terminal event, as
+//! they get no mailbox delivery).
 
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -59,14 +81,16 @@ use crate::cancellation::{
     offer,
 };
 use crate::contain::contain;
+use crate::events::Events;
 use crate::ledger::{Ledger, SettleOnDrop};
 use crate::shutdown::{ShutdownPolicy, ShutdownReport};
 
 use prometheus_parking_lot_core::dispatch::{Dispatched, Dispatcher, Grant, TaskQueueAdapter};
 use prometheus_parking_lot_core::semaphore::{Permit, UnitSemaphore};
 use prometheus_parking_lot_core::{
-    AuditSink, Clock, Mailbox, MailboxKey, PoolLimits, ScheduledTask, SchedulerError, Spawn,
-    SystemClock, TaskError, TaskExecutor, TaskId, TaskMetadata, TaskPayload, TaskQueue, TaskStatus,
+    AuditSink, Clock, Hook, HookBus, Mailbox, MailboxKey, PoolLimits, ScheduledTask,
+    SchedulerError, Spawn, SystemClock, TaskError, TaskExecutor, TaskId, TaskMetadata, TaskPayload,
+    TaskQueue, TaskStatus,
 };
 
 /// Pool name used in errors and audit events (pools are not named yet).
@@ -126,6 +150,8 @@ struct Inner<P, T, Q, M, E, S> {
     sink: RwLock<Option<Arc<dyn CancellationSink<P>>>>,
     /// The sink's per-call bound (`delta`).
     cancellation: RwLock<CancellationConfig>,
+    /// Lifecycle-event observers (cr-31).
+    hooks: HookBus,
     /// Tasks that ran and returned a value.
     completed: AtomicU64,
     /// Tasks whose outcome was a failure: an executor error or panic, a
@@ -167,6 +193,7 @@ where
                 ledger: Ledger::default(),
                 sink: RwLock::new(None),
                 cancellation: RwLock::new(CancellationConfig::default()),
+                hooks: HookBus::new(),
                 completed: AtomicU64::new(0),
                 failed: AtomicU64::new(0),
                 _types: PhantomData,
@@ -211,6 +238,22 @@ where
     pub fn with_cancellation_config(self, config: CancellationConfig) -> Self {
         *self.inner.cancellation.write() = config;
         self
+    }
+
+    /// Register a lifecycle hook (cr-31); see the module docs for the events.
+    /// Hooks run on the bus's own thread, so a slow or panicking hook never
+    /// stalls the pool.
+    #[must_use]
+    pub fn with_hook(self, hook: Arc<dyn Hook>) -> Self {
+        self.inner.hooks.register(hook);
+        self
+    }
+
+    /// The pool's hook bus: register more hooks at any time, read its
+    /// counters, or [`flush`](HookBus::flush) it.
+    #[must_use]
+    pub fn hooks(&self) -> &HookBus {
+        &self.inner.hooks
     }
 
     /// Resource units currently held by running tasks.
@@ -298,29 +341,38 @@ where
     /// - the queue backend's error when enqueueing fails.
     pub async fn submit(&self, task: ScheduledTask<P>) -> Result<TaskStatus, SchedulerError> {
         let inner = &self.inner;
+        let events = inner.events();
+        let task_id = task.meta.id;
+        events.submitted(&task.meta);
         // Count the task before reading the flag; SeqCst on both sides (see
         // `crate::ledger`): either this submission is refused or a concurrent
         // `shutdown_with` counts it and waits for it.
         inner.ledger.accept();
         if inner.shutdown.load(Ordering::SeqCst) {
             inner.ledger.settle(1);
-            return Err(SchedulerError::PoolShutdown {
+            let error = SchedulerError::PoolShutdown {
                 pool: POOL_NAME.into(),
-            });
+            };
+            events.rejected(task_id, &error);
+            return Err(error);
         }
         if inner.is_expired(&task.meta) {
             inner.ledger.settle(1);
-            tracing::warn!(task_id = task.meta.id, "task expired before enqueue");
-            return Err(SchedulerError::DeadlineExpired {
-                task_id: task.meta.id,
-            });
+            tracing::warn!(task_id, "task expired before enqueue");
+            let error = SchedulerError::DeadlineExpired { task_id };
+            events.rejected(task_id, &error);
+            return Err(error);
         }
         let now_ms = inner.now_ms();
         let meta = task.meta.clone();
-        let admission = inner.dispatcher.submit(task, now_ms).inspect_err(|error| {
-            inner.ledger.settle(1);
-            tracing::warn!(task_id = meta.id, %error, "task rejected at admission");
-        })?;
+        let admission = inner
+            .dispatcher
+            .submit_with(task, now_ms, |depth| events.queued(task_id, depth))
+            .inspect_err(|error| {
+                inner.ledger.settle(1);
+                tracing::warn!(task_id, %error, "task rejected at admission");
+                events.rejected(task_id, error);
+            })?;
         let status = if admission.started {
             TaskStatus::Running
         } else {
@@ -447,6 +499,13 @@ where
         self.clock.read().now_ms()
     }
 
+    const fn events(&self) -> Events<'_> {
+        Events {
+            bus: &self.hooks,
+            pool: POOL_NAME,
+        }
+    }
+
     fn is_expired(&self, meta: &TaskMetadata) -> bool {
         meta.deadline_ms
             .is_some_and(|deadline| self.now_ms() > deadline)
@@ -528,8 +587,10 @@ where
             );
             if !reported.load(Ordering::Relaxed) {
                 self.failed.fetch_add(1, Ordering::Relaxed);
+                let error = TaskError::from(panicked);
+                self.events().failed(task_id, &error);
                 if let Some(key) = mailbox_key.as_ref() {
-                    let status = TaskStatus::Failed(TaskError::from(panicked));
+                    let status = TaskStatus::Failed(error);
                     self.deliver(task_id, key, status, None);
                 }
                 let tenant = mailbox_key
@@ -569,6 +630,9 @@ where
         let snapshot = self.snapshot(task_id, &payload);
         let kept_meta = meta.clone();
         tracing::debug!(task_id, ?budget, "executing task");
+        let events = self.events();
+        events.started(task_id, 0);
+        let started = events.clock();
 
         // On elapse (or cancellation) the executor future is dropped, which
         // cancels it at its next await point; an executor owning a
@@ -601,6 +665,7 @@ where
         };
 
         reported.store(true, Ordering::Relaxed);
+        events.finished(task_id, &outcome, started);
         self.finish(task_id, permit, mailbox_key.as_ref(), outcome);
     }
 
@@ -662,6 +727,7 @@ where
 
     /// Record a queued task that reached the head after its deadline.
     fn expire(&self, meta: &TaskMetadata) {
+        self.events().expired(meta.id);
         self.failed.fetch_add(1, Ordering::Relaxed);
         self.ledger.finish(1);
         self.ledger.settle(1);
@@ -694,6 +760,7 @@ where
     /// mailbox, audit it, and offer it to the sink under `delta`. Settling is
     /// the caller's (a running task settles when `supervise` returns).
     async fn capture(&self, meta: TaskMetadata, payload: Option<P>, reason: CancelReason) {
+        self.events().cancelled(&meta, &reason, 0);
         let task_id = meta.id;
         tracing::warn!(task_id, ?reason, "task cancelled at shutdown");
         if let Some(key) = meta.mailbox.as_ref() {

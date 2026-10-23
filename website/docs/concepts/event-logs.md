@@ -108,16 +108,21 @@ sequenceDiagram
 - `ResourcePool` accepts an `AuditSink` and records `enqueue`, `start`,
   `wake`, `complete`, `fail`, `timeout`, `expire` and `cancel` events through
   it.
-- The core crate defines `LifecycleEvent`, the `Hook` trait and `HookBus`, but
-  the pools do not emit lifecycle events through them yet.
+- Every native pool (`ResourcePool`, `WorkerPool`, `DurableResourcePool`)
+  emits lifecycle events through its `HookBus` (cr-31): `Submitted`, then
+  `Queued` if the task parks, `Started` if it runs, and exactly one terminal
+  event (`Completed`, `Failed`, `Rejected`, `Cancelled`, `Expired` or
+  `Requeued`). Hooks run on a background delivery thread fed by a bounded
+  queue, so a slow or panicking hook never stalls dispatch; when the queue is
+  full, events are dropped and counted (`HookBus::dropped_events`). With no
+  hook registered, emission is one atomic load and a branch. The WASM pool
+  does not emit yet (cr-53).
 - The place a notifier plugs in exists: `StorageMailbox<S, N>` (cr-34) stores a
   result first and then hands it to a `Notifier` off the delivery path, with
   bounded retries. The only built-in notifier is `NoopNotifier`.
 
 ### Planned
 
-- `cr-31-hook-emission`: emit a lifecycle event at every transition, with no
-  overhead when no hook is registered.
 - `cr-32-iggy-events`: behind an `iggy` feature, an Iggy hook (lifecycle
   events, partitioned by tenant) and an Iggy notifier (`mailbox.ready`), with
   message ids derived from the idempotency key so retried publishes

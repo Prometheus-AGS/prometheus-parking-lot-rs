@@ -6,7 +6,8 @@ use std::time::Duration;
 
 use crate::config::{PoolConfig, SchedulerConfig};
 use crate::core::{
-    Mailbox, PoolLimits, ResourcePool, SchedulerError, Spawn, TaskExecutor, TaskPayload, TaskStatus,
+    Hook, Mailbox, PoolLimits, ResourcePool, SchedulerError, Spawn, TaskExecutor, TaskPayload,
+    TaskStatus,
 };
 use crate::infra::{InMemoryMailbox, InMemoryQueue};
 use crate::util::MailboxKey;
@@ -349,9 +350,12 @@ where
 /// - [`SchedulerError::Backend`] when a backend cannot be opened (its context
 ///   names the section, e.g. `backends.db: connect`);
 /// - the error of `executor_factory`.
+///
+/// To observe lifecycle events, use
+/// [`build_pools_from_scheduler_config_with_hooks`].
 pub async fn build_pools_from_scheduler_config<P, T, E, S, FE>(
     cfg: &SchedulerConfig,
-    mut executor_factory: FE,
+    executor_factory: FE,
     spawner: S,
 ) -> Result<BuiltScheduler<P, T, E, S>, SchedulerError>
 where
@@ -359,6 +363,37 @@ where
     T: Clone + Send + Sync + serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,
     E: TaskExecutor<P, T>,
     FE: FnMut(&str, &PoolConfig) -> Result<E, SchedulerError>,
+    S: Spawn + Clone + Send + Sync + 'static,
+{
+    build_pools_from_scheduler_config_with_hooks(cfg, executor_factory, |_, _| Vec::new(), spawner)
+        .await
+}
+
+/// [`build_pools_from_scheduler_config`], registering on each pool the
+/// lifecycle hooks (cr-31) `hooks_factory` returns for it, by pool name.
+///
+/// The hooks are registered before the pool sees any task: an in-memory pool
+/// gets them before it is returned, a durable pool through
+/// `DurableOptions::with_hooks` before it starts leasing, so even a task
+/// redelivered from a previous process is observed from its first event.
+/// Hooks run on each pool's hook thread; return the same `Arc` for several
+/// pools to observe them all with one hook.
+///
+/// # Errors
+///
+/// As [`build_pools_from_scheduler_config`].
+pub async fn build_pools_from_scheduler_config_with_hooks<P, T, E, S, FE, FH>(
+    cfg: &SchedulerConfig,
+    mut executor_factory: FE,
+    mut hooks_factory: FH,
+    spawner: S,
+) -> Result<BuiltScheduler<P, T, E, S>, SchedulerError>
+where
+    P: TaskPayload,
+    T: Clone + Send + Sync + serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,
+    E: TaskExecutor<P, T>,
+    FE: FnMut(&str, &PoolConfig) -> Result<E, SchedulerError>,
+    FH: FnMut(&str, &PoolConfig) -> Vec<Arc<dyn Hook>>,
     S: Spawn + Clone + Send + Sync + 'static,
 {
     cfg.validate()?;
@@ -369,6 +404,7 @@ where
     let mut durable_pools = BTreeMap::new();
     for (name, pool_cfg) in &cfg.pools {
         let executor = executor_factory(name, pool_cfg)?;
+        let hooks = hooks_factory(name, pool_cfg);
         let limits = limits_of(pool_cfg);
         let Some(backend) = pool_cfg.durable_backend() else {
             let mailbox = SharedInMemoryMailbox::new();
@@ -379,20 +415,30 @@ where
                 executor,
                 spawner.clone(),
             );
+            for hook in hooks {
+                pool.hooks().register(hook);
+            }
             pools.insert(name.clone(), ConfiguredPool { pool, mailbox });
             continue;
         };
         #[cfg(any(feature = "postgres", feature = "embedded"))]
         {
-            let durable =
-                opened.start_durable_pool(cfg, name, backend, limits, executor, spawner.clone())?;
+            let durable = opened.start_durable_pool(
+                cfg,
+                name,
+                backend,
+                limits,
+                executor,
+                spawner.clone(),
+                hooks,
+            )?;
             durable_pools.insert(name.clone(), durable);
         }
         #[cfg(not(any(feature = "postgres", feature = "embedded")))]
         {
             // `validate` rejects every backend section without its feature,
             // so no pool can name one here.
-            let _ = (executor, limits);
+            let _ = (executor, limits, hooks);
             return Err(SchedulerError::invalid_config(format!(
                 "pools.{name}.queue: backend `{backend}` is not enabled"
             )));
@@ -507,7 +553,11 @@ where
     T: Clone + Send + Sync + serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,
 {
     /// Start the durable pool `name` on the opened backend `backend`, leasing
-    /// for the backend's `lease_secs`.
+    /// for the backend's `lease_secs` and emitting lifecycle events to `hooks`.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "private helper; each argument is one piece of the pool"
+    )]
     fn start_durable_pool<E, S>(
         &self,
         cfg: &SchedulerConfig,
@@ -516,13 +566,20 @@ where
         limits: PoolLimits,
         executor: E,
         spawner: S,
+        hooks: Vec<Arc<dyn Hook>>,
     ) -> Result<ConfiguredDurablePool<P, T, E, S>, SchedulerError>
     where
         E: TaskExecutor<P, T>,
         S: Spawn + Send + Sync + 'static,
     {
         let section = &cfg.backends[backend];
-        let options = DurableOptions::new(section.lease_for()).with_name(name);
+        let bus = crate::core::HookBus::new();
+        for hook in hooks {
+            bus.register(hook);
+        }
+        let options = DurableOptions::new(section.lease_for())
+            .with_name(name)
+            .with_hooks(bus);
         match section {
             #[cfg(feature = "postgres")]
             crate::config::BackendConfig::Postgres(_) => {

@@ -38,6 +38,16 @@
 //!   freed while unwinding are handed to parked work with `Dispatcher::poke`,
 //!   and the worker thread is replaced by a fresh one, so the pool keeps its
 //!   worker count.
+//! - **Lifecycle events** (cr-31): hooks registered with
+//!   [`WorkerPool::with_hook`] see, per task (keyed by
+//!   [`TaskMetadata::id`]): `Submitted` first in `submit`; `Rejected` when
+//!   `submit` refuses it; `Queued` under the dispatch lock when it parks;
+//!   `Started` on the worker thread that runs it (`worker_id` is that
+//!   worker's index); then one terminal event: `Completed`/`Failed` when the
+//!   executor returns (before its units are returned), `Expired` when it
+//!   reached the head after its deadline, or `Cancelled` when a shutdown or a
+//!   drop captured it. A panic escaping the containment reports `Failed` from
+//!   the backstop unless the terminal event was already out.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
@@ -57,8 +67,8 @@ use prometheus_parking_lot_core::dispatch::{
 };
 use prometheus_parking_lot_core::semaphore::UnitSemaphore;
 use prometheus_parking_lot_core::{
-    Clock, MailboxKey, PoolStats, SchedulerError, SystemClock, TaskError, TaskMetadata,
-    WorkerExecutor,
+    Clock, Hook, HookBus, MailboxKey, PoolStats, SchedulerError, SystemClock, TaskError,
+    TaskMetadata, WorkerExecutor,
 };
 
 use super::slots::{Missing, ResultSlots, SlotId};
@@ -67,6 +77,7 @@ use crate::cancellation::{
     offer,
 };
 use crate::contain::{Panicked, catch, contain};
+use crate::events::Events;
 use crate::ledger::Ledger;
 use crate::shutdown::{ShutdownPolicy, ShutdownReport};
 
@@ -180,6 +191,8 @@ struct Shared<P, R, E> {
     /// Cancelled tasks to the sink thread, started on the first capture.
     /// Dropped with `Shared`, which ends the thread once it has drained.
     capture_tx: Mutex<Option<UnboundedSender<CancelledTask<P>>>>,
+    /// Lifecycle-event observers (cr-31).
+    hooks: HookBus,
     /// The executor; each worker runs a clone.
     executor: E,
     /// Worker thread handles, joined by `shutdown`. A replacement worker's
@@ -199,6 +212,13 @@ where
 {
     fn now_ms(&self) -> u128 {
         self.clock.read().now_ms()
+    }
+
+    const fn events(&self) -> Events<'_> {
+        Events {
+            bus: &self.hooks,
+            pool: POOL_NAME,
+        }
     }
 
     /// The pool clock's monotonic reading, which result TTLs are measured on.
@@ -263,6 +283,7 @@ where
                     task_id = task.meta.id,
                     "queued task expired before it could start"
                 );
+                self.events().expired(task.meta.id);
                 self.finish(&task.mailbox_key, Err(TaskError::DeadlineExpired));
                 self.ledger.finish(1);
                 self.ledger.settle(1);
@@ -324,6 +345,7 @@ where
     ) {
         let task_id = meta.id;
         warn!(task_id, ?reason, "task cancelled at shutdown");
+        self.events().cancelled(&meta, &reason, 0);
         self.finish(mailbox_key, Err(shutdown_cancelled()));
         self.ledger.begin_capture();
         let cancelled = CancelledTask {
@@ -373,11 +395,12 @@ where
         &self,
         runtime: &tokio::runtime::Runtime,
         admitted: Admitted<P>,
+        worker_id: usize,
     ) -> Result<(), Panicked> {
         let task_id = admitted.item.meta.id;
         let mailbox_key = admitted.item.mailbox_key.clone();
         let mut progress = Progress::default();
-        let ran = catch(|| self.execute(runtime, admitted, &mut progress));
+        let ran = catch(|| self.execute(runtime, admitted, worker_id, &mut progress));
         if let Err(panicked) = &ran {
             error!(
                 task_id,
@@ -385,7 +408,9 @@ where
                 "panic escaped the executor containment; replacing the worker"
             );
             if !progress.reported {
-                self.finish(&mailbox_key, Err(TaskError::from(panicked.clone())));
+                let error = TaskError::from(panicked.clone());
+                self.events().failed(task_id, &error);
+                self.finish(&mailbox_key, Err(error));
                 self.ledger.finish(1);
             }
             if !progress.settled {
@@ -416,6 +441,7 @@ where
         &self,
         runtime: &tokio::runtime::Runtime,
         admitted: Admitted<P>,
+        worker_id: usize,
         progress: &mut Progress,
     ) {
         let Grant { item: task, permit } = admitted;
@@ -453,6 +479,9 @@ where
         let kept_meta = meta.clone();
         let budget = self.budget(&meta);
         debug!(task_id, ?budget, "worker executing task");
+        let events = self.events();
+        events.started(task_id, worker_id);
+        let started = events.clock();
         // On elapse or cancellation the executor future is dropped, which
         // cancels it at its next await point. The timer is created inside
         // `block_on`: it needs the worker runtime's time driver in context.
@@ -494,6 +523,7 @@ where
         // has retrieved the result already sees them released.
         let now_ms = self.now_ms();
         progress.reported = true;
+        events.finished(task_id, &outcome, started);
         let woken = self.dispatcher.complete(permit, now_ms);
         self.finish(&mailbox_key, outcome);
         self.ledger.finish(1);
@@ -693,6 +723,7 @@ where
             sink: RwLock::new(None),
             cancellation: RwLock::new(CancellationConfig::default()),
             capture_tx: Mutex::new(None),
+            hooks: HookBus::new(),
             executor,
             workers: Mutex::new(Vec::new()),
             live_workers: AtomicUsize::new(config.worker_count),
@@ -774,6 +805,22 @@ where
         self
     }
 
+    /// Register a lifecycle hook (cr-31); see the module docs for the events.
+    /// Hooks run on the bus's own thread, never on a worker or the
+    /// submitting thread.
+    #[must_use]
+    pub fn with_hook(self, hook: Arc<dyn Hook>) -> Self {
+        self.shared.hooks.register(hook);
+        self
+    }
+
+    /// The pool's hook bus: register more hooks at any time, read its
+    /// counters, or [`flush`](HookBus::flush) it.
+    #[must_use]
+    pub fn hooks(&self) -> &HookBus {
+        &self.shared.hooks
+    }
+
     /// Submit a task asynchronously.
     ///
     /// This method can be called from an async context and will not block.
@@ -818,18 +865,25 @@ where
     ///   `max_queue_depth` tasks are already waiting
     pub fn submit(&self, payload: P, meta: TaskMetadata) -> Result<MailboxKey, SchedulerError> {
         let shared = &self.shared;
+        let events = shared.events();
+        let id = meta.id;
+        events.submitted(&meta);
         // Count the task before reading the flag; SeqCst on both sides (see
         // `crate::ledger`): either this submission is refused or a concurrent
         // `shutdown_with` counts it and waits for it.
         shared.ledger.accept();
         if shared.shutdown.load(Ordering::SeqCst) {
             shared.ledger.settle(1);
-            return Err(pool_shutdown());
+            let error = pool_shutdown();
+            events.rejected(id, &error);
+            return Err(error);
         }
         let now_ms = shared.now_ms();
         if meta.deadline_ms.is_some_and(|deadline| now_ms > deadline) {
             shared.ledger.settle(1);
-            return Err(SchedulerError::DeadlineExpired { task_id: meta.id });
+            let error = SchedulerError::DeadlineExpired { task_id: id };
+            events.rejected(id, &error);
+            return Err(error);
         }
 
         // Relaxed: the counter only needs unique values.
@@ -842,12 +896,16 @@ where
             meta,
             mailbox_key: mailbox_key.clone(),
         };
-        let admission = match shared.dispatcher.submit(task, now_ms) {
+        let admission = match shared
+            .dispatcher
+            .submit_with(task, now_ms, |depth| events.queued(id, depth))
+        {
             Ok(admission) => admission,
             Err(error) => {
                 shared.results.discard(task_id);
                 shared.ledger.settle(1);
                 warn!(%error, "worker pool rejected task");
+                events.rejected(id, &error);
                 return Err(error);
             }
         };
@@ -1153,7 +1211,10 @@ where
                     }
                     Err(RecvTimeoutError::Disconnected) => break,
                 };
-                if shared.execute_supervised(&runtime, admitted).is_err() {
+                if shared
+                    .execute_supervised(&runtime, admitted, worker_id)
+                    .is_err()
+                {
                     // This thread's runtime unwound mid-task; hand the
                     // channel to a fresh worker and exit.
                     drop(runtime);
