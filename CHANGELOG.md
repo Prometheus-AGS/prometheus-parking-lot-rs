@@ -13,6 +13,32 @@ entry names the OpenSpec change that made it.
 
 ### Changed (breaking)
 
+- **`LeaseQueue::identity` (0.3.0 gate review, C1).** `LeaseQueue` has a new
+  required method, `fn identity(&self) -> &str`: a stable name for the queue,
+  the same in every process and across restarts, that qualifies its entry ids.
+  The built-in backends return `in-memory:<process nonce>:<instance>`,
+  `pg:pl_lease_queue:<queue name>`, `pgmq:<queue name>` and `redb:<store id>`
+  (a random id generated when the file is first opened and stored in it).
+  Custom queues and queue wrappers must implement it (wrappers forward it).
+  The backend conformance suite checks it
+  (`identity_is_stable_and_distinct`).
+- **Durable result keys (C1).** A `DurableResourcePool` result delivered
+  without a task idempotency key is keyed `"<queue identity>:entry:<entry
+  id>"` instead of `"<pool name>:entry:<entry id>"`. `DurableOptions::with_name`
+  now names the pool in logs, errors and events only. Pre-release users:
+  drain durable queues before upgrading, or a task in flight across the
+  upgrade can deliver a second result under the new key.
+- **Durable lifecycle events (W2).** `DurableResourcePool` emits one terminal
+  event per run, not per task: a run that ends in `Requeued` is followed by
+  the task's next run. An enqueue that fails with an unknown outcome (a
+  backend error) no longer emits `Rejected`, because the task may have been
+  stored and may run; definite refusals (`QueueFull`, `CapacityExceeded`,
+  `DeadlineExpired`, `PoolShutdown`, `InvalidConfig`) still do.
+- **Durable oversize tasks (W4).** A leased task too large for this pool is
+  handed back (`nack`, requeued after one lease duration) instead of being
+  delivered as `Dropped` and dead-lettered, so a consumer with more capacity
+  can run it. It emits `Requeued`, not `Rejected`.
+
 - **Workspace split (cr-48).** The crate is now a workspace: the facade
   `prometheus_parking_lot` re-exports `prometheus-parking-lot-core`,
   `-runtime-tokio`, `-pg`, `-embedded` and `-wasm` under the paths 0.2 used
@@ -268,7 +294,9 @@ entry names the OpenSpec change that made it.
   `WorkerPool` and `DurableResourcePool` emit `Submitted`, `Queued`,
   `Started` and exactly one terminal event per task (`Completed`, `Failed`,
   `Rejected`, `Cancelled`, `Expired`, or `Requeued` for a durable task handed
-  back to its queue), in that causal order for every observer. Register hooks
+  back to its queue), in that causal order for every observer. For
+  `DurableResourcePool` the guarantee is one terminal event per run: a run
+  ending in `Requeued` is followed by the task's next run. Register hooks
   with `ResourcePool::with_hook`/`WorkerPool::with_hook` (or on `hooks()`),
   `DurableOptions::with_hooks`, or
   `build_pools_from_scheduler_config_with_hooks`. Emission never blocks the
@@ -319,9 +347,10 @@ entry names the OpenSpec change that made it.
   leased task is heartbeated with `extend` (every third of the lease by
   default) until its lease is resolved, so a task that runs longer than the
   lease is not redelivered. The outcome is delivered to the mailbox with an
-  idempotency key (the task's own key, or `"<pool name>:entry:<queue entry
-  id>"`), and only then is the lease acked (success) or dead-lettered (executor
-  error, panic, timeout, expired deadline, cost above capacity). A process
+  idempotency key (the task's own key, or `"<queue identity>:entry:<queue
+  entry id>"`), and only then is the lease acked (success) or dead-lettered
+  (executor error, panic, timeout, expired deadline); a task too large for the
+  pool is requeued for another consumer. A process
   killed at any point leaves the task leased; it is redelivered after the lease
   expires and the first-write-wins mailbox keeps exactly one result. A lost
   lease does not cancel the running execution; its delivery is deduplicated.
@@ -522,6 +551,32 @@ entry names the OpenSpec change that made it.
 
 ### Fixed
 
+- **Durable exactly-one-result no longer depends on pool names (C1).**
+  Differently named pools consuming one queue stored a second result when a
+  consumer died between delivery and ack, and pools on different queues
+  sharing one mailbox dropped each other's results as duplicates (entry ids
+  repeat across queues). Results are now keyed by the queue's identity.
+  Tested by `durable_differently_named_consumers_of_one_queue_store_one_result`,
+  `durable_pools_on_two_queues_share_one_mailbox_and_keep_both_results` and
+  the S-16 `pool_sigkill_*_between_delivery_and_ack` tests, whose restarted
+  pool is named differently.
+- **Durable `ShutdownReport` (W1).** A task is counted when its lease is
+  resolved: `completed` once its outcome is stored, `requeued` (and
+  `cancelled`) when it is handed back, including a task whose delivery kept
+  failing (it was reported `completed`). A task still delivering when the
+  shutdown began is counted when it lands (it was counted nowhere), and the
+  dispatcher no longer counts as an `unsettled` task.
+- **`ResourcePool` lost woken tasks on a panicking `Mailbox` or `AuditSink`
+  (W3).** A completion now starts the tasks it woke before it calls them.
+- **Durable pool had no bound for zero-cost tasks (W5).** New
+  `DurableOptions::with_max_running` (default: `max_units`) bounds the tasks
+  running at once.
+- **Durable cancellation (S1).** A running task cancelled at shutdown whose
+  executor panics while being dropped is handed back, not dead-lettered as
+  `Failed`.
+- The S-21 negative control also suppresses the durable `Requeued` event, so
+  the durable requeue tests are covered by it (W7).
+
 - `WorkerPool::retrieve_async` no longer uses a blocking-pool thread per
   waiter (cr-22); any number of concurrent waiters fit on a runtime whose
   blocking pool is exhausted.
@@ -540,6 +595,15 @@ entry names the OpenSpec change that made it.
 - Durable dispatch is at-least-once for the executor: a task can run again
   after a crash, a lost lease or a failed ack. Results are deduplicated by the
   mailbox; executors with external side effects must be idempotent.
+- A durable queue dropped and recreated under the same identity (a Postgres
+  table or pgmq queue whose id sequence restarts) can reuse entry ids; a
+  mailbox that remembers the old keys would then drop the new results as
+  duplicates. Recreate the mailbox with the queue, or set task idempotency
+  keys.
+- After a crash between storing a durable task's `Failed` result and
+  dead-lettering it, the redelivered run can emit `Completed` while the stored
+  result stays `Failed` (first write wins); events report the run, the
+  mailbox the task.
 - A durable pool lets at most one leased task wait for capacity; a task
   enqueued later at a higher priority waits behind it instead of overtaking it
   as it would in the in-memory pool.

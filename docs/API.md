@@ -35,7 +35,11 @@ once the task is persisted), `queue`, `mailbox`, `options`, `active_units`,
 only), `shutdown_with(policy)` (async; hands cancelled tasks back to the queue
 and returns a `ShutdownReport`, cr-29).
 `DurableOptions::new(lease_for)` with `with_heartbeat_interval`,
-`with_poll_interval`, `with_result_ttl`, `with_name`.
+`with_poll_interval`, `with_result_ttl`, `with_name` (logs and events only;
+results are keyed by `LeaseQueue::identity`, not the name), `with_resource_limit`,
+`with_hooks`, `with_max_running` (running-task bound, default `max_units`).
+`LeaseQueue::identity` (required): a stable name for the queue that qualifies
+its entry ids.
 
 `WorkerPool`: `new`, `with_clock`, `with_result_ttl`, `with_cancellation_sink`,
 `with_cancellation_config`, `submit` / `submit_async`, `retrieve` /
@@ -115,7 +119,11 @@ behind that crate's `conformance` feature.
 task, `Submitted`, then `Queued` if it parks, `Started` when the executor is
 about to run, and exactly one terminal event: `Completed`, `Failed`,
 `Rejected`, `Cancelled`, `Expired` or (durable pool) `Requeued`
-(`LifecycleEvent::is_terminal`). Register hooks with `with_hook` /
+(`LifecycleEvent::is_terminal`). For `DurableResourcePool` that holds per
+run, not per task: a run that ends in `Requeued` is followed by the task's
+next run (`Queued`/`Started`, then its own terminal event), here or in another
+process. A durable `submit` whose enqueue fails with an unknown outcome emits
+no terminal event. Register hooks with `with_hook` /
 `hooks().register(..)` on the in-memory pools, `DurableOptions::with_hooks`
 on the durable pool, or `builders::build_pools_from_scheduler_config_with_hooks`.
 Hooks run on the bus's own thread, in emission order; emission never blocks a

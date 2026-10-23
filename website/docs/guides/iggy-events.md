@@ -11,7 +11,8 @@ an audit trail, or another service that starts when a task completes.
 
 **What you get:** two publishers on Apache Iggy. `IggyHook` publishes every
 lifecycle event (`submitted`, `queued`, `started`, then exactly one terminal
-event) to the `lifecycle` topic. `IggyNotifier` publishes a `mailbox.ready`
+event; per run for a durable pool, where `requeued` ends a run that another
+follows) to the `lifecycle` topic. `IggyNotifier` publishes a `mailbox.ready`
 pointer to the `mailbox.ready` topic after each result is stored. Neither runs
 on the dispatch path: a slow or absent server costs bounded buffering and
 counted drops, never scheduling latency.

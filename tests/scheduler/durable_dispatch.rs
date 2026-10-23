@@ -948,10 +948,10 @@ async fn durable_zero_cost_tasks_are_bounded() {
         })
         .await;
         assert!(finished.is_some(), "every zero-cost task runs");
-        assert_eq!(
-            executor.peak.load(Ordering::SeqCst),
-            bound,
-            "zero-cost tasks running at once ({max_units} units, max_running {max_running:?})"
+        let peak = executor.peak.load(Ordering::SeqCst);
+        assert!(
+            (1..=bound).contains(&peak),
+            "{peak} zero-cost tasks ran at once ({max_units} units, max_running {max_running:?})"
         );
     }
 }

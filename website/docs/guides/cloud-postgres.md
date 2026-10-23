@@ -91,6 +91,27 @@ service tiers are two backends; they can share a database through different
 - Keep the password out of the file: build the `url` from a secret at start-up,
   as the example does with `DATABASE_URL`. `Debug` output hides it.
 
+## Several processes on one queue
+
+Run the same configuration in as many processes as you like: every replica's
+pool consumes the same `queue_name`, and a request is still answered exactly
+once. The pools' names do not matter; replicas can share a name or each have
+their own. A result delivered without a request idempotency key is keyed by
+the queue, not the pool: `"<queue identity>:entry:<entry id>"`, where the
+identity of a `PgLeaseQueue` is `pg:pl_lease_queue:<queue_name>`. So when a
+replica dies after storing a result and before acking it, the replica that
+picks the request up runs it again but stores nothing new; and pools on
+different `queue_name`s can share one mailbox without dropping each other's
+results.
+
+Two limits. Execution is at-least-once: the request can run twice, so make
+external side effects idempotent. And if you drop and recreate the queue table
+(its id sequence restarts) while the mailbox table keeps old keys, a new
+request can reuse an old entry id and its result would be taken for a
+duplicate; recreate the mailbox with the queue, or give every request an
+idempotency key. The same holds for two databases whose queues have the same
+`queue_name` and deliver into one mailbox.
+
 ## Tenants share a pool, not results
 
 The example builds the configuration from code and the URL from the
