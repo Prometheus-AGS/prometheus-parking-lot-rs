@@ -4,7 +4,8 @@
       "type": "redb",
       "path": "./data/parking-lot.redb",
       "max_depth": 1000,
-      "lease_secs": 300
+      "lease_secs": 300,
+      "max_attempts": 5
     }
   },
   "pools": {

@@ -27,7 +27,7 @@ use prometheus_parking_lot_iggy::ids::mailbox_ready_id;
 use prometheus_parking_lot_iggy::{
     IggyHook, IggyNotifier, IggyOptions, TokioHandleSpawner, TokioSleeper,
 };
-use support::{IggyServer, TestResult, read_topic, wait_for_messages};
+use support::{IggyServer, TestResult, read_topic, wait_for_distinct_messages, wait_for_messages};
 
 const PARTITIONS: u32 = 4;
 const FLUSH: Duration = Duration::from_secs(30);
@@ -223,8 +223,12 @@ async fn iggy_lifecycle_events_arrive_in_order_for_a_pool() -> TestResult<()> {
     assert!(hook.flush(FLUSH).await);
 
     let client = server.client().await?;
-    let messages = wait_for_messages(&client, "lifecycle", "lifecycle", PARTITIONS, 6).await?;
-    assert_eq!(messages.len(), 6);
+    // At-least-once: a send that reached the server but timed out is retried
+    // and stored twice under one id (seen under heavy load), so compare the
+    // distinct ids, in order.
+    let messages =
+        wait_for_distinct_messages(&client, "lifecycle", "lifecycle", PARTITIONS, 6).await?;
+    assert_eq!(messages.len(), 6, "six distinct lifecycle events");
     let partitions: BTreeSet<u32> = messages.iter().map(|m| m.partition).collect();
     assert_eq!(partitions.len(), 1, "one pool, one partition");
     let events: Vec<String> = messages
