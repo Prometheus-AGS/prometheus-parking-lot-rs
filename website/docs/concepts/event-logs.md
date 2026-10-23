@@ -106,9 +106,13 @@ sequenceDiagram
 
 - There is **no Iggy integration** on `main`.
 - `ResourcePool` accepts an `AuditSink` and records `enqueue`, `start`,
-  `wake`, `complete`, `fail`, `timeout` and `expire` events through it.
+  `wake`, `complete`, `fail`, `timeout`, `expire` and `cancel` events through
+  it.
 - The core crate defines `LifecycleEvent`, the `Hook` trait and `HookBus`, but
   the pools do not emit lifecycle events through them yet.
+- The place a notifier plugs in exists: `StorageMailbox<S, N>` (cr-34) stores a
+  result first and then hands it to a `Notifier` off the delivery path, with
+  bounded retries. The only built-in notifier is `NoopNotifier`.
 
 ### Planned
 

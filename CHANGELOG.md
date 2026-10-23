@@ -217,7 +217,7 @@ entry names the OpenSpec change that made it.
   implementations are `InMemoryLeaseQueue` (with `DeadLetter`) in
   `infra::queue` and `InMemoryResultMailbox` in `infra::mailbox`. `DurableResourcePool`
   runs on these contracts (durable dispatch, cr-49). The redb backends (cr-28,
-  below) implement them; the Postgres ones are cr-26 and cr-27.
+  below) and the Postgres ones (cr-26, cr-27, cr-30) implement them.
 - `SchedulerError::LeaseLost` (cr-25): the lease on a queue entry is no longer
   held; not retryable.
 - **Backend conformance suite (cr-25).** The `conformance` feature of
@@ -269,11 +269,6 @@ entry names the OpenSpec change that made it.
   validated with the rule `PgmqLeaseQueue::new` enforces. Example:
   `examples/configs/pgmq.json`. `infra::queue::PgmqLeaseQueue` re-exports the
   queue.
-- **Removed:** the synchronous sea-orm `PostgresQueue` and `PostgresMailbox`, the
-  sea-orm entities (`infra::entities`), and migrations 001 and 002 (existing
-  `pl_queue_jobs` / `pl_mailbox_messages` tables are not dropped). sea-orm and
-  sqlx 0.8 are gone from the dependency graph; the `postgres` feature now uses
-  raw sqlx 0.9 only.
 
 - **Crash-safe embedded queue and mailbox (cr-28, ADR 0004).** With the
   `embedded` feature, `EmbeddedStore::open(path)` opens one redb database file;
@@ -337,6 +332,11 @@ entry names the OpenSpec change that made it.
 
 ### Removed
 
+- **The sea-orm Postgres backends (cr-27).** The synchronous `PostgresQueue` and
+  `PostgresMailbox`, the sea-orm entities (`infra::entities`), and migrations 001
+  and 002 are removed (existing `pl_queue_jobs` / `pl_mailbox_messages` tables
+  are not dropped). sea-orm and sqlx 0.8 are gone from the dependency graph; the
+  `postgres` feature now uses raw sqlx 0.9 only.
 - **The JSONL file queue and mailbox (cr-28).** `YaqueQueue`, `YaqueMailbox`
   and the facade paths `infra::queue::yaque` and `infra::mailbox::yaque` are
   removed; the redb backends replace them. They were not crash-safe, and their

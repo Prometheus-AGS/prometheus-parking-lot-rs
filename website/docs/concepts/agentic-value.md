@@ -71,7 +71,7 @@ flowchart TD
   A -->|no| PL["Parking lot:<br/>priority queue"]
   A -->|yes| X["Execution on workers<br/>bounded by a budget"]
   PL -->|"capacity released"| A
-  PL -.->|"durable backend (planned)"| LQ["Lease queue:<br/>lease, extend, ack"]
+  PL -.->|"durable pool"| LQ["Lease queue:<br/>lease, extend, ack"]
   X --> MB["Mailbox:<br/>store the outcome"]
   MB -.->|"planned"| EV["Event log:<br/>result-ready event"]
   EV -.-> GW["Gateway / reconnecting client"]
@@ -79,28 +79,34 @@ flowchart TD
 ```
 
 **GPU memory limit, answered by weighted admission.**
-On `main`, `ResourcePool` admits by units and never exceeds `max_units`.
-Planned: one shared semaphore for every pool (`cr-19`), per-resource admission
-(`cr-23`) and bounded skip-ahead (`cr-20`).
+On `main`, every pool admits through one dispatcher and unit-weighted
+semaphore (`cr-19`) and never exceeds `max_units`. Planned: per-resource
+admission (`cr-23`) and bounded skip-ahead (`cr-20`).
 
 **Long, variable work, answered by budgets and leases.**
-On `main`, every `ResourcePool` execution is bounded by its deadline or
-`default_timeout`. Planned: lease extension while a task runs (`cr-25`,
-`cr-26`, `cr-49`).
+On `main`, every execution is bounded by its deadline or the pool's default
+timeout. A durable pool (`DurableResourcePool`, `cr-49`) extends the lease of
+every task it holds with a heartbeat, so a long task is not mistaken for a dead
+one.
 
 **Disconnecting clients, answered by the mailbox and notifications.**
-On `main`, outcomes are delivered to the mailbox, and `InMemoryMailbox`
-supports consume-once and TTL. Planned: a readable Postgres mailbox (`cr-27`),
-storage plus notifier composition (`cr-34`) and an Iggy notifier (`cr-32`).
+On `main`, outcomes are delivered to a mailbox with consume-once and TTL, in
+memory, in Postgres (`PgResultMailbox`, `cr-27`) or in redb
+(`RedbResultMailbox`, `cr-28`). `StorageMailbox` (`cr-34`) stores first and
+notifies off the delivery path. Planned: an Iggy notifier (`cr-32`); until it
+ships, clients poll.
 
 **Expensive work, answered by durable at-least-once delivery and idempotency.**
-Not on `main` yet: the Postgres queue deletes on dequeue and the file queue is
-not crash-safe. Planned: the Postgres lease queue (`cr-26`), the redb queue
-(`cr-28`) and acknowledgement after delivery (`cr-49`).
+On `main`, a pool whose queue and mailbox name a Postgres or redb backend
+persists each task before accepting it, and acks it only after the outcome is
+stored under an idempotency key (`cr-26`, `cr-28`, `cr-49`). A crash at any
+point re-runs the task and leaves exactly one result. The executor itself can
+run twice, so its side effects must be idempotent.
 
 The honest summary for `main`: the capacity guarantee and the bounded execution
-budget hold for `ResourcePool` today. Durable, crash-safe parking and
-notifications are the subject of the current phase and are not yet available.
+budget hold for every pool. Accepted work survives a crash only in a
+`DurableResourcePool`, a separate pool type with its own result contract; the
+worker pools and in-memory pools still lose parked work on restart. Result-ready notifications are not available yet.
 
 ## Why one library
 
