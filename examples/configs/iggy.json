@@ -1,0 +1,25 @@
+{
+  "backends": {
+    "events": {
+      "type": "iggy",
+      "connection_string": "iggy://iggy:iggy@127.0.0.1:8090",
+      "stream": "parking-lot",
+      "lifecycle_topic": "lifecycle",
+      "mailbox_topic": "mailbox.ready",
+      "partitions": 4,
+      "queue_capacity": 1024,
+      "send_timeout_ms": 2000,
+      "max_attempts": 5,
+      "dedup_window": 4096
+    }
+  },
+  "pools": {
+    "inference": {
+      "max_units": 8,
+      "max_queue_depth": 200,
+      "default_timeout_secs": 45,
+      "queue": "in_memory",
+      "mailbox": "in_memory"
+    }
+  }
+}

@@ -158,6 +158,18 @@ entry names the OpenSpec change that made it.
   map, and `take_all` returns items in dispatch order. Benchmark:
   `cargo bench --bench skip_ahead_bench` (utilization 0.947 with the default
   against 0.917 under strict order on a 95%-loaded mixed workload).
+- **Apache Iggy events and notifications (cr-32).** New crate
+  `prometheus-parking-lot-iggy`, behind the facade's `iggy` feature
+  (`infra::events`): `IggyHook` publishes every lifecycle event to a `lifecycle`
+  topic partitioned by tenant (or pool), and `IggyNotifier` publishes
+  `mailbox.ready` after a result is stored (used through `BackgroundNotifier` in
+  a `StorageMailbox`). Message ids are UUIDv5 values of the idempotency key.
+  Publishing is off the dispatch path through a bounded queue: `on_event` only
+  enqueues, and a slow or down server causes bounded buffering and counted
+  drops, never dispatch latency. The `iggy` client is pinned to `=0.11.0`; the
+  tests run against `apache/iggy:0.9.0` (digest-pinned). New config backend
+  `"type": "iggy"` (`config::IggyBackendConfig`, example
+  `examples/configs/iggy.json`); `LifecycleEvent::pool()` is new in core.
 
 - **Lifecycle events (cr-31, scenario S-21).** `ResourcePool`, the native
   `WorkerPool` and `DurableResourcePool` emit `Submitted`, `Queued`,

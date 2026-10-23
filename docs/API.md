@@ -48,7 +48,7 @@ returning a `ShutdownReport` (cr-29).
 | --- | --- | --- |
 | `SchedulerConfig { backends, pools }` (`from_json_str`, `validate`); every config struct rejects unknown fields | `config::SchedulerConfig` | always |
 | `PoolConfig { max_units, max_queue_depth, default_timeout_secs, queue, mailbox, max_head_skips }`, `StorageConfig` (`"in_memory"` or `{ "backend": name }`) | `config::*` | always |
-| `BackendConfig` (`"type": "postgres"` / `"redb"`), `PostgresBackendConfig`, `RedbBackendConfig` | `config::*` | always (validation requires `postgres` / `embedded`) |
+| `BackendConfig` (`"type": "postgres"` / `"redb"` / `"pgmq"` / `"iggy"`), `PostgresBackendConfig`, `RedbBackendConfig`, `PgmqBackendConfig`, `IggyBackendConfig` (`options()` with `iggy`) | `config::*` | always (validation requires `postgres` / `embedded` / `iggy`) |
 | `ConfigError` (`Parse` names an unknown or missing field; `Invalid { field, reason }` with a dotted path) | `config::ConfigError` | always |
 | `build_pools_from_scheduler_config(cfg, executor_factory, spawner)` → `BuiltScheduler { pools, durable_pools, postgres, redb }` | `builders::*` | `tokio-runtime` |
 | `ConfiguredDurablePool` (`Postgres` / `Redb` variants; `submit`, `consume`, `shutdown`) | `builders::*` | `postgres` or `embedded` |
@@ -117,6 +117,29 @@ pool (a full queue drops the event and counts it in
 `HookBus::dropped_events`), and a pool with no hook pays one atomic load per
 transition. `HookBus::flush` waits for delivery. The WASM pool does not emit
 yet.
+
+## Iggy events and notifications (feature `iggy`)
+
+`infra::events` re-exports `prometheus-parking-lot-iggy` (cr-32). Iggy carries
+events and notifications only; results stay in the mailbox storage and the work
+queue stays in Postgres or redb.
+
+| Item | What it does |
+| --- | --- |
+| `IggyOptions::new(connection_string)` | Stream `parking-lot`, topics `lifecycle` and `mailbox.ready`, 4 partitions, a 1024-event queue, a 2 s attempt timeout, `RetryPolicy::default()`, a 4096-id dedup window. `Debug` hides the password. |
+| `IggyHook::start(&options)` | A `Hook`: register it on a pool's `HookBus`. Publishes every `LifecycleEvent` to `lifecycle`, partitioned by `options.tenant`, else by pool. |
+| `IggyNotifier::start(&options)` | A `Notifier<T>`: wrap in `BackgroundNotifier::new(notifier, TokioHandleSpawner::current(), TokioSleeper)` and pass to `StorageMailbox::new(storage, ..)`. Publishes `mailbox.ready` (mailbox key, task id, status, `result_ref`) after the result is stored, partitioned by tenant. |
+| `ids::message_id`, `ids::mailbox_ready_id` | UUIDv5 message ids (as `u128`) from the idempotency key, or from the mailbox address and task id when there is none. |
+| `Publisher`, `PublisherStats` (`hook.stats()`, `notifier.stats()`) | `enqueued`, `published`, `dropped` (queue full), `deduplicated`, `retried`, `failed`. `flush(timeout)` waits for the queue to drain. |
+
+Publishing is off the dispatch path: `Hook::on_event` only serializes and does
+a non-blocking enqueue. While the server is slow or down the queue (default
+1024) fills and further events are dropped and counted; each message gets
+`RetryPolicy` attempts with a per-attempt timeout. Iggy 0.9 deduplicates
+retried requests per client, not by message id, so the publisher skips an id it
+published recently and a consumer that must be exactly-once across publisher
+restarts de-duplicates on the message id. Use an IPv4 literal such as
+`127.0.0.1` in the connection string when `localhost` resolves to `::1`.
 
 ## Scheduling internals (core crate only)
 

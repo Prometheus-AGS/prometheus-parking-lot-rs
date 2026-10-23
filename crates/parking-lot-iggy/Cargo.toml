@@ -1,0 +1,34 @@
+[package]
+name = "prometheus-parking-lot-iggy"
+description = "Apache Iggy lifecycle events and mailbox notifications for prometheus_parking_lot."
+documentation = "https://docs.rs/prometheus-parking-lot-iggy"
+keywords = ["scheduler", "iggy", "events", "streaming", "ai"]
+categories = ["asynchronous", "network-programming"]
+include = ["/src/**", "/Cargo.toml", "/README.md", "/LICENSE*"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+prometheus-parking-lot-core.workspace = true
+iggy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["rt", "sync", "time"] }
+tracing.workspace = true
+uuid = { workspace = true, features = ["v5"] }
+
+[dev-dependencies]
+testcontainers.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+
+[lints]
+workspace = true

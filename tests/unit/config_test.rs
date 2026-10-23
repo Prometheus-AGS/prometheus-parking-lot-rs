@@ -413,6 +413,63 @@ fn config_pool_on_a_pgmq_backend_is_rejected() {
     assert_eq!(invalid_field(&json), "pools.p.mailbox");
 }
 
+const IGGY_BACKEND: &str = r#""type": "iggy", "connection_string": "iggy://app:s3cret@iggy:8090""#;
+
+#[cfg(feature = "iggy")]
+#[test]
+fn config_iggy_section_defaults_validates_and_builds_options() {
+    let json = format!(
+        r#"{{ "backends": {{ "ev": {{ {IGGY_BACKEND} }} }}, "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    let parsed =
+        SchedulerConfig::from_json_str(&json).expect("an iggy section with defaults loads");
+    let Some(BackendConfig::Iggy(section)) = parsed.backends.get("ev") else {
+        panic!("`type: iggy` parses as an iggy section");
+    };
+    assert_eq!(section.stream, "parking-lot");
+    assert_eq!(section.mailbox_topic, "mailbox.ready");
+    assert!(
+        !format!("{section:?}").contains("s3cret"),
+        "Debug hides the password"
+    );
+    let options = section.options();
+    assert_eq!(options.lifecycle_topic, "lifecycle");
+    assert_eq!(options.queue_capacity, 1024);
+    assert_eq!(options.retry.max_attempts, 5);
+
+    let json = json.replace(IGGY_BACKEND, &format!("{IGGY_BACKEND}, \"partitions\": 0"));
+    assert_eq!(invalid_field(&json), "backends.ev.partitions");
+    let json = format!(
+        r#"{{ "backends": {{ "ev": {{ {IGGY_BACKEND}, "strem": "x" }} }}, "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    assert!(
+        parse_error(&json).contains("strem"),
+        "a misspelled field is named"
+    );
+}
+
+/// An iggy backend carries events only: no pool can run on it.
+#[cfg(feature = "iggy")]
+#[test]
+fn config_pool_on_an_iggy_backend_is_rejected() {
+    let durable = r#""max_units": 4, "max_queue_depth": 8, "default_timeout_secs": 30,
+                     "queue": { "backend": "ev" }, "mailbox": { "backend": "ev" }"#;
+    let json = format!(
+        r#"{{ "backends": {{ "ev": {{ {IGGY_BACKEND} }} }}, "pools": {{ "p": {{ {durable} }} }} }}"#
+    );
+    let err = SchedulerConfig::from_json_str(&json).expect_err("no pool runs on iggy");
+    assert_eq!(err.field(), Some("pools.p.queue"));
+}
+
+#[cfg(not(feature = "iggy"))]
+#[test]
+fn config_iggy_backend_without_the_feature_is_rejected() {
+    let json = format!(
+        r#"{{ "backends": {{ "ev": {{ {IGGY_BACKEND} }} }}, "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    assert_eq!(invalid_field(&json), "backends.ev.type");
+}
+
 #[cfg(not(feature = "postgres"))]
 #[test]
 fn config_pgmq_backend_without_the_feature_is_rejected() {
@@ -436,7 +493,7 @@ fn config_postgres_backend_without_the_feature_is_rejected() {
 // ── documented examples ─────────────────────────────────────────────────────
 
 /// The documented examples use every backend, so they need every feature.
-#[cfg(all(feature = "postgres", feature = "embedded"))]
+#[cfg(all(feature = "postgres", feature = "embedded", feature = "iggy"))]
 mod examples {
     use std::path::{Path, PathBuf};
 
@@ -472,7 +529,13 @@ mod examples {
             .collect();
         assert_eq!(
             names,
-            ["in-memory.json", "pgmq.json", "postgres.json", "redb.json"]
+            [
+                "iggy.json",
+                "in-memory.json",
+                "pgmq.json",
+                "postgres.json",
+                "redb.json"
+            ]
         );
         for file in &files {
             let text = std::fs::read_to_string(file).expect("read example");
