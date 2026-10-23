@@ -2,8 +2,9 @@
 //!
 //! Every test is named `config_*` so the S-22 entry point selects them. The
 //! documented example configs are built through the real path: in memory, redb
-//! in a temporary directory, and Postgres in the project's PG 18 image (that
-//! test needs Docker and is `#[ignore]`d; run it with `--run-ignored all`).
+//! in a temporary directory, and Postgres and pgmq in the project's PG 18 image
+//! (or the `PARKING_LOT_PG_MAJOR` image; those tests need Docker and are
+//! `#[ignore]`d; run them with `--run-ignored all`).
 
 use std::cell::Cell;
 use std::collections::BTreeMap;
@@ -297,13 +298,15 @@ mod postgres {
     use std::time::Duration;
 
     use prometheus_parking_lot::config::BackendConfig;
-    use prometheus_parking_lot::core::{LeaseQueue, ResultMailbox};
+    use prometheus_parking_lot::core::{Enqueued, LeaseQueue, ResultMailbox};
     use prometheus_parking_lot::util::MailboxKey;
     use testcontainers::core::{ContainerPort, WaitFor};
     use testcontainers::runners::AsyncRunner;
     use testcontainers::{ContainerAsync, GenericImage, ImageExt};
 
-    use super::{Built, Echo, build_pools_from_scheduler_config, read_example, spawner};
+    use prometheus_parking_lot::config::SchedulerConfig;
+
+    use super::{Built, Echo, build_pools_from_scheduler_config, read_example, spawner, task};
 
     /// Postgres major version of the project image under test: 18, or the
     /// `PARKING_LOT_PG_MAJOR` the CI matrix sets (`docker/postgres17`, `docker/postgres18`).
@@ -351,6 +354,22 @@ mod postgres {
         (container, url)
     }
 
+    /// Build `cfg` against the container. The image logs "ready" for its
+    /// temporary init server too, so retry until the real server accepts the
+    /// connection.
+    async fn build_when_ready(cfg: &SchedulerConfig) -> Built {
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(60);
+        loop {
+            match build_pools_from_scheduler_config(cfg, |_, _| Ok(Echo), spawner()).await {
+                Ok(built) => return built,
+                Err(err) if tokio::time::Instant::now() >= deadline => {
+                    panic!("example does not build: {err}")
+                }
+                Err(_) => tokio::time::sleep(Duration::from_millis(250)).await,
+            }
+        }
+    }
+
     #[tokio::test]
     #[ignore = "needs Docker: starts a parking-lot-pg:18 container; run with --run-ignored all"]
     async fn config_postgres_example_builds_against_pg18() {
@@ -361,18 +380,7 @@ mod postgres {
         };
         section.url = url;
 
-        // The image logs "ready" for its temporary init server too, so retry
-        // until the real server accepts the connection.
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(60);
-        let built: Built = loop {
-            match build_pools_from_scheduler_config(&cfg, |_, _| Ok(Echo), spawner()).await {
-                Ok(built) => break built,
-                Err(err) if tokio::time::Instant::now() >= deadline => {
-                    panic!("postgres example does not build: {err}")
-                }
-                Err(_) => tokio::time::sleep(Duration::from_millis(250)).await,
-            }
-        };
+        let built = build_when_ready(&cfg).await;
         assert!(built.pools.is_empty(), "the example's pool is durable");
         let names: Vec<_> = built.durable_pools.keys().cloned().collect();
         assert_eq!(names, ["llm_inference"]);
@@ -422,5 +430,65 @@ mod postgres {
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
         assert_eq!(live, 0, "the pool acked its task");
+    }
+
+    /// The pgmq example opens a prepared pgmq queue (and its listener) next to
+    /// an in-memory pool, and the queue round-trips a task through the real
+    /// extension: enqueue, lease for the configured `lease_secs`, ack.
+    #[tokio::test]
+    #[ignore = "needs Docker: starts a parking-lot-pg:18 container; run with --run-ignored all"]
+    async fn config_pgmq_example_opens_the_queue_against_pg18() {
+        let (_container, url) = start_pg18().await;
+        let mut cfg = read_example("pgmq.json");
+        let Some(BackendConfig::Pgmq(section)) = cfg.backends.get_mut("events") else {
+            panic!("pgmq.json has a pgmq backend named `events`");
+        };
+        section.url = url;
+
+        let built = build_when_ready(&cfg).await;
+        assert!(built.durable_pools.is_empty(), "no pool runs on pgmq");
+        let names: Vec<_> = built.pools.keys().cloned().collect();
+        assert_eq!(names, ["llm_inference"]);
+        super::run_one_task_per_pool(&built).await;
+
+        let events = &built.pgmq["events"];
+        assert_eq!(events.queue.queue_name(), "events");
+        assert_eq!(events.queue.max_depth(), 10_000);
+        assert_eq!(events.lease_for, Duration::from_secs(30));
+        assert!(events.listener.is_some(), "listen: true opens a listener");
+
+        // `prepare: true` created the pgmq queues: a task round-trips.
+        let key = MailboxKey {
+            tenant: "config-test".into(),
+            user_id: None,
+            session_id: Some("events".to_owned()),
+        };
+        let enqueued = events
+            .queue
+            .enqueue(task(7, &key, "hello"))
+            .await
+            .expect("enqueue on the prepared pgmq queue");
+        assert!(matches!(enqueued, Enqueued::Accepted(_)), "{enqueued:?}");
+        let leased = events
+            .queue
+            .lease(4, events.lease_for)
+            .await
+            .expect("lease");
+        let [leased] = <[_; 1]>::try_from(leased)
+            .unwrap_or_else(|all| panic!("expected one leased task, got {}", all.len()));
+        assert_eq!(leased.task.meta.id, 7);
+        assert_eq!(leased.task.payload, "hello");
+        assert_eq!(leased.attempt, 1);
+        assert!(
+            events
+                .queue
+                .lease(4, events.lease_for)
+                .await
+                .expect("lease again")
+                .is_empty(),
+            "a leased task is invisible until acked or expired"
+        );
+        events.queue.ack(leased.token).await.expect("ack");
+        assert_eq!(events.queue.depth().await.expect("depth").live(), 0);
     }
 }

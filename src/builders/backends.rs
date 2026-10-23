@@ -5,13 +5,16 @@
 //! same objects (durable dispatch, change `cr-49`); applications can also use
 //! them directly through [`LeaseQueue`](crate::core::LeaseQueue) and
 //! [`ResultMailbox`](crate::core::ResultMailbox), for example to consume the
-//! pool's results.
+//! pool's results. A `pgmq` backend drives no pool; its queue is for the
+//! application to use directly.
 
 #[cfg(any(feature = "postgres", feature = "embedded"))]
 use std::time::Duration;
 
 #[cfg(feature = "postgres")]
-use prometheus_parking_lot_pg::{PgLeaseQueue, PgPool, PgResultMailbox, QueueListener};
+use prometheus_parking_lot_pg::{
+    PgLeaseQueue, PgPool, PgResultMailbox, PgmqLeaseQueue, QueueListener,
+};
 
 #[cfg(feature = "embedded")]
 use prometheus_parking_lot_embedded::{EmbeddedStore, RedbLeaseQueue, RedbResultMailbox};
@@ -31,6 +34,22 @@ pub struct PostgresBackend<P, T> {
     /// The result mailbox, also named by `queue_name`.
     pub mailbox: PgResultMailbox<T>,
     /// The wake-up listener, present when the section sets `listen: true`.
+    pub listener: Option<QueueListener>,
+    /// `lease_secs`: the duration to pass to
+    /// [`LeaseQueue::lease`](crate::core::LeaseQueue::lease).
+    pub lease_for: Duration,
+}
+
+/// An opened pgmq backend (a `"type": "pgmq"` section): a lease queue over
+/// the pgmq extension. No pool runs on it; use the queue directly.
+#[cfg(feature = "postgres")]
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct PgmqBackend<P> {
+    /// The lease queue named by `queue_name`, with `max_depth` and
+    /// `max_attempts` applied (and prepared when `prepare` is set).
+    pub queue: PgmqLeaseQueue<P>,
+    /// The enqueue listener, present when the section sets `listen: true`.
     pub listener: Option<QueueListener>,
     /// `lease_secs`: the duration to pass to
     /// [`LeaseQueue::lease`](crate::core::LeaseQueue::lease).
@@ -91,6 +110,43 @@ pub(super) async fn open_postgres<P, T>(
     Ok(PostgresBackend {
         queue,
         mailbox,
+        listener,
+        lease_for: Duration::from_secs(cfg.lease_secs),
+    })
+}
+
+/// Connect to Postgres, open the pgmq queue, run its `prepare` when `prepare`
+/// is set, and open its listener when `listen` is set.
+#[cfg(feature = "postgres")]
+pub(super) async fn open_pgmq<P>(
+    name: &str,
+    cfg: &crate::config::PgmqBackendConfig,
+) -> Result<PgmqBackend<P>, SchedulerError> {
+    let pool = PgPool::connect(&cfg.url)
+        .await
+        .map_err(|e| SchedulerError::backend(format!("backends.{name}: connect"), e))?;
+    let mut queue = PgmqLeaseQueue::new(pool, cfg.queue_name.clone(), cfg.max_depth)?;
+    if let Some(max_attempts) = cfg.max_attempts {
+        queue = queue.with_max_attempts(max_attempts);
+    }
+    if cfg.prepare {
+        queue
+            .prepare()
+            .await
+            .map_err(|e| SchedulerError::backend(format!("backends.{name}: prepare"), e))?;
+    }
+    let listener = if cfg.listen {
+        Some(
+            queue
+                .listener()
+                .await
+                .map_err(|e| SchedulerError::backend(format!("backends.{name}: listen"), e))?,
+        )
+    } else {
+        None
+    };
+    Ok(PgmqBackend {
+        queue,
         listener,
         lease_for: Duration::from_secs(cfg.lease_secs),
     })
