@@ -66,6 +66,13 @@ entry names the OpenSpec change that made it.
   returns `SchedulerError::Task(TaskError::Timeout { .. })`. Raise
   `default_timeout_ms` (or set a per-task `deadline_ms`) to the longest run
   you intend to permit.
+- **Executor panics are contained (cr-21).** A panic in an executor run by
+  `ResourcePool` or the native `WorkerPool` no longer escapes: the task's
+  outcome is `TaskError::ExecutorPanicked`, its units are released and parked
+  work is started. A `WorkerPool` worker thread killed by a panic is replaced.
+- **`WorkerPool::stats().worker_count` reports live workers (cr-21).** It now
+  counts the worker threads serving the pool instead of echoing the configured
+  count, and drops to 0 after `shutdown`.
 
 ### Added
 
@@ -78,6 +85,10 @@ entry names the OpenSpec change that made it.
   `UnitSemaphore`, `Permit`. The facade does not re-export these; applications
   use the pools.
 - `ResourcePool::running_tasks` and `ResourcePool::queued_tasks` (cr-19).
+- `ResourcePool::completed_tasks` and `ResourcePool::failed_tasks` (cr-21):
+  counts of tasks that returned a value and of tasks whose outcome was a
+  failure (executor error or panic, timeout, or a deadline that passed while
+  parked).
 - `WorkerPool::with_clock` (cr-19): drive deadline checks and execution
   budgets from a `TestClock`.
 - **Async backend contracts (cr-25).** `LeaseQueue` (`enqueue`, `lease`, `ack`,
@@ -115,7 +126,6 @@ entry names the OpenSpec change that made it.
 
 ### Known limitations
 
-- Executor panics are not caught yet (cr-21).
 - The Postgres queue still removes a task when it dequeues it (at-most-once)
   and bridges async calls with `block_on`; the leasing Postgres backends are
   cr-26 and cr-27.
