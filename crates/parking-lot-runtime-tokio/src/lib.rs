@@ -1,7 +1,8 @@
 //! # Prometheus Parking Lot - tokio runtime
 //!
 //! The tokio-based runtime layer of the `prometheus_parking_lot` scheduler:
-//! the async [`ResourcePool`], the native [`WorkerPool`] (dedicated OS
+//! the async [`ResourcePool`] and its crash-durable mode
+//! [`DurableResourcePool`] (cr-49), the native [`WorkerPool`] (dedicated OS
 //! threads), graceful shutdown, the cancellation channel and the tokio
 //! [`TokioSpawner`].
 //!
@@ -12,6 +13,7 @@
 
 pub mod cancellation;
 mod contain;
+pub mod durable_pool;
 pub mod resource_pool;
 pub mod shutdown;
 pub mod tokio_spawner;
@@ -22,6 +24,7 @@ pub use cancellation::{
     CancelReason, CancellationChannel, CancellationConfig, CancellationSink, CancelledTask,
     LoggingCancellationSink, RecordingCancellationSink, SinkOutcome,
 };
+pub use durable_pool::{DurableOptions, DurableResourcePool};
 pub use resource_pool::ResourcePool;
 pub use shutdown::{ShutdownHandle, ShutdownPolicy, wait_for_signal};
 pub use tokio_spawner::TokioSpawner;

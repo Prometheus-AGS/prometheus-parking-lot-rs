@@ -84,8 +84,9 @@ entry names the OpenSpec change that made it.
   `WorkerPoolConfig`, rejects unknown fields, and the error names the field.
   `SchedulerConfig` gains named `backends` (`"type": "postgres"` or `"redb"`,
   with their parameters) and `pools` is a `BTreeMap`. `PoolConfig.queue` and
-  `.mailbox` are `"in_memory"` or `{ "backend": name }`; naming a backend is
-  rejected until durable dispatch (cr-49). The ignored `runtime` field and
+  `.mailbox` are `"in_memory"` or `{ "backend": name }`; since durable
+  dispatch (cr-49, under Added) a pool naming a backend for both runs durably
+  on it. The ignored `runtime` field and
   `RuntimeConfig`, `QueueBackendConfig` and `MailboxBackendConfig` are
   removed. `validate` and `from_json_str` return `ConfigError` (`Parse` names
   an unknown or missing field; `Invalid` names the field by dotted path, e.g.
@@ -93,8 +94,43 @@ entry names the OpenSpec change that made it.
   `BTreeMap`. `WorkerPoolConfig::thread_stack_size` exists on every target
   (ignored on WASM), and `default_timeout_ms` is documented as the execution
   budget (and the native default result TTL), not a `retrieve` timeout.
+- **Builder spawner bound (cr-49).** `build_pools_from_scheduler_config` now
+  requires `S: Spawn + Clone + Send + Sync + 'static` (it was `S: Clone`),
+  because a durable pool starts its dispatcher while it is built.
+  `TokioSpawner` satisfies it. `build_pools` rejects a configuration whose
+  pools name a durable backend; build those with
+  `build_pools_from_scheduler_config`.
 
 ### Added
+
+- **Durable dispatch (cr-49).** `DurableResourcePool` (top level, and
+  `prometheus-parking-lot-runtime-tokio::durable_pool`) is the crash-durable
+  mode of `ResourcePool` on any `LeaseQueue` and `ResultMailbox`:
+  `DurableResourcePool::start(limits, queue, mailbox, executor, spawner,
+  DurableOptions::new(lease_for))`. `submit` returns `Queued` only after
+  `LeaseQueue::enqueue` has stored the task. A dispatcher leases the queue's
+  head while a unit is free and admits it through the same `Dispatcher` and
+  `UnitSemaphore` as the in-memory pool (capacity, priority then FIFO). Every
+  leased task is heartbeated with `extend` (every third of the lease by
+  default) until its lease is resolved, so a task that runs longer than the
+  lease is not redelivered. The outcome is delivered to the mailbox with an
+  idempotency key (the task's own key, or `"<pool name>:entry:<queue entry
+  id>"`), and only then is the lease acked (success) or dead-lettered (executor
+  error, panic, timeout, expired deadline, cost above capacity). A process
+  killed at any point leaves the task leased; it is redelivered after the lease
+  expires and the first-write-wins mailbox keeps exactly one result. A lost
+  lease does not cancel the running execution; its delivery is deduplicated.
+  The executor itself is at-least-once. In configuration, a pool whose `queue`
+  and `mailbox` both name a backend is built as a durable pool
+  (`BuiltScheduler::durable_pools`, `ConfiguredDurablePool` with `submit`,
+  `consume`, `shutdown`); one backend drives at most one pool, and a pool with
+  only one half on a backend is rejected. The `redb.json` and `postgres.json`
+  examples now run their pool durably. Scenario S-16
+  (`-E "test(pool_sigkill_)"`, `tests/scheduler/`) kills a pool process with
+  `SIGKILL` mid-execution and between execution and the mailbox write, on PG 18
+  and redb, and requires the task to complete with exactly one result after a
+  restart; under `--cfg parking_lot_negative_control="s-16"` (ack before the
+  mailbox write) the second case loses the result and fails.
 - **Pools and backends from configuration (cr-37).**
   `builders::build_pools_from_scheduler_config` validates a `SchedulerConfig`,
   opens every backend (Postgres: connect, optional migration of the queue and
@@ -133,8 +169,8 @@ entry names the OpenSpec change that made it.
   `StorageMailbox<S, N>`, which pairs storage with a notifier. They are
   re-exported by the facade under `core::backend`. The reference
   implementations are `InMemoryLeaseQueue` (with `DeadLetter`) in
-  `infra::queue` and `InMemoryResultMailbox` in `infra::mailbox`. No pool uses
-  these contracts yet (durable dispatch is cr-49). The redb backends (cr-28,
+  `infra::queue` and `InMemoryResultMailbox` in `infra::mailbox`. `DurableResourcePool`
+  runs on these contracts (durable dispatch, cr-49). The redb backends (cr-28,
   below) implement them; the Postgres ones are cr-26 and cr-27.
 - `SchedulerError::LeaseLost` (cr-25): the lease on a queue entry is no longer
   held; not retryable.
@@ -159,7 +195,7 @@ entry names the OpenSpec change that made it.
   and wakes idle dispatchers through LISTEN/NOTIFY (`PgLeaseQueue::listener()`,
   `QueueListener`). `reap_expired` and `spawn_reaper` return expired leases.
   Migration `004_lease_queue.sql` adds the `pl_lease_queue` table, and
-  `migrate(pool)` applies it. No pool uses it yet (durable dispatch is cr-49).
+  `migrate(pool)` applies it. `DurableResourcePool` runs on it (cr-49).
 - **Postgres result mailbox (cr-27).** `prometheus-parking-lot-pg::PgResultMailbox`
   is an async `ResultMailbox` on raw sqlx 0.9. Consume is one `DELETE ... RETURNING`
   with `FOR UPDATE SKIP LOCKED`, so a result reaches exactly one consumer.
@@ -192,9 +228,8 @@ entry names the OpenSpec change that made it.
   redelivered and an acked task never returns. They need a tokio runtime, and
   one process holds a database file at a time. The facade re-exports them as
   `infra::EmbeddedStore`, `infra::queue::RedbLeaseQueue` and
-  `infra::mailbox::RedbResultMailbox`. No pool can use them yet: the pools
-  still park and deliver through the synchronous `TaskQueue` and `Mailbox`
-  until durable dispatch (cr-49). `examples/embedded_pool.rs` shows direct use.
+  `infra::mailbox::RedbResultMailbox`. `DurableResourcePool` runs on them
+  (cr-49); `examples/embedded_pool.rs` shows direct use.
 
 - **Composable mailbox with a notifier (cr-34).** `StorageMailbox<S, N>` is now a
   `ResultMailbox`: it stores in `S` first and notifies only after a `Stored`
@@ -266,8 +301,17 @@ entry names the OpenSpec change that made it.
 
 ### Known limitations
 
-- No pool runs on the Postgres backends yet: `PgLeaseQueue` and `PgResultMailbox`
-  are called directly until durable dispatch (cr-49).
+- Only `ResourcePool` has a durable mode (cr-49). The `WorkerPool` (native and
+  WASM) and in-memory `ResourcePool`s still lose parked work on restart.
+- Durable dispatch is at-least-once for the executor: a task can run again
+  after a crash, a lost lease or a failed ack. Results are deduplicated by the
+  mailbox; executors with external side effects must be idempotent.
+- A durable pool lets at most one leased task wait for capacity; a task
+  enqueued later at a higher priority waits behind it instead of overtaking it
+  as it would in the in-memory pool.
+- An idle durable pool notices work enqueued by another process, and leases
+  that expired, by polling (`DurableOptions::with_poll_interval`, 500 ms by
+  default); it does not use the Postgres `QueueListener` yet.
 
 ## [0.2.0]
 

@@ -5,12 +5,11 @@
 //! it back ready to use through the [`LeaseQueue`] and [`ResultMailbox`]
 //! contracts.
 //!
-//! Pools do not run on these backends yet: a `ResourcePool` parks tasks
-//! through the synchronous `TaskQueue` contract, and the durable backends
-//! implement the asynchronous lease contracts. Durable dispatch (change
-//! `cr-49`) connects the two; until then a pool that names a backend for its
-//! queue or mailbox is rejected at validation instead of quietly running
-//! in memory.
+//! A pool whose `queue` and `mailbox` both name a backend runs on it durably
+//! (change `cr-49`): the builder starts a `DurableResourcePool` that persists
+//! each task in the backend's lease queue before accepting it, extends the
+//! lease while the task waits or runs, and acks it only after the outcome is
+//! stored in the backend's result mailbox.
 //!
 //! [`build_pools_from_scheduler_config`]: crate::builders::build_pools_from_scheduler_config
 //! [`LeaseQueue`]: prometheus_parking_lot_core::LeaseQueue
@@ -101,8 +100,10 @@ pub struct PostgresBackendConfig {
     /// fails with `QueueFull`.
     pub max_depth: usize,
     /// Lease duration in seconds: how long a leased task stays invisible to
-    /// other consumers before it is redelivered. Must cover the longest task
-    /// (or its heartbeat interval once leases are extended).
+    /// other consumers before it is redelivered. A durable pool extends the
+    /// lease every third of it while the task waits, runs or is delivered, so
+    /// it bounds how soon work held by a crashed process is redelivered, not
+    /// how long a task may run.
     pub lease_secs: u64,
     /// Dead-letter an entry after this many leases instead of redelivering it
     /// forever. Absent: redeliver forever.

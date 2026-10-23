@@ -49,7 +49,7 @@ You have moved through several iterations to arrive at a **Feature-Based Clean A
 
 *   **Builders & Config:**
     *   A single scheduler configuration file (`config::SchedulerConfig`, examples in `examples/configs/`) declares the pools and opens the durable backends.
-    *   Today pools still park and deliver in memory: the Postgres and redb backends are opened from the configuration and used directly through `LeaseQueue` and `ResultMailbox`. Moving a pool from in-memory to a durable backend by changing the configuration alone becomes possible only with durable dispatch (cr-49).
+    *   Moving a pool from in-memory to a durable backend is a configuration change (durable dispatch, cr-49): a pool whose `queue` and `mailbox` name a Postgres or redb backend persists every accepted task before `submit` returns, extends its lease while it waits or runs, and acks it only after the outcome is stored, so a crash at any point re-runs the task and leaves exactly one result. The executor can still run twice for one task, so its side effects must be idempotent.
 
 ### Summary
 You are professionalizing your AI Agent infrastructure. Instead of ad-hoc task spawning, you are creating a **dedicated scheduling engine** that treats GPU/CPU availability as a hard constraint, ensures tasks are never lost (persistence), and guarantees results are delivered even if the user goes offline (mailbox).

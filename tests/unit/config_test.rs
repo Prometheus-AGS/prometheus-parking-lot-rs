@@ -202,27 +202,93 @@ fn config_pool_on_unknown_backend_is_rejected() {
     assert_eq!(invalid_field(json), "pools.p.queue");
 }
 
-#[test]
-fn config_pool_on_a_durable_backend_is_rejected_until_durable_dispatch() {
-    // A pool cannot park tasks or deliver results in a durable backend yet; the
-    // configuration must say so rather than run the pool in memory.
+/// `one_pool(pool(4))` plus redb backends named `names` (never opened).
+fn with_redb_backends(names: &[&str]) -> SchedulerConfig {
     let mut cfg = one_pool(pool(4));
-    cfg.backends.insert(
-        "local".to_owned(),
-        BackendConfig::Redb(RedbBackendConfig {
-            path: PathBuf::from("./never-opened.redb"),
-            max_depth: 10,
-            lease_secs: 30,
-        }),
-    );
-    if let Some(pool) = cfg.pools.get_mut("inference") {
-        pool.mailbox = StorageConfig::Backend("local".to_owned());
+    for name in names {
+        cfg.backends.insert(
+            (*name).to_owned(),
+            BackendConfig::Redb(RedbBackendConfig {
+                path: PathBuf::from(format!("./never-opened-{name}.redb")),
+                max_depth: 10,
+                lease_secs: 30,
+            }),
+        );
     }
-    let err = cfg.validate().expect_err("durable mailbox");
-    // Without the `embedded` feature the backend itself is rejected first.
+    cfg
+}
+
+fn on(backend: &str) -> StorageConfig {
+    StorageConfig::Backend(backend.to_owned())
+}
+
+#[test]
+fn config_pool_on_a_durable_backend_needs_queue_and_mailbox_on_it() {
+    // Durable dispatch (cr-49): a pool runs on a backend only when its queue
+    // and its mailbox both name that backend; half in memory would lose
+    // accepted tasks or their results at a crash.
+    let mut durable = with_redb_backends(&["local"]);
+    let mut half_queue = with_redb_backends(&["local"]);
+    let mut half_mailbox = with_redb_backends(&["local"]);
+    let mut split = with_redb_backends(&["local", "other"]);
+    for (cfg, queue, mailbox) in [
+        (&mut durable, on("local"), on("local")),
+        (&mut half_queue, on("local"), StorageConfig::InMemory),
+        (&mut half_mailbox, StorageConfig::InMemory, on("local")),
+        (&mut split, on("local"), on("other")),
+    ] {
+        if let Some(pool) = cfg.pools.get_mut("inference") {
+            pool.queue = queue;
+            pool.mailbox = mailbox;
+        }
+    }
+    if !cfg!(feature = "embedded") {
+        // Without the `embedded` feature the backend itself is rejected first.
+        let err = durable.validate().expect_err("redb needs `embedded`");
+        assert_eq!(err.field(), Some("backends.local.type"));
+        return;
+    }
+    durable
+        .validate()
+        .expect("queue and mailbox on one backend");
+    let field = |cfg: &SchedulerConfig| {
+        let err = cfg.validate().expect_err("invalid storage");
+        (err.field().map(str::to_owned), err.to_string())
+    };
+    let (path, message) = field(&half_queue);
+    assert_eq!(
+        path.as_deref(),
+        Some("pools.inference.mailbox"),
+        "{message}"
+    );
+    assert!(message.contains("loses results"), "{message}");
+    let (path, message) = field(&half_mailbox);
+    assert_eq!(path.as_deref(), Some("pools.inference.queue"), "{message}");
+    assert!(message.contains("loses accepted tasks"), "{message}");
+    let (path, message) = field(&split);
+    assert_eq!(
+        path.as_deref(),
+        Some("pools.inference.mailbox"),
+        "{message}"
+    );
+    assert!(message.contains("same backend"), "{message}");
+}
+
+#[test]
+fn config_durable_backend_drives_at_most_one_pool() {
+    let mut cfg = with_redb_backends(&["local"]);
+    let mut second = pool(2);
+    second.queue = on("local");
+    second.mailbox = on("local");
+    cfg.pools.insert("second".to_owned(), second.clone());
+    cfg.pools.insert("third".to_owned(), second);
+    let err = cfg.validate().expect_err("two pools on one backend");
     if cfg!(feature = "embedded") {
-        assert_eq!(err.field(), Some("pools.inference.mailbox"));
-        assert!(err.to_string().contains("durable dispatch"), "{err}");
+        assert_eq!(err.field(), Some("pools.third.queue"), "{err}");
+        assert!(
+            err.to_string().contains("already drives pool `second`"),
+            "{err}"
+        );
     } else {
         assert_eq!(err.field(), Some("backends.local.type"));
     }

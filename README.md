@@ -35,7 +35,7 @@ migration notes.
 | Execution budgets | Yes, for both pools. |
 | Multi-resource admission | Costs are already vectors, but pools admit by the sum of units against one `max_units`; per-dimension limits are cr-23. |
 | Executor panics | Contained, for `ResourcePool` and the native `WorkerPool` (cr-21): the outcome is `TaskError::ExecutorPanicked`, the task's units are released and parked work starts; a `WorkerPool` worker killed by a panic is replaced. |
-| Accepted work survives a crash | **Not through the pools yet.** Both pools park tasks in memory and lose them on restart. The embedded redb `RedbLeaseQueue` and `RedbResultMailbox` (feature `embedded`, cr-28) are crash-safe: every operation is one durably committed transaction. They implement the async `LeaseQueue` and `ResultMailbox` contracts, which no pool uses until durable dispatch (cr-49); until then you call them directly (`examples/embedded_pool.rs`). The Postgres `PgLeaseQueue` (cr-26) and `PgResultMailbox` (cr-27) give the same guarantees on Postgres and are likewise called directly until cr-49 (`examples/postgres_pool.rs`). |
+| Accepted work survives a crash | **Yes, for `ResourcePool` on a durable backend** (cr-49): configure a pool's `queue` and `mailbox` as `{"backend": "<name>"}` (or start a `DurableResourcePool` directly) on Postgres (`PgLeaseQueue`, `PgResultMailbox`) or redb (`RedbLeaseQueue`, `RedbResultMailbox`). `submit` returns only after the task is committed to the lease queue; the task's lease is extended while it waits or runs and is acked only after its outcome is stored in the result mailbox, so a process killed at any point (tested with `SIGKILL` mid-execution and between execution and the mailbox write, on PG 18 and redb) has the task re-run after the lease expires and exactly one result consumable. The executor itself can run more than once for one task (at-least-once); make side effects idempotent. In-memory pools and the `WorkerPool` still lose parked work on restart. |
 
 ## Crates and features
 
@@ -46,15 +46,15 @@ re-exports the rest.
 | --- | --- |
 | `prometheus_parking_lot` | Facade: re-exports, scheduler configuration (`config`), pool builders (`builders`) |
 | `prometheus-parking-lot-core` | Runtime-free contracts and types, the dispatcher and semaphore, hooks and audit types, in-memory backends. No async runtime, IO or database dependency. |
-| `prometheus-parking-lot-runtime-tokio` | `ResourcePool`, the native `WorkerPool`, shutdown, cancellation, `TokioSpawner` |
+| `prometheus-parking-lot-runtime-tokio` | `ResourcePool` and its crash-durable mode `DurableResourcePool`, the native `WorkerPool`, shutdown, cancellation, `TokioSpawner` |
 | `prometheus-parking-lot-pg` | Postgres lease queue, result mailbox and audit sink on raw sqlx, plus migrations |
-| `prometheus-parking-lot-embedded` | Crash-safe redb lease queue and result mailbox for desktop and single-node use (`EmbeddedStore`, `RedbLeaseQueue`, `RedbResultMailbox`; ADR 0004). Needs a tokio runtime. Not usable by the pools until cr-49. |
+| `prometheus-parking-lot-embedded` | Crash-safe redb lease queue and result mailbox for desktop and single-node use (`EmbeddedStore`, `RedbLeaseQueue`, `RedbResultMailbox`; ADR 0004). Needs a tokio runtime. A `DurableResourcePool` runs on it (cr-49). |
 | `prometheus-parking-lot-ffi` | UniFFI (Kotlin, Swift) bindings over the embedded queue and mailbox for Android and iOS; not published. See `bindings/README.md`; `bindings/tauri-desktop` is a Tauri 2 example whose queue survives an app restart. |
 | `prometheus-parking-lot-wasm` | `WorkerPool` for `wasm32` (async tasks instead of threads); building it for `wasm32-unknown-unknown` is cr-38 |
 
 | Facade feature | Enables | Default |
 | --- | --- | --- |
-| `tokio-runtime` | `ResourcePool`, native `WorkerPool`, shutdown, cancellation, `TokioSpawner`, `builders`, `runtime` | yes |
+| `tokio-runtime` | `ResourcePool`, `DurableResourcePool`, native `WorkerPool`, shutdown, cancellation, `TokioSpawner`, `builders`, `runtime` | yes |
 | `postgres` | `infra::queue::PgLeaseQueue`, `infra::mailbox::PgResultMailbox`, `core::PostgresAuditSink` | no |
 | `embedded` | `infra::EmbeddedStore`, `infra::queue::RedbLeaseQueue`, `infra::mailbox::RedbResultMailbox` | no |
 
@@ -311,15 +311,16 @@ A task with `mailbox: None` runs, but its outcome is not stored.
 named `pools` (limits and execution budget) and optional named durable
 `backends` (Postgres or redb, with their parameters).
 `builders::build_pools_from_scheduler_config` builds every pool and opens
-every backend; `builders::build_pools` builds pools from queue and mailbox
-factories you supply instead.
+every backend; `builders::build_pools` builds in-memory pools from queue and
+mailbox factories you supply instead.
 
 The schema is strict: an unknown or misspelled field fails to load, and the
-error names it. Pools park tasks and deliver results in memory; a pool that
-names a durable backend for its `queue` or `mailbox` is rejected until durable
-dispatch lands, and the opened backends are used directly through
-`LeaseQueue` and `ResultMailbox`. One example per backend, each loaded and
-built by the test suite:
+error names it. A pool whose `queue` and `mailbox` are `"in_memory"` parks
+tasks and delivers results in memory. A pool whose `queue` and `mailbox` both
+name a backend (`{"backend": "local"}`) is built as a `DurableResourcePool` on
+it (cr-49): accepted tasks and their results survive a crash. Each backend
+drives at most one pool, and a pool with one half in memory is rejected. One
+example per backend, each loaded and built by the test suite:
 [`in-memory.json`](examples/configs/in-memory.json),
 [`postgres.json`](examples/configs/postgres.json),
 [`redb.json`](examples/configs/redb.json).

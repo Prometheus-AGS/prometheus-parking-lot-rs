@@ -168,3 +168,10 @@ pub use crate::core::hooks::{
 #[cfg(feature = "tokio-runtime")]
 pub use crate::core::shutdown::{ShutdownHandle, ShutdownPolicy, wait_for_signal};
 pub use crate::core::{PoolStats, TaskMetadata};
+/// The crash-durable resource pool (cr-49): accepted tasks persist in a
+/// durable lease queue and results in a durable result mailbox. Built from
+/// configuration by [`builders::build_pools_from_scheduler_config`] when a
+/// pool names a backend, or started directly with
+/// [`DurableResourcePool::start`].
+#[cfg(feature = "tokio-runtime")]
+pub use prometheus_parking_lot_runtime_tokio::durable_pool::{DurableOptions, DurableResourcePool};
