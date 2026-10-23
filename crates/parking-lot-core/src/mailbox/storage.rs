@@ -27,31 +27,21 @@ where
     N: DetachedNotifier<T>,
 {
     #[cfg(not(parking_lot_negative_control = "s-10"))]
-    fn deliver(
-        &self,
-        delivery: Delivery<T>,
-    ) -> impl Future<Output = Result<DeliveryOutcome, SchedulerError>> + Send {
-        async move {
-            let copy = N::ACTIVE.then(|| delivery.clone());
-            let outcome = self.storage().deliver(delivery).await?;
-            if outcome == DeliveryOutcome::Stored {
-                if let Some(copy) = &copy {
-                    self.notifier().dispatch(copy);
-                }
-            }
-            Ok(outcome)
+    async fn deliver(&self, delivery: Delivery<T>) -> Result<DeliveryOutcome, SchedulerError> {
+        let copy = N::ACTIVE.then(|| delivery.clone());
+        let outcome = self.storage().deliver(delivery).await?;
+        if outcome == DeliveryOutcome::Stored
+            && let Some(copy) = &copy
+        {
+            self.notifier().dispatch(copy);
         }
+        Ok(outcome)
     }
 
     #[cfg(parking_lot_negative_control = "s-10")]
-    fn deliver(
-        &self,
-        delivery: Delivery<T>,
-    ) -> impl Future<Output = Result<DeliveryOutcome, SchedulerError>> + Send {
-        async move {
-            self.notifier().notify_inline(&delivery).await?;
-            self.storage().deliver(delivery).await
-        }
+    async fn deliver(&self, delivery: Delivery<T>) -> Result<DeliveryOutcome, SchedulerError> {
+        self.notifier().notify_inline(&delivery).await?;
+        self.storage().deliver(delivery).await
     }
 
     fn consume(
