@@ -105,6 +105,19 @@ behind that crate's `conformance` feature.
 `RecordingHook`) and `core::audit` (`AuditSink`, `AuditEvent`,
 `InMemoryAuditSink`; `PostgresAuditSink` with `postgres`).
 
+`ResourcePool`, the native `WorkerPool` and `DurableResourcePool` emit, per
+task, `Submitted`, then `Queued` if it parks, `Started` when the executor is
+about to run, and exactly one terminal event: `Completed`, `Failed`,
+`Rejected`, `Cancelled`, `Expired` or (durable pool) `Requeued`
+(`LifecycleEvent::is_terminal`). Register hooks with `with_hook` /
+`hooks().register(..)` on the in-memory pools, `DurableOptions::with_hooks`
+on the durable pool, or `builders::build_pools_from_scheduler_config_with_hooks`.
+Hooks run on the bus's own thread, in emission order; emission never blocks a
+pool (a full queue drops the event and counts it in
+`HookBus::dropped_events`), and a pool with no hook pays one atomic load per
+transition. `HookBus::flush` waits for delivery. The WASM pool does not emit
+yet.
+
 ## Scheduling internals (core crate only)
 
 `prometheus_parking_lot_core::dispatch` (`Dispatcher`, `Admission`,

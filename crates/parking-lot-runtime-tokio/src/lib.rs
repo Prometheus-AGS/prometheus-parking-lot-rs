@@ -15,6 +15,7 @@
 pub mod cancellation;
 mod contain;
 pub mod durable_pool;
+mod events;
 mod ledger;
 pub mod resource_pool;
 pub mod shutdown;

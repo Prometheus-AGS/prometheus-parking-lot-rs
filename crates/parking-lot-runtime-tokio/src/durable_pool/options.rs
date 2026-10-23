@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-use prometheus_parking_lot_core::SchedulerError;
+use prometheus_parking_lot_core::{HookBus, SchedulerError};
 
 /// Pool name used in errors and in the fallback result idempotency key.
 pub(super) const DEFAULT_NAME: &str = "resource_pool";
@@ -32,6 +32,7 @@ pub struct DurableOptions {
     poll_every: Duration,
     result_ttl: Option<Duration>,
     name: String,
+    hooks: HookBus,
 }
 
 impl DurableOptions {
@@ -46,6 +47,7 @@ impl DurableOptions {
             poll_every: DEFAULT_POLL,
             result_ttl: None,
             name: DEFAULT_NAME.to_owned(),
+            hooks: HookBus::new(),
         }
     }
 
@@ -83,6 +85,22 @@ impl DurableOptions {
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = name.into();
         self
+    }
+
+    /// Emit the pool's lifecycle events (cr-31) on `hooks`. The bus is fixed
+    /// before the pool starts leasing, so no event of a redelivered task is
+    /// missed; register hooks on it before or after `start` (an empty bus
+    /// costs nothing). Options compare equal only when they share one bus.
+    #[must_use]
+    pub fn with_hooks(mut self, hooks: HookBus) -> Self {
+        self.hooks = hooks;
+        self
+    }
+
+    /// The bus the pool emits lifecycle events on.
+    #[must_use]
+    pub const fn hooks(&self) -> &HookBus {
+        &self.hooks
     }
 
     /// How long each lease lasts before it must be extended.

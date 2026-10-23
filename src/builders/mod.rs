@@ -16,5 +16,5 @@ pub use backends::RedbBackend;
 pub use pool_builder::ConfiguredDurablePool;
 pub use pool_builder::{
     BuiltScheduler, ConfiguredPool, ConfiguredResourcePool, SharedInMemoryMailbox, build_pools,
-    build_pools_from_scheduler_config,
+    build_pools_from_scheduler_config, build_pools_from_scheduler_config_with_hooks,
 };

@@ -20,6 +20,16 @@
 //! The dispatcher never runs anything: started items come back to the caller
 //! as [`Grant`]s (item plus [`Permit`]) to spawn outside the lock.
 //!
+//! ## Lifecycle events (cr-31)
+//!
+//! [`submit_with`](Dispatcher::submit_with) calls its `on_park` observer
+//! inside the park's critical section, after the enqueue and before the
+//! drain. Anything that could start the parked item (this drain, or a
+//! completion's) runs after it under the same lock, so a "parked" event the
+//! observer emits is ordered before the item's "started" event. The pools
+//! emit through a non-blocking `HookBus`, so the observer adds no wait under
+//! the lock.
+//!
 //! ## Capacity invariant
 //!
 //! Units are claimed only through [`UnitSemaphore::try_acquire`], whose CAS
@@ -233,7 +243,26 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
     ///
     /// On error the item is dropped and nothing else changes (its sequence
     /// number stays unused).
-    pub fn submit(&self, mut item: T, now_ms: u128) -> Result<Admission<T>, SchedulerError> {
+    pub fn submit(&self, item: T, now_ms: u128) -> Result<Admission<T>, SchedulerError> {
+        self.submit_with(item, now_ms, |_| {})
+    }
+
+    /// [`submit`](Self::submit), calling `on_park(depth)` when the item is
+    /// parked, with `depth` the number of parked items including it.
+    ///
+    /// `on_park` runs under the dispatch lock, after the enqueue and before
+    /// the drain that may start the item; see the module docs. It must not
+    /// block or call back into the dispatcher.
+    ///
+    /// # Errors
+    ///
+    /// As [`submit`](Self::submit); `on_park` is not called then.
+    pub fn submit_with(
+        &self,
+        mut item: T,
+        now_ms: u128,
+        on_park: impl FnOnce(usize),
+    ) -> Result<Admission<T>, SchedulerError> {
         let units = item.ticket().units;
         if units > self.semaphore.max_units() {
             return Err(SchedulerError::CapacityExceeded {
@@ -278,7 +307,10 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
             // not drain. A completion between the two finds an empty queue,
             // and the item is then parked with nothing left to wake it.
             drop(state);
-            self.state.lock().queue.push(item)?;
+            let mut state = self.state.lock();
+            state.queue.push(item)?;
+            on_park(state.queue.len());
+            drop(state);
             return Ok(Admission {
                 sequence,
                 started: false,
@@ -289,6 +321,7 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
         #[cfg(not(parking_lot_negative_control = "s-2"))]
         {
             state.queue.push(item)?;
+            on_park(state.queue.len());
             let dispatched = self.drain_locked(&mut state, now_ms);
             drop(state);
             let started = dispatched

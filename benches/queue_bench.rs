@@ -7,6 +7,7 @@
 //! - Mailbox delivery
 //! - End-to-end scheduling scenarios
 //! - Parking lot primitives (Mutex, atomics, Condvar)
+//! - Lifecycle-hook overhead (cr-31): no hooks vs one no-op hook
 
 #![expect(
     clippy::cast_possible_truncation,
@@ -22,8 +23,8 @@ use std::time::Duration;
 use parking_lot::{Condvar, Mutex};
 
 use prometheus_parking_lot::core::{
-    Mailbox, PoolLimits, ResourcePool, ScheduledTask, Spawn, TaskExecutor, TaskMetadata, TaskQueue,
-    TaskStatus,
+    Hook, HookBus, LifecycleEvent, Mailbox, PoolLimits, ResourcePool, ScheduledTask, Spawn,
+    TaskExecutor, TaskMetadata, TaskQueue, TaskStatus,
 };
 use prometheus_parking_lot::infra::mailbox::memory::InMemoryMailbox;
 use prometheus_parking_lot::infra::queue::memory::InMemoryQueue;
@@ -626,6 +627,87 @@ fn bench_end_to_end_scenario(c: &mut Criterion) {
 }
 
 // ============================================================================
+// Lifecycle-hook overhead (cr-31)
+// ============================================================================
+
+/// A hook that does nothing with the event.
+struct NoopHook;
+
+impl Hook for NoopHook {
+    fn on_event(&self, event: &LifecycleEvent) {
+        black_box(event.kind());
+    }
+}
+
+/// One emission at a pool's transition, without and with a hook.
+fn bench_hook_emit(c: &mut Criterion) {
+    let mut group = c.benchmark_group("hook_emit");
+    let started = |task_id| LifecycleEvent::Started {
+        task_id,
+        pool: "resource_pool".to_owned(),
+        worker_id: 0,
+        at_ms: now_ms(),
+    };
+
+    let bus = HookBus::new();
+    group.bench_function("no_hooks", |b| {
+        b.iter(|| bus.emit_with(|| started(black_box(1))));
+    });
+
+    let bus = HookBus::new();
+    bus.register(Arc::new(NoopHook));
+    group.bench_function("noop_hook", |b| {
+        b.iter(|| bus.emit_with(|| started(black_box(1))));
+    });
+    group.finish();
+}
+
+/// `TASKS` submissions run to completion through a `ResourcePool`, without and
+/// with one no-op hook.
+fn bench_hook_pool_cycle(c: &mut Criterion) {
+    const TASKS: u32 = 100;
+    let mut group = c.benchmark_group("hook_pool_cycle");
+    group.throughput(Throughput::Elements(u64::from(TASKS)));
+    for hooked in [false, true] {
+        let name = if hooked { "noop_hook" } else { "no_hooks" };
+        let runtime = Runtime::new().unwrap();
+        let mut pool = ResourcePool::new(
+            PoolLimits {
+                max_units: TASKS,
+                max_queue_depth: 10 * TASKS as usize,
+                default_timeout: Duration::from_secs(60),
+            },
+            InMemoryQueue::new(10 * TASKS as usize),
+            InMemoryMailbox::new(),
+            BenchExecutor,
+            NoOpSpawner,
+        );
+        if hooked {
+            pool = pool.with_hook(Arc::new(NoopHook));
+        }
+        let pool = Arc::new(pool);
+        let next_id = Arc::new(AtomicU32::new(0));
+        group.bench_function(name, |b| {
+            b.to_async(&runtime).iter(|| {
+                let pool = Arc::clone(&pool);
+                let next_id = Arc::clone(&next_id);
+                async move {
+                    let target = pool.completed_tasks() + u64::from(TASKS);
+                    for _ in 0..TASKS {
+                        let id = u64::from(next_id.fetch_add(1, Ordering::Relaxed));
+                        black_box(pool.submit(build_task(id, Priority::Normal)).await.unwrap());
+                    }
+                    while pool.completed_tasks() < target {
+                        tokio::task::yield_now().await;
+                    }
+                }
+            });
+        });
+    }
+    group.finish();
+}
+
+// ============================================================================
 // Benchmark Groups
 // ============================================================================
 
@@ -657,10 +739,13 @@ criterion_group!(
 
 criterion_group!(scenario_benches, bench_end_to_end_scenario);
 
+criterion_group!(hook_benches, bench_hook_emit, bench_hook_pool_cycle);
+
 criterion_main!(
     primitives_benches,
     queue_benches,
     mailbox_benches,
     pool_benches,
-    scenario_benches
+    scenario_benches,
+    hook_benches
 );

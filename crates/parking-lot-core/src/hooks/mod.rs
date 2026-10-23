@@ -2,20 +2,41 @@
 //!
 //! ## Overview
 //!
-//! Pools emit [`LifecycleEvent`]s at key points in task processing. Any code
-//! wanting to observe those events (metrics, logging, distributed tracing,
-//! audit, alerting) implements the [`Hook`] trait and registers with a pool's
-//! [`HookBus`].
+//! Pools emit [`LifecycleEvent`]s at every transition of a task (cr-31). Any
+//! code wanting to observe those events (metrics, logging, distributed
+//! tracing, audit, alerting) implements the [`Hook`] trait and registers with
+//! a pool's [`HookBus`].
 //!
 //! Hooks are **fire-and-observe**: the bus calls each registered hook and
-//! discards the return value. Hooks must not modify pool state and should
-//! complete quickly; heavy I/O should be offloaded to background tasks inside
-//! the hook implementation.
+//! discards the return value. Hooks cannot modify pool state.
 //!
-//! ## Zero-cost when empty
+//! ## Event sequence
 //!
-//! `HookBus::emit` is a no-op when no hooks are registered. The check is a
-//! single slice-empty test — no allocation, no virtual dispatch.
+//! Every task a pool sees emits, in this order:
+//!
+//! 1. [`Submitted`](LifecycleEvent::Submitted) when `submit` is called;
+//! 2. [`Queued`](LifecycleEvent::Queued) if it parks waiting for capacity
+//!    (emitted under the dispatch lock, so before anything can start it);
+//! 3. [`Started`](LifecycleEvent::Started) when the executor is about to run
+//!    it;
+//! 4. exactly one terminal event ([`LifecycleEvent::is_terminal`]):
+//!    `Completed`, `Failed`, `Rejected` (refused at submission, or by a
+//!    durable pool when its cost can never fit), `Cancelled` (shutdown),
+//!    `Expired` (deadline passed before it started) or `Requeued` (a durable
+//!    pool handed it back to its queue; another run follows, in this or a
+//!    later process).
+//!
+//! `Queued` and `Started` are optional (a task rejected at submission has
+//! neither; one cancelled while parked has no `Started`). A durable pool's
+//! task redelivered from its queue starts at `Queued`/`Started`: its
+//! `Submitted` was emitted by the process that accepted it.
+//!
+//! ## Delivery and zero cost when empty
+//!
+//! See [`bus`]: events are queued without blocking and delivered in order on
+//! the bus's own thread, so a slow or panicking hook never stalls dispatch.
+//! With no hook registered, emission is one atomic load and a branch; no
+//! event is built.
 //!
 //! ## `AuditSink` backward-compatibility
 //!
@@ -43,15 +64,16 @@
 //!     }
 //! }
 //!
-//! let mut bus = HookBus::new();
+//! let bus = HookBus::new();
 //! bus.register(std::sync::Arc::new(MetricsHook));
 //! ```
-
-use std::sync::Arc;
 
 use crate::contracts::clock::now_ms;
 
 pub mod audit;
+pub mod bus;
+
+pub use bus::{DEFAULT_HOOK_QUEUE_CAPACITY, HookBus};
 
 /// Reason a task was rejected before it could start.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,6 +85,9 @@ pub enum RejectionReason {
     DeadlineExpired,
     /// The pool has been shut down.
     PoolShutdown,
+    /// The task costs more units than the pool has in total, so it could
+    /// never start.
+    CapacityExceeded,
     /// A custom reason provided by a policy implementation.
     Custom(String),
 }
@@ -99,7 +124,7 @@ pub enum LifecycleEvent {
         at_ms: u128,
     },
 
-    /// A task was placed in the queue (capacity not immediately available).
+    /// A task was parked in the queue (capacity not immediately available).
     Queued {
         /// Internal task ID.
         task_id: u64,
@@ -117,7 +142,8 @@ pub enum LifecycleEvent {
         task_id: u64,
         /// Pool name.
         pool: String,
-        /// Worker index.
+        /// Worker index (the native `WorkerPool`'s worker thread; `0` for
+        /// pools that run tasks on an async runtime).
         worker_id: usize,
         /// Timestamp.
         at_ms: u128,
@@ -178,12 +204,42 @@ pub enum LifecycleEvent {
         at_ms: u128,
     },
 
-    /// A queued task was evicted (deadline expired or explicit eviction).
+    /// A queued task was evicted by an explicit eviction. Not emitted by the
+    /// built-in pools, which report a passed deadline as
+    /// [`Expired`](Self::Expired).
     Evicted {
         /// Internal task ID.
         task_id: u64,
         /// Pool name.
         pool: String,
+        /// Timestamp.
+        at_ms: u128,
+    },
+
+    /// A task's deadline passed before it could start; it never ran (its
+    /// outcome is `TaskStatus::Expired`).
+    Expired {
+        /// Internal task ID.
+        task_id: u64,
+        /// Pool name.
+        pool: String,
+        /// Timestamp.
+        at_ms: u128,
+    },
+
+    /// A durable pool handed a task back to its queue without an outcome
+    /// (shutdown, a delivery that kept failing, or a panic outside the
+    /// executor): it runs again on a later lease. Terminal for this run.
+    Requeued {
+        /// Internal task ID.
+        task_id: u64,
+        /// The idempotency key the task's outcome is delivered under (the
+        /// caller's key, or one derived from the queue entry).
+        idempotency_key: Option<String>,
+        /// Pool name.
+        pool: String,
+        /// Number of prior attempts, as the queue reported at lease time.
+        attempt: u32,
         /// Timestamp.
         at_ms: u128,
     },
@@ -202,7 +258,19 @@ impl LifecycleEvent {
             Self::Rejected { .. } => "rejected",
             Self::Cancelled { .. } => "cancelled",
             Self::Evicted { .. } => "evicted",
+            Self::Expired { .. } => "expired",
+            Self::Requeued { .. } => "requeued",
         }
+    }
+
+    /// Whether this event ends the task's run: `Completed`, `Failed`,
+    /// `Rejected`, `Cancelled`, `Expired`, `Evicted` or `Requeued`.
+    #[must_use]
+    pub const fn is_terminal(&self) -> bool {
+        !matches!(
+            self,
+            Self::Submitted { .. } | Self::Queued { .. } | Self::Started { .. }
+        )
     }
 
     /// Task ID of the event, for correlation.
@@ -216,56 +284,22 @@ impl LifecycleEvent {
             | Self::Failed { task_id, .. }
             | Self::Rejected { task_id, .. }
             | Self::Cancelled { task_id, .. }
-            | Self::Evicted { task_id, .. } => *task_id,
+            | Self::Evicted { task_id, .. }
+            | Self::Expired { task_id, .. }
+            | Self::Requeued { task_id, .. } => *task_id,
         }
     }
 }
 
 /// A lifecycle observer. Implement this to react to pool events.
 ///
-/// Implementations must be `Send + Sync` because the bus may be shared across
-/// threads. `on_event` is called synchronously; offload I/O to background tasks
-/// if needed, and return quickly.
+/// `on_event` runs on the [`HookBus`]'s delivery thread, never on a pool's
+/// scheduling path, one event at a time in emission order. It may block (a
+/// slow hook makes the bus drop events once its queue is full, never stalls
+/// the pool) and a panic is contained and counted.
 pub trait Hook: Send + Sync {
-    /// Called synchronously for each emitted [`LifecycleEvent`].
+    /// Called for each emitted [`LifecycleEvent`], in emission order.
     fn on_event(&self, event: &LifecycleEvent);
-}
-
-/// A registry of [`Hook`] observers for a single pool.
-///
-/// Hooks are stored as `Arc<dyn Hook>` so they can be cheaply shared and
-/// registered on multiple buses. Emission is a no-op when empty.
-#[derive(Default)]
-pub struct HookBus {
-    hooks: Vec<Arc<dyn Hook>>,
-}
-
-impl HookBus {
-    /// Create an empty bus.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Register a hook. All registered hooks receive every subsequent event.
-    pub fn register(&mut self, hook: Arc<dyn Hook>) {
-        self.hooks.push(hook);
-    }
-
-    /// Emit an event to all registered hooks.
-    ///
-    /// No-op (zero overhead) when no hooks are registered.
-    pub fn emit(&self, event: &LifecycleEvent) {
-        for hook in &self.hooks {
-            hook.on_event(event);
-        }
-    }
-
-    /// Returns `true` if at least one hook is registered.
-    #[must_use]
-    pub fn is_active(&self) -> bool {
-        !self.hooks.is_empty()
-    }
 }
 
 // --- AuditSink backward-compatibility bridge ---
@@ -361,6 +395,14 @@ impl Hook for TracingHook {
             } => {
                 tracing::warn!(pool = %self.pool, task_id, ?reason, attempt, "task cancelled");
             }
+            LifecycleEvent::Expired { task_id, .. } => {
+                tracing::warn!(pool = %self.pool, task_id, "task expired before it started");
+            }
+            LifecycleEvent::Requeued {
+                task_id, attempt, ..
+            } => {
+                tracing::info!(pool = %self.pool, task_id, attempt, "task requeued");
+            }
             _ => {}
         }
     }
@@ -415,14 +457,12 @@ pub fn emit_submitted(
     idempotency_key: Option<String>,
     pool: impl Into<String>,
 ) {
-    if bus.is_active() {
-        bus.emit(&LifecycleEvent::Submitted {
-            task_id,
-            idempotency_key,
-            pool: pool.into(),
-            at_ms: now_ms(),
-        });
-    }
+    bus.emit_with(|| LifecycleEvent::Submitted {
+        task_id,
+        idempotency_key,
+        pool: pool.into(),
+        at_ms: now_ms(),
+    });
 }
 
 /// Convenience: emit a `Rejected` event.
@@ -432,26 +472,22 @@ pub fn emit_rejected(
     pool: impl Into<String>,
     reason: RejectionReason,
 ) {
-    if bus.is_active() {
-        bus.emit(&LifecycleEvent::Rejected {
-            task_id,
-            pool: pool.into(),
-            reason,
-            at_ms: now_ms(),
-        });
-    }
+    bus.emit_with(|| LifecycleEvent::Rejected {
+        task_id,
+        pool: pool.into(),
+        reason,
+        at_ms: now_ms(),
+    });
 }
 
 /// Convenience: emit a `Completed` event.
 pub fn emit_completed(bus: &HookBus, task_id: u64, pool: impl Into<String>, duration_ms: u64) {
-    if bus.is_active() {
-        bus.emit(&LifecycleEvent::Completed {
-            task_id,
-            pool: pool.into(),
-            duration_ms,
-            at_ms: now_ms(),
-        });
-    }
+    bus.emit_with(|| LifecycleEvent::Completed {
+        task_id,
+        pool: pool.into(),
+        duration_ms,
+        at_ms: now_ms(),
+    });
 }
 
 /// Convenience: emit a `Cancelled` event.
@@ -463,20 +499,20 @@ pub fn emit_cancelled(
     reason: CancelledReason,
     attempt: u32,
 ) {
-    if bus.is_active() {
-        bus.emit(&LifecycleEvent::Cancelled {
-            task_id,
-            idempotency_key,
-            pool: pool.into(),
-            reason,
-            attempt,
-            at_ms: now_ms(),
-        });
-    }
+    bus.emit_with(|| LifecycleEvent::Cancelled {
+        task_id,
+        idempotency_key,
+        pool: pool.into(),
+        reason,
+        attempt,
+        at_ms: now_ms(),
+    });
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
 
     #[test]
@@ -495,7 +531,7 @@ mod tests {
     #[test]
     fn recording_hook_captures_events() {
         let hook = Arc::new(RecordingHook::new(100));
-        let mut bus = HookBus::new();
+        let bus = HookBus::new();
         bus.register(Arc::clone(&hook) as Arc<dyn Hook>);
         assert!(bus.is_active());
 
@@ -511,6 +547,7 @@ mod tests {
             duration_ms: 50,
             at_ms: 1,
         });
+        assert!(bus.flush(std::time::Duration::from_secs(5)));
 
         let events = hook.drain();
         assert_eq!(events.len(), 2);
@@ -535,7 +572,7 @@ mod tests {
     fn multiple_hooks_all_called() {
         let h1 = Arc::new(RecordingHook::new(10));
         let h2 = Arc::new(RecordingHook::new(10));
-        let mut bus = HookBus::new();
+        let bus = HookBus::new();
         bus.register(Arc::clone(&h1) as Arc<dyn Hook>);
         bus.register(Arc::clone(&h2) as Arc<dyn Hook>);
 
@@ -544,6 +581,7 @@ mod tests {
             pool: "p".into(),
             at_ms: 0,
         });
+        assert!(bus.flush(std::time::Duration::from_secs(5)));
         assert_eq!(h1.len(), 1);
         assert_eq!(h2.len(), 1);
     }

@@ -119,7 +119,30 @@ entry names the OpenSpec change that made it.
   use `SeqCst` on the shutdown flag (no behaviour change). The runtime crate
   depends on `serde_json` (payload snapshots).
 
+- **Hook delivery (cr-31).** `HookBus` no longer calls hooks inline: it is a
+  cheap-to-clone handle whose `register` takes `&self`, and events reach the
+  hooks on the bus's own thread (`pl-hooks`), in emission order, after
+  `emit` returns. Call `HookBus::flush(timeout)` to wait for delivery.
+  `LifecycleEvent` gains `Expired` and `Requeued`, and `RejectionReason`
+  gains `CapacityExceeded` (both enums are `#[non_exhaustive]`).
+
 ### Added
+
+- **Lifecycle events (cr-31, scenario S-21).** `ResourcePool`, the native
+  `WorkerPool` and `DurableResourcePool` emit `Submitted`, `Queued`,
+  `Started` and exactly one terminal event per task (`Completed`, `Failed`,
+  `Rejected`, `Cancelled`, `Expired`, or `Requeued` for a durable task handed
+  back to its queue), in that causal order for every observer. Register hooks
+  with `ResourcePool::with_hook`/`WorkerPool::with_hook` (or on `hooks()`),
+  `DurableOptions::with_hooks`, or
+  `build_pools_from_scheduler_config_with_hooks`. Emission never blocks the
+  scheduling path: events go through a bounded queue
+  (`DEFAULT_HOOK_QUEUE_CAPACITY`, 4096) to a delivery thread; a full queue
+  drops the event and counts it (`HookBus::dropped_events`), and a panicking
+  hook is contained and counted (`HookBus::hook_panics`). With no hook
+  registered an emission is one atomic load and a branch and builds no event.
+  `Dispatcher::submit_with` reports a park under the dispatch lock, which is
+  what orders `Queued` before `Started`.
 
 - **Shutdown without silent loss (cr-29, scenario S-9).** Every pool has
   `shutdown_with(ShutdownPolicy) -> ShutdownReport` (`ResourcePool` and
@@ -358,6 +381,11 @@ entry names the OpenSpec change that made it.
 - An idle durable pool notices work enqueued by another process, and leases
   that expired, by polling (`DurableOptions::with_poll_interval`, 500 ms by
   default); it does not use the Postgres `QueueListener` yet.
+- Lifecycle events are lossy under backpressure: a hook that cannot keep up
+  makes the bus drop events (counted), so an observer can miss a terminal
+  event. Tasks removed by `ResourcePool::prune_expired` emit no terminal
+  event (the `TaskQueue` contract does not return their ids). The WASM pool
+  does not emit lifecycle events yet (cr-53).
 
 ## [0.2.0]
 
