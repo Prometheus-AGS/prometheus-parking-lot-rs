@@ -155,8 +155,9 @@ conformance suite (the core crate's `conformance` feature).
 - **`PgmqLeaseQueue`** (cr-30) is the same contract over the pgmq extension,
   through plain SQL: one pgmq queue per priority, the visibility timeout as the
   lease, `read_ct` as the fence, and a pgmq dead-letter queue. It has
-  one-second lease granularity and no reaper, and the configuration schema
-  cannot select it yet.
+  one-second lease granularity and no reaper. A `"type": "pgmq"` config
+  backend opens it for direct use, but no pool can run on it: pool-level crash
+  durability on pgmq is not claimed.
 - **`RedbLeaseQueue`** (cr-28, crate `prometheus-parking-lot-embedded`, ADR
   0004) is the embedded queue for desktop and single-node use. `EmbeddedStore`
   opens one redb file that holds both the queue and the result mailbox. Every
