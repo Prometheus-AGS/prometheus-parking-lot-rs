@@ -40,15 +40,17 @@ merged, so the streaming-replay guide is in scope.
    so no existing link breaks; the nine guides and the upgrade notes are new
    pages in the sidebar.
 
-## Library API gaps found (reported, not fixed)
+## Library API gaps found
 
-- `BackgroundNotifier` is not re-exported by the facade; a facade-only user
-  cannot attach `IggyNotifier` to a `StorageMailbox`
-  (`iggy_events.rs` imports `prometheus_parking_lot_core::mailbox`).
-- A configuration-built durable pool cannot take a notifier, a result TTL, or
-  heartbeat/poll intervals, and ignores the Postgres `listen` listener (it
-  polls every 500 ms).
-- `IggyBackendConfig` has no `stream_topic` field (`IggyOptions` has one).
-- `CapacityExceeded` from a configuration-built in-memory pool names the pool
-  `resource_pool` (not the configured name) and does not name the resource kind
-  that did not fit.
+Status as of the pre-release API-gaps change (`team/tech-lead/prerelease-api-gaps`):
+
+- **Fixed:** `BackgroundNotifier` and its companions are re-exported by the
+  facade (`core::backend`, `core::*`); `iggy_events.rs` imports only through
+  the facade.
+- **Open, 0.4.0:** a configuration-built durable pool cannot take a notifier, a
+  result TTL, or heartbeat/poll intervals, and ignores the Postgres `listen`
+  listener (it polls every 500 ms). Tracked in #52, #53 and #54.
+- **Fixed:** `IggyBackendConfig` has a `stream_topic` field.
+- **Fixed:** `CapacityExceeded` names the configured pool and the resource kind
+  that did not fit (`kind: Option<ResourceKind>`).
+- **Open, 0.4.0:** a `SchedulerConfig` with no pools cannot be loaded (#55).
