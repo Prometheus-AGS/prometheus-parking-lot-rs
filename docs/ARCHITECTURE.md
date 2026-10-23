@@ -262,36 +262,132 @@ Complete examples, loaded and built by the test suite: `examples/configs/`.
 
 ## 7. Performance Characteristics
 
-The library is optimized for high-throughput scenarios using `parking_lot` crate primitives and lock-free data structures.
+Every number in this section was measured by the benchmark suites in `benches/`
+(cr-40; `benches/README.md` describes the workloads and the method).
 
-### 7.1 Synchronization Primitives
+**Machine and run.** Apple M1 Max (8 performance + 2 efficiency cores), 64 GB,
+macOS 26.7.2, internal SSD for `$TMPDIR`; rustc 1.99.1, the `bench` profile;
+2026-10-23, commit 6824e83 plus the cr-40 suites. The machine was shared with other
+builds: load average 20 to 50 during the runs. Two full runs of
 
-The timings below were measured on 0.2, before the dispatcher and semaphore
-(cr-19) replaced the 0.2 primitives; they have not been re-measured.
+```bash
+cargo bench --all-features --locked \
+  --bench components --bench throughput --bench latency --bench utilization -- --noplot
+```
 
-| Component | Primitive on `main` | 0.2 measurement |
-|-----------|-----------|-------------|
-| Capacity tracking | `UnitSemaphore`: one packed `AtomicU64` + CAS (units and permits together) | ~700ps per operation (0.2 `AtomicU32` CAS) |
-| Admission, parking and waking | `Dispatcher` under one `parking_lot::Mutex` | ~888ns lock/unlock |
-| Mailbox access | `parking_lot::Mutex` | ~888ns lock/unlock |
-| Native worker hand-off | crossbeam channel of admitted tasks | not measured (0.2 used a `Condvar`, ~2.4µs `notify_one`) |
+and two runs at the CI configuration (`--warm-up-time 1 --measurement-time 3
+--sample-size 20`). Where two values are given they are the two full runs; a single
+value means the runs agreed to the shown precision.
 
-### 7.2 Queue Performance
+**CI numbers differ.** The `Benchmarks` CI job runs on a GitHub-hosted 4-vCPU x86_64
+Linux runner, whose CPU and fsync cost differ from this machine; its results (job
+summary and the `bench-results-<sha>` artifact) are the reproducible record per commit,
+and they are not expected to match the figures below. Treat these figures as one
+machine's evidence of orders of magnitude and ratios, not as guarantees.
 
-The `InMemoryQueue` uses a `BinaryHeap` for O(log n) priority queue operations:
+### 7.1 Component costs (`components`)
 
-| Queue Size | Enqueue+Dequeue Time | Throughput |
-|------------|---------------------|------------|
-| 100 | ~12µs | 8.4M elem/s |
-| 1,000 | ~143µs | 7.0M elem/s |
-| 10,000 | ~1.75ms | 5.7M elem/s |
+One thread, no contention. Mean per operation.
 
-### 7.3 Design Decisions
+| Operation | Primitive | Time |
+|---|---|---|
+| Claim and release 1 unit | `UnitSemaphore`: one packed `AtomicU64`, CAS (units and permits together) | 14.5 ns |
+| Claim and release a vector with a per-kind limit (cr-23) | packed CAS plus the kind lock | 24 to 25 ns |
+| Submit that starts at once, then complete | `Dispatcher` under one `parking_lot::Mutex` | 35 to 37 ns |
+| Submit that parks, then the completion that starts it | `Dispatcher` | 109 ns |
+| Emit a lifecycle event, no hook registered | `HookBus` (one atomic load) | 0.55 ns |
+| Emit a lifecycle event to one no-op hook | `HookBus` bounded channel | 53 to 54 ns |
+| 100 tasks through a `ResourcePool`, no hook / one no-op hook | whole cycle | 172 to 183 µs / 291 µs |
+| `InMemoryQueue` enqueue + dequeue, 100 / 1,000 / 10,000 tasks | `BinaryHeap`, O(log n) | 14 to 15 µs / 191 µs / 2.25 to 2.29 ms (6.5 to 7.0 / 5.2 / 4.4 Melem/s) |
+| Same with four priorities mixed, 1,000 tasks | | 244 to 253 µs (3.9 to 4.1 Melem/s) |
+| `InMemoryMailbox` deliver, 1,000 messages | `HashMap` | 143 to 146 µs (6.9 to 7.0 Melem/s) |
+| `InMemoryMailbox` lookup of 5,000 keys | | 220 to 224 µs |
+
+A registered hook costs about 1.2 µs per task in a pool cycle (three events per task,
+submitted, started and completed, through the delivery channel and thread), not the
+53 ns of a single emission.
+
+### 7.2 Throughput (`throughput`)
+
+Batches through a pool of 16 units, executor doing no work, client on a 4-worker tokio
+runtime; a batch ends when every result is readable by the client (stored in the
+mailbox, or returned by `retrieve_async`). Unit tasks cost 1 unit; mixed tasks 1 to 4.
+
+| Pool | Unit tasks | Mixed costs |
+|---|---|---|
+| `ResourcePool` (in-memory queue and mailbox) | 470,000 tasks/s | 408,000 to 436,000 tasks/s |
+| native `WorkerPool` (16 threads, a waiter task per result) | 219,000 to 234,000 tasks/s | 201,000 to 212,000 tasks/s |
+| `DurableResourcePool`, in-memory lease queue and result mailbox | 175,000 to 193,000 tasks/s | |
+| `DurableResourcePool`, redb (`embedded`), fsync per commit | 43 to 44 tasks/s | |
+
+The redb pool is bound by storage, not by the scheduler: every task is at least four
+durable commits (persist on submit, lease, deliver, ack), and on this Mac each commit
+is a full fsync. The in-memory durable pool shows what the durable dispatch path
+itself costs.
+
+### 7.3 Latency (`latency`)
+
+Microseconds from `submit` to the executor starting (start) and to the result being
+readable (result). Median of 5 rounds; the two values are the two full runs.
+
+**Light load** (one task in flight, executor doing no work):
+
+| Pool | Start p50 | Start p99 | Result p50 | Result p99 |
+|---|---|---|---|---|
+| `ResourcePool` | 5.2 to 6.0 | 18 to 32 | 5.6 to 6.5 | 21 to 35 |
+| native `WorkerPool` | 5.2 to 5.7 | 20 to 70 | 11.3 to 11.7 | 38 to 116 |
+| `DurableResourcePool`, in-memory backends | 6.2 to 10.0 | 25 to 74 | 7.1 to 11.8 | 27 to 87 |
+| `DurableResourcePool`, redb | 15,300 to 15,400 | 24,000 to 27,000 | 20,300 to 20,400 | 33,000 to 50,000 |
+
+The p99 values move more between runs than the p50 values: they are where other load
+on the machine shows.
+
+**Saturated load** (the whole round submitted at once, many times the 16 units, each
+task holding 1 unit for a 1 ms tokio sleep, which the timer turns into 1 to 3 ms): start
+latency is then queueing (a task waits for every task ahead of it; p50 117 to 158 ms
+for 1,600 tasks in the in-memory pools), so the useful figure is how busy the pool kept
+its units from the first submission to the last result:
+
+| Pool | Utilization of 16 units |
+|---|---|
+| `ResourcePool` | 0.95 to 0.99 |
+| native `WorkerPool` | 0.95 to 0.99 |
+| `DurableResourcePool`, in-memory backends | 0.83 to 0.91 |
+| `DurableResourcePool`, redb | 0.01 |
+
+The durable pool leases one task at a time and holds at most one leased task waiting
+for capacity (section "Ordering difference" in the `durable_pool` module docs), which
+is where its lower utilization comes from. On redb the client cannot even build a
+backlog: each `submit` returns only after its durable enqueue commit, so tasks arrive
+about as slowly as the pool serves them (section 7.2: 43 to 44 tasks/s), far below
+what 16 units of 1 to 3 ms tasks could run.
+
+### 7.4 Scheduling efficiency (`utilization`)
+
+A virtual-time simulation of the real `Dispatcher` and `UnitSemaphore` (2,000 ticks,
+seed `0x5eed`). The results depend only on scheduling decisions, so they are the same
+on every machine.
+
+| Workload | Strict order | Skip-ahead, default guard (8) | Large-item wait p50 / max, strict → default |
+|---|---|---|---|
+| `mixed`: 16 units, about 95% offered | 0.917 | 0.947 | 47 / 73 → 4 / 11 ticks |
+| `overload`: 16 units, about 115% offered | 0.928 | 0.955 | 183 / 367 → 158 / 318 ticks |
+| `multi`: cost vectors, `GpuVram` limit 8 (the bottleneck), `Cpu` limit 12 | `GpuVram` 0.913, `Cpu` 0.319 | `GpuVram` 0.947, `Cpu` 0.332 | 41 / 90 → 13 / 25 ticks |
+
+Over 100-tick windows the `mixed` workload with the default guard stays between 0.907
+and 0.972. The dispatcher's own cost per simulated run (about 3,200 admissions and
+completions) is 0.75 to 1.24 ms.
+
+### 7.5 Design Decisions
 
 1. **Lock-free capacity tracking:** the `UnitSemaphore` claims units and permits in one CAS on a packed `AtomicU64`, so both limits are taken together or not at all.
 2. **Fine-grained locking:** Queue and mailbox have separate mutexes, reducing lock contention.
 3. **BinaryHeap vs VecDeque:** Priority queues use heap for O(log n) vs O(n log n) sorted insertion.
 4. **No lost wakeups:** admission, parking and waking happen under the dispatcher's lock, and completion starts the parked work the freed units admit. An idle durable pool is the exception: it polls its queue (500 ms by default) for work enqueued by another process.
+
+Not measured: contention on the semaphore and dispatcher from many threads at once,
+memory use, and Postgres-backed pools (the Postgres suites need Docker; see
+`benches/README.md`).
 
 ------
 

@@ -42,7 +42,7 @@ crates/parking-lot-iggy/      IggyHook, IggyNotifier, bounded off-path Iggy publ
 crates/parking-lot-wasm/      wasm32 WorkerPool (built for wasm32 only; cr-38)
 crates/parking-lot-ffi/       UniFFI Kotlin/Swift bindings over the embedded store (not published; cr-44)
 bindings/                     binding generator, Kotlin/Swift smoke tests, Tauri 2 desktop example
-tests/, benches/, examples/   full-stack tests, criterion (queue_bench), examples, examples/configs/
+tests/, benches/, examples/   full-stack tests, criterion suites (benches/README.md), examples, examples/configs/
 docker/                       parking-lot-pg:18 and :17 images (Postgres + pgmq)
 ```
 

@@ -342,6 +342,67 @@ jobs:
         env:
           RUSTDOCFLAGS: "-D warnings"
 
+  bench:
+    # cr-40. The four criterion suites (benches/README.md) in a reduced configuration:
+    # 1 s warm-up, 3 s measurement, 20 samples per benchmark, instead of the local
+    # 2 s / 5 s / 50. The latency percentile and utilization passes run in full.
+    # Report-only: a slower number never fails the job (benches/README.md,
+    # "Regression policy"). On main the run is saved as criterion's `main` baseline
+    # (actions/cache, keyed by commit); pull requests restore the newest main
+    # baseline and compare against it. Results: the job summary
+    # (.github/scripts/bench-report.py) and the bench-results artifact (criterion
+    # JSON, the latency and utilization reports, machine metadata).
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CRITERION_HOME: ${{ github.workspace }}/bench-results/criterion
+      PARKING_LOT_BENCH_REPORT_DIR: ${{ github.workspace }}/bench-results/report
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.PINNED_TOOLCHAIN }}
+      # The bench profile is optimized: a cache of its own.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: bench
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Restore the main baseline
+        if: github.ref != 'refs/heads/main'
+        uses: actions/cache/restore@v6
+        with:
+          path: bench-results/criterion
+          key: bench-baseline-${{ github.sha }}
+          restore-keys: bench-baseline-
+      # Build first so the timeout below bounds the measurement, not a cold compile.
+      - name: Build the benchmarks
+        run: cargo bench --all-features --locked --bench components --bench throughput --bench latency --bench utilization --no-run
+      - name: Run the benchmarks (reduced configuration)
+        timeout-minutes: 25
+        run: |
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            mode=(--save-baseline main)
+          else
+            mode=(--baseline-lenient main)
+          fi
+          cargo bench --all-features --locked --bench components --bench throughput --bench latency --bench utilization -- --noplot --warm-up-time 1 --measurement-time 3 --sample-size 20 "${mode[@]}"
+      - name: Summary
+        if: always()
+        run: python3 .github/scripts/bench-report.py --criterion bench-results/criterion --reports bench-results/report --summary "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bench-results-${{ github.sha }}
+          path: bench-results
+          retention-days: 90
+      - name: Save the main baseline
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v6
+        with:
+          path: bench-results/criterion
+          key: bench-baseline-${{ github.sha }}
+
   deny:
     name: Deny (licenses / advisories)
     runs-on: ubuntu-latest

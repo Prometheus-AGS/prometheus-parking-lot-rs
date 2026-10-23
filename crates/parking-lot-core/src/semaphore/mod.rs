@@ -393,7 +393,7 @@ impl UnitSemaphore {
     ///
     /// Out of line so that the single-dimension path (`claim_packed` alone)
     /// does not carry the lock path's frame. Measured on
-    /// `benches/skip_ahead_bench.rs` (strict, single-dimension): with both
+    /// `benches/utilization.rs` (strict, single-dimension): with both
     /// paths in one function the claim took about 50% more profile samples
     /// and the simulation ran about 6% slower than the cr-20 semaphore;
     /// split, about 2%.

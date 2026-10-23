@@ -169,7 +169,7 @@ use super::parked::{Parkable, ParkedQueue, PriorityQueue, Ticket};
 /// fits beside a waiting head fill its gap for a couple of turnovers, which is
 /// where the utilization gain comes from, while keeping the added head wait to
 /// a few small-item run times. On the mixed workload of
-/// `benches/skip_ahead_bench.rs` (16 units, about 95% offered load) 8 skips
+/// `benches/utilization.rs` (16 units, about 95% offered load) 8 skips
 /// reach a utilization of 0.947 against 0.917 for strict order and 0.949
 /// unbounded; 2 and 4 skips reach 0.932 and 0.945.
 pub const DEFAULT_MAX_HEAD_SKIPS: u32 = 8;
