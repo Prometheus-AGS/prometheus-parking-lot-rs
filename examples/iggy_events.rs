@@ -30,8 +30,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use prometheus_parking_lot::config::BackendConfig;
 use prometheus_parking_lot::core::{
-    HookBus, PoolLimits, ResultMailbox, ScheduledTask, StorageMailbox, TaskError, TaskExecutor,
-    TaskMetadata,
+    BackgroundNotifier, HookBus, PoolLimits, ResultMailbox, ScheduledTask, StorageMailbox,
+    TaskError, TaskExecutor, TaskMetadata,
 };
 use prometheus_parking_lot::infra::EmbeddedStore;
 use prometheus_parking_lot::infra::events::{
@@ -40,9 +40,6 @@ use prometheus_parking_lot::infra::events::{
 use prometheus_parking_lot::runtime::TokioSpawner;
 use prometheus_parking_lot::util::{MailboxKey, Priority, ResourceCost, ResourceKind, now_ms};
 use prometheus_parking_lot::{DurableOptions, DurableResourcePool, ShutdownPolicy};
-// `BackgroundNotifier` is not re-exported by the facade yet; it comes from the
-// core crate (`prometheus-parking-lot-core`).
-use prometheus_parking_lot_core::mailbox::BackgroundNotifier;
 
 #[derive(Clone)]
 struct Reply;

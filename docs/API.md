@@ -96,6 +96,11 @@ synchronous pair, `DurableResourcePool` (cr-49) the async pair.
 | `ResultMailbox<T>` + `Notifier<T>` | async, idempotent (`deliver`, `consume`, `peek`, `evict_expired`) | `infra::mailbox::InMemoryResultMailbox` (reference); `infra::mailbox::RedbResultMailbox` (`embedded`, crash-safe); `infra::mailbox::PgResultMailbox` (`postgres`); `StorageMailbox<S, N>` composes storage and notifier |
 
 The async contracts live in `core::backend`; `DurableResourcePool` runs on them.
+`StorageMailbox::new(storage, notifier)` takes a `DetachedNotifier`:
+`NoopNotifier`, or `BackgroundNotifier::new(notifier, spawner, sleeper)`, which
+runs any `Notifier` off the delivery path with bounded retries (`with_policy(RetryPolicy)`,
+`stats()` returning `NotifyStats` / `NotifyStatsSnapshot`; cr-34). All of them
+are in `core::backend` and at `core::*`.
 The backend conformance suite is `prometheus_parking_lot_core::conformance`
 behind that crate's `conformance` feature.
 

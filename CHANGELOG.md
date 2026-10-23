@@ -144,6 +144,13 @@ entry names the OpenSpec change that made it.
 
 ### Added
 
+- **Notifier composition in the facade (cr-34, cr-32, cr-47).**
+  `BackgroundNotifier`, `DetachedNotifier`, `RetryPolicy`, `Sleeper`,
+  `NotifyStats` and `NotifyStatsSnapshot` are re-exported at
+  `prometheus_parking_lot::core` and `core::backend`, beside `StorageMailbox`.
+  A facade-only application can now wrap `infra::events::IggyNotifier` in a
+  `StorageMailbox` without depending on `prometheus-parking-lot-core`; the
+  `iggy_events` example imports through the facade only.
 - **Scenario guides and examples (cr-47).** The docs site gains guides for a
   GPU inference pool, a Tauri local LLM, a multi-tenant Postgres service,
   disconnected clients, shutdown and requeue, Iggy events, streaming replay,
