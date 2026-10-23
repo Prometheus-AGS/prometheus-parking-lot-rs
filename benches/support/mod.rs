@@ -273,8 +273,12 @@ fn command_output(program: &str, args: &[&str]) -> Option<String> {
 
 fn first_line_with(path: &str, prefix: &str) -> Option<String> {
     fs::read_to_string(path).ok()?.lines().find_map(|line| {
-        line.starts_with(prefix)
-            .then(|| line.split_once(':').map_or("", |(_, v)| v).trim().to_owned())
+        line.starts_with(prefix).then(|| {
+            line.split_once(':')
+                .map_or("", |(_, v)| v)
+                .trim()
+                .to_owned()
+        })
     })
 }
 

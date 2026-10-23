@@ -25,10 +25,13 @@
 //! cargo bench --all-features --bench throughput
 //! ```
 
-#[allow(dead_code, reason = "each suite uses a different part of the shared module")]
-mod support;
 #[path = "support/pools.rs"]
 mod pools;
+#[allow(
+    dead_code,
+    reason = "each suite uses a different part of the shared module"
+)]
+mod support;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};

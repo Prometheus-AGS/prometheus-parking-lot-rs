@@ -22,7 +22,10 @@
     reason = "benchmark sizes are small constants; casts cannot truncate"
 )]
 
-#[allow(dead_code, reason = "each suite uses a different part of the shared module")]
+#[allow(
+    dead_code,
+    reason = "each suite uses a different part of the shared module"
+)]
 mod support;
 
 use std::hint::black_box;
@@ -145,7 +148,12 @@ fn bench_semaphore(c: &mut Criterion) {
         &ResourceCost::new(ResourceKind::GpuVram, 2).with(ResourceKind::Cpu, 1),
     );
     group.bench_function("acquire_release/per_kind_limit", |b| {
-        b.iter(|| black_box(UnitSemaphore::try_acquire_vector(&limited, black_box(&demand))));
+        b.iter(|| {
+            black_box(UnitSemaphore::try_acquire_vector(
+                &limited,
+                black_box(&demand),
+            ))
+        });
     });
     group.finish();
 }
@@ -195,7 +203,12 @@ fn bench_dispatcher(c: &mut Criterion) {
 
     let full = Dispatcher::in_memory("bench", UnitSemaphore::new(1), usize::MAX);
     let first = full.submit(Item::new(), 0).expect("unbounded depth");
-    let mut held = first.dispatched.started.into_iter().next().map(|g| g.permit);
+    let mut held = first
+        .dispatched
+        .started
+        .into_iter()
+        .next()
+        .map(|g| g.permit);
     group.bench_function("park_wake", |b| {
         b.iter(|| {
             let admission = full.submit(Item::new(), 0).expect("unbounded depth");
@@ -445,4 +458,9 @@ criterion_group!(
     targets = bench_hook_emit, bench_hook_pool_cycle
 );
 
-criterion_main!(scheduling_benches, queue_benches, mailbox_benches, hook_benches);
+criterion_main!(
+    scheduling_benches,
+    queue_benches,
+    mailbox_benches,
+    hook_benches
+);

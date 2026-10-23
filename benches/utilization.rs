@@ -36,7 +36,10 @@
 //! cargo bench --all-features --bench utilization
 //! ```
 
-#[allow(dead_code, reason = "each suite uses a different part of the shared module")]
+#[allow(
+    dead_code,
+    reason = "each suite uses a different part of the shared module"
+)]
 mod support;
 
 use std::collections::BTreeMap;

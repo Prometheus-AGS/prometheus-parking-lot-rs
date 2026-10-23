@@ -33,10 +33,13 @@
 //! cargo bench --all-features --bench latency
 //! ```
 
-#[allow(dead_code, reason = "each suite uses a different part of the shared module")]
-mod support;
 #[path = "support/pools.rs"]
 mod pools;
+#[allow(
+    dead_code,
+    reason = "each suite uses a different part of the shared module"
+)]
+mod support;
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -171,10 +174,18 @@ fn percentile_report(runtime: &tokio::runtime::Runtime) {
                 "latency {:>14} {:>9}: start p50 {:>9.1} p99 {:>9.1} us | result p50 {:>9.1} p99 {:>9.1} us | util {:.3} ({} tasks x {} rounds, {:.1}s)",
                 kind.name(),
                 workload.name(),
-                summary["submit_to_start_us"]["p50"]["median"].as_f64().unwrap_or(0.0),
-                summary["submit_to_start_us"]["p99"]["median"].as_f64().unwrap_or(0.0),
-                summary["submit_to_result_us"]["p50"]["median"].as_f64().unwrap_or(0.0),
-                summary["submit_to_result_us"]["p99"]["median"].as_f64().unwrap_or(0.0),
+                summary["submit_to_start_us"]["p50"]["median"]
+                    .as_f64()
+                    .unwrap_or(0.0),
+                summary["submit_to_start_us"]["p99"]["median"]
+                    .as_f64()
+                    .unwrap_or(0.0),
+                summary["submit_to_result_us"]["p50"]["median"]
+                    .as_f64()
+                    .unwrap_or(0.0),
+                summary["submit_to_result_us"]["p99"]["median"]
+                    .as_f64()
+                    .unwrap_or(0.0),
                 summary["utilization"]["median"].as_f64().unwrap_or(0.0),
                 tasks,
                 rounds,
@@ -205,7 +216,12 @@ fn latency(c: &mut Criterion) {
         let probe = Arc::new(Probe::new(0));
         let harness = {
             let _guard = runtime.enter();
-            Arc::new(Harness::new(kind, Arc::clone(&probe), Duration::ZERO, UNITS))
+            Arc::new(Harness::new(
+                kind,
+                Arc::clone(&probe),
+                Duration::ZERO,
+                UNITS,
+            ))
         };
         let mut next_id = 0_u64;
         group.sampling_mode(if kind.is_durable() {

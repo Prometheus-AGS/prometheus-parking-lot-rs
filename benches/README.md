@@ -89,7 +89,10 @@ Why report-only, and why 25%: two back-to-back runs of identical code at the CI
 configuration on one machine (M1 Max, load average 20 to 30, 2026-10-23) produced
 changes whose 95% intervals excluded zero by up to 22%: for example
 `throughput/resource_pool/mixed` -21.7% [-31.2%, -12.5%] and
-`hook_pool_cycle/noop_hook` +8.3% [+4.4%, +12.7%]. Between CI runs the variance is
+`hook_pool_cycle/noop_hook` +8.3% [+4.4%, +12.7%]. A third run, after merging a
+change that does not touch these paths, reported `latency_round_trip/resource_pool`
++27.1% [+15.1%, +38.8%] and `hook_pool_cycle/no_hooks` +69.9% [+12.6%, +134.9%]: a
+15% threshold would have warned on both, 25% on neither. Between CI runs the variance is
 larger, not smaller: a pull request and its `main` baseline usually run on different
 runner hosts, possibly with different CPU models. A gate tighter than that noise
 would fail unchanged code; a much looser one would never fire. A slower number is a
