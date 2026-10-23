@@ -4,6 +4,7 @@ description = "Crash-safe embedded (redb) lease queue and result mailbox for pro
 documentation = "https://docs.rs/prometheus-parking-lot-embedded"
 keywords = ["scheduler", "queue", "embedded", "tauri", "ai"]
 categories = ["asynchronous", "filesystem"]
+readme = "README.md"
 include = ["/src/**", "/Cargo.toml", "/README.md", "/LICENSE*"]
 version.workspace = true
 edition.workspace = true
@@ -35,7 +36,9 @@ tokio = { workspace = true, features = ["rt"] }
 
 [dev-dependencies]
 prometheus-parking-lot-core = { workspace = true, features = ["conformance"] }
-prometheus-parking-lot-embedded = { workspace = true, features = ["fault-injection"] }
+# Path-only: cargo strips a dev-dependency that has no version when it packages,
+# so the unpublished crate does not have to resolve itself on crates.io.
+prometheus-parking-lot-embedded = { path = ".", features = ["fault-injection"] }
 tempfile.workspace = true
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time"] }
 

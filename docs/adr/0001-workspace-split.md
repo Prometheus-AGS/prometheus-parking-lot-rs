@@ -86,7 +86,7 @@ Directories are short (`crates/parking-lot-*`); every package is named
 
 ### Toolchain, version and lints
 
-- `[workspace.package]`: `version = "0.2.0"` (0.3.0 is set at release, cr-52),
+- `[workspace.package]`: `version = "0.3.0"` (the first publication; the release date and tag are cr-52),
   `edition = "2024"`, `rust-version = "1.95"` (MSRV; the toolchain stays pinned to
   1.99.1 by `rust-toolchain.toml`), plus shared authors/repository/homepage/license.
 - `[workspace.lints]` carries the cr-41 set unchanged and every crate opts in with

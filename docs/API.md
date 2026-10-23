@@ -10,6 +10,11 @@ Paths below are facade paths unless a crate is named.
 
 ## Pools
 
+On `wasm32-unknown-unknown`, depend on the facade with `default-features = false`:
+the default `tokio-runtime` feature needs tokio's multi-thread runtime, which does
+not build for that target. The wasm `WorkerPool` is re-exported by target, not by
+feature.
+
 | Item | Path | Feature |
 | --- | --- | --- |
 | `ResourcePool<P, T, Q, M, E, S>`: async parking-lot scheduler over a `TaskQueue`, a `Mailbox`, a `TaskExecutor` and a `Spawn` | `core::ResourcePool` | `tokio-runtime` (default) |

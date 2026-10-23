@@ -532,6 +532,14 @@ entry names the OpenSpec change that made it.
 
 - The WASM pool ignored `max_units` (audit C1); it now enforces capacity,
   priority then FIFO order and the queue depth (cr-38).
+- Release packaging: `cargo package --workspace` failed for
+  `prometheus-parking-lot-embedded` and the facade (a self dev-dependency
+  that carried a version); the six library crates now ship a README and the
+  MIT license file; workspace version is 0.3.0.
+- Building the facade for `wasm32-unknown-unknown` needs
+  `default-features = false`: the default `tokio-runtime` feature does not
+  build for that target. README, `docs/API.md` and the crate docs say so, and
+  CI checks it.
 
 ### Known limitations
 
