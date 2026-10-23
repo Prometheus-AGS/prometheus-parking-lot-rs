@@ -367,7 +367,7 @@ fn workload(long_ms: u64) -> Vec<(u64, Job)> {
         .collect()
 }
 
-fn policies() -> [(ShutdownPolicy, u64); 3] {
+const fn policies() -> [(ShutdownPolicy, u64); 3] {
     [
         // Long tasks outlive the deadline and complete afterwards.
         (ShutdownPolicy::Drain { deadline: DRAIN }, 1_500),

@@ -200,7 +200,10 @@ impl HookBus {
         // release in `OnceLock::set` (`start_delivery`), so the channel the
         // registering thread created is fully visible here.
         if let Some(delivery) = self.shared.delivery.get() {
+            #[cfg(not(target_arch = "wasm32"))]
             self.send(delivery, make());
+            #[cfg(target_arch = "wasm32")]
+            self.send(delivery, &make());
         }
     }
 
@@ -252,20 +255,22 @@ impl HookBus {
         self.shared.observers.panicked.load(Ordering::Relaxed)
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn send(&self, delivery: &Delivery, event: LifecycleEvent) {
-        match delivery {
-            #[cfg(not(target_arch = "wasm32"))]
-            Delivery::Thread(sender) => {
-                if sender.try_send(Message::Event(event)).is_err() {
-                    self.note_dropped();
-                }
-            }
-            #[cfg(target_arch = "wasm32")]
-            Delivery::Inline => self.shared.observers.deliver(&event),
+        let Delivery::Thread(sender) = delivery;
+        if sender.try_send(Message::Event(event)).is_err() {
+            self.note_dropped();
         }
     }
 
+    #[cfg(target_arch = "wasm32")]
+    fn send(&self, delivery: &Delivery, event: &LifecycleEvent) {
+        let Delivery::Inline = delivery;
+        self.shared.observers.deliver(event);
+    }
+
     /// Count a dropped event; warn on the first and every power of two after.
+    #[cfg(not(target_arch = "wasm32"))]
     fn note_dropped(&self) {
         // Relaxed: a statistic.
         let before = self.shared.dropped.fetch_add(1, Ordering::Relaxed);
@@ -325,7 +330,10 @@ fn spawn_delivery(capacity: usize, observers: &Arc<Observers>) -> std::io::Resul
     clippy::unnecessary_wraps,
     reason = "same signature as the threaded variant"
 )]
-fn spawn_delivery(_capacity: usize, _observers: &Arc<Observers>) -> std::io::Result<Delivery> {
+const fn spawn_delivery(
+    _capacity: usize,
+    _observers: &Arc<Observers>,
+) -> std::io::Result<Delivery> {
     Ok(Delivery::Inline)
 }
 
@@ -422,7 +430,7 @@ mod tests {
         for id in 0..10 {
             bus.emit(&submitted(id));
         }
-        assert!(bus.dropped_events() >= 7, "{:?}", bus);
+        assert!(bus.dropped_events() >= 7, "{bus:?}");
         drop(held);
         assert!(bus.flush(Duration::from_secs(5)));
     }
