@@ -181,6 +181,17 @@ entry names the OpenSpec change that made it.
   map, and `take_all` returns items in dispatch order. Benchmark:
   `cargo bench --bench skip_ahead_bench` (utilization 0.947 with the default
   against 0.917 under strict order on a 95%-loaded mixed workload).
+- **Stream replay (cr-33, scenario S-33).** `IggyStreamSink` publishes a task's
+  streamed output (for example LLM tokens) to the `stream.chunks` topic as
+  numbered chunks plus an end marker carrying the final `StreamOutcome`, keyed
+  by the idempotency key; `IggyStreamReader::resume(key, ResumePoint)` gives a
+  reconnecting client exactly the chunks after the last sequence number it saw,
+  in order, then live ones until the end marker. Chunk ids are UUIDv5 values of
+  key and sequence number; the cursor skips repeats and reports a missing chunk
+  as `StreamError::Gap`. Unlike lifecycle events, chunks are never dropped on a
+  full queue: `StreamWriter::send` waits for room (backpressure to the
+  executor, off the dispatch path), and a chunk abandoned after its retries
+  poisons the writer. New option `IggyOptions::stream_topic`.
 - **Apache Iggy events and notifications (cr-32).** New crate
   `prometheus-parking-lot-iggy`, behind the facade's `iggy` feature
   (`infra::events`): `IggyHook` publishes every lifecycle event to a `lifecycle`
