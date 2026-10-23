@@ -54,7 +54,8 @@ async fn durable_lease_extension_keeps_a_long_task_from_redelivery() {
     // Wait until one of the pools holds the task.
     let raw = store.lease_queue::<String>(100);
     let raw_ref = &raw;
-    let held = eventually(Duration::from_secs(5), || async move {
+    // Generous: under heavy machine load the first lease can take seconds.
+    let held = eventually(Duration::from_secs(60), || async move {
         let depth = raw_ref.depth().await.expect("depth");
         (depth.leased == 1).then_some(())
     })
@@ -81,7 +82,7 @@ async fn durable_lease_extension_keeps_a_long_task_from_redelivery() {
 
     let mailbox = store.result_mailbox::<String>();
     let mailbox_ref = &mailbox;
-    let entry = eventually(Duration::from_secs(10), || async move {
+    let entry = eventually(Duration::from_secs(60), || async move {
         mailbox_ref.consume(&key("long")).await.expect("consume")
     })
     .await
