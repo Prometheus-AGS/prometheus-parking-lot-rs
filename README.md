@@ -72,6 +72,19 @@ re-exports the rest.
 | `embedded` | `infra::EmbeddedStore`, `infra::queue::RedbLeaseQueue`, `infra::mailbox::RedbResultMailbox` | no |
 | `iggy` | `infra::events::{IggyHook, IggyNotifier, IggyOptions, IggyStreamSink, IggyStreamReader}`, `config::IggyBackendConfig` (`"type": "iggy"`) | no |
 
+**Building for `wasm32-unknown-unknown`.** The default `tokio-runtime` feature
+pulls in tokio's multi-thread runtime and OS signal handling, which do not build
+for that target (`mio` is unsupported). Turn the defaults off; the facade then
+exposes the runtime-free API and the wasm `WorkerPool`:
+
+```toml
+[dependencies]
+prometheus_parking_lot = { version = "0.3", default-features = false }
+```
+
+CI runs `cargo check --target wasm32-unknown-unknown -p prometheus_parking_lot
+--no-default-features`. The default features are not supported on that target.
+
 The core crate has one feature, `conformance`, which publishes the test suite
 every queue and mailbox backend must pass.
 

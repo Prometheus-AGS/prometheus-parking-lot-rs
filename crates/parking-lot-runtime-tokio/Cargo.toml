@@ -4,6 +4,7 @@ description = "Tokio runtime layer of prometheus_parking_lot: ResourcePool, nati
 documentation = "https://docs.rs/prometheus-parking-lot-runtime-tokio"
 keywords = ["scheduler", "queue", "tokio", "gpu", "ai"]
 categories = ["asynchronous", "concurrency"]
+readme = "README.md"
 include = ["/src/**", "/Cargo.toml", "/README.md", "/LICENSE*"]
 version.workspace = true
 edition.workspace = true

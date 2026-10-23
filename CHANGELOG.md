@@ -614,6 +614,14 @@ entry names the OpenSpec change that made it.
 - `QueueListener::wait` no longer claims to be cancel safe: sqlx does not
   promise that a cancelled receive keeps a notification. Callers already poll
   on `Wake::TimedOut`.
+- Release packaging: `cargo package --workspace` failed for
+  `prometheus-parking-lot-embedded` and the facade (a self dev-dependency
+  that carried a version); the six library crates now ship a README and the
+  MIT license file; workspace version is 0.3.0.
+- Building the facade for `wasm32-unknown-unknown` needs
+  `default-features = false`: the default `tokio-runtime` feature does not
+  build for that target. README, `docs/API.md` and the crate docs say so, and
+  CI checks it.
 
 ### Known limitations
 

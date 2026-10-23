@@ -4,6 +4,7 @@ description = "Runtime-free core of prometheus_parking_lot: scheduling contracts
 documentation = "https://docs.rs/prometheus-parking-lot-core"
 keywords = ["scheduler", "queue", "gpu", "ai", "no-runtime"]
 categories = ["asynchronous", "concurrency"]
+readme = "README.md"
 include = ["/src/**", "/Cargo.toml", "/README.md", "/LICENSE*"]
 version.workspace = true
 edition.workspace = true

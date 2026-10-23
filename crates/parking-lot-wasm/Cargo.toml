@@ -4,6 +4,7 @@ description = "WASM WorkerPool for prometheus_parking_lot (async tasks instead o
 documentation = "https://docs.rs/prometheus-parking-lot-wasm"
 keywords = ["scheduler", "wasm", "worker", "ai"]
 categories = ["asynchronous", "wasm"]
+readme = "README.md"
 include = ["/src/**", "/Cargo.toml", "/README.md", "/LICENSE*"]
 version.workspace = true
 edition.workspace = true
