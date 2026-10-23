@@ -257,7 +257,18 @@ entry names the OpenSpec change that made it.
   in a small side table (`006_pgmq_lease_queue.sql`). Enqueue sends a `NOTIFY`
   (`PgmqLeaseQueue::listener()`); expiry and delays are polled. Differences from
   `PgLeaseQueue` (priority is read lane by lane, one-second lease granularity, no
-  reaper) are listed in the module docs. No config backend type yet.
+  reaper) are listed in the module docs.
+- **pgmq config backend (cr-30, cr-37).** A `"type": "pgmq"` backend section
+  (`config::PgmqBackendConfig`: `url`, `queue_name`, `max_depth`, `lease_secs`,
+  optional `max_attempts`, `listen`, `prepare`) opens a `PgmqLeaseQueue`
+  (prepared when `prepare` is set) and an optional `QueueListener`, returned in
+  `BuiltScheduler::pgmq` as `builders::PgmqBackend`. It is a queue for the
+  application to use directly: validation rejects a pool whose `queue` or
+  `mailbox` names a pgmq backend, because pool-level crash durability on pgmq is
+  not claimed (use a `postgres` backend for a durable pool). The queue name is
+  validated with the rule `PgmqLeaseQueue::new` enforces. Example:
+  `examples/configs/pgmq.json`. `infra::queue::PgmqLeaseQueue` re-exports the
+  queue.
 - **Removed:** the synchronous sea-orm `PostgresQueue` and `PostgresMailbox`, the
   sea-orm entities (`infra::entities`), and migrations 001 and 002 (existing
   `pl_queue_jobs` / `pl_mailbox_messages` tables are not dropped). sea-orm and

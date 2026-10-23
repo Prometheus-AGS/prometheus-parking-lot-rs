@@ -234,7 +234,10 @@ A pool whose `queue` and `mailbox` are `"in_memory"` parks tasks and delivers
 results in memory; a pool whose `queue` and `mailbox` both name a backend runs
 as a `DurableResourcePool` on that backend's `LeaseQueue` and `ResultMailbox`
 (durable dispatch, cr-49): persist before accept, lease with a heartbeat,
-deliver, then ack. Each backend drives at most one pool.
+deliver, then ack. Each backend drives at most one pool. A `"type": "pgmq"`
+backend opens a `PgmqLeaseQueue` for the application to use directly; no pool
+runs on it, because pool-level crash durability on pgmq is not claimed
+(scenario S-18).
 
 ```json
 {

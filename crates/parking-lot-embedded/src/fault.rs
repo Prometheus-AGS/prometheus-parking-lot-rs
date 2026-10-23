@@ -42,4 +42,4 @@ pub fn point(operation: &str, phase: Phase) {
 
 #[cfg(not(feature = "fault-injection"))]
 #[inline(always)]
-pub fn point(_operation: &str, _phase: Phase) {}
+pub const fn point(_operation: &str, _phase: Phase) {}

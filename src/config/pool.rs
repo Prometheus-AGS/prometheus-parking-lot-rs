@@ -38,7 +38,8 @@ use super::error::ConfigError;
 /// queue before `submit` returns and delivers every outcome to the backend's
 /// result mailbox before it acks the task, so accepted work survives a crash
 /// of the process (durable dispatch, change `cr-49`). Each backend drives at
-/// most one pool. Mixing a durable queue with an in-memory mailbox (or the
+/// most one pool, and only a `postgres` or `redb` backend can drive one (a
+/// `pgmq` backend is a queue for the application to use directly). Mixing a durable queue with an in-memory mailbox (or the
 /// reverse) is rejected: either half in memory would lose work or results at
 /// a crash.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -169,15 +170,21 @@ impl SchedulerConfig {
     /// Check a pool's `queue` and `mailbox`: both in memory, or both naming
     /// the same existing backend.
     fn validate_storage(&self, prefix: &str, pool: &PoolConfig) -> Result<(), ConfigError> {
-        let exists = |field: &str, name: &str| {
-            if self.backends.contains_key(name) {
-                Ok(())
-            } else {
-                Err(ConfigError::invalid(
-                    format!("{prefix}{field}"),
-                    format!("no backend named `{name}` under `backends`"),
-                ))
-            }
+        let exists = |field: &str, name: &str| match self.backends.get(name) {
+            None => Err(ConfigError::invalid(
+                format!("{prefix}{field}"),
+                format!("no backend named `{name}` under `backends`"),
+            )),
+            Some(backend) if !backend.can_drive_pool() => Err(ConfigError::invalid(
+                format!("{prefix}{field}"),
+                format!(
+                    "backend `{name}` is a `{}` queue, which no pool can run on: pool-level \
+                     crash durability on it is not claimed; use a `postgres` or `redb` \
+                     backend for a durable pool, or use the opened queue directly",
+                    backend.kind()
+                ),
+            )),
+            Some(_) => Ok(()),
         };
         match (&pool.queue, &pool.mailbox) {
             (StorageConfig::InMemory, StorageConfig::InMemory) => Ok(()),
