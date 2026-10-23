@@ -196,6 +196,14 @@ entry names the OpenSpec change that made it.
   still park and deliver through the synchronous `TaskQueue` and `Mailbox`
   until durable dispatch (cr-49). `examples/embedded_pool.rs` shows direct use.
 
+- **Composable mailbox with a notifier (cr-34).** `StorageMailbox<S, N>` is now a
+  `ResultMailbox`: it stores in `S` first and notifies only after a `Stored`
+  outcome (a first-write-wins `Duplicate` does not notify). The notification runs
+  off the delivery path through `mailbox::BackgroundNotifier`, which spawns it on a
+  `Spawn`er and retries a failing notifier with capped exponential backoff
+  (`mailbox::RetryPolicy`, a `mailbox::Sleeper` for the wait). A notifier failure is
+  logged and counted (`NotifyStats`), never fails or undoes a stored result. Core
+  stays runtime-free.
 - **WASM pool on the shared dispatcher (cr-38).** The WASM `WorkerPool` now
   admits through the core dispatcher and runs on
   `wasm_bindgen_futures::spawn_local` with JS timers; it no longer depends on
