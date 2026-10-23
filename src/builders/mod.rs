@@ -1,9 +1,8 @@
 //! Builders to construct scheduler components from configuration.
 //!
-//! [`build_pools_from_scheduler_config`] builds every pool and opens every
-//! durable backend a [`SchedulerConfig`](crate::config::SchedulerConfig)
-//! describes; [`build_pools`] builds pools from queue, mailbox and executor
-//! factories you supply.
+//! `build_pools_from_scheduler_config` builds every pool and opens every
+//! durable backend a `config::SchedulerConfig` describes; `build_pools` builds
+//! pools from queue, mailbox and executor factories you supply.
 
 pub mod backends;
 pub mod pool_builder;

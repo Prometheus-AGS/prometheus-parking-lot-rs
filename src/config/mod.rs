@@ -1,11 +1,11 @@
 //! Configuration models for pools, backends, and timeouts.
 //!
-//! [`SchedulerConfig`] is the root: named `pools` (limits plus where parked
+//! `SchedulerConfig` is the root: named `pools` (limits plus where parked
 //! tasks and results live) and optional named durable `backends` (Postgres,
 //! redb) with every parameter needed to open them.
-//! [`builders::build_pools_from_scheduler_config`](crate::builders::build_pools_from_scheduler_config)
-//! turns a validated configuration into pools and opened backends. Example
-//! files: `examples/configs/`.
+//! `builders::build_pools_from_scheduler_config` turns a validated
+//! configuration into pools and opened backends. Example files:
+//! `examples/configs/`.
 
 pub mod backend;
 pub mod error;
