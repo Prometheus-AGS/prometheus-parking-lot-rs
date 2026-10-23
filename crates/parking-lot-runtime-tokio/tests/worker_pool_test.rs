@@ -328,7 +328,7 @@ async fn test_blocking_api() {
             .with_max_units(100)
             .with_max_queue_depth(10);
 
-        let pool = WorkerPool::new(config, AddExecutor).expect("Failed to create pool");
+        let pool = Arc::new(WorkerPool::new(config, AddExecutor).expect("Failed to create pool"));
 
         println!("Pool created, testing blocking API");
 
@@ -338,9 +338,16 @@ async fn test_blocking_api() {
 
         println!("Task submitted via blocking API");
 
-        let result = pool
-            .retrieve(&key, Duration::from_secs(5))
-            .expect("Failed to retrieve");
+        // The blocking `retrieve` must not run on a thread that drives async
+        // tasks (it panics there); from async code it belongs on a
+        // `spawn_blocking` thread.
+        let blocking_pool = Arc::clone(&pool);
+        let result = tokio::task::spawn_blocking(move || {
+            blocking_pool.retrieve(&key, Duration::from_secs(5))
+        })
+        .await
+        .expect("blocking retrieve task")
+        .expect("Failed to retrieve");
 
         println!("Result: {result}");
         assert_eq!(result, 30);
@@ -614,9 +621,9 @@ async fn test_timeout_handling() {
 }
 
 /// Regression: `retrieve_async` must report `Timeout` every time the caller's
-/// deadline elapses before a result is stored, whichever internal wait (the
-/// tokio timeout or the blocking Condvar wait) fires first. Before the fix the
-/// blocking wait could win the race and the call returned `ResultNotFound`.
+/// deadline elapses before a result is stored. Before the fix an internal
+/// blocking wait could win the race with the tokio timeout and the call
+/// returned `ResultNotFound`.
 #[tokio::test]
 async fn test_retrieve_async_timeout_is_always_timeout() {
     const ITERATIONS: u64 = 200;

@@ -16,8 +16,10 @@
 //!   deadline or the pool's default timeout, whichever is nearer); a task
 //!   still running at its budget is cancelled, its units are released and its
 //!   result is [`TaskError::Timeout`].
-//! - **No polling**: workers block on a channel of admitted tasks; results use
-//!   a Condvar.
+//! - **No polling, no parked waiters**: workers block on a channel of
+//!   admitted tasks; results go to per-task slots (`super::slots`, cr-22)
+//!   that async callers await without holding a thread. Unretrieved results
+//!   are evicted after the result TTL (default: the pool's task timeout).
 //! - **Clean shutdown**: dropping the sender unblocks workers naturally;
 //!   parked tasks are failed with [`TaskError::Cancelled`] rather than dropped
 //!   silently.
@@ -30,14 +32,13 @@
 //!   and the worker thread is replaced by a fresh one, so the pool keeps its
 //!   worker count.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::thread::{self, JoinHandle};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use crossbeam_channel::{Receiver, Sender, unbounded};
-use parking_lot::{Condvar, Mutex, RwLock};
+use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, unbounded};
+use parking_lot::{Mutex, RwLock};
 use tracing::{debug, error, info, warn};
 
 use prometheus_parking_lot_core::config::WorkerPoolConfig;
@@ -51,6 +52,7 @@ use prometheus_parking_lot_core::{
     WorkerExecutor,
 };
 
+use super::slots::{Missing, ResultSlots, SlotId};
 use crate::contain::{Panicked, catch, contain};
 
 /// Pool name used in errors (pools are not named yet).
@@ -79,208 +81,34 @@ const fn wait_timed_out() -> SchedulerError {
     SchedulerError::Timeout { task_id: None }
 }
 
-/// Result entry state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ResultState {
-    /// Waiting for result.
-    Pending,
-    /// Result is ready.
-    Ready,
-    /// The slot was removed/cancelled before a result arrived; any waiter must
-    /// wake and stop waiting. This prevents a waiter from parking forever if the
-    /// producing worker never stores a result (e.g. it was cancelled or the
-    /// caller timed out and removed the slot first).
-    Cancelled,
-}
-
-/// Result storage entry with Condvar-based notification.
-struct ResultEntry<R> {
-    /// The result value (once available).
-    result: Option<R>,
-    /// State of this entry.
-    state: ResultState,
-}
-
-/// Result storage for the worker pool using Condvar for efficient waiting.
-///
-/// Design:
-/// - `RwLock` for the entry map (read-heavy, write on create/remove)
-/// - Per-entry Mutex + Condvar for waiting (lock only when blocking wait needed)
-/// - Lock-free check via state atomic would be ideal but Condvar needs Mutex
-struct ResultStorage<R> {
-    /// Map from mailbox key to (entry, condvar) pair.
-    /// The Condvar is used for blocking wait, paired with entry's mutex.
-    #[expect(
-        clippy::type_complexity,
-        reason = "private storage map; the worker-pool rework (cr-19/cr-29) replaces it"
-    )]
-    entries: RwLock<HashMap<String, Arc<(Mutex<ResultEntry<R>>, Condvar)>>>,
-}
-
-impl<R> ResultStorage<R> {
-    fn new() -> Self {
-        Self {
-            entries: RwLock::new(HashMap::new()),
-        }
-    }
-
-    /// Create a slot for a result.
-    fn create_slot(&self, key: &MailboxKey) {
-        let key_str = mailbox_key_to_string(key);
-
-        let entry = ResultEntry {
-            result: None,
-            state: ResultState::Pending,
-        };
-
-        let mut entries = self.entries.write();
-        entries.insert(key_str, Arc::new((Mutex::new(entry), Condvar::new())));
-    }
-
-    /// Store a result and notify any waiters.
-    /// This is lock-free for the map lookup, only locks the entry briefly.
-    #[expect(
-        clippy::significant_drop_tightening,
-        reason = "narrowing lock scopes changes concurrent behaviour; the worker-pool rework (cr-19/cr-29) owns it"
-    )]
-    fn store(&self, key: &MailboxKey, result: R) {
-        let key_str = mailbox_key_to_string(key);
-
-        // Read lock on map (fast, concurrent reads allowed)
-        let entries = self.entries.read();
-        if let Some(entry_pair) = entries.get(&key_str) {
-            let (entry_mutex, condvar) = entry_pair.as_ref();
-            // Brief lock on entry
-            let mut entry = entry_mutex.lock();
-            entry.result = Some(result);
-            entry.state = ResultState::Ready;
-            // Notify ALL waiters (there should only be one, but be safe)
-            condvar.notify_all();
-        }
-    }
-
-    /// Try to retrieve a result immediately (non-blocking).
-    #[expect(
-        clippy::significant_drop_tightening,
-        reason = "narrowing lock scopes changes concurrent behaviour; the worker-pool rework (cr-19/cr-29) owns it"
-    )]
-    fn try_retrieve(&self, key: &MailboxKey) -> Option<R> {
-        let key_str = mailbox_key_to_string(key);
-
-        let entries = self.entries.read();
-        if let Some(entry_pair) = entries.get(&key_str) {
-            let (entry_mutex, _) = entry_pair.as_ref();
-            let mut entry = entry_mutex.lock();
-            if entry.state == ResultState::Ready {
-                return entry.result.take();
-            }
-        }
-        None
-    }
-
-    /// Wait for a result with timeout (blocking).
-    /// Uses Condvar for efficient waiting - NO POLLING.
-    fn wait_for_result(&self, key: &MailboxKey, timeout: Duration) -> Result<R, SchedulerError> {
-        // Fix the deadline before touching any lock so lock contention counts
-        // against the caller's budget rather than extending it.
-        let deadline = Instant::now() + timeout;
-
-        // Get the entry pair (need to hold Arc while waiting)
-        let entry_pair = {
-            let entries = self.entries.read();
-            entries.get(&mailbox_key_to_string(key)).cloned()
-        };
-
-        let Some(entry_pair) = entry_pair else {
-            return Err(result_not_found(key));
-        };
-
-        wait_on_entry(&entry_pair, deadline)
-    }
-
-    /// Remove a result entry entirely.
-    ///
-    /// Any task still parked on this entry's `Condvar` is woken before we drop
-    /// our reference: we mark the entry `Cancelled` (unless a result already
-    /// arrived) and `notify_all`. Because a waiter holds its own `Arc` to the
-    /// entry, removing it from the map is not enough to wake it — without this
-    /// notify a waiter whose result never gets stored would block forever and
-    /// wedge the runtime on shutdown. See `retrieve_async`.
-    fn remove(&self, key: &MailboxKey) -> Option<R> {
-        let key_str = mailbox_key_to_string(key);
-
-        // Drop the map entry under the write lock, then deal with the entry
-        // itself outside the map lock.
-        let entry_pair = {
-            let mut entries = self.entries.write();
-            entries.remove(&key_str)
-        };
-
-        entry_pair.and_then(|entry_pair| {
-            let (entry_mutex, condvar) = entry_pair.as_ref();
-            // Mutate state under the lock, then release it before notifying:
-            // the state change is published under the lock (no lost wakeup),
-            // and notifying after unlock avoids the woken waiter immediately
-            // re-blocking on a still-held mutex.
-            let taken = {
-                let mut entry = entry_mutex.lock();
-                let taken = entry.result.take();
-                if entry.state != ResultState::Ready {
-                    entry.state = ResultState::Cancelled;
-                }
-                taken
-            };
-            // Wake any waiter so it can observe the terminal state and exit.
-            condvar.notify_all();
-            taken
-        })
-    }
-
-    /// Get entry for async waiting (returns clone of Arc).
-    fn get_entry(&self, key: &MailboxKey) -> Option<Arc<(Mutex<ResultEntry<R>>, Condvar)>> {
-        let key_str = mailbox_key_to_string(key);
-        let entries = self.entries.read();
-        entries.get(&key_str).cloned()
+/// The error for a result evicted unread after its TTL.
+fn result_expired(key: &MailboxKey) -> SchedulerError {
+    SchedulerError::ResultExpired {
+        key: Some(mailbox_key_to_string(key)),
     }
 }
 
-/// Block on one result slot until a result is stored or `deadline` passes.
-///
-/// This is the single place that maps a slot's terminal state to the
-/// caller-visible outcome, shared by `retrieve` and `retrieve_async`:
-///
-/// - `Ready` with a value → `Ok(result)`.
-/// - `Ready` but the value was already taken (a concurrent retriever consumed
-///   it) → `SchedulerError::ResultNotFound`.
-/// - still `Pending` at the deadline, or `Cancelled` (the slot was reclaimed
-///   before a result arrived) → `SchedulerError::Timeout`.
-///
-/// The slot value is the task's outcome (`Result<_, TaskError>`); callers map
-/// an executor error to `SchedulerError::Task`.
-///
-/// The wait loops on the slot state against an absolute deadline, so a spurious
-/// Condvar wakeup neither returns early nor restarts the full timeout. A result
-/// stored at the same instant the deadline fires is still delivered, because
-/// the state is re-read under the reacquired lock after the wait.
-fn wait_on_entry<R>(
-    entry_pair: &(Mutex<ResultEntry<R>>, Condvar),
-    deadline: Instant,
-) -> Result<R, SchedulerError> {
-    let (entry_mutex, condvar) = entry_pair;
-    let mut entry = entry_mutex.lock();
-    while entry.state == ResultState::Pending {
-        if condvar.wait_until(&mut entry, deadline).timed_out() {
-            break;
-        }
-    }
-    match entry.state {
-        ResultState::Ready => entry
-            .result
-            .take()
-            .ok_or(SchedulerError::ResultNotFound { key: None }),
-        ResultState::Pending | ResultState::Cancelled => Err(wait_timed_out()),
+/// Map a wait that produced no value to the caller's error.
+fn missing_error(key: &MailboxKey, missing: Missing) -> SchedulerError {
+    match missing {
+        Missing::NotFound => result_not_found(key),
+        Missing::Expired => result_expired(key),
+        Missing::TimedOut => wait_timed_out(),
     }
 }
+
+/// The slot id of a key issued by this pool (`generate_mailbox_key`), or
+/// `None` for any other key.
+fn slot_id(key: &MailboxKey) -> Option<SlotId> {
+    if key.tenant != POOL_NAME || key.user_id.is_some() {
+        return None;
+    }
+    key.session_id.as_deref()?.parse().ok()
+}
+
+/// Shortest interval at which an idle worker sweeps expired results, so a
+/// tiny TTL cannot turn the idle wait into a spin.
+const MIN_SWEEP_INTERVAL: Duration = Duration::from_millis(50);
 
 /// An admitted task on its way to a worker.
 type Admitted<P> = Grant<WorkerTask<P>>;
@@ -291,8 +119,8 @@ struct Shared<P, R, E> {
     config: WorkerPoolConfig,
     /// Admission, the parked queue and the semaphore.
     dispatcher: Dispatcher<WorkerTask<P>>,
-    /// Result storage with Condvar-based notification.
-    results: ResultStorage<TaskOutcome<R>>,
+    /// Per-task result slots with TTL eviction.
+    results: ResultSlots<TaskOutcome<R>>,
     /// Submitted/completed/failed counters (running and parked come from the
     /// dispatcher).
     counters: PoolCounters,
@@ -324,6 +152,17 @@ where
         self.clock.read().now_ms()
     }
 
+    /// The pool clock's monotonic reading, which result TTLs are measured on.
+    fn monotonic(&self) -> Duration {
+        self.clock.read().monotonic()
+    }
+
+    /// How long an idle worker waits for work before sweeping expired
+    /// results: the result TTL, but at least [`MIN_SWEEP_INTERVAL`].
+    fn sweep_interval(&self) -> Duration {
+        self.results.ttl().max(MIN_SWEEP_INTERVAL)
+    }
+
     /// Resolve the execution budget for one task: the task's deadline when it
     /// is nearer than the pool's default timeout, otherwise the default. No
     /// path is unbounded; an already-passed deadline gives a zero budget.
@@ -353,7 +192,11 @@ where
             &self.counters.failed_tasks
         };
         counter.fetch_add(1, Ordering::Relaxed);
-        self.results.store(key, outcome);
+        let stored =
+            slot_id(key).is_some_and(|id| self.results.fill(id, outcome, self.monotonic()));
+        if !stored {
+            error!(key = %mailbox_key_to_string(key), "no result slot for a finished task");
+        }
     }
 
     /// Hand every admitted task to the workers and fail every task found
@@ -553,7 +396,12 @@ fn shutdown_cancelled() -> TaskError {
 ///   priority first, FIFO within a priority.
 /// - **Budgets**: each execution is bounded by the task's deadline or
 ///   `default_timeout_ms`, whichever is nearer.
-/// - **No polling**: Workers block on channel recv; results use Condvar
+/// - **No polling**: workers block on channel recv; a result waiter is a
+///   suspended future (async) or the caller's own parked thread (blocking),
+///   never a blocking-pool thread.
+/// - **Result TTL**: a result not retrieved within the result TTL (default:
+///   the pool's `default_timeout_ms`) is evicted; see
+///   [`with_result_ttl`](Self::with_result_ttl).
 /// - **Clean shutdown**: Dropping sender naturally unblocks all workers
 pub struct WorkerPool<P, R, E>
 where
@@ -598,7 +446,7 @@ where
                 config.max_queue_depth,
             ),
             config: config.clone(),
-            results: ResultStorage::new(),
+            results: ResultSlots::new(config.default_timeout()),
             counters: PoolCounters::default(),
             ready_tx: Mutex::new(Some(ready_tx)),
             clock: RwLock::new(Arc::new(SystemClock::new())),
@@ -644,6 +492,21 @@ where
     #[must_use]
     pub fn with_clock(self, clock: impl Clock + 'static) -> Self {
         *self.shared.clock.write() = Arc::new(clock);
+        self
+    }
+
+    /// Keep each result that nobody retrieves for `ttl` after its task
+    /// finishes, then evict it (default: the pool's `default_timeout_ms`).
+    ///
+    /// The TTL is measured on the pool clock's monotonic reading (see
+    /// [`with_clock`](Self::with_clock)) and applies to results stored from
+    /// now on. A `retrieve` of an evicted result fails once with
+    /// [`SchedulerError::ResultExpired`], then with `ResultNotFound`.
+    /// Eviction happens on the next pool operation after the TTL, or within
+    /// one sweep interval (the TTL, at least 50 ms) on an idle pool.
+    #[must_use]
+    pub fn with_result_ttl(self, ttl: Duration) -> Self {
+        self.shared.results.set_ttl(ttl);
         self
     }
 
@@ -703,7 +566,7 @@ where
         // Relaxed: the counter only needs unique values.
         let task_id = self.task_id_counter.fetch_add(1, Ordering::Relaxed);
         let mailbox_key = generate_mailbox_key(task_id);
-        shared.results.create_slot(&mailbox_key);
+        shared.results.create(task_id, shared.monotonic());
 
         let task = WorkerTask {
             payload,
@@ -713,7 +576,7 @@ where
         let admission = match shared.dispatcher.submit(task, now_ms) {
             Ok(admission) => admission,
             Err(error) => {
-                shared.results.remove(&mailbox_key);
+                shared.results.discard(task_id);
                 warn!(%error, "worker pool rejected task");
                 return Err(error);
             }
@@ -738,10 +601,14 @@ where
         Ok(mailbox_key)
     }
 
-    /// Retrieve a result asynchronously with timeout.
+    /// Retrieve a result asynchronously, waiting up to `timeout`.
     ///
-    /// This method waits for the result to become available or times out.
-    /// Uses tokio's async timing - no polling.
+    /// The wait is a suspended future under a tokio timer: it occupies no
+    /// thread, so any number of concurrent callers fit on a runtime whose
+    /// blocking pool is exhausted. A result is taken by the first caller; if
+    /// the wait times out the result stays in its slot, and a later call can
+    /// still take it until the result TTL evicts it. Cancel-safe: dropping
+    /// the future leaves the result in place.
     ///
     /// # Errors
     ///
@@ -750,66 +617,58 @@ where
     ///   queued or was cancelled at shutdown
     /// - [`SchedulerError::Timeout`] if the result is not available within the
     ///   timeout
-    /// - [`SchedulerError::ResultNotFound`] if the mailbox key is invalid
+    /// - [`SchedulerError::ResultExpired`] if the result was evicted unread
+    ///   after the result TTL (reported once)
+    /// - [`SchedulerError::ResultNotFound`] if the key was not issued by this
+    ///   pool, its result was already taken, or its expiry was already
+    ///   reported
     pub async fn retrieve_async(
         &self,
         key: &MailboxKey,
         timeout: Duration,
     ) -> Result<R, SchedulerError> {
-        let results = &self.shared.results;
-        // First, try immediate retrieval (fast path)
-        if let Some(outcome) = results.try_retrieve(key) {
-            results.remove(key);
-            return outcome.map_err(SchedulerError::Task);
-        }
-
-        // Get entry for waiting
-        let entry_pair = results
-            .get_entry(key)
-            .ok_or_else(|| result_not_found(key))?;
-
-        // One absolute deadline shared by both waits below. The blocking wait
-        // is bounded by it (so the `spawn_blocking` thread cannot park forever
-        // and wedge runtime shutdown if `store` never fires), and the outer
-        // tokio timeout covers the case where the blocking pool is saturated
-        // and the closure has not started yet. Whichever of the two fires
-        // first, an elapsed deadline is reported as `SchedulerError::Timeout`:
-        // `wait_on_entry` maps a still-pending slot to `Timeout`, never to
-        // `ResultNotFound`.
-        let deadline = Instant::now() + timeout;
-        let waited = tokio::time::timeout(
-            timeout,
-            tokio::task::spawn_blocking(move || wait_on_entry(&entry_pair, deadline)),
-        )
-        .await;
-
-        // Clean up the entry. This also wakes a still-parked blocking waiter
-        // (outer timeout fired first) via `remove`'s notify.
-        results.remove(key);
-
-        match waited {
-            Ok(Ok(outcome)) => outcome?.map_err(SchedulerError::Task),
-            Ok(Err(join_error)) => Err(SchedulerError::internal(format!(
-                "result wait task failed: {join_error}"
-            ))),
-            Err(_elapsed) => Err(wait_timed_out()),
+        let Some(id) = slot_id(key) else {
+            return Err(result_not_found(key));
+        };
+        let shared = &self.shared;
+        match shared
+            .results
+            .wait(id, timeout, || shared.monotonic())
+            .await
+        {
+            Ok(outcome) => outcome.map_err(SchedulerError::Task),
+            Err(missing) => Err(missing_error(key, missing)),
         }
     }
 
-    /// Retrieve a result (blocking API) with timeout.
+    /// Retrieve a result, blocking the calling thread up to `timeout`.
     ///
-    /// This method blocks the current thread until the result is available
-    /// or the timeout expires. Uses Condvar for efficient waiting - NO POLLING.
+    /// For synchronous callers: a plain thread or a `spawn_blocking`
+    /// closure. From async code use [`retrieve_async`](Self::retrieve_async).
     ///
     /// # Errors
     ///
     /// As [`retrieve_async`](Self::retrieve_async).
+    ///
+    /// # Panics
+    ///
+    /// When called on a thread that is driving async tasks (inside a tokio
+    /// runtime's `block_on` or an async task), with tokio's "Cannot block the
+    /// current thread from within a runtime" message, instead of parking a
+    /// runtime thread.
+    #[track_caller]
     pub fn retrieve(&self, key: &MailboxKey, timeout: Duration) -> Result<R, SchedulerError> {
-        let results = &self.shared.results;
-        let outcome = results.wait_for_result(key, timeout);
-        // Clean up entry on any outcome
-        results.remove(key);
-        outcome?.map_err(SchedulerError::Task)
+        let Some(id) = slot_id(key) else {
+            return Err(result_not_found(key));
+        };
+        let shared = &self.shared;
+        match shared
+            .results
+            .wait_blocking(id, timeout, || shared.monotonic())
+        {
+            Ok(outcome) => outcome.map_err(SchedulerError::Task),
+            Err(missing) => Err(missing_error(key, missing)),
+        }
     }
 
     /// Get current pool statistics.
@@ -958,10 +817,19 @@ where
                 }
             };
 
-            // Worker loop - blocking recv, NO POLLING. When the sender is
-            // dropped (shutdown) and the channel is empty, recv returns Err
-            // and the worker exits.
-            while let Ok(admitted) = ready_rx.recv() {
+            // Worker loop - blocking recv, NO POLLING. An idle worker wakes
+            // once per sweep interval to evict expired results. When the
+            // sender is dropped (shutdown) and the channel is empty, recv
+            // returns Disconnected and the worker exits.
+            loop {
+                let admitted = match ready_rx.recv_timeout(shared.sweep_interval()) {
+                    Ok(admitted) => admitted,
+                    Err(RecvTimeoutError::Timeout) => {
+                        shared.results.sweep(shared.monotonic());
+                        continue;
+                    }
+                    Err(RecvTimeoutError::Disconnected) => break,
+                };
                 if shared.execute_supervised(&runtime, admitted).is_err() {
                     // This thread's runtime unwound mid-task; hand the
                     // channel to a fresh worker and exit.

@@ -74,6 +74,12 @@ entry names the OpenSpec change that made it.
 - **`WorkerPool::stats().worker_count` reports live workers (cr-21).** It now
   counts the worker threads serving the pool instead of echoing the configured
   count, and drops to 0 after `shutdown`.
+- **Blocking `WorkerPool::retrieve` refuses async threads (cr-22).** It now
+  panics when called on a thread that is driving async tasks; call it from a
+  plain thread or `spawn_blocking`, or use `retrieve_async`.
+- **A timed-out retrieve keeps the result (cr-22).** A `retrieve` or
+  `retrieve_async` that times out leaves the result in its slot, so a later
+  call can still take it until the result TTL evicts it.
 
 ### Added
 
@@ -92,6 +98,11 @@ entry names the OpenSpec change that made it.
   parked).
 - `WorkerPool::with_clock` (cr-19): drive deadline checks and execution
   budgets from a `TestClock`.
+- `WorkerPool::with_result_ttl(Duration)` (cr-22): results nobody retrieves
+  are evicted after the TTL (default: the pool's `default_timeout_ms`), and a
+  later retrieve reports `SchedulerError::ResultExpired`.
+- `SchedulerError::ResultExpired` (cr-22): a stored result was not retrieved
+  within its TTL and was evicted; not retryable.
 - **Async backend contracts (cr-25).** `LeaseQueue` (`enqueue`, `lease`, `ack`,
   `nack`, `extend`, `depth`, `max_depth`) with `LeaseToken`, `LeasedTask`,
   `NackAction`, `Enqueued`, `QueueDepth` and `QueueEntryId`; `ResultMailbox`
@@ -142,6 +153,9 @@ entry names the OpenSpec change that made it.
 
 ### Fixed
 
+- `WorkerPool::retrieve_async` no longer uses a blocking-pool thread per
+  waiter (cr-22); any number of concurrent waiters fit on a runtime whose
+  blocking pool is exhausted.
 - `TokioSpawner::with_worker_threads` keeps its runtime alive for as long as
   the spawner or any clone exists (cr-19). In 0.2 the runtime was dropped when
   the constructor returned, so every spawn went to a dead runtime.

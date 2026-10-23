@@ -206,6 +206,13 @@ pub enum SchedulerError {
         key: Option<String>,
     },
 
+    /// A result was stored but not retrieved within its TTL and was evicted.
+    #[error("result expired{}", key.as_deref().map(|k| format!(" for key '{k}'")).unwrap_or_default())]
+    ResultExpired {
+        /// The key whose result expired.
+        key: Option<String>,
+    },
+
     /// The caller no longer holds the lease named by a
     /// [`LeaseToken`](crate::contracts::LeaseToken): the lease expired (and the
     /// task may already be redelivered to another consumer), or the task was
@@ -353,6 +360,7 @@ mod tests {
         assert!(!SchedulerError::Task(TaskError::executor("bad input")).is_retryable());
         assert!(!SchedulerError::DeadlineExpired { task_id: 1 }.is_retryable());
         assert!(!SchedulerError::PoolShutdown { pool: "p".into() }.is_retryable());
+        assert!(!SchedulerError::ResultExpired { key: None }.is_retryable());
     }
 
     #[test]
@@ -376,6 +384,16 @@ mod tests {
             let back: TaskError = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(back, err, "{json}");
         }
+    }
+
+    #[test]
+    fn result_expired_display() {
+        let keyed = SchedulerError::ResultExpired {
+            key: Some("worker_pool:7".into()),
+        };
+        assert_eq!(keyed.to_string(), "result expired for key 'worker_pool:7'");
+        let bare = SchedulerError::ResultExpired { key: None };
+        assert_eq!(bare.to_string(), "result expired");
     }
 
     #[test]
