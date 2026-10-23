@@ -208,12 +208,98 @@ async fn config_build_pools_applies_resource_limits() {
         matches!(
             error,
             SchedulerError::CapacityExceeded {
+                kind: Some(ResourceKind::Cpu),
                 requested: 2,
                 available: 1,
                 ..
             }
         ),
         "{error:?}"
+    );
+    assert_eq!(
+        error.to_string(),
+        "capacity exceeded: need 2 cpu units, pool 'gpu' has 1"
+    );
+}
+
+/// A pool built from a configuration file carries its key in `pools` into
+/// its errors and lifecycle events, and a capacity error names the dimension
+/// that did not fit.
+#[tokio::test]
+async fn config_built_pool_names_itself_and_the_kind_in_capacity_errors() {
+    use std::sync::Arc;
+
+    use prometheus_parking_lot::builders::build_pools_from_scheduler_config_with_hooks;
+    use prometheus_parking_lot::core::{Hook, LifecycleEvent, RecordingHook};
+
+    let mut inference = pool_config(24);
+    inference.resource_limits = BTreeMap::from([(ResourceKind::GpuVram, 16)]);
+    let cfg = SchedulerConfig {
+        backends: BTreeMap::new(),
+        pools: BTreeMap::from([("inference".to_string(), inference)]),
+    };
+    let recorder = Arc::new(RecordingHook::new(64));
+    let hook: Arc<dyn Hook> = recorder.clone();
+    let built: Built = build_pools_from_scheduler_config_with_hooks(
+        &cfg,
+        |_, _| Ok(Echo),
+        |_, _| vec![Arc::clone(&hook)],
+        spawner(),
+    )
+    .await
+    .expect("valid configuration builds");
+    let pool = &built.pools["inference"].pool;
+    assert_eq!(pool.name(), "inference");
+    let key = MailboxKey {
+        tenant: "acme".into(),
+        user_id: None,
+        session_id: None,
+    };
+    let with_cost = |id: u64, cost: ResourceCost| {
+        let mut task = task(id, &key, "x");
+        task.meta.cost = cost;
+        task
+    };
+
+    let total = pool
+        .submit(with_cost(1, ResourceCost::new(ResourceKind::Cpu, 30)))
+        .await
+        .expect_err("30 units, the pool has 24");
+    assert_eq!(
+        total.to_string(),
+        "capacity exceeded: need 30 units, pool 'inference' has 24"
+    );
+    let vram = pool
+        .submit(with_cost(2, ResourceCost::new(ResourceKind::GpuVram, 20)))
+        .await
+        .expect_err("20 units of VRAM, the limit is 16");
+    assert!(
+        matches!(
+            vram,
+            SchedulerError::CapacityExceeded {
+                kind: Some(ResourceKind::GpuVram),
+                requested: 20,
+                available: 16,
+                ..
+            }
+        ),
+        "{vram:?}"
+    );
+    assert_eq!(
+        vram.to_string(),
+        "capacity exceeded: need 20 gpu_vram units, pool 'inference' has 16"
+    );
+
+    assert!(pool.hooks().flush(Duration::from_secs(5)), "hooks drained");
+    let events = recorder.drain();
+    let rejected = events
+        .iter()
+        .filter(|event| matches!(event, LifecycleEvent::Rejected { .. }))
+        .count();
+    assert_eq!(rejected, 2, "{events:?}");
+    assert!(
+        events.iter().all(|event| event.pool() == "inference"),
+        "{events:?}"
     );
 }
 

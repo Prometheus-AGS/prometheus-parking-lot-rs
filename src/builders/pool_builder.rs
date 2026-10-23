@@ -84,7 +84,8 @@ where
                 mailbox,
                 executor,
                 spawner.clone(),
-            ),
+            )
+            .with_name(name.clone()),
             pool_cfg,
         )
         .with_max_head_skips(pool_cfg.max_head_skips);
@@ -436,7 +437,8 @@ where
                     mailbox.clone(),
                     executor,
                     spawner.clone(),
-                ),
+                )
+                .with_name(name.clone()),
                 pool_cfg,
             )
             .with_max_head_skips(pool_cfg.max_head_skips);

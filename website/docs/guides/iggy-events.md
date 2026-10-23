@@ -42,6 +42,7 @@ reads the whole string from `IGGY_URL`); the rest are the defaults shown in
   "stream": "parking-lot",
   "lifecycle_topic": "lifecycle",
   "mailbox_topic": "mailbox.ready",
+  "stream_topic": "stream.chunks",
   "partitions": 4,
   "queue_capacity": 1024,
   "send_timeout_ms": 2000,
@@ -97,9 +98,9 @@ the stored result.
     );
 ```
 
-`BackgroundNotifier` is not re-exported by the facade yet: import it from
-`prometheus_parking_lot_core::mailbox`, which means depending on the core crate
-directly. The pool then runs on that mailbox:
+`BackgroundNotifier` comes from the facade (`prometheus_parking_lot::core`,
+with its `RetryPolicy` and `Sleeper`); `TokioHandleSpawner` and `TokioSleeper`
+come from `infra::events`. The pool then runs on that mailbox:
 
 ```rust title="examples/iggy_events.rs"
     let pool = DurableResourcePool::start(

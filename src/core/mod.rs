@@ -33,11 +33,21 @@ pub mod resource_pool {
 /// Async backend contracts (ADR 0003): the leasing task queue, the idempotent
 /// result mailbox, notifiers and the storage-plus-notifier composition that
 /// durable backends implement.
+///
+/// [`BackgroundNotifier`] runs a [`Notifier`] off the delivery path with
+/// bounded retries ([`RetryPolicy`], waiting through a [`Sleeper`]); it is the
+/// [`DetachedNotifier`] a [`StorageMailbox`] takes (cr-34). For example,
+/// `StorageMailbox::new(storage, BackgroundNotifier::new(notifier, spawner, sleeper))`
+/// with `infra::events::IggyNotifier` (feature `iggy`).
 pub mod backend {
     pub use prometheus_parking_lot_core::contracts::{
         Delivery, DeliveryOutcome, Enqueued, LeaseQueue, LeaseToken, LeasedTask, MailboxEntry,
         NackAction, NoopNotifier, Notifier, QueueDepth, QueueEntryId, ResultMailbox,
         StorageMailbox,
+    };
+    pub use prometheus_parking_lot_core::mailbox::{
+        BackgroundNotifier, DetachedNotifier, NotifyStats, NotifyStatsSnapshot, RetryPolicy,
+        Sleeper,
     };
 }
 
@@ -54,8 +64,10 @@ pub mod worker_pool {
 pub use audit::PostgresAuditSink;
 pub use audit::{AuditEvent, AuditSink, InMemoryAuditSink, build_audit_event};
 pub use backend::{
-    Delivery, DeliveryOutcome, Enqueued, LeaseQueue, LeaseToken, LeasedTask, MailboxEntry,
-    NackAction, NoopNotifier, Notifier, QueueDepth, QueueEntryId, ResultMailbox, StorageMailbox,
+    BackgroundNotifier, Delivery, DeliveryOutcome, DetachedNotifier, Enqueued, LeaseQueue,
+    LeaseToken, LeasedTask, MailboxEntry, NackAction, NoopNotifier, Notifier, NotifyStats,
+    NotifyStatsSnapshot, QueueDepth, QueueEntryId, ResultMailbox, RetryPolicy, Sleeper,
+    StorageMailbox,
 };
 #[cfg(feature = "tokio-runtime")]
 pub use cancellation::{

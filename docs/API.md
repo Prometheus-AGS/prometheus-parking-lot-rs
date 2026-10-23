@@ -21,7 +21,8 @@ Paths below are facade paths unless a crate is named.
 | `ShutdownHandle`, `ShutdownPolicy`, `ShutdownReport`, `wait_for_signal` | `core::shutdown` (`ShutdownReport` also top level) | `tokio-runtime` |
 | `CancellationSink`, `CancelledTask`, `CancelReason`, `SinkOutcome`, `CancellationConfig`, the logging and recording sinks, `CancellationChannel` | `core::cancellation` | `tokio-runtime` |
 
-`ResourcePool`: `new`, `with_audit`, `with_clock`, `with_cancellation_sink`,
+`ResourcePool`: `new`, `with_name` (default `resource_pool`; config-built
+pools take their key in `pools`), `name`, `with_audit`, `with_clock`, `with_cancellation_sink`,
 `with_cancellation_config`, `submit`, `prune_expired`, `active_units`,
 `running_tasks`, `queued_tasks`, `shutdown` (refuse new work only),
 `shutdown_with(policy)` (async; returns a `ShutdownReport`, cr-29).
@@ -48,7 +49,7 @@ returning a `ShutdownReport` (cr-29).
 | --- | --- | --- |
 | `SchedulerConfig { backends, pools }` (`from_json_str`, `validate`); every config struct rejects unknown fields | `config::SchedulerConfig` | always |
 | `PoolConfig { max_units, max_queue_depth, default_timeout_secs, queue, mailbox, max_head_skips, resource_limits }`, `StorageConfig` (`"in_memory"` or `{ "backend": name }`) | `config::*` | always |
-| `BackendConfig` (`"type": "postgres"` / `"redb"` / `"pgmq"` / `"iggy"`), `PostgresBackendConfig`, `RedbBackendConfig`, `PgmqBackendConfig`, `IggyBackendConfig` (`options()` with `iggy`) | `config::*` | always (validation requires `postgres` / `embedded` / `iggy`) |
+| `BackendConfig` (`"type": "postgres"` / `"redb"` / `"pgmq"` / `"iggy"`), `PostgresBackendConfig`, `RedbBackendConfig`, `PgmqBackendConfig`, `IggyBackendConfig` (`options()` with `iggy`; topics `lifecycle_topic`, `mailbox_topic`, `stream_topic`) | `config::*` | always (validation requires `postgres` / `embedded` / `iggy`) |
 | `ConfigError` (`Parse` names an unknown or missing field; `Invalid { field, reason }` with a dotted path) | `config::ConfigError` | always |
 | `build_pools_from_scheduler_config(cfg, executor_factory, spawner)` → `BuiltScheduler { pools, durable_pools, postgres, redb }` | `builders::*` | `tokio-runtime` |
 | `ConfiguredDurablePool` (`Postgres` / `Redb` variants; `submit`, `consume`, `shutdown`) | `builders::*` | `postgres` or `embedded` |
@@ -77,7 +78,7 @@ a `ConfiguredDurablePool` with `submit`, `consume` and `shutdown`; cr-49).
 
 | Item | Covers |
 | --- | --- |
-| `SchedulerError` | Admission (`QueueFull`, `CapacityExceeded`, `DeadlineExpired`, `PoolShutdown`), `InvalidConfig`, `Backend`, `Timeout` (a wait for a result), `ResultNotFound`, `LeaseLost`, `Internal`, and `Task(TaskError)` |
+| `SchedulerError` | Admission (`QueueFull`, `CapacityExceeded { pool, kind, requested, available }` — `kind` is the limited `ResourceKind` that did not fit, `None` for the total; the variant is `#[non_exhaustive]`, build it with `SchedulerError::capacity_exceeded` — `DeadlineExpired`, `PoolShutdown`), `InvalidConfig`, `Backend`, `Timeout` (a wait for a result), `ResultNotFound`, `LeaseLost`, `Internal`, and `Task(TaskError)` |
 | `TaskError` | How one task failed: `Executor { message, retryable }`, `ExecutorPanicked`, `Timeout { budget }`, `Cancelled { reason }`, `DeadlineExpired` |
 
 Both are `#[non_exhaustive]`. See ADR 0002 for the mapping from the 0.2
@@ -96,6 +97,11 @@ synchronous pair, `DurableResourcePool` (cr-49) the async pair.
 | `ResultMailbox<T>` + `Notifier<T>` | async, idempotent (`deliver`, `consume`, `peek`, `evict_expired`) | `infra::mailbox::InMemoryResultMailbox` (reference); `infra::mailbox::RedbResultMailbox` (`embedded`, crash-safe); `infra::mailbox::PgResultMailbox` (`postgres`); `StorageMailbox<S, N>` composes storage and notifier |
 
 The async contracts live in `core::backend`; `DurableResourcePool` runs on them.
+`StorageMailbox::new(storage, notifier)` takes a `DetachedNotifier`:
+`NoopNotifier`, or `BackgroundNotifier::new(notifier, spawner, sleeper)`, which
+runs any `Notifier` off the delivery path with bounded retries (`with_policy(RetryPolicy)`,
+`stats()` returning `NotifyStats` / `NotifyStatsSnapshot`; cr-34). All of them
+are in `core::backend` and at `core::*`.
 The backend conformance suite is `prometheus_parking_lot_core::conformance`
 behind that crate's `conformance` feature.
 

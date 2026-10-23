@@ -142,8 +142,39 @@ entry names the OpenSpec change that made it.
   gain the public field `max_head_skips` (optional in JSON, default 8), so a
   struct literal of either must now set it.
 
+- **`CapacityExceeded` names the dimension (cr-23).**
+  `SchedulerError::CapacityExceeded` gains `kind: Option<ResourceKind>`: the
+  per-kind limit the task exceeded, or `None` for the pool's total.
+  `available` is that dimension's limit. The message names the kind
+  (`need 30 gpu_vram units, pool 'inference' has 24`). The variant is now
+  `#[non_exhaustive]`: match it with `..` and build it with the new
+  `SchedulerError::capacity_exceeded(pool, kind, requested, available)`. A
+  durable pool's `TaskStatus::Dropped` reason for a task that can never fit is
+  now this error's message.
+- **Configured pool names in errors and events (cr-37, cr-23).** New
+  `ResourcePool::with_name` and `ResourcePool::name` (default
+  `resource_pool`); `build_pools` and `build_pools_from_scheduler_config` name
+  each in-memory pool after its key in `pools`, as they already did for durable
+  pools (`DurableOptions::with_name`). `CapacityExceeded`, `QueueFull` and
+  `PoolShutdown` from such a pool, its lifecycle events and its cancellation
+  log now carry that name instead of `resource_pool`. In the core crate,
+  `Dispatcher::pool_name` and `Dispatcher::set_pool_name` are new.
+
 ### Added
 
+- **Notifier composition in the facade (cr-34, cr-32, cr-47).**
+  `BackgroundNotifier`, `DetachedNotifier`, `RetryPolicy`, `Sleeper`,
+  `NotifyStats` and `NotifyStatsSnapshot` are re-exported at
+  `prometheus_parking_lot::core` and `core::backend`, beside `StorageMailbox`.
+  A facade-only application can now wrap `infra::events::IggyNotifier` in a
+  `StorageMailbox` without depending on `prometheus-parking-lot-core`; the
+  `iggy_events` example imports through the facade only.
+- **`stream_topic` in the Iggy configuration (cr-33, cr-37).**
+  `IggyBackendConfig` gains `stream_topic` (default `stream.chunks`, the
+  `IggyOptions` default; must not be empty), and `options()` passes it to
+  `IggyOptions::with_stream_topic`, so a configuration file can name the topic
+  `IggyStreamSink` and `IggyStreamReader` use. The field is optional in JSON;
+  a struct literal of `IggyBackendConfig` must now set it.
 - **Scenario guides and examples (cr-47).** The docs site gains guides for a
   GPU inference pool, a Tauri local LLM, a multi-tenant Postgres service,
   disconnected clients, shutdown and requeue, Iggy events, streaming replay,

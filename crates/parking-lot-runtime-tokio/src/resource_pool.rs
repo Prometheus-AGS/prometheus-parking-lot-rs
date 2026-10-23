@@ -107,7 +107,8 @@ use prometheus_parking_lot_core::{
     TaskQueue, TaskStatus,
 };
 
-/// Pool name used in errors and audit events (pools are not named yet).
+/// Pool name used in errors, lifecycle events and logs until
+/// [`ResourcePool::with_name`] sets one.
 const POOL_NAME: &str = "resource_pool";
 
 /// Extra wait, beyond the sink's `delta`, for cancelled stragglers to settle.
@@ -213,6 +214,30 @@ where
                 _types: PhantomData,
             }),
         }
+    }
+
+    /// Name the pool: the name appears in its errors
+    /// ([`SchedulerError::CapacityExceeded`], `QueueFull`, `PoolShutdown`),
+    /// its lifecycle events and its logs. Default: `"resource_pool"`. Pools
+    /// built from a configuration file take their key in `pools`.
+    ///
+    /// # Panics
+    ///
+    /// When a task is running (it shares the pool's state): the name is part
+    /// of building the pool. Call it before the first `submit`.
+    #[must_use]
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        let Some(inner) = Arc::get_mut(&mut self.inner) else {
+            panic!("ResourcePool::with_name must be called before the pool holds work");
+        };
+        inner.dispatcher.set_pool_name(name);
+        self
+    }
+
+    /// The pool's name (see [`with_name`](Self::with_name)).
+    #[must_use]
+    pub fn name(&self) -> &str {
+        self.inner.dispatcher.pool_name()
     }
 
     /// Attach an audit sink.
@@ -416,7 +441,7 @@ where
         if inner.shutdown.load(Ordering::SeqCst) {
             inner.ledger.settle(1);
             let error = SchedulerError::PoolShutdown {
-                pool: POOL_NAME.into(),
+                pool: inner.dispatcher.pool_name().to_owned(),
             };
             events.rejected(task_id, &error);
             return Err(error);
@@ -564,10 +589,10 @@ where
         self.clock.read().now_ms()
     }
 
-    const fn events(&self) -> Events<'_> {
+    fn events(&self) -> Events<'_> {
         Events {
             bus: &self.hooks,
-            pool: POOL_NAME,
+            pool: self.dispatcher.pool_name(),
         }
     }
 
@@ -837,7 +862,8 @@ where
             .map_or("unknown", |key| key.tenant.as_str());
         self.record_event(task_id, tenant, "cancel");
         let sink = self.sink.read().clone().unwrap_or_else(|| {
-            Arc::new(LoggingCancellationSink::new(POOL_NAME)) as Arc<dyn CancellationSink<P>>
+            Arc::new(LoggingCancellationSink::new(self.dispatcher.pool_name()))
+                as Arc<dyn CancellationSink<P>>
         });
         let delta = self.cancellation.read().delta;
         let cancelled = CancelledTask {

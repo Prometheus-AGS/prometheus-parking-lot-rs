@@ -106,8 +106,5 @@ number as a duplicate, and reports a higher one as `StreamError::Gap`.
   what it saw. Treat a stream from a re-run as a restart: compare against the
   final result in the mailbox, or have the executor continue with
   `writer_from(key, next_seq)` from output it persisted.
-- **The stream topic is not in the configuration.** `IggyBackendConfig` has no
-  field for it; set it with `IggyOptions::with_stream_topic` (default
-  `stream.chunks`).
 
 Concepts: [Event logs](../concepts/event-logs.md).

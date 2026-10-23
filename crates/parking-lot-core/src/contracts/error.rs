@@ -36,6 +36,8 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use super::ResourceKind;
+
 /// How the execution of one task failed.
 ///
 /// Executors return [`TaskError::Executor`] (through [`TaskError::executor`] or
@@ -142,19 +144,31 @@ pub enum SchedulerError {
         retry_hint: Option<Duration>,
     },
 
-    /// The task's resource cost exceeds the pool's total capacity, so the
-    /// task can never be admitted; `available` is the pool's total.
+    /// The task's resource cost exceeds the pool's limit in one dimension, so
+    /// the task can never be admitted: the total over every kind (`kind` is
+    /// `None`) or the per-kind limit of `kind` (cr-23).
     ///
     /// This is not transient: the pool rejects the task at submission instead
     /// of parking a task that could never start and would block the tasks
     /// behind it.
-    #[error("capacity exceeded: need {requested} units, pool '{pool}' has {available}")]
+    ///
+    /// The variant is `#[non_exhaustive]`: match it with `..` and build it
+    /// with [`SchedulerError::capacity_exceeded`].
+    #[error(
+        "capacity exceeded: need {requested} {}units, pool '{pool}' has {available}",
+        kind_label(*kind)
+    )]
+    #[non_exhaustive]
     CapacityExceeded {
         /// Name of the pool.
         pool: String,
-        /// Resource units required by the task.
+        /// The limited dimension the task exceeded, or `None` for the pool's
+        /// total.
+        kind: Option<ResourceKind>,
+        /// Units the task requires in that dimension.
         requested: u32,
-        /// Resource units currently available.
+        /// The pool's limit in that dimension (its total units when `kind`
+        /// is `None`).
         available: u32,
     },
 
@@ -251,6 +265,23 @@ impl SchedulerError {
         }
     }
 
+    /// Constructor for [`SchedulerError::CapacityExceeded`]: the task needs
+    /// `requested` units in dimension `kind` (`None`: the total) and pool
+    /// `pool` admits at most `available` there.
+    pub fn capacity_exceeded(
+        pool: impl Into<String>,
+        kind: Option<ResourceKind>,
+        requested: u32,
+        available: u32,
+    ) -> Self {
+        Self::CapacityExceeded {
+            pool: pool.into(),
+            kind,
+            requested,
+            available,
+        }
+    }
+
     /// Convenience constructor for [`SchedulerError::Backend`] from any error.
     pub fn backend(
         context: impl Into<String>,
@@ -289,6 +320,17 @@ impl SchedulerError {
     }
 }
 
+/// `"gpu_vram "` for a kind (its configuration name), `""` for the total.
+const fn kind_label(kind: Option<ResourceKind>) -> &'static str {
+    match kind {
+        None => "",
+        Some(ResourceKind::Cpu) => "cpu ",
+        Some(ResourceKind::GpuVram) => "gpu_vram ",
+        Some(ResourceKind::Io) => "io ",
+        Some(ResourceKind::Mixed) => "mixed ",
+    }
+}
+
 /// Application-facing result type using `anyhow` for higher-level contexts.
 ///
 /// Use this in application / binary code where rich error context chains are
@@ -323,14 +365,19 @@ mod tests {
 
     #[test]
     fn capacity_exceeded_display() {
-        let e = SchedulerError::CapacityExceeded {
-            pool: "gpu".into(),
-            requested: 10,
-            available: 4,
-        };
+        let e = SchedulerError::capacity_exceeded("gpu", None, 10, 4);
         let s = e.to_string();
         assert!(s.contains("10"), "{s}");
         assert!(s.contains('4'), "{s}");
+    }
+
+    #[test]
+    fn capacity_exceeded_display_names_the_kind() {
+        let e = SchedulerError::capacity_exceeded("inference", Some(ResourceKind::GpuVram), 30, 24);
+        assert_eq!(
+            e.to_string(),
+            "capacity exceeded: need 30 gpu_vram units, pool 'inference' has 24"
+        );
     }
 
     #[test]
@@ -347,14 +394,7 @@ mod tests {
     #[test]
     fn is_retryable_classification() {
         assert!(SchedulerError::queue_full("p", 1, 1).is_retryable());
-        assert!(
-            !SchedulerError::CapacityExceeded {
-                pool: "p".into(),
-                requested: 2,
-                available: 1
-            }
-            .is_retryable()
-        );
+        assert!(!SchedulerError::capacity_exceeded("p", None, 2, 1).is_retryable());
         assert!(SchedulerError::Timeout { task_id: None }.is_retryable());
         assert!(SchedulerError::Task(TaskError::transient("busy")).is_retryable());
         assert!(!SchedulerError::Task(TaskError::executor("bad input")).is_retryable());
