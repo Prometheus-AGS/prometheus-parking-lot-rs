@@ -421,11 +421,11 @@ mod tests {
                 _ => unreachable!("slot is pending"),
             }
         }
-        let table = slots.table.lock();
-        let Some(Slot::Pending { waiters }) = table.slots.get(&1) else {
-            unreachable!("slot is pending");
+        let live = match slots.table.lock().slots.get(&1) {
+            Some(Slot::Pending { waiters }) => waiters.len(),
+            _ => unreachable!("slot is pending"),
         };
-        assert_eq!(waiters.len(), 1);
+        assert_eq!(live, 1);
     }
 
     #[test]
