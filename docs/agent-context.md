@@ -11,7 +11,12 @@ units and nothing is parked ahead of it; otherwise it parks the task (priority,
 then FIFO) and starts parked tasks in order as capacity frees. A task costing
 more than the pool's total is rejected with `CapacityExceeded`. `ResourcePool`
 delivers outcomes to a `Mailbox` so disconnected clients can retrieve them
-later; `WorkerPool` holds them in result slots for `retrieve`. Executors return
+later; `WorkerPool` holds them in result slots for `retrieve` (native: with a TTL).
+
+`DurableResourcePool` is a separate, crash-durable pool type: it persists each
+task in a `LeaseQueue` before accepting it, heartbeats the lease, delivers to a
+`ResultMailbox` under an idempotency key, then acks (results exactly once,
+execution at least once). Executors return
 `Result<T, TaskError>`. Shutdown, timeouts, cancellation capture and
 idempotency follow the decisions recorded in
 `.kbd-orchestrator/phases/phase-certification-remediation/decision-*.md` and
@@ -28,11 +33,15 @@ src/                          facade: re-exports, config/, builders/, runtime/ap
 crates/parking-lot-core/      contracts/ (sync TaskQueue/Mailbox, async LeaseQueue/ResultMailbox,
                               conformance suite), dispatch/, semaphore/, hooks/, mailbox/, config/
                               — no async runtime, IO, database or network dependency
-crates/parking-lot-runtime-tokio/  ResourcePool, native WorkerPool, shutdown, cancellation, TokioSpawner
-crates/parking-lot-pg/        PgLeaseQueue, PgResultMailbox (raw sqlx 0.9), audit sink, migrations/, PG 17/18 test images
-crates/parking-lot-embedded/  redb EmbeddedStore, RedbLeaseQueue, RedbResultMailbox (ADR 0004; pools use them from cr-49)
+crates/parking-lot-runtime-tokio/  ResourcePool, DurableResourcePool (durable_pool/), native WorkerPool,
+                              shutdown, cancellation, TokioSpawner
+crates/parking-lot-pg/        PgLeaseQueue, PgmqLeaseQueue, PgResultMailbox (raw sqlx 0.9), audit sink,
+                              migrations/, PG 17/18 testcontainers helper
+crates/parking-lot-embedded/  redb EmbeddedStore, RedbLeaseQueue, RedbResultMailbox (ADR 0004)
 crates/parking-lot-wasm/      wasm32 WorkerPool (built for wasm32 only; cr-38)
-tests/, benches/, examples/   full-stack tests, criterion (queue_bench), examples
+crates/parking-lot-ffi/       UniFFI Kotlin/Swift bindings over the embedded store (not published; cr-44)
+bindings/                     binding generator, Kotlin/Swift smoke tests, Tauri 2 desktop example
+tests/, benches/, examples/   full-stack tests, criterion (queue_bench), examples, examples/configs/
 docker/                       parking-lot-pg:18 and :17 images (Postgres + pgmq)
 ```
 
@@ -55,7 +64,10 @@ cargo deny check
 
 - `unsafe_code = "deny"` and `missing_docs = "deny"` (Cargo.toml lints). Clippy
   `all`, `pedantic`, `nursery` are warn and CI runs `-D warnings`.
-- `src/core` never imports `sea_orm`, `sqlx`, `pgmq` or `reqwest`.
+- `crates/parking-lot-core` has no async runtime, IO, database or network
+  dependency (the facade's `core` module mixes it with the runtime-tokio pools): never add `tokio`, `sqlx`,
+  `redb`, `pgmq` or `reqwest` to it. CI gates the core and wasm dependency
+  graphs.
 - Public API changes go in `CHANGELOG.md`; the crate is published.
 - Do not raise MSRV without a decision record.
 - KBD state (`.kbd-orchestrator/*.json`) is runtime-owned: change it only through
