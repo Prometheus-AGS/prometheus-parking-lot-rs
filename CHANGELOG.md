@@ -80,8 +80,30 @@ entry names the OpenSpec change that made it.
 - **A timed-out retrieve keeps the result (cr-22).** A `retrieve` or
   `retrieve_async` that times out leaves the result in its slot, so a later
   call can still take it until the result TTL evicts it.
+- **Strict scheduler configuration (cr-37).** Every config struct, including
+  `WorkerPoolConfig`, rejects unknown fields, and the error names the field.
+  `SchedulerConfig` gains named `backends` (`"type": "postgres"` or `"redb"`,
+  with their parameters) and `pools` is a `BTreeMap`. `PoolConfig.queue` and
+  `.mailbox` are `"in_memory"` or `{ "backend": name }`; naming a backend is
+  rejected until durable dispatch (cr-49). The ignored `runtime` field and
+  `RuntimeConfig`, `QueueBackendConfig` and `MailboxBackendConfig` are
+  removed. `validate` and `from_json_str` return `ConfigError` (`Parse` names
+  an unknown or missing field; `Invalid` names the field by dotted path, e.g.
+  `pools.inference.max_units`) instead of `String`; `build_pools` returns a
+  `BTreeMap`. `WorkerPoolConfig::thread_stack_size` exists on every target
+  (ignored on WASM), and `default_timeout_ms` is documented as the execution
+  budget (and the native default result TTL), not a `retrieve` timeout.
 
 ### Added
+- **Pools and backends from configuration (cr-37).**
+  `builders::build_pools_from_scheduler_config` validates a `SchedulerConfig`,
+  opens every backend (Postgres: connect, optional migration of the queue and
+  mailbox schemas, `PgLeaseQueue`, `PgResultMailbox` and an optional
+  `QueueListener`; redb: `EmbeddedStore`, `RedbLeaseQueue`,
+  `RedbResultMailbox`) and builds every pool with an in-memory queue and a
+  readable `SharedInMemoryMailbox`. One example per backend is in
+  `examples/configs/`, and the test suite loads and builds each of them, plus
+  every JSON config block in the README and docs.
 
 - **Dispatcher and unit-weighted semaphore (cr-19).** Both pools now admit
   through one `Dispatcher` that owns a `UnitSemaphore` and the parked queue, so
@@ -138,8 +160,17 @@ entry names the OpenSpec change that made it.
   `QueueListener`). `reap_expired` and `spawn_reaper` return expired leases.
   Migration `004_lease_queue.sql` adds the `pl_lease_queue` table, and
   `migrate(pool)` applies it. No pool uses it yet (durable dispatch is cr-49).
-- The pg crate's direct sqlx dependency is now 0.9; sea-orm keeps sqlx 0.8 until
-  the Postgres mailbox moves off it (cr-27).
+- **Postgres result mailbox (cr-27).** `prometheus-parking-lot-pg::PgResultMailbox`
+  is an async `ResultMailbox` on raw sqlx 0.9. Consume is one `DELETE ... RETURNING`
+  with `FOR UPDATE SKIP LOCKED`, so a result reaches exactly one consumer.
+  Duplicate deliveries keep the first write via `INSERT ... ON CONFLICT`. TTLs use
+  database time, with `evict_expired` and a background sweeper (`spawn_sweeper`).
+  Migration `005_result_mailbox.sql`; `infra::PgPool` is re-exported.
+- **Removed:** the synchronous sea-orm `PostgresQueue` and `PostgresMailbox`, the
+  sea-orm entities (`infra::entities`), and migrations 001 and 002 (existing
+  `pl_queue_jobs` / `pl_mailbox_messages` tables are not dropped). sea-orm and
+  sqlx 0.8 are gone from the dependency graph; the `postgres` feature now uses
+  raw sqlx 0.9 only.
 
 - **Crash-safe embedded queue and mailbox (cr-28, ADR 0004).** With the
   `embedded` feature, `EmbeddedStore::open(path)` opens one redb database file;
@@ -188,10 +219,8 @@ entry names the OpenSpec change that made it.
 
 ### Known limitations
 
-- The synchronous Postgres `TaskQueue` and `Mailbox` still remove a task when
-  it is dequeued (at-most-once) and bridge async calls with `block_on`. The
-  leasing `PgLeaseQueue` (cr-26) replaces the queue once the pools use it
-  (cr-49); the Postgres mailbox moves in cr-27.
+- No pool runs on the Postgres backends yet: `PgLeaseQueue` and `PgResultMailbox`
+  are called directly until durable dispatch (cr-49).
 
 ## [0.2.0]
 

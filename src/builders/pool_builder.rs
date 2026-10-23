@@ -203,7 +203,7 @@ where
     pub pools: BTreeMap<String, ConfiguredPool<P, T, E, S>>,
     /// One entry per `"type": "postgres"` backend section, by name.
     #[cfg(feature = "postgres")]
-    pub postgres: BTreeMap<String, PostgresBackend<P>>,
+    pub postgres: BTreeMap<String, PostgresBackend<P, T>>,
     /// One entry per `"type": "redb"` backend section, by name.
     #[cfg(feature = "embedded")]
     pub redb: BTreeMap<String, RedbBackend<P, T>>,
@@ -214,9 +214,9 @@ where
 ///
 /// The configuration is validated first; nothing is opened for an invalid
 /// one. Then each backend section is opened (Postgres: connect, migrate when
-/// `migrate` is set, open the queue and, with `listen`, its listener; redb:
-/// open or create the file and its queue and mailbox), and each pool section
-/// becomes a `ResourcePool` with an in-memory queue and a
+/// `migrate` is set, open the queue, its listener when `listen` is set, and
+/// the result mailbox; redb: open or create the file and its queue and
+/// mailbox), and each pool section becomes a `ResourcePool` with an in-memory queue and a
 /// [`SharedInMemoryMailbox`]. `executor_factory` is called once per pool, in
 /// name order.
 ///

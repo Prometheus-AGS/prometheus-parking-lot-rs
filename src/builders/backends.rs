@@ -10,7 +10,7 @@
 use std::time::Duration;
 
 #[cfg(feature = "postgres")]
-use prometheus_parking_lot_pg::{PgLeaseQueue, QueueListener};
+use prometheus_parking_lot_pg::{PgLeaseQueue, PgPool, PgResultMailbox, QueueListener};
 
 #[cfg(feature = "embedded")]
 use prometheus_parking_lot_embedded::{EmbeddedStore, RedbLeaseQueue, RedbResultMailbox};
@@ -18,18 +18,17 @@ use prometheus_parking_lot_embedded::{EmbeddedStore, RedbLeaseQueue, RedbResultM
 #[cfg(any(feature = "postgres", feature = "embedded"))]
 use crate::core::SchedulerError;
 
-/// An opened Postgres backend (a `"type": "postgres"` section).
-///
-/// The Postgres result mailbox is not part of the handle yet: it is being
-/// rewritten on the raw-SQL stack (change `cr-27`) and joins this
-/// handle when that lands.
+/// An opened Postgres backend (a `"type": "postgres"` section): its lease
+/// queue and result mailbox, sharing one connection pool.
 #[cfg(feature = "postgres")]
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct PostgresBackend<P> {
+pub struct PostgresBackend<P, T> {
     /// The lease queue named by `queue_name`, with `max_depth` and
     /// `max_attempts` applied.
     pub queue: PgLeaseQueue<P>,
+    /// The result mailbox, also named by `queue_name`.
+    pub mailbox: PgResultMailbox<T>,
     /// The wake-up listener, present when the section sets `listen: true`.
     pub listener: Option<QueueListener>,
     /// `lease_secs`: the duration to pass to
@@ -54,22 +53,26 @@ pub struct RedbBackend<P, T> {
     pub lease_for: Duration,
 }
 
-/// Connect to Postgres, apply the schema when `migrate` is set, and open the
-/// queue (and its listener when `listen` is set).
+/// Connect to Postgres, apply the queue and mailbox schemas when `migrate` is
+/// set, and open the queue (and its listener when `listen` is set) and the
+/// result mailbox on one connection pool.
 #[cfg(feature = "postgres")]
-pub(super) async fn open_postgres<P>(
+pub(super) async fn open_postgres<P, T>(
     name: &str,
     cfg: &crate::config::PostgresBackendConfig,
-) -> Result<PostgresBackend<P>, SchedulerError> {
-    let pool = sqlx::postgres::PgPoolOptions::new()
-        .connect(&cfg.url)
+) -> Result<PostgresBackend<P, T>, SchedulerError> {
+    let pool = PgPool::connect(&cfg.url)
         .await
         .map_err(|e| SchedulerError::backend(format!("backends.{name}: connect"), e))?;
     if cfg.migrate {
         PgLeaseQueue::<P>::migrate(&pool)
             .await
-            .map_err(|e| SchedulerError::backend(format!("backends.{name}: migrate"), e))?;
+            .map_err(|e| SchedulerError::backend(format!("backends.{name}: migrate queue"), e))?;
+        PgResultMailbox::<T>::migrate(&pool)
+            .await
+            .map_err(|e| SchedulerError::backend(format!("backends.{name}: migrate mailbox"), e))?;
     }
+    let mailbox = PgResultMailbox::new(pool.clone(), cfg.queue_name.clone());
     let mut queue = PgLeaseQueue::new(pool, cfg.queue_name.clone(), cfg.max_depth);
     if let Some(max_attempts) = cfg.max_attempts {
         queue = queue.with_max_attempts(max_attempts);
@@ -86,6 +89,7 @@ pub(super) async fn open_postgres<P>(
     };
     Ok(PostgresBackend {
         queue,
+        mailbox,
         listener,
         lease_for: Duration::from_secs(cfg.lease_secs),
     })

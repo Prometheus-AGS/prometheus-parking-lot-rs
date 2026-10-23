@@ -240,7 +240,9 @@ mod postgres {
     use std::time::Duration;
 
     use prometheus_parking_lot::config::BackendConfig;
-    use prometheus_parking_lot::core::{Enqueued, LeaseQueue};
+    use prometheus_parking_lot::core::{
+        Delivery, DeliveryOutcome, Enqueued, LeaseQueue, ResultMailbox, TaskStatus,
+    };
     use prometheus_parking_lot::util::MailboxKey;
     use testcontainers::core::{ContainerPort, WaitFor};
     use testcontainers::runners::AsyncRunner;
@@ -315,7 +317,7 @@ mod postgres {
         super::run_one_task_per_pool(&built).await;
 
         // The opened backend carries the section's parameters and works:
-        // `migrate` created the schema, `listen` opened a listener.
+        // `migrate` created both schemas, `listen` opened a listener.
         let cloud = &built.postgres["cloud"];
         assert_eq!(cloud.queue.queue_name(), "inference");
         assert_eq!(cloud.queue.max_depth(), 10_000);
@@ -340,6 +342,35 @@ mod postgres {
             .pop()
             .expect("one task ready");
         assert_eq!(leased.task.payload, "durable");
+
+        // The result mailbox shares the pool: deliver the outcome, then
+        // consume it exactly once.
+        assert_eq!(cloud.mailbox.name(), "inference");
+        let delivery = Delivery::new(
+            key.clone(),
+            1,
+            TaskStatus::Completed,
+            Some("DURABLE".to_owned()),
+        );
+        let outcome = cloud.mailbox.deliver(delivery).await.expect("deliver");
+        assert_eq!(outcome, DeliveryOutcome::Stored);
         cloud.queue.ack(leased.token).await.expect("ack");
+        let entry = cloud
+            .mailbox
+            .consume(&key)
+            .await
+            .expect("consume")
+            .expect("the delivered outcome");
+        assert_eq!(entry.status, TaskStatus::Completed);
+        assert_eq!(entry.payload.as_deref(), Some("DURABLE"));
+        assert!(
+            cloud
+                .mailbox
+                .consume(&key)
+                .await
+                .expect("consume again")
+                .is_none(),
+            "an outcome is consumed once"
+        );
     }
 }

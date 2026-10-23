@@ -41,7 +41,8 @@ use super::error::ConfigError;
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum BackendConfig {
-    /// The Postgres lease queue (`PgLeaseQueue`, feature `postgres`).
+    /// The Postgres lease queue and result mailbox (`PgLeaseQueue`,
+    /// `PgResultMailbox`; feature `postgres`).
     Postgres(PostgresBackendConfig),
     /// The embedded redb store: lease queue and result mailbox (feature
     /// `embedded`).
@@ -81,7 +82,7 @@ impl BackendConfig {
     }
 }
 
-/// Parameters of a Postgres lease queue.
+/// Parameters of a Postgres backend: a lease queue and a result mailbox.
 ///
 /// `Debug` hides the password in `url`.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -93,7 +94,8 @@ pub struct PostgresBackendConfig {
     /// a secret store into the parsed configuration over writing a password
     /// into the file.
     pub url: String,
-    /// Queue name. Queues with different names share the table, not entries.
+    /// Name of the queue and of the result mailbox. Queues (and mailboxes)
+    /// with different names share the tables, not entries.
     pub queue_name: String,
     /// Maximum live (ready, delayed or leased) entries; `enqueue` beyond it
     /// fails with `QueueFull`.
@@ -110,7 +112,8 @@ pub struct PostgresBackendConfig {
     /// (`QueueListener`), so consumers wake on enqueue instead of polling.
     #[serde(default)]
     pub listen: bool,
-    /// Create the queue table, indexes and triggers when missing (idempotent).
+    /// Create the queue and mailbox tables, indexes and triggers when missing
+    /// (idempotent).
     /// Leave `false` where migrations are applied separately.
     #[serde(default)]
     pub migrate: bool,
