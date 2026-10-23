@@ -164,6 +164,14 @@ struct Shared<P, R, E> {
     /// Pool configuration.
     config: WorkerPoolConfig,
     /// Admission, the parked queue and the semaphore.
+    ///
+    /// No release hook (`Dispatcher::install_release_hook`): every permit
+    /// goes back through `complete` (a finished, cancelled or captured task,
+    /// a grant `launch` could not send, the channel drain of a worker that is
+    /// not replaced) or is followed by a `poke` (the panic backstop in
+    /// `execute_supervised`). The only grants dropped otherwise are those
+    /// still in the worker channel when the channel itself is dropped with
+    /// the pool, when nothing is left to start.
     dispatcher: Dispatcher<WorkerTask<P>>,
     /// Per-task result slots with TTL eviction.
     results: ResultSlots<TaskOutcome<R>>,

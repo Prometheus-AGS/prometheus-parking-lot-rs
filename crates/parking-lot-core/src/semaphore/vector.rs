@@ -91,6 +91,17 @@ impl UnitVector {
         self.total
     }
 
+    /// Whether the per-kind units sum past `u32::MAX`, so that
+    /// [`from_cost`](Self::from_cost) saturated the total. Such a demand
+    /// exceeds every pool's total.
+    pub(crate) fn total_overflows(&self) -> bool {
+        self.kinds
+            .iter()
+            .map(|&units| u64::from(units))
+            .sum::<u64>()
+            > u64::from(u32::MAX)
+    }
+
     /// Units in dimension `kind`.
     #[must_use]
     pub const fn of(&self, kind: ResourceKind) -> u32 {
