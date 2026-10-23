@@ -348,6 +348,10 @@ pub struct IggyBackendConfig {
     /// Topic for `mailbox.ready` notifications; created when missing.
     #[serde(default = "default_iggy_mailbox_topic")]
     pub mailbox_topic: String,
+    /// Topic for task output streams (`IggyStreamSink` and
+    /// `IggyStreamReader`, cr-33); created when missing.
+    #[serde(default = "default_iggy_stream_topic")]
+    pub stream_topic: String,
     /// Partitions of a topic this crate creates.
     #[serde(default = "default_iggy_partitions")]
     pub partitions: u32,
@@ -378,6 +382,9 @@ fn default_iggy_lifecycle_topic() -> String {
 fn default_iggy_mailbox_topic() -> String {
     "mailbox.ready".to_owned()
 }
+fn default_iggy_stream_topic() -> String {
+    "stream.chunks".to_owned()
+}
 const fn default_iggy_partitions() -> u32 {
     4
 }
@@ -407,6 +414,7 @@ impl IggyBackendConfig {
             ("stream", &self.stream),
             ("lifecycle_topic", &self.lifecycle_topic),
             ("mailbox_topic", &self.mailbox_topic),
+            ("stream_topic", &self.stream_topic),
         ];
         for (field, value) in text {
             if value.trim().is_empty() {
@@ -434,7 +442,8 @@ impl IggyBackendConfig {
     }
 
     /// The publisher settings this section describes, for
-    /// `IggyHook::start` and `IggyNotifier::start`.
+    /// `IggyHook::start`, `IggyNotifier::start`, `IggyStreamSink::start` and
+    /// `IggyStreamReader::connect`.
     #[cfg(feature = "iggy")]
     #[must_use]
     pub fn options(&self) -> prometheus_parking_lot_iggy::IggyOptions {
@@ -452,7 +461,8 @@ impl IggyBackendConfig {
                 defaults.max_backoff,
             ))
             .with_dedup_window(self.dedup_window)
-            .with_topics(self.lifecycle_topic.clone(), self.mailbox_topic.clone());
+            .with_topics(self.lifecycle_topic.clone(), self.mailbox_topic.clone())
+            .with_stream_topic(self.stream_topic.clone());
         if let Some(tenant) = &self.tenant {
             options = options.with_tenant(tenant.clone());
         }
@@ -470,6 +480,7 @@ impl fmt::Debug for IggyBackendConfig {
             .field("stream", &self.stream)
             .field("lifecycle_topic", &self.lifecycle_topic)
             .field("mailbox_topic", &self.mailbox_topic)
+            .field("stream_topic", &self.stream_topic)
             .field("partitions", &self.partitions)
             .field("tenant", &self.tenant)
             .field("queue_capacity", &self.queue_capacity)

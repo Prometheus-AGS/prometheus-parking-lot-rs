@@ -42,6 +42,7 @@ reads the whole string from `IGGY_URL`); the rest are the defaults shown in
   "stream": "parking-lot",
   "lifecycle_topic": "lifecycle",
   "mailbox_topic": "mailbox.ready",
+  "stream_topic": "stream.chunks",
   "partitions": 4,
   "queue_capacity": 1024,
   "send_timeout_ms": 2000,

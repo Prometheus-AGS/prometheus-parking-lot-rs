@@ -48,7 +48,7 @@ returning a `ShutdownReport` (cr-29).
 | --- | --- | --- |
 | `SchedulerConfig { backends, pools }` (`from_json_str`, `validate`); every config struct rejects unknown fields | `config::SchedulerConfig` | always |
 | `PoolConfig { max_units, max_queue_depth, default_timeout_secs, queue, mailbox, max_head_skips, resource_limits }`, `StorageConfig` (`"in_memory"` or `{ "backend": name }`) | `config::*` | always |
-| `BackendConfig` (`"type": "postgres"` / `"redb"` / `"pgmq"` / `"iggy"`), `PostgresBackendConfig`, `RedbBackendConfig`, `PgmqBackendConfig`, `IggyBackendConfig` (`options()` with `iggy`) | `config::*` | always (validation requires `postgres` / `embedded` / `iggy`) |
+| `BackendConfig` (`"type": "postgres"` / `"redb"` / `"pgmq"` / `"iggy"`), `PostgresBackendConfig`, `RedbBackendConfig`, `PgmqBackendConfig`, `IggyBackendConfig` (`options()` with `iggy`; topics `lifecycle_topic`, `mailbox_topic`, `stream_topic`) | `config::*` | always (validation requires `postgres` / `embedded` / `iggy`) |
 | `ConfigError` (`Parse` names an unknown or missing field; `Invalid { field, reason }` with a dotted path) | `config::ConfigError` | always |
 | `build_pools_from_scheduler_config(cfg, executor_factory, spawner)` → `BuiltScheduler { pools, durable_pools, postgres, redb }` | `builders::*` | `tokio-runtime` |
 | `ConfiguredDurablePool` (`Postgres` / `Redb` variants; `submit`, `consume`, `shutdown`) | `builders::*` | `postgres` or `embedded` |

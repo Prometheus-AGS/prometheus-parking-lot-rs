@@ -500,6 +500,7 @@ fn config_iggy_section_defaults_validates_and_builds_options() {
     };
     assert_eq!(section.stream, "parking-lot");
     assert_eq!(section.mailbox_topic, "mailbox.ready");
+    assert_eq!(section.stream_topic, "stream.chunks");
     assert!(
         !format!("{section:?}").contains("s3cret"),
         "Debug hides the password"
@@ -508,6 +509,7 @@ fn config_iggy_section_defaults_validates_and_builds_options() {
     assert_eq!(options.lifecycle_topic, "lifecycle");
     assert_eq!(options.queue_capacity, 1024);
     assert_eq!(options.retry.max_attempts, 5);
+    assert_eq!(options.stream_topic, "stream.chunks");
 
     let json = json.replace(IGGY_BACKEND, &format!("{IGGY_BACKEND}, \"partitions\": 0"));
     assert_eq!(invalid_field(&json), "backends.ev.partitions");
@@ -518,6 +520,26 @@ fn config_iggy_section_defaults_validates_and_builds_options() {
         parse_error(&json).contains("strem"),
         "a misspelled field is named"
     );
+}
+
+/// `stream_topic` (cr-33) is configurable, reaches `options()`, and must not be
+/// empty.
+#[cfg(feature = "iggy")]
+#[test]
+fn config_iggy_stream_topic_reaches_the_options() {
+    let section = format!(r#"{IGGY_BACKEND}, "stream_topic": "llm.tokens""#);
+    let json = format!(
+        r#"{{ "backends": {{ "ev": {{ {section} }} }}, "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    let parsed = SchedulerConfig::from_json_str(&json).expect("a stream_topic loads");
+    let Some(BackendConfig::Iggy(section)) = parsed.backends.get("ev") else {
+        panic!("`type: iggy` parses as an iggy section");
+    };
+    assert_eq!(section.stream_topic, "llm.tokens");
+    assert_eq!(section.options().stream_topic, "llm.tokens");
+
+    let json = json.replace("llm.tokens", " ");
+    assert_eq!(invalid_field(&json), "backends.ev.stream_topic");
 }
 
 /// An iggy backend carries events only: no pool can run on it.

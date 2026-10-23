@@ -151,6 +151,12 @@ entry names the OpenSpec change that made it.
   A facade-only application can now wrap `infra::events::IggyNotifier` in a
   `StorageMailbox` without depending on `prometheus-parking-lot-core`; the
   `iggy_events` example imports through the facade only.
+- **`stream_topic` in the Iggy configuration (cr-33, cr-37).**
+  `IggyBackendConfig` gains `stream_topic` (default `stream.chunks`, the
+  `IggyOptions` default; must not be empty), and `options()` passes it to
+  `IggyOptions::with_stream_topic`, so a configuration file can name the topic
+  `IggyStreamSink` and `IggyStreamReader` use. The field is optional in JSON;
+  a struct literal of `IggyBackendConfig` must now set it.
 - **Scenario guides and examples (cr-47).** The docs site gains guides for a
   GPU inference pool, a Tauri local LLM, a multi-tenant Postgres service,
   disconnected clients, shutdown and requeue, Iggy events, streaming replay,

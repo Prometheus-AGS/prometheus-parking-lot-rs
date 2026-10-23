@@ -148,9 +148,12 @@ is claimed for `postgres` and `redb` only.
 Only `connection_string` is required (`***` stands for the password: inject
 it from a secret store; `Debug` output hides it). The other fields and their defaults:
 `stream` (`parking-lot`), `lifecycle_topic` (`lifecycle`), `mailbox_topic`
-(`mailbox.ready`), `partitions` (4), `tenant` (absent: partition by pool),
-`queue_capacity` (1024), `send_timeout_ms` (2000), `max_attempts` (5),
-`dedup_window` (4096). See [Iggy events](./iggy-events.md).
+(`mailbox.ready`), `stream_topic` (`stream.chunks`), `partitions` (4),
+`tenant` (absent: partition by pool), `queue_capacity` (1024),
+`send_timeout_ms` (2000), `max_attempts` (5), `dedup_window` (4096). `IggyBackendConfig::options()` turns the section into
+the `IggyOptions` that the hook, the notifier and the
+[streaming replay](./streaming-replay.md) sink and reader take. See
+[Iggy events](./iggy-events.md).
 
 ## A complete file
 
@@ -208,6 +211,5 @@ and `resource_limits`.
 - A result TTL for a durable pool (results wait until consumed); use
   `DurableOptions::with_result_ttl` and start the pool yourself.
 - A notifier on a durable pool's mailbox; see [Iggy events](./iggy-events.md).
-- The Iggy stream topic for [streaming replay](./streaming-replay.md).
 - A durable pool's heartbeat and poll intervals (a third of the lease, and
   500 ms).
