@@ -285,6 +285,7 @@ fn with_redb_backends(names: &[&str]) -> SchedulerConfig {
                 path: PathBuf::from(format!("./never-opened-{name}.redb")),
                 max_depth: 10,
                 lease_secs: 30,
+                max_attempts: None,
             }),
         );
     }
@@ -381,6 +382,16 @@ fn config_backend_values_are_validated() {
             "max_depth": 0, "lease_secs": 5 }} }}, "pools": {{ "p": {{ {POOL} }} }} }}"#
     );
     assert_eq!(invalid_field(&json), "backends.local.max_depth");
+}
+
+#[cfg(feature = "embedded")]
+#[test]
+fn config_redb_max_attempts_zero_is_rejected() {
+    let json = format!(
+        r#"{{ "backends": {{ "local": {{ "type": "redb", "path": "./q.redb",
+            "max_depth": 10, "lease_secs": 5, "max_attempts": 0 }} }}, "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    assert_eq!(invalid_field(&json), "backends.local.max_attempts");
 }
 
 #[cfg(feature = "postgres")]

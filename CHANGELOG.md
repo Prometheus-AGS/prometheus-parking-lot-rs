@@ -162,6 +162,13 @@ entry names the OpenSpec change that made it.
 
 ### Added
 
+- **`RedbLeaseQueue::with_max_attempts` and `max_attempts` in the `redb`
+  backend section.** A task is delivered exactly that many times, then the next
+  lease dead-letters it with the reason `max attempts (N) exhausted`, the same
+  rule as `PgLeaseQueue::with_max_attempts`. Without it a task that kills a
+  desktop app is redelivered, and kills it again, on every launch. The field is
+  optional and must be greater than 0 (`examples/configs/redb.json` sets 5).
+
 - **Notifier composition in the facade (cr-34, cr-32, cr-47).**
   `BackgroundNotifier`, `DetachedNotifier`, `RetryPolicy`, `Sleeper`,
   `NotifyStats` and `NotifyStatsSnapshot` are re-exported at
@@ -522,6 +529,15 @@ entry names the OpenSpec change that made it.
 
 ### Fixed
 
+- **One undecodable task wedged the whole embedded queue.** `RedbLeaseQueue::lease`
+  aborted its transaction on a stored task that did not decode as `P` (for
+  example after an app update changed the payload type), leaving the entry at the
+  front so every later lease failed the same way. The entry is now moved to the
+  dead letters with the decode error as its reason, in the same transaction, and
+  leasing continues; the Postgres queue already behaved this way.
+- `RedbResultMailbox::consume` of an entry that no longer decodes now removes it
+  and returns the decode error once, as the Postgres mailbox does, instead of
+  failing on every call for that key. `peek` still only reads.
 - `WorkerPool::retrieve_async` no longer uses a blocking-pool thread per
   waiter (cr-22); any number of concurrent waiters fit on a runtime whose
   blocking pool is exhausted.
