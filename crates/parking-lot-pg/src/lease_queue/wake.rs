@@ -40,7 +40,7 @@ pub struct QueueListener {
 }
 
 impl QueueListener {
-    pub(super) async fn connect(
+    pub(crate) async fn connect(
         pool: &sqlx::PgPool,
         queue_name: String,
     ) -> Result<Self, SchedulerError> {

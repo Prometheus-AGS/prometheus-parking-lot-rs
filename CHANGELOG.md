@@ -166,6 +166,16 @@ entry names the OpenSpec change that made it.
   Duplicate deliveries keep the first write via `INSERT ... ON CONFLICT`. TTLs use
   database time, with `evict_expired` and a background sweeper (`spawn_sweeper`).
   Migration `005_result_mailbox.sql`; `infra::PgPool` is re-exported.
+- **pgmq lease queue (cr-30).** `prometheus-parking-lot-pg::PgmqLeaseQueue` is an
+  async `LeaseQueue` over the pgmq extension (>= 1.8, tested on 1.13.1, PG 17 and
+  18) through plain SQL on raw sqlx 0.9; no pgmq client crate. One pgmq queue per
+  priority level, the visibility timeout is the lease, `read_ct` is the fence
+  (a stale token gets `LeaseLost`), nack-with-delay is `set_vt`, dead letters go
+  to a per-queue pgmq dead-letter queue, and idempotency keys are first-write-wins
+  in a small side table (`006_pgmq_lease_queue.sql`). Enqueue sends a `NOTIFY`
+  (`PgmqLeaseQueue::listener()`); expiry and delays are polled. Differences from
+  `PgLeaseQueue` (priority is read lane by lane, one-second lease granularity, no
+  reaper) are listed in the module docs. No config backend type yet.
 - **Removed:** the synchronous sea-orm `PostgresQueue` and `PostgresMailbox`, the
   sea-orm entities (`infra::entities`), and migrations 001 and 002 (existing
   `pl_queue_jobs` / `pl_mailbox_messages` tables are not dropped). sea-orm and
