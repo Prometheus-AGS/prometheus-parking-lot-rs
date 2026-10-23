@@ -244,7 +244,11 @@ async fn accepted_task_survives_a_killed_process() {
 #[tokio::test]
 #[ignore = "child process of accepted_task_survives_a_killed_process"]
 async fn child_enqueue_then_exit() {
-    let path = std::env::var_os(CHILD_PATH_VAR).expect("run through the parent test");
+    // Run directly (for example by `--run-ignored all`), there is no parent:
+    // do nothing, like the other child-process helpers in this workspace.
+    let Some(path) = std::env::var_os(CHILD_PATH_VAR) else {
+        return;
+    };
     let store = open_store(config(std::path::Path::new(&path)))
         .await
         .expect("open");
