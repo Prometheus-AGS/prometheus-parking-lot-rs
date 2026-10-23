@@ -23,7 +23,7 @@ chrono.workspace = true
 sea-orm = { workspace = true, features = ["runtime-tokio-rustls", "sqlx-postgres", "macros"] }
 serde.workspace = true
 serde_json.workspace = true
-sqlx = { workspace = true, default-features = false, features = ["postgres", "runtime-tokio", "tls-rustls", "json"] }
+sqlx = { workspace = true, features = ["postgres", "runtime-tokio", "tls-rustls", "json"] }
 tokio = { workspace = true, features = ["rt", "time"] }
 tracing.workspace = true
 

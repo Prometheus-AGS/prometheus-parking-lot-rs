@@ -399,7 +399,7 @@ fn ensure_duration(duration: Duration, what: &str) -> Result<(), SchedulerError>
     Ok(())
 }
 
-fn priority_to_i16(priority: Priority) -> i16 {
+const fn priority_to_i16(priority: Priority) -> i16 {
     match priority {
         Priority::Low => 0,
         Priority::Normal => 1,
