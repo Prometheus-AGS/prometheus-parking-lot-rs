@@ -30,6 +30,20 @@ Workspace loop, 2026-10-22, 1.99.1, fresh worktree build-dir (first run builds d
 | `cargo lint` (after `ck`, same worktree) | 3.5s |
 | `cargo t` (cold, builds test profile) | 55s; the 64 tests themselves take ~2.2s |
 
+Wasm loop (cr-38), 2026-10-22, 1.99.1, `wasm32-unknown-unknown`, dependencies already built, other
+agents building on the same machine (so treat as upper bounds):
+
+| Command | Wall time |
+|---|---|
+| `cargo check --target wasm32-unknown-unknown -p core -p wasm`, dependencies cold | 29s to 46s |
+| `cargo wasm-ck` (`--all-targets`, includes the wasm-bindgen-test crate) | 19.6s |
+| `cargo wasm` after touching `pool.rs` (rebuild, wasm-bindgen-test-runner, Node.js); the 10 tests take 0.3 to 0.9s | 4.4s |
+| `cargo +1.95 check` of the same two crates (MSRV, cold) | 2m58s |
+
+The wasm target has its own build-dir subtree (`target/wasm32-unknown-unknown`), so native and wasm
+loops do not invalidate each other; do not mix `RUSTFLAGS` between them. The negative-control run
+(`RUSTFLAGS='--cfg parking_lot_negative_control="s-4"'`) rebuilds every dependency: run it once, not in a loop.
+
 The rows measured before the workspace split (940 MB, 113 GB, 2.68%) are the 2026-10-22
 pre-split baseline and are kept for comparison; re-measure after CI caching lands.
 
@@ -71,6 +85,11 @@ differ — and each build-dir has a different path.
 - Jobs: fmt, clippy (pinned 1.99.1 only; 1.95 lacks the `unused_async_trait_impl` lint), test on
   1.99.1 and MSRV 1.95 via nextest (build step separated so the 5-minute watchdog bounds test
   execution only), docs with `-D warnings`, cargo-deny, coverage (cargo-llvm-cov).
+- `wasm` job (cr-38), pinned toolchain and MSRV: `cargo check`/`test` for `wasm32-unknown-unknown`;
+  on the pinned leg also `.github/scripts/check-wasm-graph.sh`, wasm clippy and wasm docs. Cache key
+  `wasm-<toolchain>`. `wasm-bindgen-test-runner` is installed prebuilt (`taiki-e/install-action`, no
+  compile) at the version of `wasm-bindgen` in `Cargo.lock`; a runner of another version rejects the
+  test binary.
 - No CI timings measured yet; record the first green main run and a cache-hit run here.
 
 ## Disk hygiene

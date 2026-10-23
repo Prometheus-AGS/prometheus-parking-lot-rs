@@ -143,6 +143,16 @@ entry names the OpenSpec change that made it.
   still park and deliver through the synchronous `TaskQueue` and `Mailbox`
   until durable dispatch (cr-49). `examples/embedded_pool.rs` shows direct use.
 
+- **WASM pool on the shared dispatcher (cr-38).** The WASM `WorkerPool` now
+  admits through the core dispatcher and runs on
+  `wasm_bindgen_futures::spawn_local` with JS timers; it no longer depends on
+  tokio and builds and passes `wasm-bindgen-test` on `wasm32-unknown-unknown`.
+  Tasks past their deadline or `default_timeout_ms` are cancelled and fail
+  with `TaskError::Timeout`. New: `WorkerPool::{submit, with_clock}`,
+  `WasmClock` and `sleep`. Executor panics abort the module on
+  `wasm32-unknown-unknown`; native panic containment does not apply there.
+  CI gains a wasm check/test job and a core/wasm dependency-graph gate.
+
 ### Removed
 
 - **The JSONL file queue and mailbox (cr-28).** `YaqueQueue`, `YaqueMailbox`
@@ -160,6 +170,9 @@ entry names the OpenSpec change that made it.
   the spawner or any clone exists (cr-19). In 0.2 the runtime was dropped when
   the constructor returned, so every spawn went to a dead runtime.
   `TokioSpawner` now also implements `Debug`.
+
+- The WASM pool ignored `max_units` (audit C1); it now enforces capacity,
+  priority then FIFO order and the queue depth (cr-38).
 
 ### Known limitations
 
