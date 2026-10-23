@@ -1,0 +1,23 @@
+{
+  "backends": {
+    "cloud": {
+      "type": "postgres",
+      "url": "postgres://parking_lot@localhost:5432/parking_lot",
+      "queue_name": "inference",
+      "max_depth": 10000,
+      "lease_secs": 300,
+      "max_attempts": 5,
+      "listen": true,
+      "migrate": true
+    }
+  },
+  "pools": {
+    "llm_inference": {
+      "max_units": 20,
+      "max_queue_depth": 1000,
+      "default_timeout_secs": 60,
+      "queue": "in_memory",
+      "mailbox": "in_memory"
+    }
+  }
+}

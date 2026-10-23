@@ -105,8 +105,9 @@ default = ["tokio-runtime"]
 tokio-runtime = ["dep:prometheus-parking-lot-runtime-tokio"]
 # Postgres queue, mailbox, entities and audit schema. `sea-orm` stays a direct
 # optional dependency so applications (and examples/postgres_pool.rs) can open
-# the connection the backends take.
-postgres = ["dep:prometheus-parking-lot-pg", "dep:sea-orm"]
+# the connection the backends take; `sqlx` lets the config builder connect the
+# lease queue (cr-37).
+postgres = ["dep:prometheus-parking-lot-pg", "dep:sea-orm", "dep:sqlx"]
 # Embedded redb-backed lease queue and result mailbox (ADR 0004).
 embedded = ["dep:prometheus-parking-lot-embedded"]
 
@@ -118,6 +119,7 @@ prometheus-parking-lot-embedded = { workspace = true, optional = true }
 sea-orm = { workspace = true, optional = true, features = ["runtime-tokio-rustls", "sqlx-postgres", "macros"] }
 serde.workspace = true
 serde_json.workspace = true
+sqlx = { workspace = true, optional = true, features = ["postgres", "runtime-tokio"] }
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
 
@@ -128,6 +130,8 @@ prometheus-parking-lot-wasm.workspace = true
 async-trait.workspace = true
 criterion = { workspace = true, features = ["async_tokio"] }
 parking_lot.workspace = true
+tempfile.workspace = true
+testcontainers.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "sync", "time"] }
 
 [[bench]]

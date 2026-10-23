@@ -118,6 +118,8 @@ pub mod infra {
         };
         #[cfg(feature = "embedded")]
         pub use prometheus_parking_lot_embedded::RedbLeaseQueue;
+        #[cfg(feature = "postgres")]
+        pub use prometheus_parking_lot_pg::{PgLeaseQueue, QueueListener};
     }
 
     /// Mailbox backends.

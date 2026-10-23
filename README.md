@@ -307,10 +307,21 @@ A task with `mailbox: None` runs, but its outcome is not stored.
 ## Configuration
 
 `config::SchedulerConfig::from_json_str` parses and validates a JSON file of
-named pools (limits plus the kind of queue, mailbox and runtime), and
-`builders::build_pools` turns it into `ResourcePool`s from factories you
-supply. See
-[`examples/configs/scheduler-config.json`](examples/configs/scheduler-config.json).
+named `pools` (limits and execution budget) and optional named durable
+`backends` (Postgres or redb, with their parameters).
+`builders::build_pools_from_scheduler_config` builds every pool and opens
+every backend; `builders::build_pools` builds pools from queue and mailbox
+factories you supply instead.
+
+The schema is strict: an unknown or misspelled field fails to load, and the
+error names it. Pools park tasks and deliver results in memory; a pool that
+names a durable backend for its `queue` or `mailbox` is rejected until durable
+dispatch lands, and the opened backends are used directly through
+`LeaseQueue` and `ResultMailbox`. One example per backend, each loaded and
+built by the test suite:
+[`in-memory.json`](examples/configs/in-memory.json),
+[`postgres.json`](examples/configs/postgres.json),
+[`redb.json`](examples/configs/redb.json).
 
 ## Documentation
 

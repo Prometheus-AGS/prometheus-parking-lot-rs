@@ -1,103 +1,430 @@
-//! Tests for configuration validation
+//! Scheduler configuration: schema strictness, validation, documented examples
+//! (cr-37, scenario S-22).
+//!
+//! Every test is named `config_*` so the S-22 entry point selects them:
+//! `cargo nextest run -p prometheus_parking_lot --all-features --locked -E "test(config_)"`.
+//!
+//! Negative control: built with `--cfg parking_lot_negative_control="s-22"` the
+//! config structs stop denying unknown fields, and the `*_misspelled_*` tests
+//! below must fail.
+
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use prometheus_parking_lot::config::{
-    MailboxBackendConfig, PoolConfig, QueueBackendConfig, RuntimeConfig, SchedulerConfig,
+    BackendConfig, ConfigError, PoolConfig, RedbBackendConfig, SchedulerConfig, StorageConfig,
+    WorkerPoolConfig,
 };
 
-#[test]
-fn test_pool_config_validation() {
-    let valid = PoolConfig {
-        max_units: 100,
+const fn pool(max_units: u32) -> PoolConfig {
+    PoolConfig {
+        max_units,
         max_queue_depth: 50,
         default_timeout_secs: 60,
-        queue: QueueBackendConfig::InMemory,
-        mailbox: MailboxBackendConfig::InMemory,
-        runtime: RuntimeConfig::Native,
-    };
-    assert!(valid.validate().is_ok());
+        queue: StorageConfig::InMemory,
+        mailbox: StorageConfig::InMemory,
+    }
+}
+
+fn one_pool(pool: PoolConfig) -> SchedulerConfig {
+    SchedulerConfig {
+        backends: BTreeMap::new(),
+        pools: BTreeMap::from([("inference".to_owned(), pool)]),
+    }
+}
+
+/// The parse error for `json`, which must not load.
+fn parse_error(json: &str) -> String {
+    match SchedulerConfig::from_json_str(json) {
+        Ok(cfg) => panic!("expected a parse error, loaded {cfg:?}"),
+        Err(err @ ConfigError::Parse(_)) => err.to_string(),
+        Err(other) => panic!("expected a parse error, got {other}"),
+    }
+}
+
+/// The field named by the validation error for `json`.
+fn invalid_field(json: &str) -> String {
+    match SchedulerConfig::from_json_str(json) {
+        Ok(cfg) => panic!("expected a validation error, loaded {cfg:?}"),
+        Err(err) => err
+            .field()
+            .unwrap_or_else(|| panic!("expected a validation error, got {err}"))
+            .to_owned(),
+    }
+}
+
+const POOL: &str = r#""max_units": 4, "max_queue_depth": 8, "default_timeout_secs": 30,
+                      "queue": "in_memory", "mailbox": "in_memory""#;
+
+// ── strict schema: misspelled fields fail, naming the field ─────────────────
+
+#[test]
+fn config_misspelled_pool_field_is_rejected_naming_it() {
+    let json = r#"{ "pools": { "p": { "max_units": 4, "max_queue_dept": 8,
+        "default_timeout_secs": 30, "queue": "in_memory", "mailbox": "in_memory",
+        "max_queue_depth": 8 } } }"#;
+    let message = parse_error(json);
+    assert!(
+        message.contains("unknown field `max_queue_dept`"),
+        "error must name the misspelled field: {message}"
+    );
 }
 
 #[test]
-fn test_pool_config_invalid_max_units() {
-    let invalid = PoolConfig {
-        max_units: 0,
-        max_queue_depth: 50,
-        default_timeout_secs: 60,
-        queue: QueueBackendConfig::InMemory,
-        mailbox: MailboxBackendConfig::InMemory,
-        runtime: RuntimeConfig::Native,
-    };
-    assert!(invalid.validate().is_err());
+fn config_misspelled_top_level_field_is_rejected_naming_it() {
+    let json = format!(r#"{{ "backend": {{}}, "pools": {{ "p": {{ {POOL} }} }} }}"#);
+    let message = parse_error(&json);
+    assert!(
+        message.contains("unknown field `backend`"),
+        "error must name the misspelled field: {message}"
+    );
 }
 
 #[test]
-fn test_pool_config_invalid_queue_depth() {
-    let invalid = PoolConfig {
-        max_units: 100,
-        max_queue_depth: 0,
-        default_timeout_secs: 60,
-        queue: QueueBackendConfig::InMemory,
-        mailbox: MailboxBackendConfig::InMemory,
-        runtime: RuntimeConfig::Native,
-    };
-    assert!(invalid.validate().is_err());
+fn config_misspelled_postgres_backend_field_is_rejected_naming_it() {
+    let json = format!(
+        r#"{{ "backends": {{ "db": {{ "type": "postgres", "url": "postgres://u@h/d",
+            "queue_name": "q", "max_depth": 10, "lease_secs": 30, "listne": true }} }},
+            "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    let message = parse_error(&json);
+    assert!(
+        message.contains("unknown field `listne`"),
+        "error must name the misspelled field: {message}"
+    );
 }
 
 #[test]
-fn test_pool_config_invalid_timeout() {
-    let invalid = PoolConfig {
-        max_units: 100,
-        max_queue_depth: 50,
-        default_timeout_secs: 0,
-        queue: QueueBackendConfig::InMemory,
-        mailbox: MailboxBackendConfig::InMemory,
-        runtime: RuntimeConfig::Native,
-    };
-    assert!(invalid.validate().is_err());
+fn config_misspelled_redb_backend_field_is_rejected_naming_it() {
+    let json = format!(
+        r#"{{ "backends": {{ "local": {{ "type": "redb", "path": "./q.redb",
+            "max_depth": 10, "lease_secs": 30, "fsync": false }} }},
+            "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    let message = parse_error(&json);
+    assert!(
+        message.contains("unknown field `fsync`"),
+        "error must name the misspelled field: {message}"
+    );
 }
 
 #[test]
-fn test_scheduler_config_validation() {
-    let mut pools = std::collections::HashMap::new();
-    pools.insert(
-        "pool1".to_string(),
-        PoolConfig {
-            max_units: 100,
-            max_queue_depth: 50,
-            default_timeout_secs: 60,
-            queue: QueueBackendConfig::InMemory,
-            mailbox: MailboxBackendConfig::InMemory,
-            runtime: RuntimeConfig::Native,
-        },
+fn config_misspelled_worker_pool_field_is_rejected_naming_it() {
+    let err = serde_json::from_str::<WorkerPoolConfig>(r#"{ "worker_cout": 4 }"#)
+        .expect_err("a misspelled field must not load");
+    assert!(
+        err.to_string().contains("unknown field `worker_cout`"),
+        "error must name the misspelled field: {err}"
+    );
+}
+
+#[test]
+fn config_misspelled_0_2_runtime_field_is_rejected_instead_of_ignored() {
+    // 0.2 accepted `"runtime"` and ignored it; it now fails, naming the field.
+    let json = format!(r#"{{ "pools": {{ "p": {{ {POOL}, "runtime": "native" }} }} }}"#);
+    let message = parse_error(&json);
+    assert!(
+        message.contains("unknown field `runtime`"),
+        "error must name the field: {message}"
+    );
+}
+
+#[test]
+fn config_unknown_backend_type_is_rejected_naming_the_type() {
+    let json = format!(
+        r#"{{ "backends": {{ "q": {{ "type": "pgmq", "queue_name": "q" }} }},
+            "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    let message = parse_error(&json);
+    assert!(
+        message.contains("unknown variant `pgmq`"),
+        "error must name the type: {message}"
+    );
+}
+
+#[test]
+fn config_worker_pool_config_loads_every_field_on_every_target() {
+    let cfg: WorkerPoolConfig = serde_json::from_str(
+        r#"{ "worker_count": 2, "thread_stack_size": 1048576, "max_units": 10,
+             "max_queue_depth": 20, "default_timeout_ms": 5000 }"#,
+    )
+    .expect("a complete worker pool config loads");
+    assert_eq!(cfg.thread_stack_size, 1_048_576);
+    assert!(cfg.validate().is_ok());
+}
+
+// ── validation names the offending field ────────────────────────────────────
+
+#[test]
+fn config_pool_limits_are_validated() {
+    assert!(pool(100).validate().is_ok());
+    let zero_units = pool(0).validate().expect_err("zero units");
+    assert_eq!(zero_units.field(), Some("max_units"));
+
+    let mut zero_depth = pool(1);
+    zero_depth.max_queue_depth = 0;
+    assert_eq!(
+        zero_depth.validate().expect_err("zero depth").field(),
+        Some("max_queue_depth")
     );
 
-    let config = SchedulerConfig { pools };
-    assert!(config.validate().is_ok());
+    let mut zero_timeout = pool(1);
+    zero_timeout.default_timeout_secs = 0;
+    assert_eq!(
+        zero_timeout.validate().expect_err("zero timeout").field(),
+        Some("default_timeout_secs")
+    );
 }
 
 #[test]
-fn test_scheduler_config_empty_pools() {
-    let config = SchedulerConfig {
-        pools: std::collections::HashMap::new(),
+fn config_scheduler_errors_carry_the_dotted_path() {
+    let err = one_pool(pool(0)).validate().expect_err("zero units");
+    assert_eq!(err.field(), Some("pools.inference.max_units"));
+    assert_eq!(
+        err.to_string(),
+        "pools.inference.max_units: must be greater than 0"
+    );
+
+    let empty = SchedulerConfig {
+        backends: BTreeMap::new(),
+        pools: BTreeMap::new(),
     };
-    assert!(config.validate().is_err());
+    assert_eq!(
+        empty.validate().expect_err("no pools").field(),
+        Some("pools")
+    );
 }
 
 #[test]
-fn test_scheduler_config_from_json() {
-    let json = r#"{
-        "pools": {
-            "pool1": {
-                "max_units": 100,
-                "max_queue_depth": 50,
-                "default_timeout_secs": 60,
-                "queue": "in_memory",
-                "mailbox": "in_memory",
-                "runtime": "native"
+fn config_pool_on_unknown_backend_is_rejected() {
+    let json = r#"{ "pools": { "p": { "max_units": 4, "max_queue_depth": 8,
+        "default_timeout_secs": 30, "queue": { "backend": "nope" }, "mailbox": "in_memory" } } }"#;
+    assert_eq!(invalid_field(json), "pools.p.queue");
+}
+
+#[test]
+fn config_pool_on_a_durable_backend_is_rejected_until_durable_dispatch() {
+    // A pool cannot park tasks or deliver results in a durable backend yet; the
+    // configuration must say so rather than run the pool in memory.
+    let mut cfg = one_pool(pool(4));
+    cfg.backends.insert(
+        "local".to_owned(),
+        BackendConfig::Redb(RedbBackendConfig {
+            path: PathBuf::from("./never-opened.redb"),
+            max_depth: 10,
+            lease_secs: 30,
+        }),
+    );
+    if let Some(pool) = cfg.pools.get_mut("inference") {
+        pool.mailbox = StorageConfig::Backend("local".to_owned());
+    }
+    let err = cfg.validate().expect_err("durable mailbox");
+    // Without the `embedded` feature the backend itself is rejected first.
+    if cfg!(feature = "embedded") {
+        assert_eq!(err.field(), Some("pools.inference.mailbox"));
+        assert!(err.to_string().contains("durable dispatch"), "{err}");
+    } else {
+        assert_eq!(err.field(), Some("backends.local.type"));
+    }
+}
+
+#[cfg(feature = "embedded")]
+#[test]
+fn config_backend_values_are_validated() {
+    let json = format!(
+        r#"{{ "backends": {{ "local": {{ "type": "redb", "path": "./q.redb",
+            "max_depth": 10, "lease_secs": 0 }} }}, "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    assert_eq!(invalid_field(&json), "backends.local.lease_secs");
+
+    let json = format!(
+        r#"{{ "backends": {{ "local": {{ "type": "redb", "path": "./q.redb",
+            "max_depth": 0, "lease_secs": 5 }} }}, "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    assert_eq!(invalid_field(&json), "backends.local.max_depth");
+}
+
+#[cfg(feature = "postgres")]
+#[test]
+fn config_postgres_values_are_validated_and_debug_hides_the_password() {
+    let json = format!(
+        r#"{{ "backends": {{ "db": {{ "type": "postgres", "url": "postgres://app:s3cret@db/app",
+            "queue_name": "q", "max_depth": 10, "lease_secs": 30, "max_attempts": 0 }} }},
+            "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    assert_eq!(invalid_field(&json), "backends.db.max_attempts");
+
+    let parsed: SchedulerConfig = serde_json::from_str(&json).expect("parses");
+    let debug = format!("{parsed:?}");
+    assert!(
+        !debug.contains("s3cret"),
+        "Debug leaks the password: {debug}"
+    );
+    assert!(debug.contains("postgres://app:***@db/app"), "{debug}");
+}
+
+#[cfg(not(feature = "postgres"))]
+#[test]
+fn config_postgres_backend_without_the_feature_is_rejected() {
+    let json = format!(
+        r#"{{ "backends": {{ "db": {{ "type": "postgres", "url": "postgres://u@h/d",
+            "queue_name": "q", "max_depth": 10, "lease_secs": 30 }} }},
+            "pools": {{ "p": {{ {POOL} }} }} }}"#
+    );
+    assert_eq!(invalid_field(&json), "backends.db.type");
+}
+
+// ── documented examples ─────────────────────────────────────────────────────
+
+/// The documented examples use every backend, so they need every feature.
+#[cfg(all(feature = "postgres", feature = "embedded"))]
+mod examples {
+    use std::path::{Path, PathBuf};
+
+    use prometheus_parking_lot::config::{BackendConfig, SchedulerConfig};
+
+    fn repo_root() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    }
+
+    /// `examples/configs/*.json`, sorted.
+    fn example_config_files() -> Vec<PathBuf> {
+        let dir = repo_root().join("examples/configs");
+        let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
+            .unwrap_or_else(|e| panic!("read {}: {e}", dir.display()))
+            .map(|entry| entry.expect("dir entry").path())
+            .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
+            .collect();
+        files.sort();
+        files
+    }
+
+    #[test]
+    fn config_every_example_file_loads_and_validates() {
+        let files = example_config_files();
+        let names: Vec<_> = files
+            .iter()
+            .map(|p| {
+                p.file_name()
+                    .expect("file name")
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect();
+        assert_eq!(names, ["in-memory.json", "postgres.json", "redb.json"]);
+        for file in &files {
+            let text = std::fs::read_to_string(file).expect("read example");
+            if let Err(err) = SchedulerConfig::from_json_str(&text) {
+                panic!("{} does not load: {err}", file.display());
             }
         }
-    }"#;
+    }
 
-    let config = SchedulerConfig::from_json_str(json);
-    assert!(config.is_ok());
+    /// Fenced `json` code blocks in `text`. For Rust sources, only doc comments
+    /// (`//!`, `///`) are read, with their markers stripped.
+    fn json_blocks(path: &Path, text: &str) -> Vec<String> {
+        let is_rust = path.extension().is_some_and(|ext| ext == "rs");
+        let lines = text.lines().filter_map(|line| {
+            if !is_rust {
+                return Some(line);
+            }
+            let trimmed = line.trim_start();
+            trimmed
+                .strip_prefix("//!")
+                .or_else(|| trimmed.strip_prefix("///"))
+                .map(|rest| rest.strip_prefix(' ').unwrap_or(rest))
+        });
+        let mut blocks = Vec::new();
+        let mut current: Option<String> = None;
+        for line in lines {
+            let fence = line.trim_start();
+            match current.as_mut() {
+                None if fence.starts_with("```json") => current = Some(String::new()),
+                Some(_) if fence.starts_with("```") => blocks.extend(current.take()),
+                Some(block) => {
+                    block.push_str(line);
+                    block.push('\n');
+                }
+                None => {}
+            }
+        }
+        blocks
+    }
+
+    fn markdown_files(dir: &Path, out: &mut Vec<PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries {
+            let path = entry.expect("dir entry").path();
+            if path.is_dir() {
+                markdown_files(&path, out);
+            } else if path
+                .extension()
+                .is_some_and(|ext| ext == "md" || ext == "mdx")
+            {
+                out.push(path);
+            }
+        }
+    }
+
+    /// Every place a configuration example is documented: the README, the docs
+    /// (not the archive or the audit), the docs site, and the config rustdoc.
+    fn documentation_files() -> Vec<PathBuf> {
+        let root = repo_root();
+        let mut files = vec![root.join("README.md")];
+        for dir in ["docs", "website/docs"] {
+            let mut found = Vec::new();
+            markdown_files(&root.join(dir), &mut found);
+            files.extend(
+                found
+                    .into_iter()
+                    .filter(|p| !p.components().any(|c| c.as_os_str() == "archive"))
+                    .filter(|p| !p.ends_with("update-plan-10-22-2026.md")),
+            );
+        }
+        for source in [
+            "src/config/mod.rs",
+            "src/config/pool.rs",
+            "src/config/backend.rs",
+        ] {
+            files.push(root.join(source));
+        }
+        files.sort();
+        files
+    }
+
+    #[test]
+    fn config_every_json_example_in_the_docs_loads() {
+        let mut checked = 0;
+        for file in documentation_files() {
+            let text = std::fs::read_to_string(&file)
+                .unwrap_or_else(|e| panic!("read {}: {e}", file.display()));
+            for block in json_blocks(&file, &text) {
+                if block.contains("\"pools\"") {
+                    if let Err(err) = SchedulerConfig::from_json_str(&block) {
+                        panic!(
+                            "scheduler config in {} does not load: {err}\n{block}",
+                            file.display()
+                        );
+                    }
+                    checked += 1;
+                } else if block.contains("\"type\"") {
+                    if let Err(err) = serde_json::from_str::<BackendConfig>(&block) {
+                        panic!(
+                            "backend section in {} does not parse: {err}\n{block}",
+                            file.display()
+                        );
+                    }
+                    checked += 1;
+                }
+            }
+        }
+        // At least: pool.rs (one scheduler config), backend.rs (two backend
+        // sections) and docs/ARCHITECTURE.md (one scheduler config).
+        assert!(
+            checked >= 4,
+            "found only {checked} documented config examples"
+        );
+    }
 }

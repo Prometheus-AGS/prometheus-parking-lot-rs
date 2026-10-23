@@ -28,7 +28,6 @@ fn default_worker_count() -> usize {
 }
 
 /// Default thread stack size: 2MB.
-#[cfg(not(target_arch = "wasm32"))]
 const fn default_thread_stack_size() -> usize {
     2 * 1024 * 1024 // 2MB
 }
@@ -43,7 +42,7 @@ const fn default_max_queue_depth() -> usize {
     1000
 }
 
-/// Default timeout in milliseconds: 2 minutes.
+/// Default execution budget (and native default result TTL) in milliseconds: 2 minutes.
 const fn default_timeout_ms() -> u64 {
     120_000
 }
@@ -52,7 +51,11 @@ const fn default_timeout_ms() -> u64 {
 ///
 /// This configuration is used to create a worker pool with dedicated worker threads
 /// (on native) or async tasks (on WASM). The same configuration works on all platforms,
-/// with platform-specific fields handled via conditional compilation.
+/// with platform-specific fields ignored where they do not apply.
+///
+/// Deserialization is strict: an unknown or misspelled field is an error that
+/// names it. Every field exists on every target, so one configuration file
+/// loads on native and WASM alike.
 ///
 /// # Example
 ///
@@ -66,6 +69,7 @@ const fn default_timeout_ms() -> u64 {
 ///     .with_timeout_ms(60_000);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(not(parking_lot_negative_control = "s-22"), serde(deny_unknown_fields))]
 pub struct WorkerPoolConfig {
     /// Number of worker threads (native) or concurrent async tasks (WASM).
     ///
@@ -77,7 +81,6 @@ pub struct WorkerPoolConfig {
     ///
     /// This field is ignored on WASM targets.
     /// Default: 2MB (2 * 1024 * 1024 bytes).
-    #[cfg(not(target_arch = "wasm32"))]
     #[serde(default = "default_thread_stack_size")]
     pub thread_stack_size: usize,
 
@@ -94,9 +97,14 @@ pub struct WorkerPoolConfig {
     #[serde(default = "default_max_queue_depth")]
     pub max_queue_depth: usize,
 
-    /// Default timeout for `retrieve` operations in milliseconds.
+    /// Execution budget in milliseconds for a task without a nearer deadline.
     ///
-    /// If a result is not available within this time, `SchedulerError::Timeout` is returned.
+    /// A task still running when the budget runs out fails with
+    /// `TaskError::Timeout` (delivered as `SchedulerError::Task` from
+    /// `retrieve`). On native it is also the default time an unretrieved
+    /// result is kept before eviction (`WorkerPool::with_result_ttl` overrides
+    /// it); the WASM pool does not evict results.
+    /// It does not bound `retrieve` itself: `retrieve` takes its own timeout.
     #[serde(default = "default_timeout_ms")]
     pub default_timeout_ms: u64,
 }
@@ -105,7 +113,6 @@ impl Default for WorkerPoolConfig {
     fn default() -> Self {
         Self {
             worker_count: default_worker_count(),
-            #[cfg(not(target_arch = "wasm32"))]
             thread_stack_size: default_thread_stack_size(),
             max_units: default_max_units(),
             max_queue_depth: default_max_queue_depth(),
@@ -129,7 +136,6 @@ impl WorkerPoolConfig {
     }
 
     /// Set the thread stack size (native only, ignored on WASM).
-    #[cfg(not(target_arch = "wasm32"))]
     #[must_use]
     pub const fn with_thread_stack_size(mut self, size: usize) -> Self {
         self.thread_stack_size = size;
@@ -150,14 +156,15 @@ impl WorkerPoolConfig {
         self
     }
 
-    /// Set the default timeout in milliseconds.
+    /// Set the execution budget (and native default result TTL) in milliseconds; see
+    /// [`default_timeout_ms`](Self::default_timeout_ms).
     #[must_use]
     pub const fn with_timeout_ms(mut self, timeout_ms: u64) -> Self {
         self.default_timeout_ms = timeout_ms;
         self
     }
 
-    /// Get the default timeout as a `Duration`.
+    /// The execution budget (and native default result TTL) as a `Duration`.
     #[must_use]
     pub const fn default_timeout(&self) -> Duration {
         Duration::from_millis(self.default_timeout_ms)

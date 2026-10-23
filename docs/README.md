@@ -40,9 +40,10 @@ is marked as planned and names its OpenSpec change.
 
 ## Configuration and migrations
 
-- Sample scheduler configuration:
-  [`examples/configs/scheduler-config.json`](../examples/configs/scheduler-config.json),
-  parsed by `config::SchedulerConfig::from_json_str` and turned into pools by
-  `builders::build_pools`. The configuration selects backend kinds and limits;
-  the application supplies the queue, mailbox and executor factories.
+- Sample scheduler configurations, one per backend:
+  [`examples/configs/`](../examples/configs/) (`in-memory.json`,
+  `postgres.json`, `redb.json`), parsed by
+  `config::SchedulerConfig::from_json_str` and built by
+  `builders::build_pools_from_scheduler_config`. The test suite loads and
+  builds every one of them.
 - Postgres schema: [`crates/parking-lot-pg/migrations/`](../crates/parking-lot-pg/migrations/).

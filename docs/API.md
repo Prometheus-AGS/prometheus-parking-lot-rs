@@ -27,6 +27,23 @@ Paths below are facade paths unless a crate is named.
 `WorkerPool`: `new`, `with_clock`, `submit` / `submit_async`, `retrieve` /
 `retrieve_async`, `stats`, `shutdown`.
 
+## Configuration
+
+| Item | Path | Feature |
+| --- | --- | --- |
+| `SchedulerConfig { backends, pools }` (`from_json_str`, `validate`); every config struct rejects unknown fields | `config::SchedulerConfig` | always |
+| `PoolConfig { max_units, max_queue_depth, default_timeout_secs, queue, mailbox }`, `StorageConfig` (`"in_memory"` or `{ "backend": name }`) | `config::*` | always |
+| `BackendConfig` (`"type": "postgres"` / `"redb"`), `PostgresBackendConfig`, `RedbBackendConfig` | `config::*` | always (validation requires `postgres` / `embedded`) |
+| `ConfigError` (`Parse` names an unknown or missing field; `Invalid { field, reason }` with a dotted path) | `config::ConfigError` | always |
+| `build_pools_from_scheduler_config(cfg, executor_factory, spawner)` → `BuiltScheduler { pools, postgres, redb }` | `builders::*` | `tokio-runtime` |
+| `ConfiguredPool { pool, mailbox }`, `SharedInMemoryMailbox` (`take`) | `builders::*` | `tokio-runtime` |
+| `PostgresBackend { queue, listener, lease_for }`, `RedbBackend { store, queue, mailbox, lease_for }` | `builders::*` | `postgres`, `embedded` |
+| `build_pools(cfg, queue_factory, mailbox_factory, executor_factory, spawner)` | `builders::build_pools` | `tokio-runtime` |
+
+Pools built from configuration park and deliver in memory; a pool whose
+`queue` or `mailbox` names a durable backend is rejected until durable
+dispatch (cr-49). Example files: `examples/configs/`.
+
 ## Tasks and executors
 
 | Item | Path |

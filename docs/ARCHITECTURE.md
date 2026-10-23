@@ -214,28 +214,33 @@ The codebase is a Cargo workspace organized so the core logic never depends on s
 
 ### 6.1 Configuration-Driven Design
 
-Infrastructure is selected at runtime via configuration, enabling the "Write Once, Run Anywhere" capability.
+Pools and durable backends are described in a JSON configuration
+(`config::SchedulerConfig`) and built by
+`builders::build_pools_from_scheduler_config`. The schema rejects unknown
+fields. Pools park tasks and deliver results in memory; durable backends
+(Postgres, redb) are opened from their own sections and used through the
+`LeaseQueue` and `ResultMailbox` contracts until durable dispatch (cr-49) lets
+a pool run on them, which is why a pool's `queue` and `mailbox` can only be
+`"in_memory"` today.
 
-**Example `scheduler-config.json`:**
-
-JSON
-
-```
+```json
 {
+  "backends": {
+    "local": { "type": "redb", "path": "./data/parking-lot.redb", "max_depth": 1000, "lease_secs": 300 },
+    "cloud": { "type": "postgres", "url": "postgres://parking_lot@db:5432/parking_lot",
+               "queue_name": "inference", "max_depth": 10000, "lease_secs": 300,
+               "listen": true, "migrate": true }
+  },
   "pools": {
-    "local_agent": {
-      "max_units": 8,
-      "queue": { "type": "yaque", "path": "./data" },
-      "mailbox": { "type": "in_memory" }
-    },
-    "cloud_agent": {
-      "max_units": 100,
-      "queue": { "type": "postgres_pgmq", "queue_name": "inference" },
-      "mailbox": { "type": "postgres", "table": "results" }
-    }
+    "local_agent": { "max_units": 8, "max_queue_depth": 200, "default_timeout_secs": 120,
+                     "queue": "in_memory", "mailbox": "in_memory" },
+    "cloud_agent": { "max_units": 100, "max_queue_depth": 5000, "default_timeout_secs": 600,
+                     "queue": "in_memory", "mailbox": "in_memory" }
   }
 }
 ```
+
+Complete examples, loaded and built by the test suite: `examples/configs/`.
 
 ------
 

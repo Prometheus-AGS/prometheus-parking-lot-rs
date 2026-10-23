@@ -1,6 +1,6 @@
 # Load Test Harness (Manual)
 
-- Use `examples/configs/scheduler-config.json` as a baseline; point queue/mailbox/audit to Postgres for durability or file-backed for local stress.
+- Use `examples/configs/in-memory.json` as a baseline. Pools run in memory until durable dispatch (cr-49); `postgres.json` and `redb.json` open the durable backends alongside them.
 - Write a small driver (e.g., in Rust or a script) that submits 10k tasks with mixed priorities and deadlines, then polls status/mailbox.
 - Measure:
   - 0 over-capacity starts (SC-001)
