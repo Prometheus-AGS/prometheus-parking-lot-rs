@@ -10,7 +10,10 @@ How it decides, with no build needed:
 
 1. `cargo metadata --no-deps` lists every target root of every workspace
    package (auto-discovered and explicit `[[test]]`/`[[bench]]`/`[[example]]`
-   alike, honouring `autotests = false`).
+   alike, honouring `autotests = false`). Standalone workspaces that are not
+   members of the root one (bindings/tauri-desktop, bindings/uniffi-bindgen:
+   a tracked `Cargo.toml` with its own `[workspace]` table) are listed the same
+   way, so their tests are checked too.
 2. From each root the script follows out-of-line `mod name;` declarations and
    `#[path = "..."]` attributes using rustc's file-resolution rules. A module
    behind a `cfg` is still followed (the loom suites declare `mod loom_support;`
@@ -93,14 +96,42 @@ def compiled_files(target_roots: list[Path]) -> set[Path]:
     return seen
 
 
-def main() -> int:
-    top = Path(run("git", "rev-parse", "--show-toplevel").strip())
-    metadata = json.loads(run("cargo", "metadata", "--no-deps", "--format-version", "1", cwd=top))
+def target_roots(top: Path, manifest: Path | None = None) -> tuple[list[Path], set[Path]]:
+    """Target roots and package manifest paths of one workspace."""
+    cmd = ["cargo", "metadata", "--no-deps", "--format-version", "1"]
+    if manifest is not None:
+        cmd += ["--manifest-path", str(manifest)]
+    metadata = json.loads(run(*cmd, cwd=top))
     roots = [
         Path(target["src_path"])
         for package in metadata["packages"]
         for target in package["targets"]
     ]
+    manifests = {Path(package["manifest_path"]).resolve() for package in metadata["packages"]}
+    return roots, manifests
+
+
+def standalone_workspaces(top: Path, known: set[Path]) -> list[Path]:
+    """Tracked manifests that open their own workspace and are not in the root one."""
+    listed = run("git", "ls-files", "--cached", "--others", "--exclude-standard", "-z",
+                 "--", "Cargo.toml", "**/Cargo.toml", cwd=top)
+    found = []
+    for name in sorted(set(filter(None, listed.split("\0")))):
+        path = (top / name).resolve()
+        if path in known:
+            continue
+        if re.search(r"^\[workspace\]", path.read_text(encoding="utf-8"), re.MULTILINE):
+            found.append(path)
+    return found
+
+
+def main() -> int:
+    top = Path(run("git", "rev-parse", "--show-toplevel").strip())
+    roots, manifests = target_roots(top)
+    for manifest in standalone_workspaces(top, manifests):
+        extra_roots, extra_manifests = target_roots(top, manifest)
+        roots += extra_roots
+        manifests |= extra_manifests
     compiled = compiled_files(roots)
 
     listed = run(

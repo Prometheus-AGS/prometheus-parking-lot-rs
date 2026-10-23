@@ -1,0 +1,25 @@
+# Tauri 2 desktop example for the embedded parking-lot queue (cr-44).
+#
+# A workspace of its own, NOT a member of the repository's root workspace. Tauri's
+# dependency tree is several hundred crates (webview bindings, windowing, a bundler's
+# worth of build tooling); inside the root workspace, every `--workspace` job in CI
+# would compile it. Standing alone, the main build and the main CI matrix never see it;
+# it has its own Cargo.lock and its own job (.github/workflows/platform.yml).
+#
+#   queue-service  the example's logic: submit, work, collect. No GUI, so its restart
+#                  test runs anywhere `cargo test` does.
+#   src-tauri      the Tauri shell: window, commands, app-data path. Compiled by the
+#                  desktop CI job; running it needs a display.
+[workspace]
+resolver = "3"
+members = ["queue-service", "src-tauri"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }

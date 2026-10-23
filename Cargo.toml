@@ -11,6 +11,7 @@ members = [
     "crates/parking-lot-pg",
     "crates/parking-lot-embedded",
     "crates/parking-lot-wasm",
+    "crates/parking-lot-ffi",
 ]
 
 [workspace.package]
@@ -53,6 +54,11 @@ futures-channel = "0.3"
 gloo-timers = { version = "0.4", features = ["futures"] }
 js-sys = "0.3"
 wasm-bindgen-futures = "0.4"
+
+# Mobile bindings (crates/parking-lot-ffi). Proc-macro API only: the `cargo-metadata`
+# default feature and the `cli` bindgen are not linked into the library; the generator
+# is built separately (bindings/uniffi-bindgen) so clap and askama stay out of this graph.
+uniffi = { version = "0.32", default-features = false }
 
 # Test and benchmark tooling.
 criterion = "0.8.1"

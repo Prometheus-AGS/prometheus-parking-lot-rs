@@ -179,7 +179,9 @@ jobs:
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           command: check
-          arguments: --all-features --locked
+          # --workspace: without it cargo-deny walks only the facade package's graph and
+          # never sees the crates the facade does not depend on (the FFI crate, cr-44).
+          arguments: --workspace --all-features --locked
 
   supply-chain:
     # cr-51. fetch-depth 0: gitleaks and ancestry checks need full history; a shallow

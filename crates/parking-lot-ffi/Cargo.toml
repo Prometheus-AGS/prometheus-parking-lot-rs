@@ -1,0 +1,38 @@
+[package]
+name = "prometheus-parking-lot-ffi"
+description = "UniFFI (Kotlin, Swift) bindings over the embedded parking-lot lease queue and result mailbox."
+documentation = "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/tree/main/bindings"
+keywords = ["scheduler", "queue", "uniffi", "android", "ios"]
+categories = ["api-bindings"]
+# Application-side artifact (a cdylib/staticlib that ships inside an app), not a library
+# crate to depend on from crates.io: not published (cr-44, docs/adr/0001-workspace-split.md).
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+
+[lib]
+name = "parking_lot_ffi"
+# lib: Rust consumers (the Tauri example, tests). cdylib: Android (.so) and bindgen's
+# library mode. staticlib: iOS (xcframework).
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[dependencies]
+prometheus-parking-lot-core.workspace = true
+prometheus-parking-lot-embedded.workspace = true
+serde.workspace = true
+# The embedded store spawns blocking work onto tokio, so exported futures must run on a
+# tokio runtime; this crate owns one (src/runtime.rs).
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+uniffi.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "time"] }
+
+[lints]
+workspace = true

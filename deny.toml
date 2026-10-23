@@ -23,6 +23,19 @@ allow = [
     "Zlib",
 ]
 
+# MPL-2.0 is file-level copyleft: using the crates unmodified, as a dependency, puts no
+# obligation on this code; modifying one of their files would oblige publishing that file.
+# Allowed only for UniFFI (crates/parking-lot-ffi, cr-44), crate by crate, so a new MPL
+# dependency elsewhere still fails the gate and gets its own review.
+exceptions = [
+    { allow = ["MPL-2.0"], crate = "uniffi" },
+    { allow = ["MPL-2.0"], crate = "uniffi_core" },
+    { allow = ["MPL-2.0"], crate = "uniffi_internal_macros" },
+    { allow = ["MPL-2.0"], crate = "uniffi_macros" },
+    { allow = ["MPL-2.0"], crate = "uniffi_meta" },
+    { allow = ["MPL-2.0"], crate = "uniffi_pipeline" },
+]
+
 [bans]
 # Disallow duplicate versions of the same crate (warn, not error, to avoid blocking first-time adds).
 multiple-versions = "warn"

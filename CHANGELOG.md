@@ -214,6 +214,22 @@ entry names the OpenSpec change that made it.
   `wasm32-unknown-unknown`; native panic containment does not apply there.
   CI gains a wasm check/test job and a core/wasm dependency-graph gate.
 
+- **Mobile and desktop bindings (cr-44).** New crate `prometheus-parking-lot-ffi`
+  (not published) exposes the embedded redb queue and result mailbox to Kotlin and
+  Swift through UniFFI 0.32: `open_store`, then async `enqueue`, `lease`, `ack`,
+  `nack`, `extend_lease`, `depth`, `deliver_result`, `consume_result`,
+  `peek_result` and `evict_expired_results`, with payloads as bytes. It builds as
+  `lib`, `cdylib` (Android) and `staticlib` (iOS) and contains no hand-written
+  `unsafe`. `bindings/generate.sh` generates the Kotlin and Swift sources in
+  library mode (nothing generated is committed); `bindings/smoke/` runs each
+  against the real library. A Tauri 2 desktop example (`bindings/tauri-desktop`,
+  its own workspace) keeps its queue across an app restart; the restart is tested
+  without a GUI. CI gains a `Platform` workflow (Android via `cargo ndk`, iOS
+  device and simulator, Kotlin and Swift smoke tests, the Tauri example), and the
+  `deny` job now checks the whole workspace (`--workspace`; before, it only saw
+  the facade's dependency graph). `deny.toml` allows MPL-2.0 for the UniFFI crates
+  only. See `bindings/README.md`.
+
 ### Removed
 
 - **The JSONL file queue and mailbox (cr-28).** `YaqueQueue`, `YaqueMailbox`
