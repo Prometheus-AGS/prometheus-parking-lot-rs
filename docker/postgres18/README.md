@@ -13,3 +13,5 @@ pgmq is SQL-only (PGXS `make install`), supports PG 14-18, and is checked agains
 
 Build: `docker build -f docker/postgres18/Dockerfile -t parking-lot-pg:18 docker/` (likewise 17).
 Bump the digest/pgmq tag deliberately; each setting in `postgresql.conf` is commented with its reason.
+
+CI (`postgres` job, cr-36) builds both images with buildx and runs every Docker-gated Postgres test on each; set `PARKING_LOT_PG_MAJOR=17|18` to pick the image locally. Operations: `docs/runbooks/postgres18.md`.

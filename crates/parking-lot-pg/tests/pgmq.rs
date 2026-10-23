@@ -39,15 +39,7 @@ use prometheus_parking_lot_core::{
 };
 use prometheus_parking_lot_pg::{PgmqLeaseQueue, Wake};
 use sqlx::postgres::PgPoolOptions;
-use support::{PgContainer, TestResult};
-
-/// Postgres major version under test (`PARKING_LOT_PG_MAJOR`, default 18).
-fn pg_major() -> u8 {
-    std::env::var("PARKING_LOT_PG_MAJOR")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(18)
-}
+use support::{PgContainer, TestResult, pg_major};
 
 fn task(priority: Priority, payload: &str, key: Option<&str>) -> ScheduledTask<String> {
     ScheduledTask {

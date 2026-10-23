@@ -95,5 +95,27 @@ CREATE TRIGGER pl_lease_queue_wake_update
     )
     EXECUTE FUNCTION pl_lease_queue_notify();
 
+-- Autovacuum (cr-36). Queue tables churn constantly: a row is inserted, updated
+-- a few times and deleted. A backlog can also grow them large (a deep queue,
+-- undelivered results, dead letters), and the default trigger (50 + 20% of the
+-- live rows) then waits for hundreds of thousands of dead tuples; even the
+-- cluster floor in docker/postgres18/postgresql.conf (5%) scales with the
+-- backlog. Scale factor 0 with a fixed threshold makes the trigger independent
+-- of table size: vacuum after about 1000 dead tuples, whatever the
+-- table holds. That bounds the dead rows the claim index scans step over, which
+-- is what keeps FOR UPDATE SKIP LOCKED cheap. The analyze pair keeps the
+-- planner's row estimates fresh enough to choose the partial claim index as the
+-- ready/leased/dead mix shifts. The TOAST table behind the JSONB columns needs no
+-- toast.* options: with none set it uses the table's own (PostgreSQL docs,
+-- CREATE TABLE, storage parameters). ALTER TABLE ... SET takes SHARE UPDATE
+-- EXCLUSIVE, which does not block queue reads or writes, and re-applying it is
+-- a no-op, so the migration stays safe to run at every start.
+ALTER TABLE pl_lease_queue SET (
+    autovacuum_vacuum_scale_factor = 0,
+    autovacuum_vacuum_threshold = 1000,
+    autovacuum_analyze_scale_factor = 0,
+    autovacuum_analyze_threshold = 1000
+);
+
 COMMENT ON TABLE pl_lease_queue IS 'Leasing task queue: at-least-once delivery with fenced leases (cr-26)';
 COMMENT ON COLUMN pl_lease_queue.attempts IS 'Leases granted so far; also the fencing token of the current lease';

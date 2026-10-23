@@ -32,6 +32,26 @@ pub const PG_PASSWORD: &str = "postgres";
 /// Default database created by the entrypoint.
 pub const PG_DATABASE: &str = "postgres";
 
+/// Postgres major version under test: `PARKING_LOT_PG_MAJOR` (17 or 18), default 18.
+///
+/// The CI matrix (`.github/workflows/postgres.yml`) sets it per leg. A value
+/// that is set but unparsable panics instead of silently testing the default,
+/// so a typo cannot turn the 17 leg into a second 18 run.
+///
+/// # Panics
+///
+/// If `PARKING_LOT_PG_MAJOR` is set to anything but a supported major.
+#[must_use]
+pub fn pg_major() -> u8 {
+    match std::env::var("PARKING_LOT_PG_MAJOR") {
+        Err(_) => 18,
+        Ok(v) => match v.trim().parse::<u8>() {
+            Ok(major @ (17 | 18)) => major,
+            _ => panic!("PARKING_LOT_PG_MAJOR must be 17 or 18, got {v:?}"),
+        },
+    }
+}
+
 /// A running `parking-lot-pg` container with a ready pool.
 pub struct PgContainer {
     /// Pool connected to the default database.

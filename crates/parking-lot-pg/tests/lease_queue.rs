@@ -1,4 +1,5 @@
-//! Real-Postgres tests for [`PgLeaseQueue`] (cr-26) on the PG 18 project image.
+//! Real-Postgres tests for [`PgLeaseQueue`] (cr-26) on the project Postgres image
+//! (PG 18; `PARKING_LOT_PG_MAJOR=17` selects 17).
 //!
 //! Every test needs Docker, so each is `#[ignore]`d and compiles in CI without
 //! it. Run them with:
@@ -37,10 +38,7 @@ use prometheus_parking_lot_core::{
 };
 use prometheus_parking_lot_pg::{PgLeaseQueue, Wake};
 use sqlx::postgres::PgPoolOptions;
-use support::{PgContainer, TestResult};
-
-/// Postgres major version under test. The 17/18 matrix is cr-36.
-const PG_MAJOR: u8 = 18;
+use support::{PgContainer, TestResult, pg_major};
 
 fn task(priority: Priority, payload: &str, key: Option<&str>) -> ScheduledTask<String> {
     ScheduledTask {
@@ -60,7 +58,7 @@ fn task(priority: Priority, payload: &str, key: Option<&str>) -> ScheduledTask<S
 
 /// A container with the schema applied.
 async fn start() -> TestResult<PgContainer> {
-    let pg = PgContainer::start(PG_MAJOR).await?;
+    let pg = PgContainer::start(pg_major()).await?;
     PgLeaseQueue::<String>::migrate(&pg.pool).await?;
     Ok(pg)
 }

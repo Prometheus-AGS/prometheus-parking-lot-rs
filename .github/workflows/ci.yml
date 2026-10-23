@@ -22,8 +22,9 @@ env:
 
 # Every cargo invocation is --locked (Cargo.lock is committed) and --workspace
 # (the repository root is both the facade package and the workspace root).
-# The Postgres suites (crates/parking-lot-pg/tests) are registered and compiled here,
-# but need Docker and are #[ignore]d; the Docker job arrives with cr-36.
+# The Postgres suites (crates/parking-lot-pg/tests) and the facade's Postgres config
+# test need Docker and are #[ignore]d: the `test` job compiles them but skips them,
+# and the `postgres` job (cr-36) runs them with --run-ignored on PG 17 and PG 18.
 
 jobs:
   fmt:
@@ -85,6 +86,70 @@ jobs:
       - name: Run doctests (nextest does not run them)
         timeout-minutes: 5
         run: cargo +${{ matrix.toolchain }} test --workspace --all-features --locked --doc
+
+  postgres:
+    # cr-36. Every Docker-gated Postgres test, once per supported major (17, 18):
+    # the parking-lot-pg crate's suites (lease queue, mailbox, pgmq, per-table
+    # autovacuum, image smoke) and the facade's Postgres config test. The `test`
+    # job skips them because they are #[ignore]d.
+    #
+    # Image: docker/postgres<N>/Dockerfile builds Postgres + pgmq (pgmq is compiled
+    # from a pinned tag, the slow step). It is built once per leg with buildx and
+    # the GitHub Actions layer cache, and loaded into the runner's Docker engine as
+    # parking-lot-pg:<N>. The tests' helper (tests/support) starts with
+    # `docker image inspect parking-lot-pg:<N>` and only builds when that fails, so
+    # testcontainers uses this image and never pulls or rebuilds.
+    # PARKING_LOT_PG_MAJOR selects the major in every suite.
+    name: Postgres ${{ matrix.pg }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: ["17", "18"]
+    env:
+      PARKING_LOT_PG_MAJOR: ${{ matrix.pg }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.PINNED_TOOLCHAIN }}
+      # Same flags, features and toolchain as the `test` job's pinned leg, so this
+      # job restores the cache that job saves on main and saves nothing itself.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test-${{ env.PINNED_TOOLCHAIN }}
+          save-if: "false"
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+      - uses: docker/setup-buildx-action@v4
+      - name: Build parking-lot-pg:${{ matrix.pg }} (layer cache)
+        uses: docker/build-push-action@v7
+        with:
+          context: docker
+          file: docker/postgres${{ matrix.pg }}/Dockerfile
+          tags: parking-lot-pg:${{ matrix.pg }}
+          # Into the local engine, where `docker image inspect` and testcontainers look.
+          load: true
+          push: false
+          # One cache scope per major. ignore-error: a cache outage (or a fork's
+          # read-only token) must not fail the build; the layers are just rebuilt.
+          cache-from: type=gha,scope=parking-lot-pg-${{ matrix.pg }}
+          cache-to: type=gha,mode=max,scope=parking-lot-pg-${{ matrix.pg }},ignore-error=true
+      - name: Image is present and is the requested major
+        run: |
+          docker image inspect parking-lot-pg:${{ matrix.pg }} --format '{{ index .Config.Labels "ai.prometheus.pg.major" }}' | grep -qx '${{ matrix.pg }}'
+      # Build first so the timeout below bounds test execution, not a cold compile.
+      - name: Build tests
+        run: cargo nextest run --workspace --all-features --locked --no-run
+      - name: Docker-gated Postgres tests (PG ${{ matrix.pg }})
+        timeout-minutes: 25
+        # --no-tests=fail: a filter that matches nothing is a failure, not a pass.
+        run: >
+          cargo nextest run --workspace --all-features --locked
+          --run-ignored all --no-fail-fast --no-tests=fail
+          -E 'package(prometheus-parking-lot-pg) | test(config_postgres_example_builds_against_pg18)'
 
   wasm:
     # cr-38 / S-14. Everything in the wasm crate is cfg(target_arch = "wasm32"), so the

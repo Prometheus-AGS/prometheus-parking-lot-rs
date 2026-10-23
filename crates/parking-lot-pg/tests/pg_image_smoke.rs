@@ -8,7 +8,7 @@
 
 mod support;
 
-use support::{PgContainer, TestResult};
+use support::{PgContainer, TestResult, pg_major};
 
 /// Pinned in `docker/postgres*/Dockerfile` (`PGMQ_VERSION`).
 const PGMQ_VERSION: &str = "1.13.1";
@@ -69,14 +69,10 @@ async fn smoke(major: u8) -> TestResult<()> {
     Ok(())
 }
 
+/// The image of the major under test (`PARKING_LOT_PG_MAJOR`, default 18) has
+/// pgmq and the tuned configuration. The CI matrix runs it once per major.
 #[tokio::test]
 #[ignore = "requires Docker"]
-async fn postgres18_image_has_pgmq() -> TestResult<()> {
-    smoke(18).await
-}
-
-#[tokio::test]
-#[ignore = "requires Docker"]
-async fn postgres17_image_has_pgmq() -> TestResult<()> {
-    smoke(17).await
+async fn postgres_image_has_pgmq() -> TestResult<()> {
+    smoke(pg_major()).await
 }

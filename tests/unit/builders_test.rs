@@ -250,15 +250,19 @@ mod postgres {
 
     use super::{Built, Echo, build_pools_from_scheduler_config, read_example, spawner, task};
 
-    /// Postgres major version of the project image (`docker/postgres18`).
-    const PG_MAJOR: &str = "18";
+    /// Postgres major version of the project image under test: 18, or the
+    /// `PARKING_LOT_PG_MAJOR` the CI matrix sets (`docker/postgres17`, `docker/postgres18`).
+    fn pg_major() -> String {
+        std::env::var("PARKING_LOT_PG_MAJOR").unwrap_or_else(|_| "18".to_owned())
+    }
     /// Test-only superuser password configured in the container.
     const PG_PASSWORD: &str = "postgres";
 
     /// Build the `parking-lot-pg:18` image unless it exists (as the Postgres
     /// crate's test support does), then start a container.
     async fn start_pg18() -> (ContainerAsync<GenericImage>, String) {
-        let tag = format!("parking-lot-pg:{PG_MAJOR}");
+        let major = pg_major();
+        let tag = format!("parking-lot-pg:{major}");
         let present = Command::new("docker")
             .args(["image", "inspect", &tag])
             .output()
@@ -270,14 +274,14 @@ mod postgres {
             let status = Command::new("docker")
                 .arg("build")
                 .arg("-f")
-                .arg(root.join(format!("docker/postgres{PG_MAJOR}/Dockerfile")))
+                .arg(root.join(format!("docker/postgres{major}/Dockerfile")))
                 .args(["-t", &tag])
                 .arg(root.join("docker"))
                 .status()
                 .expect("run docker build");
             assert!(status.success(), "docker build of {tag} failed");
         }
-        let container = GenericImage::new("parking-lot-pg", PG_MAJOR)
+        let container = GenericImage::new("parking-lot-pg", &major)
             .with_exposed_port(ContainerPort::Tcp(5432))
             .with_wait_for(WaitFor::message_on_stderr(
                 "database system is ready to accept connections",

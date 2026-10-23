@@ -93,7 +93,7 @@ use sqlx::{PgPool, Row, SqlStr};
 
 use self::sql::{
     CREATE_QUEUE, ENQUEUE_EXISTING, ENQUEUE_KEY, ENQUEUE_LOCK, ENQUEUE_NOTIFY, ENQUEUE_SEND, LANES,
-    LEASE_READ, MIGRATION, Statements,
+    LEASE_READ, MIGRATION, Statements, TUNE_QUEUE,
 };
 use crate::lease_queue::QueueListener;
 
@@ -221,6 +221,11 @@ impl<P> PgmqLeaseQueue<P> {
                 .execute(&self.pool)
                 .await
                 .map_err(backend("create pgmq queue"))?;
+            sqlx::query(TUNE_QUEUE)
+                .bind(name)
+                .execute(&self.pool)
+                .await
+                .map_err(backend("tune pgmq queue autovacuum"))?;
         }
         Ok(())
     }

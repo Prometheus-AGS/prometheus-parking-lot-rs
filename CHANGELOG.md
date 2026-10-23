@@ -230,6 +230,19 @@ entry names the OpenSpec change that made it.
   the facade's dependency graph). `deny.toml` allows MPL-2.0 for the UniFFI crates
   only. See `bindings/README.md`.
 
+- **Postgres 17 and 18 matrix, autovacuum, runbook (cr-36).** CI gains a
+  `postgres` job that builds `parking-lot-pg:17` and `:18` (buildx, GitHub
+  Actions layer cache) and runs every Docker-gated Postgres test on both: the
+  `parking-lot-pg` suites (lease queue, mailbox, pgmq, image smoke) and the
+  facade's Postgres config test. The suites read `PARKING_LOT_PG_MAJOR`
+  (default 18); before, only the pgmq suite did. The queue tables get per-table
+  autovacuum settings (scale factor 0 with fixed thresholds of 500 to 1000 dead
+  tuples) from migrations 004 to 006, and `PgmqLeaseQueue::prepare` applies them
+  to pgmq's own `q_*` tables through the new `pl_pgmq_tune_queue` function. See
+  `docs/runbooks/postgres18.md` (PG 18 data checksums by default, the Docker
+  volume and `PGDATA` change, SCRAM, pgmq install, upgrading 17 to 18, bloat
+  monitoring).
+
 ### Removed
 
 - **The JSONL file queue and mailbox (cr-28).** `YaqueQueue`, `YaqueMailbox`

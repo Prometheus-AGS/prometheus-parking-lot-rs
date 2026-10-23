@@ -1,5 +1,5 @@
-//! Real-Postgres tests for [`PgResultMailbox`] (cr-27) on the PG 18 project
-//! image.
+//! Real-Postgres tests for [`PgResultMailbox`] (cr-27) on the project Postgres
+//! image (PG 18; `PARKING_LOT_PG_MAJOR=17` selects 17).
 //!
 //! Every test needs Docker, so each is `#[ignore]`d and compiles in CI without
 //! it. Run them with:
@@ -37,11 +37,8 @@ use prometheus_parking_lot_core::{
     Delivery, DeliveryOutcome, MailboxKey, ResultMailbox, TaskStatus, result_mailbox_conformance,
 };
 use prometheus_parking_lot_pg::PgResultMailbox;
-use support::{PgContainer, TestResult};
+use support::{PgContainer, TestResult, pg_major};
 use tokio::sync::Barrier;
-
-/// Postgres major version under test. The 17/18 matrix is cr-36.
-const PG_MAJOR: u8 = 18;
 
 /// Tests that need Docker compile everywhere and run only when asked.
 macro_rules! docker_test {
@@ -72,7 +69,7 @@ fn completed(key: &MailboxKey, task_id: u64, payload: &str) -> Delivery<String> 
 
 /// A container with the schema applied.
 async fn start() -> TestResult<PgContainer> {
-    let pg = PgContainer::start(PG_MAJOR).await?;
+    let pg = PgContainer::start(pg_major()).await?;
     PgResultMailbox::<String>::migrate(&pg.pool).await?;
     Ok(pg)
 }
@@ -311,7 +308,7 @@ docker_test! {
 docker_test! {
     /// Several processes migrating at once is safe.
     async fn mailbox_migrate_is_concurrent_and_idempotent() {
-        let pg = PgContainer::start(PG_MAJOR).await.expect("start Postgres");
+        let pg = PgContainer::start(pg_major()).await.expect("start Postgres");
         let runs: Vec<_> = (0..4)
             .map(|_| {
                 let pool = pg.pool.clone();
