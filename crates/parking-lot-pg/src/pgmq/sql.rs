@@ -20,7 +20,10 @@
 //! `pgmq.read` that re-claims an expired message also locks the row, and
 //! whichever statement gets the lock second re-evaluates `read_ct` and `vt`
 //! against the new row version. The loser is a `LeaseLost`, never a double
-//! claim.
+//! claim. (The delay mark of a nacked token is read from the statement's
+//! snapshot, so it does not cover two statements racing on the very same
+//! token, such as an `ack` and a `nack` issued concurrently by one caller;
+//! a token is meant to be resolved once.)
 //!
 //! # Lease predicate
 //!
@@ -87,7 +90,15 @@ pub(super) const LEASE_READ: &str =
     "SELECT msg_id, read_ct, message FROM pgmq.read($1::text, $2::int, $3::int)";
 
 /// Create one pgmq queue (idempotent). `$1` queue.
-pub(super) const CREATE_QUEUE: &str = "SELECT pgmq.create($1::text)";
+///
+/// `pgmq.create` on an existing queue runs `CREATE INDEX IF NOT EXISTS` on the
+/// queue table, which takes a SHARE lock (blocking every writer) before it
+/// notices the index exists. The existence check keeps a start-up
+/// `prepare()` of a live queue away from that, and the advisory lock makes two
+/// processes creating the same queue take turns.
+pub(super) const CREATE_QUEUE: &str = "SELECT pgmq.create($1::text)
+       FROM (SELECT pg_advisory_xact_lock(hashtextextended('pl_pgmq_create:' || $1::text, 0))) l
+      WHERE to_regclass(format('pgmq.%I', 'q_' || $1::text)) IS NULL";
 
 /// Apply the per-table autovacuum settings (cr-36) to one pgmq queue's table.
 /// Idempotent; defined in the migration. `$1` queue.
@@ -122,10 +133,23 @@ fn dynamic(sql: String) -> SqlStr {
 }
 
 /// The fence guard: the message row, locked, only while this lease holds it.
+///
+/// Three conditions make a token usable: `read_ct` is the token's fence (no
+/// later delivery), `vt` is still in the future (the lease has not run out) and
+/// the entry is not delayed by a nack. The third one matters because a delayed
+/// nack sets `vt` to the end of the delay without touching `read_ct`: from the
+/// guard's point of view the message then looks leased again, to the token
+/// that was just nacked. The nack records the end of the delay in
+/// `pl_pgmq_aux.delayed_until` in the same statement, and a row with a delay
+/// still running is never held. Once the delay has elapsed `vt` has too, and
+/// the next delivery changes `read_ct`, so the old token stays dead for good.
 fn held(table: &str) -> String {
     format!(
         "held AS (SELECT msg_id, read_ct, message FROM pgmq.\"{table}\"
                   WHERE msg_id = $2 AND read_ct = $3 AND vt > clock_timestamp()
+                    AND NOT EXISTS (SELECT 1 FROM pl_pgmq_aux d
+                                     WHERE d.queue_name = $4 AND d.entry_id = $5
+                                       AND d.delayed_until > clock_timestamp())
                   FOR UPDATE)"
     )
 }
@@ -146,17 +170,19 @@ fn lane_statements(table: &str) -> Lane {
     // An immediate requeue wakes idle dispatchers; a delayed one does not (it
     // is not leasable yet). The delay mark lets `depth` tell a delayed entry from a leased one: both
     // are invisible, only a nack puts `delayed_until` in the future.
+    // `due` is read once: `vt` and `delayed_until` must be the same instant, or
+    // a fresh delivery right at `vt` would see a delay that is still running.
     let nack_requeue = format!(
         "WITH {held},
+         due AS (SELECT clock_timestamp() + make_interval(secs => $6::float8) AS at),
          moved AS (SELECT s.msg_id,
                           CASE WHEN $6::float8 <= 0
                                THEN pg_notify('pl_lease_queue', $4)::text END AS woke
-                     FROM held,
-                          LATERAL pgmq.set_vt($1::text, held.msg_id,
-                                  clock_timestamp() + make_interval(secs => $6::float8)) s),
+                     FROM held, due,
+                          LATERAL pgmq.set_vt($1::text, held.msg_id, due.at) s),
          marked AS (INSERT INTO pl_pgmq_aux (queue_name, entry_id, delayed_until)
-                    SELECT $4, $5, clock_timestamp() + make_interval(secs => $6::float8)
-                      FROM held WHERE $6::float8 > 0
+                    SELECT $4, $5, due.at
+                      FROM held, due WHERE $6::float8 > 0
                     ON CONFLICT (queue_name, entry_id)
                     DO UPDATE SET delayed_until = EXCLUDED.delayed_until),
          cleared AS (UPDATE pl_pgmq_aux SET delayed_until = NULL
