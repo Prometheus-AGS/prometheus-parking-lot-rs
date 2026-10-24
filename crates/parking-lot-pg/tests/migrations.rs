@@ -15,7 +15,7 @@
 //!   `SHARE` lock and `DROP TRIGGER` for `ACCESS EXCLUSIVE`.
 //! - `migration_rerun_takes_no_table_lock`: another session holds
 //!   `SHARE UPDATE EXCLUSIVE` (what a manual VACUUM, ANALYZE, `CREATE INDEX
-//!   CONCURRENTLY` or pg_repack holds), and then `ACCESS EXCLUSIVE`, the
+//!   CONCURRENTLY` or `pg_repack` holds), and then `ACCESS EXCLUSIVE`, the
 //!   strongest mode, on every queue table; a re-run still finishes in bounded
 //!   time. An unguarded `COMMENT ON` takes `SHARE UPDATE EXCLUSIVE` and failed
 //!   this test.
@@ -110,10 +110,9 @@ async fn rerun_while_locked(
     let rerun = tokio::time::timeout(BOUND, migrate_everything(&pg.pool, pgmq)).await;
     let waited = started.elapsed();
     holder.close().await?;
-    let result = rerun.unwrap_or_else(|elapsed| {
+    rerun.unwrap_or_else(|elapsed| {
         panic!("a re-run blocked behind {mode} for {waited:?} ({elapsed})")
-    });
-    result
+    })
 }
 
 #[tokio::test]
