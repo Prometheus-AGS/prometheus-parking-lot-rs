@@ -1,0 +1,41 @@
+{
+  "scope": "Narrow independent static verification of observed first-boundary repairs; no second broad review cycle. Runtime outcomes remain separate.",
+  "reports": [
+    {
+      "path": ".agent-team/reviews/oa04-contract/observed-repair1-verification.md",
+      "sha256": "4cc8bb629316573162adae4017a38fc170cb9ad1d8362fefd2057bc290157cb7"
+    },
+    {
+      "path": ".agent-team/reviews/oa04-python/observed-repair1-verification.md",
+      "sha256": "3f6e468a3388f51e40b564aebe71ecb73fa551a3a772ee51ebd4e958735ed043"
+    },
+    {
+      "path": ".agent-team/reviews/oa04-runtime/embedded-clone-verification.md",
+      "sha256": "08fe811569fb32c58cd8727661c5f898d0da6d5a441731185b1ec25ad9859898"
+    },
+    {
+      "path": ".agent-team/reviews/oa04-runtime/fixture-batch5-verification.md",
+      "sha256": "7b36750b868fea1dbc0610ee057369ecd1dd965858947fe031f92b0c0b464b1d"
+    },
+    {
+      "path": ".agent-team/reviews/oa04-runtime/fixture-followup6-verification.md",
+      "sha256": "53cea4faa812ab1f9593457a9d2a83d520901d21a0972481736dccad925dc02c"
+    },
+    {
+      "path": ".agent-team/reviews/oa04-runtime/oa07-extraction-verification.md",
+      "sha256": "8762bf8dc6f8c2e19696724bddef2b69f0046866ab2b2fe4c720c8f4a6787fd2"
+    },
+    {
+      "path": ".agent-team/reviews/oa04-runtime/observed-repair1-verification.md",
+      "sha256": "bdb0b00ab315c7be66509254b046c99c4b35a9c0e0cd01c56938162a12ffa6c2"
+    },
+    {
+      "path": ".agent-team/reviews/oa04-runtime/pg-clippy-verification.md",
+      "sha256": "cc277f0fc6c8c782d28165e02393b539a2b74b3dcfff5002634418f0187e9156"
+    },
+    {
+      "path": ".agent-team/reviews/oa04-runtime/wasm-doclint-verification.md",
+      "sha256": "c40df7d89aa3a7a010c94d0f1287e56f4f2f134e4d0bd85c166c7195e0e293d4"
+    }
+  ]
+}

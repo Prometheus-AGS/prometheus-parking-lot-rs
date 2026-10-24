@@ -463,7 +463,7 @@ fn deliver_tx<T: Serialize>(
             }
             let remembered = serde_json::to_vec(&Remembered {
                 forget_at_ms: expires_at_ms.unwrap_or(u64::MAX),
-                status: stored.status.clone(),
+                status: stored.status,
             })
             .map_err(backend(context))?;
             idem.insert((scope, idem_key.as_str()), remembered.as_slice())

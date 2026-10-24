@@ -40,9 +40,10 @@ fn same_task(actual: &ScheduledTask<String>, expected: &ScheduledTask<String>) {
     assert_eq!(actual.payload, expected.payload);
 }
 
-/// Pruning returns all and only removed tasks with their exact original
-/// metadata/payload, once. Equality at a deadline is live, and surviving work
-/// keeps its normal priority ordering and remains available to run.
+/// Pruning returns all and only removed tasks with their exact original metadata/payload, once.
+///
+/// Equality at a deadline is live, and surviving work keeps its normal priority
+/// ordering and remains available to run.
 pub fn prune_returns_all_removed_tasks<Q: TaskQueue<String>>(queue: &mut Q) {
     assert!(queue.is_empty(), "conformance requires an empty queue");
     let expired = task(1, Some(99), Priority::High);

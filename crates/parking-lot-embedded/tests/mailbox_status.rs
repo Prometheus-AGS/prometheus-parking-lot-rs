@@ -12,6 +12,7 @@ mod legacy_metadata;
 )]
 mod legacy_v03;
 
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use legacy_metadata::{
@@ -26,6 +27,8 @@ use prometheus_parking_lot_core::{
 use prometheus_parking_lot_embedded::EmbeddedStore;
 use redb::{Database, TableDefinition};
 
+type Snapshot = BTreeMap<String, serde_json::Value>;
+
 fn retry(key: prometheus_parking_lot_core::MailboxKey, caller: &str) -> Delivery<String> {
     Delivery::new(
         key,
@@ -36,7 +39,7 @@ fn retry(key: prometheus_parking_lot_core::MailboxKey, caller: &str) -> Delivery
     .with_idempotency_key(caller)
 }
 
-fn refused(result: Result<EmbeddedStore, SchedulerError>) {
+fn refused(result: &Result<EmbeddedStore, SchedulerError>) {
     assert!(
         matches!(result, Err(SchedulerError::InvalidConfig { .. })),
         "{result:?}"
@@ -54,8 +57,11 @@ fn legacy_status_conversion_refuses_unknown_or_contradictory_metadata_atomically
         } else {
             Vec::new()
         };
-        refused(EmbeddedStore::open_with_clock(&fixture.path, clock.clone()));
-        refused(EmbeddedStore::open_with_clock_and_idempotency_owners(
+        refused(&EmbeddedStore::open_with_clock(
+            &fixture.path,
+            clock.clone(),
+        ));
+        refused(&EmbeddedStore::open_with_clock_and_idempotency_owners(
             &fixture.path,
             clock.clone(),
             &owners,
@@ -67,7 +73,7 @@ fn legacy_status_conversion_refuses_unknown_or_contradictory_metadata_atomically
         );
         let known = statuses(schema);
         if schema == 1 {
-            refused(EmbeddedStore::open_with_clock_and_idempotency_metadata(
+            refused(&EmbeddedStore::open_with_clock_and_idempotency_metadata(
                 &fixture.path,
                 clock.clone(),
                 &[],
@@ -115,7 +121,7 @@ fn legacy_status_conversion_refuses_unknown_or_contradictory_metadata_atomically
             expired,
             wrong_owner,
         ] {
-            refused(EmbeddedStore::open_with_clock_and_idempotency_metadata(
+            refused(&EmbeddedStore::open_with_clock_and_idempotency_metadata(
                 &fixture.path,
                 clock.clone(),
                 &owners,
@@ -143,268 +149,21 @@ async fn legacy_metadata_conversion_preserves_original_status_through_consume_re
             Vec::new()
         };
         let evidence = statuses(schema);
-        let store = EmbeddedStore::open_with_clock_and_idempotency_metadata(
-            &fixture.path,
-            clock.clone(),
-            &owners,
-            &evidence,
-        )
-        .expect("authoritative metadata conversion");
-        assert_eq!(store.lease_queue::<String>(10).identity(), IDENTITY);
-        drop(store);
-        let converted = snapshot(&fixture.path);
-        for (table, rows) in &before {
-            if table != "tables" && table != "q_meta" {
-                assert_eq!(
-                    converted.get(table),
-                    Some(rows),
-                    "raw source table {table} remains unchanged"
-                );
-            }
-        }
-        let mut expected_meta = before["q_meta"].clone();
-        for row in expected_meta.as_array_mut().expect("queue metadata rows") {
-            if row[0] == "schema_version" {
-                row[1] = serde_json::json!(3);
-            }
-        }
-        assert_eq!(converted["q_meta"], expected_meta);
-        assert!(
-            old_open(&fixture.path).is_err(),
-            "schema-1 writer rejects new layout"
-        );
-        assert!(
-            old_v2_open(&fixture.path).is_err(),
-            "schema-2 writer rejects new layout"
-        );
-        assert_eq!(
-            snapshot(&fixture.path),
-            converted,
-            "old writer refusal leaves all logical rows unchanged"
-        );
+        let converted = assert_metadata_conversion(&fixture, &clock, &owners, &evidence, &before);
         {
             let store = EmbeddedStore::open_with_clock(&fixture.path, clock.clone())
                 .expect("schema-3 open");
             let mailbox = store.result_mailbox::<String>();
-            assert_eq!(
-                mailbox
-                    .deliver(retry(address("a"), "a-retained"))
-                    .await
-                    .expect("retained failure retry"),
-                DeliveryOutcome::Duplicate {
-                    status: retained_failure()
-                },
-                "OA-07:stored-status: migration used retry status"
-            );
-            let peeked = mailbox
-                .peek(&address("a"))
-                .await
-                .expect("non-destructive original peek")
-                .expect("original result");
-            assert_eq!(peeked.status, retained_failure());
-            assert_eq!(peeked.payload.as_deref(), Some("legacy first"));
-            assert_eq!(
-                mailbox
-                    .deliver(retry(address("a"), "b-consumed-finite"))
-                    .await
-                    .expect("consumed finite retry"),
-                DeliveryOutcome::Duplicate {
-                    status: finite_failure()
-                },
-                "OA-07:consumed-status: consumed finite failure lost"
-            );
-            assert_eq!(
-                mailbox
-                    .deliver(retry(address("b"), "c-consumed-permanent"))
-                    .await
-                    .expect("consumed permanent retry"),
-                DeliveryOutcome::Duplicate {
-                    status: permanent_failure()
-                }
-            );
-            assert_eq!(
-                mailbox
-                    .deliver(retry(address("a"), "d-reused"))
-                    .await
-                    .expect("exact reused generation"),
-                DeliveryOutcome::Duplicate {
-                    status: TaskStatus::Running
-                },
-                "expired earlier Failed is not current Running proof"
-            );
-            assert_eq!(
-                mailbox
-                    .deliver(retry(address("a"), "e-live-finite"))
-                    .await
-                    .expect("generic queued status"),
-                DeliveryOutcome::Duplicate {
-                    status: TaskStatus::Queued
-                }
-            );
+            assert_original_statuses(&mailbox).await;
             if schema == 2 {
-                for item in evidence
-                    .iter()
-                    .filter(|item| item.idempotency_key == "z-consumed")
-                {
-                    assert_eq!(
-                        mailbox
-                            .deliver(retry(item.key.clone(), "z-consumed"))
-                            .await
-                            .expect("independent scoped status"),
-                        DeliveryOutcome::Duplicate {
-                            status: item.status.clone()
-                        }
-                    );
-                }
-                assert_eq!(
-                    mailbox
-                        .deliver(retry(address("a"), "same-scoped"))
-                        .await
-                        .expect("scoped expired status"),
-                    DeliveryOutcome::Duplicate {
-                        status: TaskStatus::Expired
-                    }
-                );
-                assert_eq!(
-                    mailbox
-                        .deliver(retry(address("b"), "same-scoped"))
-                        .await
-                        .expect("scoped drop status"),
-                    DeliveryOutcome::Duplicate {
-                        status: TaskStatus::Dropped("original drop".to_owned())
-                    }
-                );
+                assert_scoped_statuses(&mailbox, &evidence).await;
             }
-            let mut consumed = Vec::new();
-            while let Some(entry) = mailbox
-                .consume(&address("a"))
-                .await
-                .expect("client consumes originals")
-            {
-                consumed.push(entry.task_id);
-            }
-            assert_eq!(
-                consumed,
-                if schema == 1 {
-                    vec![1, 2, 4, 5]
-                } else {
-                    vec![1, 2, 4, 5, 6]
-                },
-                "each original result remains consumable exactly once, in original order"
-            );
+            consume_original_results(&mailbox, schema).await;
         }
         let consumed = snapshot(&fixture.path);
-        {
-            let store = EmbeddedStore::open_with_clock_and_idempotency_metadata(
-                &fixture.path,
-                clock.clone(),
-                &owners,
-                &evidence,
-            )
-            .expect("metadata replay after consume");
-            let mailbox = store.result_mailbox::<String>();
-            assert_eq!(
-                mailbox
-                    .deliver(retry(address("a"), "a-retained"))
-                    .await
-                    .expect("restart after consume"),
-                DeliveryOutcome::Duplicate {
-                    status: retained_failure()
-                },
-                "OA-07:consumed-status: restart used retry status"
-            );
-            assert!(
-                mailbox
-                    .peek(&address("a"))
-                    .await
-                    .expect("no replacement")
-                    .is_none()
-            );
-        }
-        assert_eq!(
-            snapshot(&fixture.path),
-            consumed,
-            "consume/retry cannot erase immutable status or recreate results"
-        );
-        let wrong = [LegacyDeliveryStatus::new(
-            "b-consumed-finite",
-            address("a"),
-            TaskStatus::Completed,
-        )];
-        refused(EmbeddedStore::open_with_clock_and_idempotency_metadata(
-            &fixture.path,
-            clock.clone(),
-            &owners,
-            &wrong,
-        ));
-        assert_eq!(snapshot(&fixture.path), consumed);
-        clock.advance(Duration::from_millis(1_000));
-        {
-            let store = EmbeddedStore::open_with_clock(&fixture.path, clock.clone())
-                .expect("open at original expiry");
-            store
-                .result_mailbox::<String>()
-                .evict_expired()
-                .await
-                .expect("original finite fence expires");
-        }
-        let evicted = snapshot(&fixture.path);
-        let replay = EmbeddedStore::open_with_clock_and_idempotency_metadata(
-            &fixture.path,
-            clock.clone(),
-            &owners,
-            &evidence,
-        )
-        .expect("evidence replay after active fence eviction");
-        drop(replay);
-        assert_eq!(
-            snapshot(&fixture.path),
-            evicted,
-            "metadata replay never resurrects or extends expired fence"
-        );
-        {
-            let store = EmbeddedStore::open_with_clock(&fixture.path, clock.clone())
-                .expect("new generation open");
-            let mailbox = store.result_mailbox::<String>();
-            assert_eq!(
-                mailbox
-                    .deliver(retry(address("a"), "b-consumed-finite"))
-                    .await
-                    .expect("new status generation"),
-                DeliveryOutcome::Stored
-            );
-            let changed_retry = Delivery::new(address("a"), 100, finite_failure(), None::<String>)
-                .with_idempotency_key("b-consumed-finite");
-            assert_eq!(
-                mailbox
-                    .deliver(changed_retry)
-                    .await
-                    .expect("new first-write status"),
-                DeliveryOutcome::Duplicate {
-                    status: TaskStatus::Completed
-                }
-            );
-            assert_eq!(
-                mailbox
-                    .deliver(retry(address("b"), "c-consumed-permanent"))
-                    .await
-                    .expect("permanent consumed fence"),
-                DeliveryOutcome::Duplicate {
-                    status: permanent_failure()
-                }
-            );
-        }
-        let new_generation = snapshot(&fixture.path);
-        drop(
-            EmbeddedStore::open_with_clock_and_idempotency_metadata(
-                &fixture.path,
-                clock.clone(),
-                &owners,
-                &evidence,
-            )
-            .expect("original proof may validate without replacing new generation"),
-        );
-        assert_eq!(snapshot(&fixture.path), new_generation);
+        assert_consumed_status_replay(&fixture, &clock, &owners, &evidence, &consumed).await;
+        let new_generation =
+            assert_status_expiry_and_replay(&fixture, &clock, &owners, &evidence).await;
         assert_eq!(
             new_generation["mb_legacy_metadata_v3"],
             converted["mb_legacy_metadata_v3"]
@@ -424,6 +183,302 @@ async fn legacy_metadata_conversion_preserves_original_status_through_consume_re
     }
 }
 
+fn assert_metadata_conversion(
+    fixture: &MetadataFixture,
+    clock: &TestClock,
+    owners: &[LegacyIdempotencyOwner],
+    evidence: &[LegacyDeliveryStatus],
+    before: &Snapshot,
+) -> Snapshot {
+    let store = EmbeddedStore::open_with_clock_and_idempotency_metadata(
+        &fixture.path,
+        clock.clone(),
+        owners,
+        evidence,
+    )
+    .expect("authoritative metadata conversion");
+    assert_eq!(store.lease_queue::<String>(10).identity(), IDENTITY);
+    drop(store);
+    let converted = snapshot(&fixture.path);
+    for (table, rows) in before {
+        if table != "tables" && table != "q_meta" {
+            assert_eq!(
+                converted.get(table),
+                Some(rows),
+                "raw source table {table} remains unchanged"
+            );
+        }
+    }
+    let mut expected_meta = before["q_meta"].clone();
+    for row in expected_meta.as_array_mut().expect("queue metadata rows") {
+        if row[0] == "schema_version" {
+            row[1] = serde_json::json!(3);
+        }
+    }
+    assert_eq!(converted["q_meta"], expected_meta);
+    assert!(
+        old_open(&fixture.path).is_err(),
+        "schema-1 writer rejects new layout"
+    );
+    assert!(
+        old_v2_open(&fixture.path).is_err(),
+        "schema-2 writer rejects new layout"
+    );
+    assert_eq!(
+        snapshot(&fixture.path),
+        converted,
+        "old writer refusal leaves all logical rows unchanged"
+    );
+    converted
+}
+
+async fn assert_original_statuses(mailbox: &impl ResultMailbox<String>) {
+    assert_eq!(
+        mailbox
+            .deliver(retry(address("a"), "a-retained"))
+            .await
+            .expect("retained failure retry"),
+        DeliveryOutcome::Duplicate {
+            status: retained_failure()
+        },
+        "OA-07:stored-status: migration used retry status"
+    );
+    let peeked = mailbox
+        .peek(&address("a"))
+        .await
+        .expect("non-destructive original peek")
+        .expect("original result");
+    assert_eq!(peeked.status, retained_failure());
+    assert_eq!(peeked.payload.as_deref(), Some("legacy first"));
+    assert_eq!(
+        mailbox
+            .deliver(retry(address("a"), "b-consumed-finite"))
+            .await
+            .expect("consumed finite retry"),
+        DeliveryOutcome::Duplicate {
+            status: finite_failure()
+        },
+        "OA-07:consumed-status: consumed finite failure lost"
+    );
+    assert_eq!(
+        mailbox
+            .deliver(retry(address("b"), "c-consumed-permanent"))
+            .await
+            .expect("consumed permanent retry"),
+        DeliveryOutcome::Duplicate {
+            status: permanent_failure()
+        }
+    );
+    assert_eq!(
+        mailbox
+            .deliver(retry(address("a"), "d-reused"))
+            .await
+            .expect("exact reused generation"),
+        DeliveryOutcome::Duplicate {
+            status: TaskStatus::Running
+        },
+        "expired earlier Failed is not current Running proof"
+    );
+    assert_eq!(
+        mailbox
+            .deliver(retry(address("a"), "e-live-finite"))
+            .await
+            .expect("generic queued status"),
+        DeliveryOutcome::Duplicate {
+            status: TaskStatus::Queued
+        }
+    );
+}
+
+async fn assert_scoped_statuses(
+    mailbox: &impl ResultMailbox<String>,
+    evidence: &[LegacyDeliveryStatus],
+) {
+    for item in evidence
+        .iter()
+        .filter(|item| item.idempotency_key == "z-consumed")
+    {
+        assert_eq!(
+            mailbox
+                .deliver(retry(item.key.clone(), "z-consumed"))
+                .await
+                .expect("independent scoped status"),
+            DeliveryOutcome::Duplicate {
+                status: item.status.clone()
+            }
+        );
+    }
+    assert_eq!(
+        mailbox
+            .deliver(retry(address("a"), "same-scoped"))
+            .await
+            .expect("scoped expired status"),
+        DeliveryOutcome::Duplicate {
+            status: TaskStatus::Expired
+        }
+    );
+    assert_eq!(
+        mailbox
+            .deliver(retry(address("b"), "same-scoped"))
+            .await
+            .expect("scoped drop status"),
+        DeliveryOutcome::Duplicate {
+            status: TaskStatus::Dropped("original drop".to_owned())
+        }
+    );
+}
+
+async fn consume_original_results(mailbox: &impl ResultMailbox<String>, schema: u64) {
+    let mut consumed = Vec::new();
+    while let Some(entry) = mailbox
+        .consume(&address("a"))
+        .await
+        .expect("client consumes originals")
+    {
+        consumed.push(entry.task_id);
+    }
+    assert_eq!(
+        consumed,
+        if schema == 1 {
+            vec![1, 2, 4, 5]
+        } else {
+            vec![1, 2, 4, 5, 6]
+        },
+        "each original result remains consumable exactly once, in original order"
+    );
+}
+
+async fn assert_consumed_status_replay(
+    fixture: &MetadataFixture,
+    clock: &TestClock,
+    owners: &[LegacyIdempotencyOwner],
+    evidence: &[LegacyDeliveryStatus],
+    consumed: &Snapshot,
+) {
+    {
+        let store = EmbeddedStore::open_with_clock_and_idempotency_metadata(
+            &fixture.path,
+            clock.clone(),
+            owners,
+            evidence,
+        )
+        .expect("metadata replay after consume");
+        let mailbox = store.result_mailbox::<String>();
+        assert_eq!(
+            mailbox
+                .deliver(retry(address("a"), "a-retained"))
+                .await
+                .expect("restart after consume"),
+            DeliveryOutcome::Duplicate {
+                status: retained_failure()
+            },
+            "OA-07:consumed-status: restart used retry status"
+        );
+        assert!(
+            mailbox
+                .peek(&address("a"))
+                .await
+                .expect("no replacement")
+                .is_none()
+        );
+    }
+    assert_eq!(
+        snapshot(&fixture.path),
+        *consumed,
+        "consume/retry cannot erase immutable status or recreate results"
+    );
+    let wrong = [LegacyDeliveryStatus::new(
+        "b-consumed-finite",
+        address("a"),
+        TaskStatus::Completed,
+    )];
+    refused(&EmbeddedStore::open_with_clock_and_idempotency_metadata(
+        &fixture.path,
+        clock.clone(),
+        owners,
+        &wrong,
+    ));
+    assert_eq!(snapshot(&fixture.path), *consumed);
+}
+
+async fn assert_status_expiry_and_replay(
+    fixture: &MetadataFixture,
+    clock: &TestClock,
+    owners: &[LegacyIdempotencyOwner],
+    evidence: &[LegacyDeliveryStatus],
+) -> Snapshot {
+    clock.advance(Duration::from_millis(1_000));
+    {
+        let store = EmbeddedStore::open_with_clock(&fixture.path, clock.clone())
+            .expect("open at original expiry");
+        store
+            .result_mailbox::<String>()
+            .evict_expired()
+            .await
+            .expect("original finite fence expires");
+    }
+    let evicted = snapshot(&fixture.path);
+    let replay = EmbeddedStore::open_with_clock_and_idempotency_metadata(
+        &fixture.path,
+        clock.clone(),
+        owners,
+        evidence,
+    )
+    .expect("evidence replay after active fence eviction");
+    drop(replay);
+    assert_eq!(
+        snapshot(&fixture.path),
+        evicted,
+        "metadata replay never resurrects or extends expired fence"
+    );
+    assert_new_generation_status(fixture, clock).await;
+    let new_generation = snapshot(&fixture.path);
+    drop(
+        EmbeddedStore::open_with_clock_and_idempotency_metadata(
+            &fixture.path,
+            clock.clone(),
+            owners,
+            evidence,
+        )
+        .expect("original proof may validate without replacing new generation"),
+    );
+    assert_eq!(snapshot(&fixture.path), new_generation);
+    new_generation
+}
+
+async fn assert_new_generation_status(fixture: &MetadataFixture, clock: &TestClock) {
+    let store =
+        EmbeddedStore::open_with_clock(&fixture.path, clock.clone()).expect("new generation open");
+    let mailbox = store.result_mailbox::<String>();
+    assert_eq!(
+        mailbox
+            .deliver(retry(address("a"), "b-consumed-finite"))
+            .await
+            .expect("new status generation"),
+        DeliveryOutcome::Stored
+    );
+    let changed_retry = Delivery::new(address("a"), 100, finite_failure(), None::<String>)
+        .with_idempotency_key("b-consumed-finite");
+    assert_eq!(
+        mailbox
+            .deliver(changed_retry)
+            .await
+            .expect("new first-write status"),
+        DeliveryOutcome::Duplicate {
+            status: TaskStatus::Completed
+        }
+    );
+    assert_eq!(
+        mailbox
+            .deliver(retry(address("b"), "c-consumed-permanent"))
+            .await
+            .expect("permanent consumed fence"),
+        DeliveryOutcome::Duplicate {
+            status: permanent_failure()
+        }
+    );
+}
+
 #[test]
 fn legacy_metadata_cannot_mix_owner_and_status_from_different_retained_rows() {
     let fixture = MetadataFixture::new(1, true);
@@ -437,7 +492,7 @@ fn legacy_metadata_cannot_mix_owner_and_status_from_different_retained_rows() {
         address("a"),
         TaskStatus::Completed,
     ));
-    refused(EmbeddedStore::open_with_clock_and_idempotency_metadata(
+    refused(&EmbeddedStore::open_with_clock_and_idempotency_metadata(
         &fixture.path,
         clock.clone(),
         &owners,
@@ -454,7 +509,7 @@ fn legacy_metadata_cannot_mix_owner_and_status_from_different_retained_rows() {
         address("b"),
         TaskStatus::Completed,
     ));
-    refused(EmbeddedStore::open_with_clock_and_idempotency_metadata(
+    refused(&EmbeddedStore::open_with_clock_and_idempotency_metadata(
         &fixture.path,
         clock.clone(),
         &owners,

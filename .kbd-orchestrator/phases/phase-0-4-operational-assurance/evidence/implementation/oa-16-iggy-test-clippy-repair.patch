@@ -1,0 +1,63 @@
+--- a/crates/parking-lot-iggy/tests/iggy_stream.rs
++++ b/crates/parking-lot-iggy/tests/iggy_stream.rs
+@@ -65,6 +65,32 @@
+     format!("tok-{seq}")
+ }
+ 
++/// Read the valid prefix and apply the first poisoning oracle before any
++/// writer-state assertion, closing this reader before the caller reconnects.
++async fn read_poisoned_prefix(options: &IggyOptions) -> TestResult<ResumePoint> {
++    let reader = IggyStreamReader::connect(options).await?;
++    let mut cursor = reader.open("job-hole");
++    let prefix = take(&mut cursor, 2).await?;
++    assert_eq!(seqs(&prefix), [1, 2]);
++    for (item, seq) in prefix.iter().zip(1..=2) {
++        let StreamItem::Chunk(chunk) = item else {
++            return Err("OA-16 prefix unexpectedly ended".into());
++        };
++        assert_eq!(chunk.data, token(seq));
++    }
++    // This is deliberately the first poisoning oracle. The oa-16 control
++    // must fail here with Gap(3,4), not at a counter or writer-only assertion.
++    let after_prefix = tokio::time::timeout(Duration::from_secs(2), cursor.next()).await;
++    assert!(
++        after_prefix.is_err(),
++        "OA-16:no-publication-past-hole: expected only seqs 1-2, got {after_prefix:?}"
++    );
++    let resume = prefix.last().ok_or("missing prefix")?.resume_point();
++    drop(cursor);
++    drop(reader);
++    Ok(resume)
++}
++
+ /// OA-16: the real server refuses seq 3 before reading its oversized body.
+ /// Already queued seqs 4-5 must be suppressed, while another writer continues
+ /// on the same publisher. Disabling poisoning makes the reader see a gap.
+@@ -117,26 +143,7 @@
+     assert!(sink.flush(FLUSH).await, "fault schedule drained");
+     eprintln!("OA-16 publisher after fault: {:?}", sink.stats());
+ 
+-    let reader = IggyStreamReader::connect(&options).await?;
+-    let mut cursor = reader.open("job-hole");
+-    let prefix = take(&mut cursor, 2).await?;
+-    assert_eq!(seqs(&prefix), [1, 2]);
+-    for (item, seq) in prefix.iter().zip(1..=2) {
+-        let StreamItem::Chunk(chunk) = item else {
+-            return Err("OA-16 prefix unexpectedly ended".into());
+-        };
+-        assert_eq!(chunk.data, token(seq));
+-    }
+-    // This is deliberately the first poisoning oracle. The oa-16 control
+-    // must fail here with Gap(3,4), not at a counter or writer-only assertion.
+-    let after_prefix = tokio::time::timeout(Duration::from_secs(2), cursor.next()).await;
+-    assert!(
+-        after_prefix.is_err(),
+-        "OA-16:no-publication-past-hole: expected only seqs 1-2, got {after_prefix:?}"
+-    );
+-    let resume = prefix.last().ok_or("missing prefix")?.resume_point();
+-    drop(cursor);
+-    drop(reader);
++    let resume = read_poisoned_prefix(&options).await?;
+ 
+     assert!(writer.is_poisoned(), "exhausted chunk poisons its writer");
+     assert_eq!(writer.send("too late").await, Err(StreamError::Poisoned));

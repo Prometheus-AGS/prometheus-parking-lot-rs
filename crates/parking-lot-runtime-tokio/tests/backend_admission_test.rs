@@ -1,7 +1,7 @@
 //! OA-09: pre-filled adapter tasks have terminal outcomes and ledger ownership.
 //!
-//! Real ResourcePool submit/shutdown paths use the real dispatcher, queue,
-//! mailbox, hook bus and TokioSpawner. Under the `oa-09` negative control,
+//! Real `ResourcePool` submit/shutdown paths use the real dispatcher, queue,
+//! mailbox, hook bus and `TokioSpawner`. Under the `oa-09` negative control,
 //! an impossible head blocks the valid followers and the bounded oracle fails.
 
 use std::sync::Arc;
@@ -44,6 +44,7 @@ impl Drop for Active {
     }
 }
 
+#[derive(Clone)]
 struct Executor(Arc<Mutex<Activity>>);
 
 #[async_trait]
@@ -60,6 +61,7 @@ impl TaskExecutor<u64, u64> for Executor {
             activity.peak_gpu = activity.peak_gpu.max(activity.gpu);
             assert!(activity.total <= 2, "active total never exceeds max_units");
             assert!(activity.gpu <= 1, "active GPU cost never exceeds its limit");
+            drop(activity);
         }
         let _active = Active {
             activity: Arc::clone(&self.0),
@@ -103,6 +105,7 @@ impl SharedMailbox {
             .expect("consume")
             .expect("terminal mailbox outcome");
         assert!(stored.consume(&key).expect("consume again").is_none());
+        drop(stored);
         result
     }
 }

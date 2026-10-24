@@ -1,10 +1,10 @@
 //! OA-08: a legal spawner may drop an accepted run without polling it.
 //!
-//! These fixtures enter through ResourcePool::submit, the production
-//! dispatcher, mailbox and hook bus, then shutdown_with. The negative control
+//! These fixtures enter through `ResourcePool::submit`, the production
+//! dispatcher, mailbox and hook bus, then `shutdown_with`. The negative control
 //! `--cfg parking_lot_negative_control="oa-08"` moves ownership back inside an
 //! unpolled async body: the discarded-run outcome and shutdown oracles fail,
-//! while the ordinary TokioSpawner control still completes normally. A child
+//! while the ordinary `TokioSpawner` control still completes normally. A child
 //! process also covers an inline-discarding spawner draining a large parked
 //! backlog on a fixed-size stack; stack overflow must not abort the suite.
 
@@ -37,6 +37,7 @@ enum Job {
     Pending,
 }
 
+#[derive(Clone)]
 struct Executor(Arc<Mutex<Vec<u64>>>);
 
 #[async_trait]
@@ -92,7 +93,7 @@ impl HoldingSpawner {
 }
 
 /// Holds the first run while the backlog is parked, then drops every
-/// successor inline. Unlike HoldingSpawner this deliberately nests Spawn
+/// successor inline. Unlike `HoldingSpawner` this deliberately nests `Spawn`
 /// calls on the completing thread, reproducing the recursive-drop defect.
 #[derive(Clone, Default)]
 struct InlineAfterReleaseSpawner(Arc<Mutex<InlineAfterRelease>>);
@@ -168,6 +169,7 @@ impl SharedMailbox {
             .expect("consume")
             .expect("task outcome");
         assert!(stored.consume(&key).expect("consume again").is_none());
+        drop(stored);
         outcome
     }
 }
@@ -583,6 +585,7 @@ fn discarded_spawn_large_backlog_child() {
                         );
                         assert!(stored.consume(&key).expect("consume again").is_none());
                     }
+                    drop(stored);
                     println!("OA-08:discarded-backlog-settled");
                 });
         })

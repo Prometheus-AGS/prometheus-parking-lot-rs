@@ -279,6 +279,9 @@
       "argv": [
         "cargo",
         "deny",
+        "--workspace",
+        "--all-features",
+        "--locked",
         "check"
       ],
       "scenarios": [],
@@ -309,19 +312,20 @@
       "id": "secrets-tree",
       "profile": "baseline",
       "argv": [
-        "gitleaks",
-        "detect",
-        "--no-git",
-        "--redact=100",
-        "--config",
-        ".gitleaks.toml",
-        "--source",
-        "."
+        "python3",
+        ".github/scripts/tests/candidate-tree-fixtures.py",
+        "--repository",
+        "{workspace}",
+        "--candidate",
+        "{candidate}",
+        "--output",
+        "{out}/secrets-tree"
       ],
       "scenarios": [
         "OA-05"
       ],
       "tools": [
+        "python3",
         "git",
         "gitleaks"
       ],
@@ -904,8 +908,8 @@
         "-p",
         "prometheus-parking-lot-runtime-tokio",
         "--locked",
-        "--test",
-        "loom_ledger",
+        "--lib",
+        "ledger::loom_ledger::",
         "--",
         "--test-threads=1"
       ],
@@ -928,8 +932,8 @@
         "-p",
         "prometheus-parking-lot-runtime-tokio",
         "--locked",
-        "--test",
-        "loom_ledger",
+        "--lib",
+        "ledger::loom_ledger::",
         "--",
         "--list"
       ],
@@ -2861,10 +2865,10 @@
         "deny",
         "--manifest-path",
         "bindings/uniffi-bindgen/Cargo.toml",
-        "check",
         "--locked",
         "--config",
-        "bindings/uniffi-bindgen/deny.toml"
+        "bindings/uniffi-bindgen/deny.toml",
+        "check"
       ],
       "scenarios": [],
       "tools": [

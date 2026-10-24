@@ -896,7 +896,32 @@ where
         // storage IO and do not hold capacity.
         self.release(permit);
 
-        let (status, payload, resolution, terminal) = match outcome {
+        let (status, payload, resolution, terminal) =
+            self.execution_outcome(task_id, outcome, started);
+        let settlement = Settlement {
+            task_id,
+            mailbox,
+            idempotency_key,
+            status,
+            payload,
+            resolution,
+            attempt,
+            terminal,
+        };
+        self.settle(settlement, token, heartbeat, held, Some(reported))
+            .await;
+    }
+
+    /// Convert the local executor outcome after returning its capacity.
+    /// These statistics describe execution; settle still selects authoritative
+    /// duplicate status before emitting a terminal event or resolving a lease.
+    fn execution_outcome(
+        &self,
+        task_id: TaskId,
+        outcome: Result<T, TaskError>,
+        started: Option<Instant>,
+    ) -> (TaskStatus, Option<T>, Resolution, Terminal) {
+        match outcome {
             Ok(value) => {
                 // Relaxed: statistics only.
                 self.completed.fetch_add(1, Ordering::Relaxed);
@@ -918,19 +943,7 @@ where
                     Terminal::Failed(error),
                 )
             }
-        };
-        let settlement = Settlement {
-            task_id,
-            mailbox,
-            idempotency_key,
-            status,
-            payload,
-            resolution,
-            attempt,
-            terminal,
-        };
-        self.settle(settlement, token, heartbeat, held, Some(reported))
-            .await;
+        }
     }
 
     /// The release hook's job: spawn a drain and start what it admits, then

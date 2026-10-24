@@ -170,9 +170,10 @@ pub async fn first_write_wins<H: MailboxHarness>(h: &H) {
     assert!(consume(&mailbox, &k).await.is_none());
 }
 
-/// The same caller key is independent at addresses differing in tenant, user
-/// or session. `None` and an empty optional identifier are different addresses.
-/// Every address keeps its own first result and its tombstone after consume.
+/// The same caller key is independent at addresses differing in tenant, user or session.
+///
+/// `None` and an empty optional identifier are different addresses. Every address
+/// keeps its own first result and its tombstone after consume.
 pub async fn idempotency_is_scoped_to_mailbox_key<H: MailboxHarness>(h: &H) {
     let mailbox = h.mailbox().await;
     let base = key("idempotency-scope");
@@ -335,9 +336,11 @@ pub async fn idempotency_survives_consume<H: MailboxHarness>(h: &H) {
     );
 }
 
-/// A duplicate returns the first status without consuming the result, including
-/// its full failure details and after consume. Current statuses remain valid
-/// generic mailbox values; no terminal-only validation is introduced.
+/// A duplicate returns the first status without consuming the result.
+///
+/// This includes its full failure details and applies after consume. Current
+/// statuses remain valid generic mailbox values; no terminal-only validation is
+/// introduced.
 pub async fn duplicate_returns_original_status<H: MailboxHarness>(h: &H) {
     let mailbox = h.mailbox().await;
     let statuses = [

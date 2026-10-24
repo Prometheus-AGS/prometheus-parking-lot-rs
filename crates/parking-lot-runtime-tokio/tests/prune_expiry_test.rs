@@ -1,6 +1,6 @@
 //! OA-10: explicit pruning reports each expired task through the real pool.
 //!
-//! `parking_lot_negative_control="oa-10-expiry"` omits ResourcePool Expired
+//! `parking_lot_negative_control="oa-10-expiry"` omits `ResourcePool` Expired
 //! events while retaining removal, mailbox delivery and settlement. The main
 //! fixture must fail its exact sequence oracle; the live-deadline control passes.
 
@@ -198,6 +198,28 @@ async fn start_blocker(pool: &Pool, executor: &Executor) {
     assert_eq!(*executor.calls.lock(), vec![0]);
 }
 
+/// Every removed task keeps its own expiry audit identity.
+fn assert_expiry_audit(audit: &Audit) {
+    let audit_events = audit.0.lock().events();
+    let expired: Vec<_> = audit_events
+        .iter()
+        .filter(|event| event.action == "expire")
+        .collect();
+    assert_eq!(
+        expired.len(),
+        2,
+        "one task-specific expiry audit per removal"
+    );
+    for id in [1, 3] {
+        assert!(
+            expired
+                .iter()
+                .any(|event| event.task_id == id.to_string() && event.tenant == key(id).tenant)
+        );
+    }
+    assert!(!audit_events.iter().any(|event| event.task_id == "batch"));
+}
+
 #[tokio::test]
 async fn prune_expiry_reports_each_front_and_backend_task_once_without_execution() {
     let executor = Executor::new();
@@ -274,24 +296,7 @@ async fn prune_expiry_reports_each_front_and_backend_task_once_without_execution
         assert!(mailbox.take(id).is_none());
         mailbox.assert_delivered_once(id);
     }
-    let audit_events = audit.0.lock().events();
-    let expired: Vec<_> = audit_events
-        .iter()
-        .filter(|event| event.action == "expire")
-        .collect();
-    assert_eq!(
-        expired.len(),
-        2,
-        "one task-specific expiry audit per removal"
-    );
-    for id in [1, 3] {
-        assert!(
-            expired
-                .iter()
-                .any(|event| event.task_id == id.to_string() && event.tenant == key(id).tenant)
-        );
-    }
-    assert!(!audit_events.iter().any(|event| event.task_id == "batch"));
+    assert_expiry_audit(&audit);
     // All accounting/mailbox/survivor checks precede this exact sequence
     // oracle: the oa-10-expiry control fails here, not on a timeout.
     let events = flush(pool.hooks(), &log).await;

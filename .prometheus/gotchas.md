@@ -22,3 +22,8 @@ Append-only. Dated entries. Mark superseded entries; do not delete them.
 ## 2026-10-24 — Source-derived negative-control classifier placement
 
 - OA12 requires build/discovery plus a designated defect assertion; a watchdog, compile failure or missing-test exit cannot stand in. Existing discarded/panic/budget/slot fixtures can await a missing outcome before their later observable check. Put the existing production-path witness before the wait through its owner, retain positive assertions, and prove the final normal/control runs at the completed phase boundary. Source inspection is not proof those classifiers execute.
+
+## 2026-10-24T14:57:28.526385+00:00 — OA02 release preparation parser and candidate identity
+The real pinned release-plz0.3.173 parser rejects duplicate historical version headings. Stage only the new generated section for set-version, then append original historical bytes after checking the new heading. Real preparation passed after this repair. Keep its pre-bump source72adf5d8ad583c3b52b22194563e94f7895c5b3f separate from finalpreparedcandidate729cc42549defb5fcf69b432485224cb89da74bc; retain original plan bytes/digest and validate ancestry+all13 file hashes.
+
+2026-10-24 OA18: a cargo clippy --help invocation omitted the private RUSTUP_HOME/RUSTUP_AUTO_INSTALL environment and Rustup started syncing/downloading the numeric toolchain. Stopped only the observed owned PID43953 (help session exit143); no Rustup setting or credential change was made. Apply the private environment to help commands as well as builds.

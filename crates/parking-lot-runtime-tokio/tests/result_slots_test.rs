@@ -100,18 +100,18 @@ const fn is_expired(error: &SchedulerError) -> bool {
 }
 
 /// Observe the first poll, rather than waiting for a missing result.
-/// Pinned Tokio1.54.1 blocking/pool.rs::spawn_thread calls thread_name_fn
+/// Pinned Tokio1.54.1 `blocking/pool.rs::spawn_thread` calls `thread_name_fn`
 /// synchronously before OS thread creation. This current-thread runtime has
-/// no async worker threads; only the mutant's spawn_blocking needs a name.
+/// no async worker threads; only the mutant's `spawn_blocking` needs a name.
 fn assert_pending_retrieve_starts_no_blocking_thread() {
     let names = Arc::new(AtomicUsize::new(0));
-    let named = Arc::clone(&names);
+    let factory_calls = Arc::clone(&names);
     let runtime = tokio::runtime::Builder::new_current_thread()
         .max_blocking_threads(1)
         .thread_name_fn(move || {
             // Called and observed on the polling thread, in program order;
             // Relaxed counts calls and supplies no cross-thread publication.
-            named.fetch_add(1, Ordering::Relaxed);
+            factory_calls.fetch_add(1, Ordering::Relaxed);
             "oa12-s17-retrieval".to_owned()
         })
         .enable_all()

@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use prometheus_parking_lot_core::{LegacyDeliveryStatus, TaskError, TaskStatus};
-use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition};
+use redb::{Database, ReadableDatabase, ReadableTable, Table, TableDefinition};
 use serde_json::{Value, json};
 
 use super::legacy_v03::{self, ENTRIES, IDEM, MB_META, NOW, Q_META, address};
@@ -27,7 +27,7 @@ pub fn finite_failure() -> TaskStatus {
     TaskStatus::Failed(TaskError::executor("original consumed finite failure"))
 }
 
-pub fn permanent_failure() -> TaskStatus {
+pub const fn permanent_failure() -> TaskStatus {
     TaskStatus::Failed(TaskError::Timeout {
         budget: Duration::from_millis(37),
     })
@@ -127,35 +127,39 @@ impl MetadataFixture {
     }
 }
 
+fn populate_original_statuses(entries: &mut Table<'_, (&str, u64), &[u8]>) {
+    let mut replacements = Vec::new();
+    for row in entries.iter().expect("legacy rows") {
+        let (key, bytes) = row.expect("legacy row");
+        let (owner, seq) = key.value();
+        let mut value: Value = serde_json::from_slice(bytes.value()).expect("legacy JSON");
+        let status = match seq {
+            1 => retained_failure(),
+            3 => TaskStatus::Failed(TaskError::executor("expired earlier generation")),
+            4 => TaskStatus::Running,
+            5 => TaskStatus::Queued,
+            _ => TaskStatus::Completed,
+        };
+        value["status"] = serde_json::to_value(status).expect("status JSON");
+        replacements.push((
+            owner.to_owned(),
+            seq,
+            serde_json::to_vec(&value).expect("entry JSON"),
+        ));
+    }
+    for (owner, seq, bytes) in &replacements {
+        entries
+            .insert((owner.as_str(), *seq), bytes.as_slice())
+            .expect("original fixture status");
+    }
+}
+
 fn populate(path: &Path, schema: u64, ambiguous: bool) {
     let db = Database::open(path).expect("raw source open");
     let txn = db.begin_write().expect("raw source transaction");
     {
         let mut entries = txn.open_table(ENTRIES).expect("legacy entries");
-        let mut replacements = Vec::new();
-        for row in entries.iter().expect("legacy rows") {
-            let (key, bytes) = row.expect("legacy row");
-            let (owner, seq) = key.value();
-            let mut value: Value = serde_json::from_slice(bytes.value()).expect("legacy JSON");
-            let status = match seq {
-                1 => retained_failure(),
-                3 => TaskStatus::Failed(TaskError::executor("expired earlier generation")),
-                4 => TaskStatus::Running,
-                5 => TaskStatus::Queued,
-                _ => TaskStatus::Completed,
-            };
-            value["status"] = serde_json::to_value(status).expect("status JSON");
-            replacements.push((
-                owner.to_owned(),
-                seq,
-                serde_json::to_vec(&value).expect("entry JSON"),
-            ));
-        }
-        for (owner, seq, bytes) in &replacements {
-            entries
-                .insert((owner.as_str(), *seq), bytes.as_slice())
-                .expect("original fixture status");
-        }
+        populate_original_statuses(&mut entries);
         let a = serde_json::to_string(&address("a")).expect("a");
         let b = serde_json::to_string(&address("b")).expect("b");
         if schema == 2 {

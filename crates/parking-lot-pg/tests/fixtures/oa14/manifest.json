@@ -37,7 +37,7 @@
     "crates/parking-lot-pg/src/lease_queue/mod.rs": "370798eef26c0a6fd1988e6af8dd8ecd3a9fd45223d0f171f9e034c2519c6f47",
     "crates/parking-lot-pg/src/lease_queue/sql.rs": "054f018e58619d2aa9cc0ff9c0f53c3fa73a6f46c647ec430197941f555d27f5",
     "crates/parking-lot-pg/src/lease_queue/wake.rs": "33ef4720f80c08ad762182cbf71f9522c0c728ba74e5967bb5e42d87dece695e",
-    "crates/parking-lot-pg/src/mailbox/mod.rs": "9545206851d999605da4c276d450039c321050df737d41c8dfe7108ec6a65d25",
+    "crates/parking-lot-pg/src/mailbox/mod.rs": "4068522019f33c6be8884391dac8af090f135e530e15268760860b6131fd009b",
     "crates/parking-lot-pg/src/mailbox/sql.rs": "abf43cde393d59f472c7255d21ec4000ea13b4a9c5e31c3030ca919a2b9a0ae6",
     "crates/parking-lot-pg/src/mailbox/migration.rs": "495f90866a6cdb9d954b08f41a19fc9169319b8459e571b0df1c9f34b50eb60a",
     "crates/parking-lot-pg/src/mailbox/migration/owners.rs": "2057e9ce599ea3a44666fca9b41d7b54acb9f0220dda5a59a2bc50ea9f093a6b",

@@ -134,7 +134,7 @@ impl<T> PgResultMailbox<T> {
     /// # Errors
     ///
     /// [`SchedulerError::Backend`] on database failure, or
-    /// [`SchedulerError::Internal`](SchedulerError::Internal) on invalid or
+    /// [`SchedulerError::Internal`] on invalid or
     /// insufficient ownership evidence. Refusal rolls back logical changes.
     pub async fn migrate_with_idempotency_owners(
         pool: &PgPool,
@@ -175,12 +175,12 @@ fn key_text(key: &MailboxKey) -> Result<String, SchedulerError> {
 
 /// The OA-06 negative control restores the 0.3 mailbox-global fence scope.
 #[cfg(parking_lot_negative_control = "oa-06")]
-fn idempotency_scope(_mailbox_key: &str) -> &str {
+const fn idempotency_scope(_mailbox_key: &str) -> &str {
     ""
 }
 
 #[cfg(not(parking_lot_negative_control = "oa-06"))]
-fn idempotency_scope(mailbox_key: &str) -> &str {
+const fn idempotency_scope(mailbox_key: &str) -> &str {
     mailbox_key
 }
 
@@ -254,7 +254,7 @@ where
     }
 }
 
-impl<T> PgResultMailbox<T> {
+impl<T: Sync> PgResultMailbox<T> {
     /// The claim lock survives the duplicate lookup's new statement snapshot.
     async fn deliver_keyed(
         &self,
@@ -297,7 +297,7 @@ impl<T> PgResultMailbox<T> {
 }
 
 #[cfg(not(parking_lot_negative_control = "oa-07"))]
-fn duplicate_outcome(status: TaskStatus, _retry: &TaskStatus) -> DeliveryOutcome {
+const fn duplicate_outcome(status: TaskStatus, _retry: &TaskStatus) -> DeliveryOutcome {
     DeliveryOutcome::Duplicate { status }
 }
 

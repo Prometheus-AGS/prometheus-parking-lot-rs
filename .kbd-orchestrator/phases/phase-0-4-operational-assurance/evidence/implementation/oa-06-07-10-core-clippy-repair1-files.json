@@ -1,0 +1,38 @@
+{
+  "owner": "/root/oa04_release",
+  "scenarios": [
+    "OA-06",
+    "OA-07",
+    "OA-10"
+  ],
+  "repair_attempt": 1,
+  "review_correction_cycle": 1,
+  "runtimeEvidence": "NOT_EXERCISED",
+  "observed_candidate_prefix": "729cc425",
+  "observed_stderr": "/tmp/oa04-boundary-729cc42/baseline/clippy.stderr.txt",
+  "files": [
+    {
+      "path": "crates/parking-lot-core/src/contracts/conformance/mailbox.rs",
+      "base_sha256": "7f0db811ed0f7d731fe46739cd2179585920cfc4bf7b430e934dcd28dee5cb75",
+      "sha256": "45614030d810b5a1f46f1846c2d73ba8c30d85bdeaf3ad1192391bc36dff3b6f"
+    },
+    {
+      "path": "crates/parking-lot-core/src/contracts/conformance/task_queue.rs",
+      "base_sha256": "510b8ac36e2d752ab2dadae32fcd3a847a33aab86e429a520e7ccff91ffb26ac",
+      "sha256": "28a8ee2880378f8dd18c31752cb4e5a9a245aa95eb2df73ceb2bc38853f2dac6"
+    },
+    {
+      "path": "crates/parking-lot-core/src/dispatch/parked.rs",
+      "base_sha256": "1fd7220ab3c9ed1d33047485a2dd6d2aca7bb62c61ad9c422d689974f1b72aa2",
+      "sha256": "9cbc79028291b990b55e0a3de10ef6a25a36a7c10c0a99660908febb4b53d223"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-06-07-10-core-clippy-repair1.md",
+      "sha256": "ccf7e8898e81e4b76645c4872f45b9af780997ab132db9ff8c0dce23aa668026"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-06-07-10-core-clippy-repair1.patch",
+      "sha256": "d9cd2d84f1453ade451e66e7a3b04743c379f82a61fbe8af7eebf5b072dcb020"
+    }
+  ]
+}

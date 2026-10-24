@@ -16,7 +16,7 @@
 //! ```
 //!
 //! Negative control: under `--cfg parking_lot_negative_control="s-3"` panics
-//! are not caught. The designated one-in-100 ResourcePool fixture joins its
+//! are not caught. The designated one-in-100 `ResourcePool` fixture joins its
 //! actual spawned runs before looking up outcomes, so an escaped panic fails
 //! OA12:S3 directly. Other panic fixtures retain their bounded outcome waits.
 
@@ -132,7 +132,7 @@ impl Spawn for TokioSpawner {
     }
 }
 
-/// Record actual ResourcePool runs without retaining a lock while joining.
+/// Record actual `ResourcePool` runs without retaining a lock while joining.
 #[derive(Clone, Default)]
 struct CollectedSpawner {
     spawned: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,

@@ -1,0 +1,10 @@
+--- a/benches/pg_backend.rs
++++ b/benches/pg_backend.rs
+@@ -34,6 +34,7 @@
+ const NAME: &str = "oa17";
+ const HOT_ID: u64 = 999_999;
+ 
++#[derive(Clone)]
+ struct Executor;
+ 
+ #[async_trait]

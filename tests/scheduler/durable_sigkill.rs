@@ -396,22 +396,19 @@ where
     assert_eq!((depth.live(), depth.dead_lettered), (0, 0), "{depth:?}");
 }
 
-/// OA-07: the child stored a failure but died before resolving its lease.
-/// The same task retries successfully under a different pool name. Await any
-/// terminal event so bool-only handling fails at the event oracle immediately,
-/// rather than timing out while waiting specifically for Failed.
-async fn restart_failed_and_check<Q, M>(queue: Q, mailbox: M, consume_before_retry: bool)
-where
-    Q: LeaseQueue<String> + 'static,
-    M: ResultMailbox<String> + 'static,
-{
-    let address = key(SESSION);
+/// Inspect the original child failure and optionally consume its sole result
+/// before the renamed pool retries the task.
+async fn original_failed_entry<M: ResultMailbox<String>>(
+    mailbox: &M,
+    address: &MailboxKey,
+    error: &TaskError,
+    consume_before_retry: bool,
+) -> MailboxEntry<String> {
     let original = mailbox
-        .peek(&address)
+        .peek(address)
         .await
         .expect("peek")
         .expect("stored child failure");
-    let error = TaskError::executor(ORIGINAL_FAILURE);
     assert_eq!(
         original.status,
         TaskStatus::Failed(error.clone()),
@@ -426,7 +423,7 @@ where
     if consume_before_retry {
         assert_eq!(
             mailbox
-                .consume(&address)
+                .consume(address)
                 .await
                 .expect("consume before retry"),
             Some(original.clone()),
@@ -434,12 +431,72 @@ where
         );
         assert!(
             mailbox
-                .consume(&address)
+                .consume(address)
                 .await
                 .expect("consume again")
                 .is_none()
         );
     }
+
+    original
+}
+
+/// The retried lease stays dead-lettered and cannot create another result,
+/// including after the original child result was already consumed.
+async fn assert_failed_result_stays_unique<Q, M>(
+    queue: &Q,
+    mailbox: &M,
+    executor: &Executor,
+    address: &MailboxKey,
+    original: MailboxEntry<String>,
+    consume_before_retry: bool,
+) where
+    Q: LeaseQueue<String>,
+    M: ResultMailbox<String>,
+{
+    let after_retry = mailbox.consume(address).await.expect("consume after retry");
+    if consume_before_retry {
+        assert_eq!(
+            after_retry, None,
+            "OA-07:one-result: retry must not replace the consumed failure"
+        );
+    } else {
+        assert_eq!(
+            after_retry,
+            Some(original),
+            "OA-07:one-result: preserve the original failure"
+        );
+    }
+    tokio::time::sleep(LEASE + Duration::from_secs(1)).await;
+    assert!(
+        mailbox
+            .consume(address)
+            .await
+            .expect("consume after another lease")
+            .is_none(),
+        "OA-07:one-result: no second consumable result"
+    );
+    let depth = queue.depth().await.expect("depth after another lease");
+    assert_eq!(
+        (depth.live(), depth.dead_lettered),
+        (0, 1),
+        "OA-07:lease-resolution: {depth:?}"
+    );
+    assert_eq!(executor.runs(), 1);
+}
+
+/// OA-07: the child stored a failure but died before resolving its lease.
+/// The same task retries successfully under a different pool name. Await any
+/// terminal event so bool-only handling fails at the event oracle immediately,
+/// rather than timing out while waiting specifically for Failed.
+async fn restart_failed_and_check<Q, M>(queue: Q, mailbox: M, consume_before_retry: bool)
+where
+    Q: LeaseQueue<String> + 'static,
+    M: ResultMailbox<String> + 'static,
+{
+    let address = key(SESSION);
+    let error = TaskError::executor(ORIGINAL_FAILURE);
+    let original = original_failed_entry(&mailbox, &address, &error, consume_before_retry).await;
 
     let executor = Executor::new(Behaviour::Succeed);
     let (bus, mut log) = event_log();
@@ -505,43 +562,15 @@ where
         "the renamed retry really executed work-1 successfully once"
     );
 
-    let after_retry = pool
-        .mailbox()
-        .consume(&address)
-        .await
-        .expect("consume after retry");
-    if consume_before_retry {
-        assert_eq!(
-            after_retry, None,
-            "OA-07:one-result: retry must not replace the consumed failure"
-        );
-    } else {
-        assert_eq!(
-            after_retry,
-            Some(original),
-            "OA-07:one-result: preserve the original failure"
-        );
-    }
-    tokio::time::sleep(LEASE + Duration::from_secs(1)).await;
-    assert!(
-        pool.mailbox()
-            .consume(&address)
-            .await
-            .expect("consume after another lease")
-            .is_none(),
-        "OA-07:one-result: no second consumable result"
-    );
-    let depth = pool
-        .queue()
-        .depth()
-        .await
-        .expect("depth after another lease");
-    assert_eq!(
-        (depth.live(), depth.dead_lettered),
-        (0, 1),
-        "OA-07:lease-resolution: {depth:?}"
-    );
-    assert_eq!(executor.runs(), 1);
+    assert_failed_result_stays_unique(
+        pool.queue(),
+        pool.mailbox(),
+        &executor,
+        &address,
+        original,
+        consume_before_retry,
+    )
+    .await;
 }
 
 /// A legal generic mailbox may remember a current, nonterminal status.
@@ -566,7 +595,7 @@ where
     );
     let mut pending = task("oa-07-nonterminal", "work-1");
     pending.meta.idempotency_key = Some(caller_key.to_owned());
-    queue.enqueue(pending).await.expect("enqueue the real task");
+    let _enqueued = queue.enqueue(pending).await.expect("enqueue the real task");
     let executor = Executor::new(Behaviour::Succeed);
     let (bus, mut log) = event_log();
     let pool = DurableResourcePool::start(

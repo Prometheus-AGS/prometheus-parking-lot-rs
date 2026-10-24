@@ -1,0 +1,13 @@
+{
+  "status": "NOT_EXERCISED",
+  "scope": "Next targeted runtime component repair: observed OA07 Inner::run Clippy too_many_lines 106/100",
+  "parent_observed_log": "/tmp/oa04-observed-repair1-clippy.log",
+  "parent_observed_exit": 101,
+  "file": "crates/parking-lot-runtime-tokio/src/durable_pool/mod.rs",
+  "base_sha256": "ca892b41e83cb3e4e9b9247428acc97f1bdd41c116c00efcb5fdd611b962689e",
+  "target_sha256": "829b64276cf370f2254f3a203521524dcaf69c8916221a26a8f5e42b423bba9b",
+  "patch_sha256": "81a31f6671938b2c9cf3832d9bda57e1778c67bb4bfe25b1547c2ef4d9ae7ad2",
+  "helper": "Inner::execution_outcome(&self, TaskId, Result<T, TaskError>, Option<Instant>) -> (TaskStatus, Option<T>, Resolution, Terminal)",
+  "semantics": "Exact local outcome/statistics match moved unchanged. run releases permit before calling helper, then constructs Settlement and awaits settle unchanged. Completed preserves original start Instant and payload; Failed retains the original full TaskError in terminal and clone in status, same reason string and dead-letter resolution. Authoritative duplicate selection/delivery/heartbeat/lease order unchanged.",
+  "commands_run": "Bounded source/log reads, source authoring, diff generation and SHA256 hashing only. No compiler/test/Cargo/fmt/analyzer/scan/review, verification-tree edit, KBD mutation or commit. Parent serial verification required."
+}

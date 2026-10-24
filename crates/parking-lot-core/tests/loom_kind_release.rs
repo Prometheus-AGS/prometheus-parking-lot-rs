@@ -1,8 +1,8 @@
 //! OA-11: bounded schedules through the production kind-limited release path.
 //!
-//! Mapping: try_acquire_vector -> claim_with_kinds checks kind counters and
-//! claims the packed total/permit under the kind lock. Permit::drop -> release
-//! -> release_with_kinds returns kind counters and packed state in one kind-lock
+//! Mapping: `try_acquire_vector` -> `claim_with_kinds` checks kind counters and
+//! claims the packed total/permit under the kind lock. `Permit::drop` -> release
+//! -> `release_with_kinds` returns kind counters and packed state in one kind-lock
 //! critical section. This target does not copy the semaphore state machine.
 //!
 //! The kind-lock unlock -> next lock pair publishes resource contents and
@@ -10,8 +10,8 @@
 //! CAS reading its release sequence supplies the resource-publication edge too.
 //! The Relaxed resource atomic below deliberately supplies no independent edge.
 //!
-//! Final-boundary execution only: --cfg parking_lot_loom,
-//! LOOM_MAX_PREEMPTIONS=3, isolated model target directory. Existing model
+//! Final-boundary execution only: `--cfg parking_lot_loom`,
+//! `LOOM_MAX_PREEMPTIONS=3`, isolated model target directory. Existing model
 //! helper explores both yielded and non-yielded release windows. The
 //! oa-11-kind-release control splits the actual kind release critical section;
 //! only the parallel-return leak oracle should fail, while publication stays

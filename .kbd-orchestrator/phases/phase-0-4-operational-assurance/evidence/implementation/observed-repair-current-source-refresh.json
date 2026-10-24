@@ -1,0 +1,125 @@
+{
+  "reason": "Coherent observed source/compiler/tooling/fixture repairs after first frozen baseline; current OA14/OA12 source hashes refreshed after formatting. Historical handoff and failed-candidate receipts preserved.",
+  "changes": [
+    {
+      "manifest": "crates/parking-lot-pg/tests/fixtures/oa14/manifest.json",
+      "path": "crates/parking-lot-pg/src/mailbox/mod.rs",
+      "before": "9545206851d999605da4c276d450039c321050df737d41c8dfe7108ec6a65d25",
+      "after": "b7005a5ea3157b6356577e647fe957f8f972436808b1fe17600fce162ca284ba"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-pg/src/mailbox/mod.rs",
+      "before": "9545206851d999605da4c276d450039c321050df737d41c8dfe7108ec6a65d25",
+      "after": "b7005a5ea3157b6356577e647fe957f8f972436808b1fe17600fce162ca284ba"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-pg/tests/fixtures/oa14/manifest.json",
+      "before": "f514920dcb2a84e9b9aaa3d6199084f7c9ae4925209803cb96f3a7f6c8e38257",
+      "after": "42071b434399d27a7fc29474c7644d90ec76b084a90c235a2af052b578a233b3"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-runtime-tokio/src/durable_pool/mod.rs",
+      "before": "ca892b41e83cb3e4e9b9247428acc97f1bdd41c116c00efcb5fdd611b962689e",
+      "after": "829b64276cf370f2254f3a203521524dcaf69c8916221a26a8f5e42b423bba9b"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-embedded/src/mailbox.rs",
+      "before": "aa96416ca40b775ddb43131396030569ee9efe0d8a4f4c6be9c56ea795bcebb2",
+      "after": "07203e18fb5bc39952f213d5a1a8fd8e81c3093ed920605ba8a2d0df6882cbf0"
+    },
+    {
+      "manifest": "crates/parking-lot-pg/tests/fixtures/oa14/manifest.json",
+      "path": "crates/parking-lot-pg/src/mailbox/mod.rs",
+      "before": "b7005a5ea3157b6356577e647fe957f8f972436808b1fe17600fce162ca284ba",
+      "after": "4068522019f33c6be8884391dac8af090f135e530e15268760860b6131fd009b"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-pg/src/mailbox/mod.rs",
+      "before": "b7005a5ea3157b6356577e647fe957f8f972436808b1fe17600fce162ca284ba",
+      "after": "4068522019f33c6be8884391dac8af090f135e530e15268760860b6131fd009b"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-pg/tests/fixtures/oa14/manifest.json",
+      "before": "42071b434399d27a7fc29474c7644d90ec76b084a90c235a2af052b578a233b3",
+      "after": "c5f8bc1849151050c12b68ccfbda1b05ac410f734c4eb5b85520eaf4eda224bf"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-wasm/tests/wasm_pool.rs",
+      "before": "6fb41b3e4c3225cc8c3e984eac0621c0c3f42605087b1030872075866a2a1a4b",
+      "after": "612c70202a7c6edcde7aa448d246a7683d60d72728487543af88aed2344ae999"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-core/tests/backend_admission_test.rs",
+      "before": "55edd214d14c794d8d1371d0845c9ad35cbb9ad07195a0e34fe5543a8e3bcc15",
+      "after": "0f793d4c3b06839a82bbff0593c288d0c33c7fc6d0a908b41bb321323153f938"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-core/tests/loom_kind_release.rs",
+      "before": "6e081f68b69d1829abd3470566982e5c0ea0c3cea465675bd931403d838b048c",
+      "after": "fd346dd77e3ae48690574baf5afad1912c431e74b7a1f317b2d2cc3716000795"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-embedded/tests/mailbox_migration.rs",
+      "before": "cfade4ff544c97ff79490731c66d970f98a143827efca97801b1b9d793b7473f",
+      "after": "aee363e0858225f12667c95ea31a97a3b10741878cf25311fec970dea928b3a8"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-embedded/tests/mailbox_status.rs",
+      "before": "9e3c93c624d9cdeb6831a715304ea16c12ffd622c315d59e2aa34102bf90f5da",
+      "after": "c845ad2e51e88e29f90a66b209cd69cbf5fe79536725ec1bf565d9f88ab2812a"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-iggy/tests/iggy_stream.rs",
+      "before": "40a5a8099d1bf8c1a3d6fa060215af7fc6f328e43b2f5086bbf58971cfba11f3",
+      "after": "69269903acbab1212cc6f70a47d3f0fd7c993e36e2572cef4039ea0b81704f99"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs",
+      "before": "b2cb481503d65c9fcd7bb47d36a9a5f9a0f91b3792b31b00bc6b5d0e264ae68d",
+      "after": "f806060d9b93161487462236259117a674a7e9fc4461385d937fd3fa33314efe"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-runtime-tokio/tests/panic_test.rs",
+      "before": "7cb850171171a890e72c90f68adb7ce093a51e0a06e35173d6639e4bc394b43c",
+      "after": "d4718fe44458d752555f915999f2427da176845d3181bdf022f10fedea70f77a"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-runtime-tokio/tests/prune_expiry_test.rs",
+      "before": "d499b40da3973fa3655032d24bf8852da899774177f8d31cce451076a4ffb7f9",
+      "after": "3233f4f694a38708056256be516fd26f9576bcf90994bab5b6d3f102f22ea30b"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-runtime-tokio/tests/result_slots_test.rs",
+      "before": "8898eceebe895455eea6d5e58dc9bd89d74ec5ceb14ee86c80a2bb4828aebd2a",
+      "after": "ece6f46144c9280fcc9fcd1c97b9ceb0c69e6bdb624a7d71dcef184ed8fb0319"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "tests/scheduler/durable_sigkill.rs",
+      "before": "f196619f0f355db788287c53e2009e51cb094dd0949701a852df209763c0a4a2",
+      "after": "3acdbf0a3dfdeb7c7cd1453710e2c82ab70f5e8145291939eab38052370249c4"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs",
+      "before": "f806060d9b93161487462236259117a674a7e9fc4461385d937fd3fa33314efe",
+      "after": "683644583389a349dd3a0204f25498b5ba2e5cbd4c504b0eaf08e8adbce89b02"
+    }
+  ]
+}

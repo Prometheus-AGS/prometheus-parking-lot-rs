@@ -222,8 +222,8 @@ jobs:
             package: prometheus-parking-lot-runtime-tokio
             target: loom_ledger
             expect: pass
-            oracle: loom_ledger_submit_shutdown_cannot_both_miss
-            positive: loom_ledger_settlement_publishes_finished_before_zero
+            oracle: ledger::loom_ledger::loom_ledger_submit_shutdown_cannot_both_miss
+            positive: ledger::loom_ledger::loom_ledger_settlement_publishes_finished_before_zero
             diagnostic: OA-11 ledger admission and shutdown both missed accepted work
           - control: oa-11-kind-release
             package: prometheus-parking-lot-core
@@ -236,8 +236,8 @@ jobs:
             package: prometheus-parking-lot-runtime-tokio
             target: loom_ledger
             expect: fail
-            oracle: loom_ledger_submit_shutdown_cannot_both_miss
-            positive: loom_ledger_settlement_publishes_finished_before_zero
+            oracle: ledger::loom_ledger::loom_ledger_submit_shutdown_cannot_both_miss
+            positive: ledger::loom_ledger::loom_ledger_settlement_publishes_finished_before_zero
             diagnostic: OA-11 ledger admission and shutdown both missed accepted work
     env:
       LOOM_MAX_PREEMPTIONS: "3"
@@ -267,15 +267,20 @@ jobs:
           fi
           export RUSTFLAGS
           mkdir -p oa11-logs
+          if [ "$MODEL" = loom_ledger ]; then
+            model_args=(--lib ledger::loom_ledger::)
+          else
+            model_args=(--test "$MODEL")
+          fi
           # Keep compile/discovery/run evidence separate. Compile failure, zero
           # discovery, timeout and abnormal termination cannot satisfy a control.
-          cargo test -p "$PACKAGE" --locked --test "$MODEL" --no-run 2>&1 | tee oa11-logs/build.log
-          cargo test -p "$PACKAGE" --locked --test "$MODEL" -- --list 2>&1 | tee oa11-logs/discovery.log
+          cargo test -p "$PACKAGE" --locked "${model_args[@]}" --no-run 2>&1 | tee oa11-logs/build.log
+          cargo test -p "$PACKAGE" --locked "${model_args[@]}" -- --list 2>&1 | tee oa11-logs/discovery.log
           grep -Fx "$ORACLE: test" oa11-logs/discovery.log
           grep -Fx "$POSITIVE: test" oa11-logs/discovery.log
           awk '/: test$/{n++} END{exit n!=2}' oa11-logs/discovery.log
           set +e
-          cargo test -p "$PACKAGE" --locked --test "$MODEL" -- --test-threads=1 2>&1 | tee oa11-logs/run.log
+          cargo test -p "$PACKAGE" --locked "${model_args[@]}" -- --test-threads=1 2>&1 | tee oa11-logs/run.log
           rc=${PIPESTATUS[0]}
           set -e
           printf '%s\n' "$rc" > oa11-logs/exit-status.txt

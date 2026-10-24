@@ -1,0 +1,67 @@
+--- a/crates/parking-lot-core/src/contracts/conformance/mailbox.rs
++++ b/crates/parking-lot-core/src/contracts/conformance/mailbox.rs
+@@ -170,9 +170,10 @@
+     assert!(consume(&mailbox, &k).await.is_none());
+ }
+ 
+-/// The same caller key is independent at addresses differing in tenant, user
+-/// or session. `None` and an empty optional identifier are different addresses.
+-/// Every address keeps its own first result and its tombstone after consume.
++/// The same caller key is independent at addresses differing in tenant, user or session.
++///
++/// `None` and an empty optional identifier are different addresses. Every address
++/// keeps its own first result and its tombstone after consume.
+ pub async fn idempotency_is_scoped_to_mailbox_key<H: MailboxHarness>(h: &H) {
+     let mailbox = h.mailbox().await;
+     let base = key("idempotency-scope");
+@@ -335,9 +336,11 @@
+     );
+ }
+ 
+-/// A duplicate returns the first status without consuming the result, including
+-/// its full failure details and after consume. Current statuses remain valid
+-/// generic mailbox values; no terminal-only validation is introduced.
++/// A duplicate returns the first status without consuming the result.
++///
++/// This includes its full failure details and applies after consume. Current
++/// statuses remain valid generic mailbox values; no terminal-only validation is
++/// introduced.
+ pub async fn duplicate_returns_original_status<H: MailboxHarness>(h: &H) {
+     let mailbox = h.mailbox().await;
+     let statuses = [
+--- a/crates/parking-lot-core/src/contracts/conformance/task_queue.rs
++++ b/crates/parking-lot-core/src/contracts/conformance/task_queue.rs
+@@ -40,9 +40,10 @@
+     assert_eq!(actual.payload, expected.payload);
+ }
+ 
+-/// Pruning returns all and only removed tasks with their exact original
+-/// metadata/payload, once. Equality at a deadline is live, and surviving work
+-/// keeps its normal priority ordering and remains available to run.
++/// Pruning returns all and only removed tasks with their exact original metadata/payload, once.
++///
++/// Equality at a deadline is live, and surviving work keeps its normal priority
++/// ordering and remains available to run.
+ pub fn prune_returns_all_removed_tasks<Q: TaskQueue<String>>(queue: &mut Q) {
+     assert!(queue.is_empty(), "conformance requires an empty queue");
+     let expired = task(1, Some(99), Priority::High);
+--- a/crates/parking-lot-core/src/dispatch/parked.rs
++++ b/crates/parking-lot-core/src/dispatch/parked.rs
+@@ -335,10 +335,13 @@
+             .filter(|(_, entry)| entry.ticket.is_expired(now_ms))
+             .map(|(key, _)| *key)
+             .collect();
+-        Ok(expired
+-            .into_iter()
+-            .filter_map(|key| self.remove(&key))
+-            .collect())
++        let mut removed = Vec::with_capacity(expired.len());
++        for key in expired {
++            if let Some(item) = self.remove(&key) {
++                removed.push(item);
++            }
++        }
++        Ok(removed)
+     }
+ }
+ 

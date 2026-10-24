@@ -32,7 +32,8 @@
 //! written before the `in_flight`/`capturing` decrement that a waiter
 //! acquires (`SeqCst` read-modify-writes are also release operations).
 //!
-//! `loom_ledger` includes this source with instrumented atomics to model the
+//! The internal `loom_ledger` test module exercises this ledger with
+//! instrumented atomics and its defining crate's production DTOs to model the
 //! admission/shutdown pair and finish-before-settle publication. It does not
 //! call `wait_until` or model Tokio's `Notify` internals. Bounded schedules and
 //! Loom's partial coverage of Relaxed memory accesses are supporting evidence,
@@ -290,6 +291,9 @@ impl Drop for SettleOnDrop<'_> {
         self.0.settle(1);
     }
 }
+
+#[cfg(all(test, parking_lot_loom))]
+mod loom_ledger;
 
 #[cfg(all(test, not(parking_lot_loom)))]
 mod tests {

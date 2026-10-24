@@ -5,7 +5,7 @@
 //! `cargo test --target wasm32-unknown-unknown -p prometheus-parking-lot-wasm`
 //! (needs `wasm-bindgen-test-runner` matching the `wasm-bindgen` in Cargo.lock).
 //! OA-13 also runs this same suite with `WASM_BINDGEN_USE_BROWSER=1` and a
-//! pinned local ChromeDriver; Node remains the default.
+//! pinned local `ChromeDriver`; Node remains the default.
 //!
 //! Executors wait with `prometheus_parking_lot_wasm::sleep`, the `Send` JS
 //! timer; a raw `gloo_timers` future cannot be awaited inside a

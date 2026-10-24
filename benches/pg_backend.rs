@@ -5,7 +5,7 @@
 //! phase, but included in the runner's full-process peak RSS. No schema is
 //! relabeled: each binary migrates its own fresh disposable database. Compare
 //! only Stored, never match Duplicate's version-dependent payload shape.
-//! See pg_measure.py for paired sampling, provenance and report validation.
+//! See `pg_measure.py` for paired sampling, provenance and report validation.
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -34,6 +34,7 @@ const POLL: Duration = Duration::from_millis(1);
 const NAME: &str = "oa17";
 const HOT_ID: u64 = 999_999;
 
+#[derive(Clone)]
 struct Executor;
 
 #[async_trait]
@@ -88,7 +89,8 @@ impl Work {
     async fn one(&self, client: usize, id: u64) -> u64 {
         match self.case.as_str() {
             "queue" => {
-                self.queue
+                let _enqueued = self
+                    .queue
                     .enqueue(task(client, id, &self.payload))
                     .await
                     .expect("enqueue");
@@ -226,16 +228,20 @@ async fn phase(
     (all.into_iter().map(|(_, ns)| ns).collect(), elapsed)
 }
 
-async fn sample(case: String, clients: usize, delay_us: u64) -> serde_json::Value {
+async fn connect_database() -> PgPool {
     let url = std::env::var("OA17_DATABASE_URL").expect("disposable database URL is required");
     let deadline = Instant::now() + Duration::from_secs(60);
-    let connection = loop {
+    loop {
         match PgPool::connect(&url).await {
             Ok(pool) => break pool,
             Err(error) if Instant::now() >= deadline => panic!("database startup: {error}"),
             Err(_) => tokio::time::sleep(Duration::from_millis(250)).await,
         }
-    };
+    }
+}
+
+async fn sample(case: String, clients: usize, delay_us: u64) -> serde_json::Value {
+    let connection = connect_database().await;
     let max_connections = connection.options().get_max_connections();
     PgLeaseQueue::<String>::migrate(&connection)
         .await

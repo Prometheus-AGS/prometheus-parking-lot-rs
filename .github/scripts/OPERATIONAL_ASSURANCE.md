@@ -159,6 +159,16 @@ libtest and unittest commands also require nonzero classified executed tests.
 The two PG ordinary ignored legs exclude postgres_upgrade explicitly; only
 OA14's marked owned upgraded cluster invokes its production upgrade test.
 
+Dependency policy uses the existing CI scope and cargo-deny root-option order:
+`cargo deny --workspace --all-features --locked check` for the full workspace,
+including FFI, and `cargo deny --manifest-path bindings/uniffi-bindgen/Cargo.toml
+--locked --config bindings/uniffi-bindgen/deny.toml check` for the standalone
+binding-generator workspace. The first observed root check without workspace
+selection covers only the facade graph and cannot certify this full-workspace
+requirement. The observed bindgen invocation with root options after `check`
+failed argument parsing before policy analysis. Both corrected commands still
+require actual final-boundary execution; no advisory/policy skip is introduced.
+
 There is no invented speedup threshold: valid measured OA17 report execution
 can PASS collection while reporting regression or overlapping noise; publication
 judgment stays separate. Permanent generic Queued/Running fences retain the

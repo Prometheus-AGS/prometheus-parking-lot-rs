@@ -1,13 +1,54 @@
 {
   "cycle": 1,
   "unique_findings": 5,
-  "correction_status": "in progress",
-  "runtime_verification": "not established by source review",
+  "correction_status": "all five unique initial findings confirmed resolved in source by original independent reviewers",
+  "runtime_verification": "First frozen baseline for this candidate finished FAIL: 28 PASS, 9 FAIL, 5 BLOCKED; retained under evidence/boundary-attempt-1. Source confirmation does not establish scenario/CI PASS. Narrow observed repair reports and fresh candidate runtime evidence are recorded separately. Same native model family isolation limitation retained.",
   "reports": [
     "oa04_final_contract_review.json",
     "oa04_final_python_review.json",
     "oa04_final_runtime_review.json",
     "oa04_final_security_review.json",
     "oa04_final_storage_review.json"
+  ],
+  "candidate": "729cc42549defb5fcf69b432485224cb89da74bc",
+  "unresolved_reported_critical": 0,
+  "unresolved_reported_high": 0,
+  "raw_reports": [
+    {
+      "path": ".agent-team/reviews/oa04-contract/correction-confirmation.md",
+      "sha256": "24f8366db09a8437ce037980920330a9786fea6619ae93f744549e58b3f21e6c"
+    },
+    {
+      "path": ".agent-team/reviews/oa04-contract/initial-report.md",
+      "sha256": "d6ee79d6417e8f21e1558c45884cdb20ee66f101e9e6434e9019b0e69e4bd0bd"
+    },
+    {
+      "path": ".agent-team/reviews/oa04-python/confirmation.md",
+      "sha256": "b351f18ba0491999f571708aa3a46a107ff934a82f6db485e6b5b1f0182d7ca0"
+    },
+    {
+      "path": ".agent-team/reviews/oa04-python/initial-report.md",
+      "sha256": "ccf76de2b4c9c3aaf219a7ec6376a31462f0634d6ea62b73dbfd4308e55d7f94"
+    },
+    {
+      "path": ".agent-team/reviews/oa04-runtime/correction-confirmation.md",
+      "sha256": "7af8b9f70f3fbf6ca58068da96360613c930f47ff91ce6da1190a23c5b9e7139"
+    },
+    {
+      "path": ".agent-team/reviews/oa04-runtime/initial-review.md",
+      "sha256": "1726872256c82ecf5638bd87e8d7d3aa6b1413fb951f0ffddf1e2fa67c093c55"
+    },
+    {
+      "path": ".agent-team/reviews/oa04-security/correction-confirmation.md",
+      "sha256": "feb484c41d95d5de9000a173a96abc6a9a0c25e6f33c26cde7b9d3ba33a9ead8"
+    },
+    {
+      "path": ".agent-team/reviews/oa04-security/initial-report.md",
+      "sha256": "e43ad150f1b2ff8d5142d00552c5be021913e7c698fb7f533c4ccf6f69e163c7"
+    },
+    {
+      "path": ".agent-team/reviews/oa04-storage/final-report.md",
+      "sha256": "6d38aef089ae9cdb87f4b30f4159f36f84662094d85cdb49eb76cea392865556"
+    }
   ]
 }

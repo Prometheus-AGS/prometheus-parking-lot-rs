@@ -1,4 +1,9 @@
-//! OA-11: bounded schedules through the actual shutdown ledger source.
+//! OA-11: bounded schedules through the actual private shutdown ledger.
+//!
+//! This is a library unit-test module inside ledger, not a path-included copy
+//! in an integration crate. Ledger and its production ShutdownReport and
+//! SinkOutcome types keep their actual defining-crate visibility, including
+//! non-exhaustive construction and matching rules. No parallel DTOs are used.
 //!
 //! ResourcePool::submit calls Ledger::accept before loading its shutdown flag;
 //! shutdown stores that flag before its wait predicate reads in_flight. The
@@ -24,14 +29,7 @@ use loom::sync::Arc;
 use loom::sync::atomic::{AtomicBool, Ordering};
 use loom::thread;
 
-// Keep the ledger private in the public runtime API while compiling precisely
-// its production implementation. Its other helpers remain out of model scope.
-use prometheus_parking_lot_runtime_tokio::{cancellation, shutdown};
-#[allow(dead_code, reason = "models exercise only admission and settlement")]
-#[path = "../src/ledger.rs"]
-mod ledger;
-
-use ledger::{Ledger, Tally};
+use super::{Ledger, Tally};
 
 #[cfg(not(parking_lot_negative_control = "oa-11-ledger-order"))]
 const FLAG_STORE_ORDER: Ordering = Ordering::SeqCst;

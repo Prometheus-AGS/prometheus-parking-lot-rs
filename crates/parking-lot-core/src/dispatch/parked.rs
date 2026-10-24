@@ -335,10 +335,13 @@ impl<T: Parkable> ParkedQueue<T> for PriorityQueue<T> {
             .filter(|(_, entry)| entry.ticket.is_expired(now_ms))
             .map(|(key, _)| *key)
             .collect();
-        Ok(expired
-            .into_iter()
-            .filter_map(|key| self.remove(&key))
-            .collect())
+        let mut removed = Vec::with_capacity(expired.len());
+        for key in expired {
+            if let Some(item) = self.remove(&key) {
+                removed.push(item);
+            }
+        }
+        Ok(removed)
     }
 }
 

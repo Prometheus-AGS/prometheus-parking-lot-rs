@@ -8,6 +8,7 @@
 #[path = "support/legacy_v03.rs"]
 mod legacy_v03;
 
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use legacy_v03::{Fixture, IDENTITY, NOW, address, assignments, old_open, snapshot};
@@ -16,6 +17,8 @@ use prometheus_parking_lot_core::{
     MailboxKey, ResultMailbox, SchedulerError, TaskStatus, TestClock,
 };
 use prometheus_parking_lot_embedded::EmbeddedStore;
+
+type Snapshot = BTreeMap<String, serde_json::Value>;
 
 fn delivery(key: &MailboxKey, caller: &str) -> Delivery<String> {
     Delivery::new(
@@ -41,7 +44,7 @@ fn open_migration(
     EmbeddedStore::open_with_clock_and_idempotency_metadata(path, clock, owners, &statuses)
 }
 
-fn assert_refusal(result: Result<EmbeddedStore, SchedulerError>) {
+fn assert_refusal(result: &Result<EmbeddedStore, SchedulerError>) {
     assert!(
         matches!(result, Err(SchedulerError::InvalidConfig { .. })),
         "{result:?}"
@@ -53,7 +56,10 @@ fn legacy_migration_refuses_missing_or_invalid_owners_without_logical_changes() 
     let fixture = Fixture::new(false);
     let before = snapshot(&fixture.path);
     let clock = TestClock::new(u128::from(NOW));
-    assert_refusal(EmbeddedStore::open_with_clock(&fixture.path, clock.clone()));
+    assert_refusal(&EmbeddedStore::open_with_clock(
+        &fixture.path,
+        clock.clone(),
+    ));
     assert_eq!(
         snapshot(&fixture.path),
         before,
@@ -67,13 +73,13 @@ fn legacy_migration_refuses_missing_or_invalid_owners_without_logical_changes() 
     duplicate.push(known[0].clone());
     let mut unknown = known.clone();
     unknown.push(LegacyIdempotencyOwner::new("never-existed", address("a")));
-    let mut expired = known.clone();
+    let mut expired = known;
     expired.push(LegacyIdempotencyOwner::new(
         "f-expired-ownerless",
         address("a"),
     ));
     for owners in [Vec::new(), conflicting, duplicate, unknown, expired] {
-        assert_refusal(open_migration(&fixture.path, clock.clone(), &owners));
+        assert_refusal(&open_migration(&fixture.path, clock.clone(), &owners));
         assert_eq!(
             snapshot(&fixture.path),
             before,
@@ -94,12 +100,46 @@ async fn legacy_migration_preserves_results_fences_identity_and_original_ttls() 
     let before = snapshot(&fixture.path);
     let owners = assignments();
     let clock = TestClock::new(u128::from(NOW));
+    let converted = assert_legacy_conversion(&fixture, &clock, &owners, &before);
+    {
+        let store = EmbeddedStore::open_with_clock(&fixture.path, clock.clone())
+            .expect("ordinary schema-3 reopen");
+        let mailbox = store.result_mailbox::<String>();
+        assert_original_results(&mailbox).await;
+        assert_original_queue(&store).await;
+    }
+    assert_original_expiry_and_replay(&fixture, &clock, &owners).await;
+    let after = snapshot(&fixture.path);
+    assert_eq!(
+        after["mb_idem"], before["mb_idem"],
+        "all legacy provenance, including expired ownerless, stays immutable"
+    );
+    assert_eq!(
+        after["mb_legacy_owners_v2"],
+        converted["mb_legacy_owners_v2"]
+    );
+    fixture.assert_backup_untouched();
+    let restored = fixture.restore_copy();
+    drop(old_open(&restored).expect("backup rollback preserves old-reader compatibility"));
+    assert_eq!(
+        snapshot(&restored),
+        before,
+        "rollback uses untouched backup, not schema downgrade"
+    );
+}
+
+fn assert_legacy_conversion(
+    fixture: &Fixture,
+    clock: &TestClock,
+    owners: &[LegacyIdempotencyOwner],
+    before: &Snapshot,
+) -> Snapshot {
     let store =
-        open_migration(&fixture.path, clock.clone(), &owners).expect("explicit mapped conversion");
+        open_migration(&fixture.path, clock.clone(), owners).expect("explicit mapped conversion");
     assert_eq!(store.lease_queue::<String>(10).identity(), IDENTITY);
     drop(store);
     let converted = snapshot(&fixture.path);
-    for (table, rows) in &before {
+    for (table, rows) in before {
         if table != "tables" && table != "q_meta" {
             assert_eq!(
                 converted.get(table),
@@ -146,7 +186,7 @@ async fn legacy_migration_preserves_results_fences_identity_and_original_ttls() 
         "refused old open cannot alter store"
     );
 
-    let again = open_migration(&fixture.path, clock.clone(), &owners).expect("same mapping replay");
+    let again = open_migration(&fixture.path, clock.clone(), owners).expect("same mapping replay");
     drop(again);
     assert_eq!(
         snapshot(&fixture.path),
@@ -161,92 +201,101 @@ async fn legacy_migration_preserves_results_fences_identity_and_original_ttls() 
         vec![LegacyIdempotencyOwner::new("never-existed", address("a"))],
         vec![owners[0].clone(), owners[0].clone()],
     ] {
-        assert_refusal(open_migration(&fixture.path, clock.clone(), &bad));
+        assert_refusal(&open_migration(&fixture.path, clock.clone(), &bad));
         assert_eq!(snapshot(&fixture.path), converted);
     }
 
-    {
-        let store = EmbeddedStore::open_with_clock(&fixture.path, clock.clone())
-            .expect("ordinary schema-3 reopen");
-        let mailbox = store.result_mailbox::<String>();
-        let a = address("a");
-        let b = address("b");
-        for (key, caller) in [
-            (&a, "a-retained"),
-            (&a, "b-consumed-finite"),
-            (&b, "c-consumed-permanent"),
-            (&a, "d-reused"),
-            (&a, "e-live-finite"),
-        ] {
-            assert_eq!(
-                mailbox.deliver(delivery(key, caller)).await.expect("retry"),
-                DeliveryOutcome::Duplicate {
-                    status: TaskStatus::Completed
-                }
-            );
-        }
-        // Expired earlier-generation row belonged to b; only the live exact
-        // expiry generation at a owns d-reused's migrated fence.
+    converted
+}
+
+async fn assert_original_results(mailbox: &impl ResultMailbox<String>) {
+    let a = address("a");
+    let b = address("b");
+    for (key, caller) in [
+        (&a, "a-retained"),
+        (&a, "b-consumed-finite"),
+        (&b, "c-consumed-permanent"),
+        (&a, "d-reused"),
+        (&a, "e-live-finite"),
+    ] {
         assert_eq!(
-            mailbox
-                .deliver(delivery(&b, "d-reused"))
-                .await
-                .expect("other generation owner"),
-            DeliveryOutcome::Stored
-        );
-        assert_eq!(
-            mailbox
-                .deliver(delivery(&b, "b-consumed-finite"))
-                .await
-                .expect("other address"),
-            DeliveryOutcome::Stored
-        );
-        let mut received = Vec::new();
-        while let Some(entry) = mailbox.consume(&a).await.expect("legacy consume") {
-            received.push((
-                entry.task_id,
-                entry.payload.expect("payload"),
-                entry.delivered_at_ms,
-            ));
-        }
-        assert_eq!(
-            received,
-            vec![
-                (1, "legacy first".to_owned(), u128::from(NOW - 100)),
-                (2, "unkeyed".to_owned(), u128::from(NOW - 100)),
-                (4, "new generation".to_owned(), u128::from(NOW)),
-                (5, "finite live".to_owned(), u128::from(NOW - 100)),
-            ],
-            "original bytes decode with original order/timestamps, never a synthesized result"
-        );
-        assert_eq!(
-            mailbox
-                .deliver(delivery(&a, "a-retained"))
-                .await
-                .expect("consumed retry"),
+            mailbox.deliver(delivery(key, caller)).await.expect("retry"),
             DeliveryOutcome::Duplicate {
                 status: TaskStatus::Completed
             }
         );
-        let queue = store.lease_queue::<String>(10);
-        assert_eq!(queue.identity(), IDENTITY);
-        let depth = queue.depth().await.expect("preserved queue");
-        assert_eq!(
-            (
-                depth.ready,
-                depth.delayed,
-                depth.leased,
-                depth.dead_lettered
-            ),
-            (1, 1, 1, 1)
-        );
-        let leased = queue
-            .lease(1, Duration::from_secs(30))
-            .await
-            .expect("original queued task");
-        assert_eq!(leased.len(), 1);
-        assert_eq!(leased[0].task.payload, "ready");
     }
+    // Expired earlier-generation row belonged to b; only the live exact
+    // expiry generation at a owns d-reused's migrated fence.
+    assert_eq!(
+        mailbox
+            .deliver(delivery(&b, "d-reused"))
+            .await
+            .expect("other generation owner"),
+        DeliveryOutcome::Stored
+    );
+    assert_eq!(
+        mailbox
+            .deliver(delivery(&b, "b-consumed-finite"))
+            .await
+            .expect("other address"),
+        DeliveryOutcome::Stored
+    );
+    let mut received = Vec::new();
+    while let Some(entry) = mailbox.consume(&a).await.expect("legacy consume") {
+        received.push((
+            entry.task_id,
+            entry.payload.expect("payload"),
+            entry.delivered_at_ms,
+        ));
+    }
+    assert_eq!(
+        received,
+        vec![
+            (1, "legacy first".to_owned(), u128::from(NOW - 100)),
+            (2, "unkeyed".to_owned(), u128::from(NOW - 100)),
+            (4, "new generation".to_owned(), u128::from(NOW)),
+            (5, "finite live".to_owned(), u128::from(NOW - 100)),
+        ],
+        "original bytes decode with original order/timestamps, never a synthesized result"
+    );
+    assert_eq!(
+        mailbox
+            .deliver(delivery(&a, "a-retained"))
+            .await
+            .expect("consumed retry"),
+        DeliveryOutcome::Duplicate {
+            status: TaskStatus::Completed
+        }
+    );
+}
+
+async fn assert_original_queue(store: &EmbeddedStore) {
+    let queue = store.lease_queue::<String>(10);
+    assert_eq!(queue.identity(), IDENTITY);
+    let depth = queue.depth().await.expect("preserved queue");
+    assert_eq!(
+        (
+            depth.ready,
+            depth.delayed,
+            depth.leased,
+            depth.dead_lettered
+        ),
+        (1, 1, 1, 1)
+    );
+    let leased = queue
+        .lease(1, Duration::from_secs(30))
+        .await
+        .expect("original queued task");
+    assert_eq!(leased.len(), 1);
+    assert_eq!(leased[0].task.payload, "ready");
+}
+
+async fn assert_original_expiry_and_replay(
+    fixture: &Fixture,
+    clock: &TestClock,
+    owners: &[LegacyIdempotencyOwner],
+) {
     clock.advance(Duration::from_millis(1_000));
     {
         let store = EmbeddedStore::open_with_clock(&fixture.path, clock.clone())
@@ -258,7 +307,7 @@ async fn legacy_migration_preserves_results_fences_identity_and_original_ttls() 
     {
         // Owner proof must remain usable after the active scoped fence has
         // been removed. Replay must not reconstruct that fence from mb_idem.
-        let store = open_migration(&fixture.path, clock.clone(), &owners)
+        let store = open_migration(&fixture.path, clock.clone(), owners)
             .expect("mapping replay after fence eviction");
         drop(store);
         assert_eq!(
@@ -304,23 +353,6 @@ async fn legacy_migration_preserves_results_fences_identity_and_original_ttls() 
             }
         );
     }
-    let after = snapshot(&fixture.path);
-    assert_eq!(
-        after["mb_idem"], before["mb_idem"],
-        "all legacy provenance, including expired ownerless, stays immutable"
-    );
-    assert_eq!(
-        after["mb_legacy_owners_v2"],
-        converted["mb_legacy_owners_v2"]
-    );
-    fixture.assert_backup_untouched();
-    let restored = fixture.restore_copy();
-    drop(old_open(&restored).expect("backup rollback preserves old-reader compatibility"));
-    assert_eq!(
-        snapshot(&restored),
-        before,
-        "rollback uses untouched backup, not schema downgrade"
-    );
 }
 
 #[test]
@@ -329,13 +361,13 @@ fn legacy_migration_requires_authority_for_ambiguous_exact_generations() {
     let before = snapshot(&fixture.path);
     let clock = TestClock::new(u128::from(NOW));
     let mut owners = assignments();
-    assert_refusal(open_migration(&fixture.path, clock.clone(), &owners));
+    assert_refusal(&open_migration(&fixture.path, clock.clone(), &owners));
     assert_eq!(snapshot(&fixture.path), before);
     owners.push(LegacyIdempotencyOwner::new(
         "g-ambiguous",
         address("outside-candidates"),
     ));
-    assert_refusal(open_migration(&fixture.path, clock.clone(), &owners));
+    assert_refusal(&open_migration(&fixture.path, clock.clone(), &owners));
     assert_eq!(snapshot(&fixture.path), before);
     owners.pop();
     owners.push(LegacyIdempotencyOwner::new("g-ambiguous", address("a")));
@@ -353,43 +385,7 @@ async fn mailbox_scope_distinguishes_optional_and_delimited_addresses() {
     let dir = tempfile::tempdir().expect("fresh isolated store");
     let path = dir.path().join("scope.redb");
     let clock = TestClock::new(u128::from(NOW));
-    let base = MailboxKey {
-        tenant: "t".to_owned(),
-        user_id: None,
-        session_id: None,
-    };
-    let addresses = [
-        base.clone(),
-        address("other-tenant"),
-        MailboxKey {
-            user_id: Some(String::new()),
-            ..base.clone()
-        },
-        MailboxKey {
-            session_id: Some(String::new()),
-            ..base.clone()
-        },
-        MailboxKey {
-            user_id: Some("u|s".to_owned()),
-            session_id: Some("tail".to_owned()),
-            ..base.clone()
-        },
-        MailboxKey {
-            user_id: Some("u".to_owned()),
-            session_id: Some("s|tail".to_owned()),
-            ..base
-        },
-        MailboxKey {
-            tenant: "t\u{1f}u".to_owned(),
-            user_id: None,
-            session_id: Some("s".to_owned()),
-        },
-        MailboxKey {
-            tenant: "t".to_owned(),
-            user_id: Some("u".to_owned()),
-            session_id: Some("\u{1f}s".to_owned()),
-        },
-    ];
+    let addresses = scoped_addresses();
     {
         let store = EmbeddedStore::open_with_clock(&path, clock.clone()).expect("fresh schema 3");
         let mailbox = store.result_mailbox::<String>();
@@ -467,4 +463,44 @@ async fn mailbox_scope_distinguishes_optional_and_delimited_addresses() {
                 .is_none()
         );
     }
+}
+
+fn scoped_addresses() -> [MailboxKey; 8] {
+    let base = MailboxKey {
+        tenant: "t".to_owned(),
+        user_id: None,
+        session_id: None,
+    };
+    [
+        base.clone(),
+        address("other-tenant"),
+        MailboxKey {
+            user_id: Some(String::new()),
+            ..base.clone()
+        },
+        MailboxKey {
+            session_id: Some(String::new()),
+            ..base.clone()
+        },
+        MailboxKey {
+            user_id: Some("u|s".to_owned()),
+            session_id: Some("tail".to_owned()),
+            ..base.clone()
+        },
+        MailboxKey {
+            user_id: Some("u".to_owned()),
+            session_id: Some("s|tail".to_owned()),
+            ..base
+        },
+        MailboxKey {
+            tenant: "t\u{1f}u".to_owned(),
+            user_id: None,
+            session_id: Some("s".to_owned()),
+        },
+        MailboxKey {
+            tenant: "t".to_owned(),
+            user_id: Some("u".to_owned()),
+            session_id: Some("\u{1f}s".to_owned()),
+        },
+    ]
 }

@@ -1,0 +1,36 @@
+--- a/crates/parking-lot-runtime-tokio/tests/backend_admission_test.rs
++++ b/crates/parking-lot-runtime-tokio/tests/backend_admission_test.rs
+@@ -61,6 +61,7 @@
+             activity.peak_gpu = activity.peak_gpu.max(activity.gpu);
+             assert!(activity.total <= 2, "active total never exceeds max_units");
+             assert!(activity.gpu <= 1, "active GPU cost never exceeds its limit");
++            drop(activity);
+         }
+         let _active = Active {
+             activity: Arc::clone(&self.0),
+@@ -104,6 +105,7 @@
+             .expect("consume")
+             .expect("terminal mailbox outcome");
+         assert!(stored.consume(&key).expect("consume again").is_none());
++        drop(stored);
+         result
+     }
+ }
+--- a/crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs
++++ b/crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs
+@@ -169,6 +169,7 @@
+             .expect("consume")
+             .expect("task outcome");
+         assert!(stored.consume(&key).expect("consume again").is_none());
++        drop(stored);
+         outcome
+     }
+ }
+@@ -584,6 +585,7 @@
+                         );
+                         assert!(stored.consume(&key).expect("consume again").is_none());
+                     }
++                    drop(stored);
+                     println!("OA-08:discarded-backlog-settled");
+                 });
+         })

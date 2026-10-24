@@ -1,0 +1,8 @@
+{
+  "path": "crates/parking-lot-iggy/tests/iggy_stream.rs",
+  "base_sha256": "40a5a8099d1bf8c1a3d6fa060215af7fc6f328e43b2f5086bbf58971cfba11f3",
+  "sha256": "69269903acbab1212cc6f70a47d3f0fd7c993e36e2572cef4039ea0b81704f99",
+  "patch_sha256": "4ad5115b8f43d7b4d78d189ebbb36164be9380985311c6ddf37b40da33084621",
+  "execution": "NOT_EXERCISED",
+  "reason": "Observed too_many_lines fixture lint; extracted prefix reader preserving publication/oracle/drop ordering."
+}

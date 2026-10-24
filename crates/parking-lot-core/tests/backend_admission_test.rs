@@ -1,7 +1,7 @@
 //! OA-09: first-observed backend heads are checked against absolute limits.
 //!
-//! The production Dispatcher and TaskQueueAdapter read a pre-filled real
-//! InMemoryQueue. `parking_lot_negative_control="oa-09"` skips the head check;
+//! The production `Dispatcher` and `TaskQueueAdapter` read a pre-filled real
+//! `InMemoryQueue`. `parking_lot_negative_control="oa-09"` skips the head check;
 //! the impossible-head oracles then fail while valid-waiting controls remain.
 #![cfg(not(parking_lot_loom))]
 
@@ -12,7 +12,7 @@ use prometheus_parking_lot_core::{
     TaskMetadata, TaskQueue,
 };
 
-fn task(id: u64, cost: ResourceCost) -> ScheduledTask<u64> {
+const fn task(id: u64, cost: ResourceCost) -> ScheduledTask<u64> {
     ScheduledTask {
         meta: TaskMetadata {
             id,

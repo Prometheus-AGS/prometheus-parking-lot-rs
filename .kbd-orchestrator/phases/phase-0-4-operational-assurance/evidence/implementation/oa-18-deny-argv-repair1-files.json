@@ -1,0 +1,32 @@
+{
+  "owner": "/root/oa04_release",
+  "repair_batch": "final-core-facade-1",
+  "review_correction_cycle": 1,
+  "runtimeEvidence": "NOT_EXERCISED",
+  "files": [
+    {
+      "path": ".github/operational-assurance.json",
+      "base_sha256": "d77f170b21dc05a6fbde6e740290b82ce178ef94d947111d4bd35d6074e5824d",
+      "sha256": "7a29ec615a8d2664716ed207fb52364d3a749871191c7ab0ac32d323a8e220b9",
+      "integration": "apply corresponding patch; do not overwrite concurrently edited model"
+    },
+    {
+      "path": ".github/scripts/OPERATIONAL_ASSURANCE.md",
+      "base_sha256": "60895fa1415c4b95a83b760e6520dec50d289c7d69cfcb6cc7355eaed1ae6d8a",
+      "sha256": "36aad39a0d6d62e9758d66437730f21f9b6ad40aa61259b279bdd01188e66ae6",
+      "integration": "apply corresponding patch; do not overwrite concurrently edited model"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-18-deny-argv-repair1-model.patch",
+      "sha256": "3e8cc48ef72c296dada978d7287b191dd74043ee363d0769421d244d5c507259"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-18-deny-argv-repair1-runbook.patch",
+      "sha256": "18c90da060657cab89bd14284a1df0c3c03621c9fef182ea90aa2c41b5cbaccf"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-18-deny-argv-repair1.md",
+      "sha256": "f31e05b6507ccc97ce71963a23b1856802c6beedcac85ccbdb4cb12a9137c063"
+    }
+  ]
+}
