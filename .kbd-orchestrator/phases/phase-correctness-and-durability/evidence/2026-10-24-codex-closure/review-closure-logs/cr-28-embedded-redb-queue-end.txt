@@ -1,0 +1,13 @@
+Completed task 4 out of 4: Independent review at the merge gate (durability under crash)
+Position: phase-correctness-and-durability › cr-28-embedded-redb-queue › 4 @ revision 714
+{"status": "queued", "eventId": "kpm-14b988476547c9ac4db90c9b8f6061aa", "sessionLogAppended": true, "memory": {"transport": "outbox", "status": "queued", "operationId": "82abebd3a2812adcd6f77f45f004b4e0fbed2fee95f6997149fb5627489d8222", "pkError": "pk exited 1"}, "receipt": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs/.prometheus/progress-memory-receipts/b6aca4b99f6e36d376830085dac38b4ed518c7e19f7f81cdbb487d53ae9e4ecf.json"}
+[kbd-orchestrator] Change complete — record it with prometheus kbd change transition --status complete, then run /opsx:verify + /opsx:archive (if OpenSpec)
+Completed change 16 out of 37: Crash-safe embedded queue (redb) replacing the JSONL Yaque queue
+Position: phase-correctness-and-durability › cr-28-embedded-redb-queue @ revision 715
+{"status": "queued", "eventId": "kpm-28ef504dfa706ea0362758d1aa55bfd2", "sessionLogAppended": true, "memory": {"transport": "outbox", "status": "queued", "operationId": "88415b6471b25f8506284f5ef12e21e9d5815f337819c81f01c63eeff64a5219", "pkError": "pk exited 1"}, "receipt": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs/.prometheus/progress-memory-receipts/602c58ac588a5fd3bd931135feeefacc97cb22642b2a8df57644264f48103224.json"}
+Remaining tasks after task 4: 0 out of 4 — none
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:23:24.535Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841004535-c00ee2c9-a5ce-448d-9c8b-e25fab0e7259.json"}
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:23:27.206Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841007207-321018c1-d339-4f31-a443-085896f20825.json"}
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:23:30.282Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841010283-5043e8fe-843e-427e-b586-78db3fa91ef9.json"}
+Completed task 4 out of 4:   cr-28-embedded-redb-queue:4
+Completed change 1 out of 1: cr-28-embedded-redb-queue

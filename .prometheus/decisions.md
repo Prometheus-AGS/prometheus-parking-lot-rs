@@ -34,3 +34,12 @@ Append-only. Dated entries. Mark superseded entries; do not delete them.
 - Post-release verification: fresh projects resolving from crates.io build for default, postgres, embedded, iggy, all three, and wasm32 with no default features. docs.rs `doc_status=true` for all seven crates.
 - Deferred to 0.4.0: #85 trusted publishing + release workflow, #86 release-plz/cliff/versioning ADR, #87 signed tags, #88 cr-15 history purge, #89 template files flagged by full-tree scans.
 - Uncomfortable part: the leaked `.codex` credentials remain in public history; only rotation (operator) neutralises them until #88 lands.
+
+## 2026-10-24 — Operator-approved phase closure with deferred carry-over
+
+- Operator in Codex: "Record both deferrals and close the phase."
+- Canonical decision: `phase-correctness-and-durability-close-deferrals-20261024`.
+- cr-52 tasks 1.1–1.3 close as deferred scope, carried to 0.4.0 #85/#86. Signed tags remain #87. The published v0.3.0 tag is annotated and unsigned; publication used the operator's local token, not OIDC.
+- cr-15 closes as deferred carry-over under #88. No credential rotation, history rewrite, GitHub Support purge or post-purge fresh-mirror verification is asserted. The operator-only actions remain outstanding outside this phase.
+- The receiving Codex driver records the completed cumulative reviews from PRs #74/#75/#76/#83 and the final gate summary at `a3e517f`, validates and archives OpenSpec artifacts, then closes Execute and writes Reflect. Administrative completion of deferred task records records their disposition, not implementation.
+- Uncomfortable part: archived scope does not neutralise the historical credential leak or supply the deferred release controls. The signing key provided to resume this journal was also delivered through a publicly reachable IPFS URL; that authority must be treated as exposed and replaced through the runtime's supported operator-authorized key process. No credential or enrollment changes are performed by this closure.

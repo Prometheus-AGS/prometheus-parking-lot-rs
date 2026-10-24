@@ -1,0 +1,13 @@
+Completed task 3 out of 3: Independent review at the merge gate (unwind safety, permit release on all paths)
+Position: phase-correctness-and-durability › cr-21-panic-containment › 3 @ revision 709
+{"status": "queued", "eventId": "kpm-6eae31a6674eac2d9eaf9010e4272d7b", "sessionLogAppended": true, "memory": {"transport": "outbox", "status": "queued", "operationId": "7f9e3a35e746dc462c71a2bff4e75127838087ce42331b6946420720832a25d9", "pkError": "pk exited 1"}, "receipt": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs/.prometheus/progress-memory-receipts/0a5f0d71bf229cf518722c1e9b5ba3df54bd60cf1af4b5bbd87eb0e3b866f20e.json"}
+[kbd-orchestrator] Change complete — record it with prometheus kbd change transition --status complete, then run /opsx:verify + /opsx:archive (if OpenSpec)
+Completed change 15 out of 37: Executor panics never leak capacity or kill the pool
+Position: phase-correctness-and-durability › cr-21-panic-containment @ revision 710
+{"status": "queued", "eventId": "kpm-3fc1b04f539c37720593d1111baa8f48", "sessionLogAppended": true, "memory": {"transport": "outbox", "status": "queued", "operationId": "dc2102cd59cea43fef0d90e4beb6515be0db16b778cdaebdfc458cff646293a2", "pkError": "pk exited 1"}, "receipt": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs/.prometheus/progress-memory-receipts/2f11b4def1ebaa069148435108cfff4bd0f92cbf79875fcc35b69fb19a5b2254.json"}
+Remaining tasks after task 3: 0 out of 3 — none
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:22:57.611Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840977612-18365f46-fcf5-4095-9bfc-759bf417e89f.json"}
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:23:00.277Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840980278-654c12b2-ff95-49e1-a759-c75670679c21.json"}
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:23:03.334Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840983335-e8c80ece-1692-484a-a8b7-e4c5f6ff0bc0.json"}
+Completed task 3 out of 3:   cr-21-panic-containment:3
+Completed change 1 out of 1: cr-21-panic-containment

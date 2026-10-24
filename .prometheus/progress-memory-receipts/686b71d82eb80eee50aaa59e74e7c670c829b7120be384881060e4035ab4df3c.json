@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "eventId": "kpm-c10bc473b6f7b20ca731ab27da3385e0",
+  "eventSha256": "02ddbe4e9d4fa21496b5ae3899d3abc14d5e854a8e3f8fa6dd1fad602ef9d751",
+  "eventIdentitySha256": "0fb3d58f30b31468310cc382ce4c823d0fa82426dd3eac23960da66fc00de93b",
+  "event": {
+    "schemaVersion": 1,
+    "eventId": "kpm-c10bc473b6f7b20ca731ab27da3385e0",
+    "observedAt": "2026-10-24T11:19:29.910685Z",
+    "runId": "phase-certification-remediation-20261022T103344Z",
+    "boundary": "change",
+    "status": "complete",
+    "phaseId": "phase-correctness-and-durability",
+    "changeId": "cr-45-docs-site",
+    "taskId": null,
+    "taskClass": "product",
+    "elapsedHours": 0.0,
+    "touchedFiles": [
+      ".kbd-orchestrator/current-waypoint.json",
+      ".kbd-orchestrator/phases/phase-certification-remediation/progress.json",
+      ".kbd-orchestrator/phases/phase-correctness-and-durability/execution.md",
+      ".kbd-orchestrator/phases/phase-correctness-and-durability/hooks-status.json",
+      ".kbd-orchestrator/phases/phase-correctness-and-durability/hooks.log.jsonl",
+      ".kbd-orchestrator/phases/phase-correctness-and-durability/progress.json",
+      ".kbd-orchestrator/phases/phase-correctness-and-durability/tasks.md",
+      ".kbd-orchestrator/position-reminder.txt",
+      ".kbd-orchestrator/position.json",
+      "openspec/changes/cr-16-docs-truth/tasks.md",
+      "openspec/changes/cr-17-kbd-correction/tasks.md",
+      "openspec/changes/cr-41-toolchain-baseline/tasks.md",
+      "openspec/changes/cr-42-ci-rebuild/tasks.md",
+      "openspec/changes/cr-45-docs-site/tasks.md",
+      "openspec/changes/cr-48-workspace-split/tasks.md"
+    ],
+    "verification": [],
+    "commitSha": "8bab869e554d37948d43770644fecd2138709660",
+    "blocker": null,
+    "exactNextWork": "/kbd-assess phase-correctness-and-durability"
+  },
+  "sessionLogAppended": true,
+  "memory": {
+    "transport": "outbox",
+    "status": "queued",
+    "operationId": "c376b34c293cd21487cfd1b7e2b6c50a4bae88f3019d23f105c780c756e0612d",
+    "pkError": "pk exited 1"
+  },
+  "complete": true,
+  "recordedAt": "2026-10-24T11:19:30.222082Z"
+}

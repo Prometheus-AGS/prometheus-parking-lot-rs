@@ -1,0 +1,13 @@
+Completed task 3 out of 3: Independent review at the merge gate (record accuracy vs code)
+Position: phase-correctness-and-durability › cr-17-kbd-correction › 3 @ revision 650
+{"status": "queued", "eventId": "kpm-ec3326bb73a488717d4259456beb7487", "sessionLogAppended": true, "memory": {"transport": "outbox", "status": "queued", "operationId": "b2a91f2eea75ed65f4bbbf51733f6712f942ae12b743b2a9dfb1e4bd59be43c2", "pkError": "pk exited 1"}, "receipt": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs/.prometheus/progress-memory-receipts/f76fe87f2f45a5bb14dd38c3d80234e80f9a025cf774be60986af16c208286af.json"}
+[kbd-orchestrator] Change complete — record it with prometheus kbd change transition --status complete, then run /opsx:verify + /opsx:archive (if OpenSpec)
+Completed change 3 out of 37: Correct the certification phase record through superseding KBD decisions
+Position: phase-correctness-and-durability › cr-17-kbd-correction @ revision 651
+{"status": "queued", "eventId": "kpm-0baa1bc317a46963a1f9d6e1ecb79da0", "sessionLogAppended": true, "memory": {"transport": "outbox", "status": "queued", "operationId": "aa5cf1d9f8e0007b3362a4c66464cab2b2c24efdc3b9c00e8a71dbdc0c891827", "pkError": "pk exited 1"}, "receipt": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs/.prometheus/progress-memory-receipts/7679707964089c6d23ad1d689baba73f2346f0c4e7e51e10f484420dc146e0c1.json"}
+Remaining tasks after task 3: 0 out of 3 — none
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:17:52.485Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840672486-4919f823-81d4-4493-a1d9-2a6e6ae9765f.json"}
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:17:54.831Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840674832-3d08a5e9-587b-42a1-b07c-87b60004489d.json"}
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:17:57.584Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840677585-cfb81e30-fe91-445a-ad46-3f2972ec1f1f.json"}
+Completed task 3 out of 3:   cr-17-kbd-correction:3
+Completed change 1 out of 1: cr-17-kbd-correction

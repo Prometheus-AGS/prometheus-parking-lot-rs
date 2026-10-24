@@ -1,0 +1,4 @@
+Starting task 4 out of 4: Independent review at the merge gate (image pinning, extension availability)
+Position: phase-correctness-and-durability › cr-43-postgres18-image › 4 @ revision 682
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:20:23.330Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840823331-164e60ab-fe02-498c-82b5-77aebbcb144e.json"}
+Starting task 4 out of 4:   cr-43-postgres18-image:4

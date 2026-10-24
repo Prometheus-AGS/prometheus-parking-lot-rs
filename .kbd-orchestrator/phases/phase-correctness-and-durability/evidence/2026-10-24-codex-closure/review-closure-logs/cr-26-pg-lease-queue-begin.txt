@@ -1,0 +1,4 @@
+Starting task 4 out of 4: Independent review at the merge gate (SQL correctness, isolation level, lease races)
+Position: phase-correctness-and-durability › cr-26-pg-lease-queue › 4 @ revision 722
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:24:07.990Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841047990-38664355-834f-4ac3-93d9-c31c72cf7116.json"}
+Starting task 4 out of 4:   cr-26-pg-lease-queue:4

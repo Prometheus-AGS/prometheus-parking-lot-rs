@@ -1,0 +1,3 @@
+verify: PASS
+⚠ [WARNING] release-management/spec.md: ADDED "Reproducible, approved release": Requirement text is very long (>500 characters). Move examples and edge cases into scenarios, or split it into separate requirements that each state one behavior.
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:40:03.328Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792842003329-81873de4-5e3a-42df-8f9c-cd48b692ac0a.json"}

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "eventId": "kpm-3831f435bf055ea97cbf92635c31ad6b",
+  "eventSha256": "264c94a943cd0def665407a9a28d0ae00630bb4fb046dcc9463e9189e6c2b7bf",
+  "eventIdentitySha256": "be210cf68abc647c373627b9719cfcda8162b8dbdefa14c79eff3df0345fc6f6",
+  "event": {
+    "schemaVersion": 1,
+    "eventId": "kpm-3831f435bf055ea97cbf92635c31ad6b",
+    "observedAt": "2026-10-24T11:16:21.549168Z",
+    "runId": "phase-certification-remediation-20261022T103344Z",
+    "boundary": "change",
+    "status": "complete",
+    "phaseId": "phase-correctness-and-durability",
+    "changeId": "cr-16-docs-truth",
+    "taskId": null,
+    "taskClass": "product",
+    "elapsedHours": 0.0,
+    "touchedFiles": [
+      ".kbd-orchestrator/current-waypoint.json",
+      ".kbd-orchestrator/phases/phase-correctness-and-durability/execution.md",
+      ".kbd-orchestrator/phases/phase-correctness-and-durability/hooks-status.json",
+      ".kbd-orchestrator/phases/phase-correctness-and-durability/hooks.log.jsonl",
+      ".kbd-orchestrator/phases/phase-correctness-and-durability/progress.json",
+      ".kbd-orchestrator/phases/phase-correctness-and-durability/tasks.md",
+      ".kbd-orchestrator/position-reminder.txt",
+      ".kbd-orchestrator/position.json",
+      "openspec/changes/cr-16-docs-truth/tasks.md"
+    ],
+    "verification": [],
+    "commitSha": "8bab869e554d37948d43770644fecd2138709660",
+    "blocker": null,
+    "exactNextWork": "/kbd-assess phase-correctness-and-durability"
+  },
+  "sessionLogAppended": true,
+  "memory": {
+    "transport": "outbox",
+    "status": "queued",
+    "operationId": "bd350d01c2c9357ee81efa7b9028ab5a6a2cfe3e9f7d8a96b868d06f0a816200",
+    "pkError": "pk exited 1"
+  },
+  "complete": true,
+  "recordedAt": "2026-10-24T11:16:21.886274Z"
+}

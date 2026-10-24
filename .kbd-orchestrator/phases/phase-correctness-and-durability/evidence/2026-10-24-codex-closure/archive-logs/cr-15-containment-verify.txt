@@ -1,0 +1,3 @@
+verify: PASS
+⚠ [WARNING] supply-chain-safety/spec.md: ADDED "No credentials in history or package": Requirement text is very long (>500 characters). Move examples and edge cases into scenarios, or split it into separate requirements that each state one behavior.
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:39:15.795Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841955796-edf7cdbc-9a30-4f4f-8e15-71b04b46c1a3.json"}

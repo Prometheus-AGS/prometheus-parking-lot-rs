@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "eventId": "kpm-affa69d33619754095d3e63bfb464d9e",
+  "eventSha256": "95e2d3a6bfb51b183967d05e9735010078e67a4b70100cbcf386f6b84ebe316f",
+  "eventIdentitySha256": "798d3208f1a3080f3c1ce1e2e55bcd2a9be3f31f1b8f8845a7b5eaab55d535db",
+  "event": {
+    "schemaVersion": 1,
+    "eventId": "kpm-affa69d33619754095d3e63bfb464d9e",
+    "observedAt": "2026-10-24T11:19:02.116483Z",
+    "runId": "phase-certification-remediation-20261022T103344Z",
+    "boundary": "change",
+    "status": "complete",
+    "phaseId": "phase-correctness-and-durability",
+    "changeId": "cr-42-ci-rebuild",
+    "taskId": null,
+    "taskClass": "product",
+    "elapsedHours": 0.0,
+    "touchedFiles": [
+      ".kbd-orchestrator/current-waypoint.json",
+      ".kbd-orchestrator/phases/phase-certification-remediation/progress.json",
+      ".kbd-orchestrator/phases/phase-correctness-and-durability/execution.md",
+      ".kbd-orchestrator/phases/phase-correctness-and-durability/hooks-status.json",
+      ".kbd-orchestrator/phases/phase-correctness-and-durability/hooks.log.jsonl",
+      ".kbd-orchestrator/phases/phase-correctness-and-durability/progress.json",
+      ".kbd-orchestrator/phases/phase-correctness-and-durability/tasks.md",
+      ".kbd-orchestrator/position-reminder.txt",
+      ".kbd-orchestrator/position.json",
+      "openspec/changes/cr-16-docs-truth/tasks.md",
+      "openspec/changes/cr-17-kbd-correction/tasks.md",
+      "openspec/changes/cr-41-toolchain-baseline/tasks.md",
+      "openspec/changes/cr-42-ci-rebuild/tasks.md",
+      "openspec/changes/cr-48-workspace-split/tasks.md"
+    ],
+    "verification": [],
+    "commitSha": "8bab869e554d37948d43770644fecd2138709660",
+    "blocker": null,
+    "exactNextWork": "/kbd-assess phase-correctness-and-durability"
+  },
+  "sessionLogAppended": true,
+  "memory": {
+    "transport": "outbox",
+    "status": "queued",
+    "operationId": "c113b288393b304c3af0047d066314ccec36e68983f0cab17dd4d08b8a714ed8",
+    "pkError": "pk exited 1"
+  },
+  "complete": true,
+  "recordedAt": "2026-10-24T11:19:02.420566Z"
+}

@@ -1,0 +1,7 @@
+Starting change 2 out of 37: Rust 1.99.1 / MSRV 1.95 / edition 2024 build baseline where every target compiles
+Position: phase-correctness-and-durability › cr-41-toolchain-baseline @ revision 637
+Starting task 5 out of 5: Independent review at the merge gate (MSRV correctness, no behaviour change hidden in lint fixes)
+Position: phase-correctness-and-durability › cr-41-toolchain-baseline › 5 @ revision 638
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:16:55.943Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840615943-a246206e-182c-4729-95e0-b507ac6f902b.json"}
+Starting change 1 out of 1: cr-41-toolchain-baseline
+Starting task 5 out of 5:   cr-41-toolchain-baseline:5

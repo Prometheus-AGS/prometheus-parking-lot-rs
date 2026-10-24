@@ -1,0 +1,4 @@
+Starting task 4 out of 4: Independent review at the merge gate (no silent loss on any shutdown path)
+Position: phase-correctness-and-durability › cr-29-shutdown-cancellation › 4 @ revision 767
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:28:24.334Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841304334-3f8c1001-154e-4274-9e94-975cf9240c59.json"}
+Starting task 4 out of 4:   cr-29-shutdown-cancellation:4

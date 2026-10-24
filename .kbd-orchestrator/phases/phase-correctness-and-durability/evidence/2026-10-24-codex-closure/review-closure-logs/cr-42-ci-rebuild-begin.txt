@@ -1,0 +1,7 @@
+Starting change 5 out of 37: Green, cached, locked CI on stable and MSRV
+Position: phase-correctness-and-durability › cr-42-ci-rebuild @ revision 659
+Starting task 4 out of 4: Independent review at the merge gate (CI covers every required job; no job silently skipped)
+Position: phase-correctness-and-durability › cr-42-ci-rebuild › 4 @ revision 660
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:18:34.938Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840714938-cf49212e-21da-4199-bd9d-da991196cfed.json"}
+Starting change 1 out of 1: cr-42-ci-rebuild
+Starting task 4 out of 4:   cr-42-ci-rebuild:4

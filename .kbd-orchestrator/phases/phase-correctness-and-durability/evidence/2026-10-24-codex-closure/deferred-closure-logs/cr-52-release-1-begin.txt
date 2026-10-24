@@ -1,0 +1,4 @@
+Starting task 1 out of 6: Versioning ADR (SemVer, workspace version 0.3.0, inter-crate pins, MSRV policy); release-plz.toml and cliff.toml
+Position: phase-correctness-and-durability › cr-52-release › 1 @ revision 826
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:34:13.962Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841653963-e0264a56-c285-4551-9473-112ce94c92a9.json"}
+Starting task 1 out of 6:   cr-52-release:1

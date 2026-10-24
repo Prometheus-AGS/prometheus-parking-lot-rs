@@ -1,0 +1,2 @@
+archived: cr-38-wasm-target
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:39:32.147Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841972148-ce4e32f3-0df1-4c26-832e-87c857f0ebd9.json"}

@@ -1,0 +1,7 @@
+Starting change 3 out of 37: Correct the certification phase record through superseding KBD decisions
+Position: phase-correctness-and-durability › cr-17-kbd-correction @ revision 647
+Starting task 3 out of 3: Independent review at the merge gate (record accuracy vs code)
+Position: phase-correctness-and-durability › cr-17-kbd-correction › 3 @ revision 648
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:17:39.614Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840659615-f58f19f4-c148-46fe-97c2-f9a6ccc2be66.json"}
+Starting change 1 out of 1: cr-17-kbd-correction
+Starting task 3 out of 3:   cr-17-kbd-correction:3

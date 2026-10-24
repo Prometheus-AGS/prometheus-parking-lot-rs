@@ -2,25 +2,24 @@
   "schemaVersion": "1",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 627,
-  "derivedRevision": 627,
+  "sourceRevision": 876,
+  "derivedRevision": 876,
   "frontier": {
+    "b4320c25-6bf5-4d74-9fe6-3d6b8b36bd69": 249,
     "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 627
   },
   "conflictCount": 0,
-  "updatedAt": "2026-10-24T09:24:20.574254Z",
+  "updatedAt": "2026-10-24T11:44:11.050525Z",
   "cursor": [
     "phase-correctness-and-durability",
-    "execute",
-    "cr-15-containment",
-    "1"
+    "reflect"
   ],
   "root": {
     "type": "phase",
     "id": "f6c384db-6ee1-4f1b-9bab-0e1602ec2615",
     "status": "ready",
     "progress": {
-      "done": 20,
+      "done": 51,
       "total": 51
     },
     "children": [
@@ -167,18 +166,18 @@
         "type": "phase",
         "id": "phase-correctness-and-durability",
         "canonicalId": "phase-correctness-and-durability",
-        "status": "IN_PROGRESS",
+        "status": "COMPLETE",
         "progress": {
-          "done": 6,
+          "done": 37,
           "total": 37
         },
         "children": [
           {
             "type": "change",
             "id": "cr-15-containment",
-            "status": "BLOCKED",
+            "status": "COMPLETE",
             "progress": {
-              "done": 0,
+              "done": 4,
               "total": 4
             }
           },
@@ -187,7 +186,7 @@
             "id": "cr-41-toolchain-baseline",
             "status": "COMPLETE",
             "progress": {
-              "done": 4,
+              "done": 5,
               "total": 5
             }
           },
@@ -196,7 +195,7 @@
             "id": "cr-17-kbd-correction",
             "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
@@ -205,7 +204,7 @@
             "id": "cr-48-workspace-split",
             "status": "COMPLETE",
             "progress": {
-              "done": 3,
+              "done": 4,
               "total": 4
             }
           },
@@ -214,7 +213,7 @@
             "id": "cr-42-ci-rebuild",
             "status": "COMPLETE",
             "progress": {
-              "done": 3,
+              "done": 4,
               "total": 4
             }
           },
@@ -223,7 +222,7 @@
             "id": "cr-45-docs-site",
             "status": "COMPLETE",
             "progress": {
-              "done": 5,
+              "done": 6,
               "total": 6
             }
           },
@@ -232,277 +231,277 @@
             "id": "cr-18-core-contracts",
             "status": "COMPLETE",
             "progress": {
-              "done": 3,
+              "done": 4,
               "total": 4
             }
           },
           {
             "type": "change",
             "id": "cr-51-supply-chain-gates",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-43-postgres18-image",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 3,
+              "done": 4,
               "total": 4
             }
           },
           {
             "type": "change",
             "id": "cr-25-backend-contracts",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 3,
+              "done": 4,
               "total": 4
             }
           },
           {
             "type": "change",
             "id": "cr-19-dispatcher-semaphore",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 3,
+              "done": 4,
               "total": 4
             }
           },
           {
             "type": "change",
             "id": "cr-46-docs-theory",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-35-test-targets",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 3,
+              "done": 4,
               "total": 4
             }
           },
           {
             "type": "change",
             "id": "cr-16-docs-truth",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-21-panic-containment",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-28-embedded-redb-queue",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 3,
+              "done": 4,
               "total": 4
             }
           },
           {
             "type": "change",
             "id": "cr-22-result-slots",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-26-pg-lease-queue",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 3,
+              "done": 4,
               "total": 4
             }
           },
           {
             "type": "change",
             "id": "cr-38-wasm-target",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-27-pg-mailbox",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-37-config-schema",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-30-pgmq-sql-backend",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-34-mailbox-composition",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-44-mobile-desktop-bindings",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-49-durable-dispatch",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 3,
+              "done": 4,
               "total": 4
             }
           },
           {
             "type": "change",
             "id": "cr-36-pg-matrix",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-29-shutdown-cancellation",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 3,
+              "done": 4,
               "total": 4
             }
           },
           {
             "type": "change",
             "id": "cr-31-hook-emission",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-20-skip-ahead",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-32-iggy-events",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-23-multi-resource",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-33-stream-replay",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-39-dependency-hygiene",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-40-benchmarks",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-47-docs-guides",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 3,
+              "done": 4,
               "total": 4
             }
           },
           {
             "type": "change",
             "id": "cr-53-wasm-parity",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 2,
+              "done": 3,
               "total": 3
             }
           },
           {
             "type": "change",
             "id": "cr-52-release",
-            "status": "PENDING",
+            "status": "COMPLETE",
             "progress": {
-              "done": 0,
+              "done": 6,
               "total": 6
             }
           }

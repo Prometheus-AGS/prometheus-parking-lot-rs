@@ -1,0 +1,2 @@
+archived: cr-47-docs-guides
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:40:01.516Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792842001517-c34e0aca-c4fb-4b4c-9002-31d37052b96c.json"}

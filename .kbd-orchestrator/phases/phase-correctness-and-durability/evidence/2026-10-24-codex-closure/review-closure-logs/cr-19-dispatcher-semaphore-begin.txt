@@ -1,0 +1,4 @@
+Starting task 4 out of 4: Independent review at the merge gate (memory ordering, lost-wakeup proof, negative control)
+Position: phase-correctness-and-durability › cr-19-dispatcher-semaphore › 4 @ revision 692
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:21:12.020Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840872021-881ff3fb-ee3d-4fbc-8bb5-665647fb0ded.json"}
+Starting task 4 out of 4:   cr-19-dispatcher-semaphore:4

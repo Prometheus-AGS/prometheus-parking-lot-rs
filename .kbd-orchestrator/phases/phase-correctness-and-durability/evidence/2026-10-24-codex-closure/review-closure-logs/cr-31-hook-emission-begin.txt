@@ -1,0 +1,4 @@
+Starting task 3 out of 3: Independent review at the merge gate (event completeness, overhead)
+Position: phase-correctness-and-durability › cr-31-hook-emission › 3 @ revision 772
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:28:52.417Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841332417-d7c53cfa-3def-48af-9ac5-28d76aca0b42.json"}
+Starting task 3 out of 3:   cr-31-hook-emission:3

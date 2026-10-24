@@ -1,0 +1,4 @@
+Starting task 3 out of 3: Independent review at the merge gate (schema strictness)
+Position: phase-correctness-and-durability › cr-37-config-schema › 3 @ revision 737
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:25:34.067Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841134067-394209ba-a5b1-4e51-aca5-dc67b4b33266.json"}
+Starting task 3 out of 3:   cr-37-config-schema:3

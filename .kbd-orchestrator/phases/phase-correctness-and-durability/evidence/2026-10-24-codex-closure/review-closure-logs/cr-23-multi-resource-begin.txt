@@ -1,0 +1,4 @@
+Starting task 3 out of 3: Independent review at the merge gate (invariant per dimension)
+Position: phase-correctness-and-durability › cr-23-multi-resource › 3 @ revision 787
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:30:19.392Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841419392-e785ca1a-3c3e-4787-a313-74103f68ba51.json"}
+Starting task 3 out of 3:   cr-23-multi-resource:3

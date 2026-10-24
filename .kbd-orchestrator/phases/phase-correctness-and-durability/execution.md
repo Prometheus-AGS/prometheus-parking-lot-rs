@@ -1450,3 +1450,195 @@ PLANNED REFLECTION INPUTS
 - Hand-backs, PR links and merge SHAs per change; the boundary packet evidence folder; review receipts; deviations recorded above (deferred containment, cumulative review instead of per-change review, same-family review).
 
 DISPATCH READY — EXECUTE REMAINS ACTIVE
+
+## 2026-10-24 — Codex cross-machine closure
+
+- Restored the canonical project journal from issue #92's archive; SHA-256 `115fc9385c95e58408d05efa5b01ea62362d9736b7118090657a96a082368767`. Registration and status confirmed revision 627, event `9cb19a43-6764-4b64-9cd9-c750bc8b83d2`, phase `phase-correctness-and-durability`, stage `execute`. The first write was refused for a missing enrolled signer; no task was started and revision remained 627. After the operator supplied the enrolled key locally, cr-16 review task 3 began successfully at revision 629. No private key contents are recorded here.
+- Closure route: Codex driver performs administrative task boundaries; this is not a new independent review or an implementation/model reassignment. The plan's reviewer assignments are discharged by the already-completed cumulative independent reviews. Per the operator's exit criteria and handoff supplement, no further review rounds or production changes are required.
+- Review evidence: merged PRs #74 (`a08e711`), #75 (`bc46db7`), #76 (`ab717c9`), #83 (`a3e517f`). PR bodies preserve the findings, corrections, observed tests and limitations. The final gate at `a3e517f` is recorded in `evidence/2026-10-24-final-gate/README.md`, `summary.txt` and per-step logs: all 19 adopted steps passed after correcting step 13 to the operator-approved secret-scan scope. These are historical results from the sender, not tests rerun on this machine.
+- Operator closure decision in this Codex chat: "Record both deferrals and close the phase." cr-52 tasks 1.1–1.3 carry to 0.4.0 (#85/#86); cr-15 carries to #88. Deferred work must not be described as implemented or credentials as rotated.
+- cr-16-docs-truth task 3 evidence: cumulative review and final-gate records above, plus the handoff supplement section 2 confirming completion and the two-round exit. Scope: record the completed review; no new API or documentation code changes.
+
+- cr-41-toolchain-baseline review task 5: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-17-kbd-correction review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-48-workspace-split review task 4: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-42-ci-rebuild review task 4: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-45-docs-site review task 4: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-18-core-contracts review task 4: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-51-supply-chain-gates review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-43-postgres18-image review task 4: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- Evidence availability correction: the checkout contains the final gate's `README.md`, `gate.sh` and `summary.txt`, but not its per-step `.log` files. The summary preserves the exact commands and return codes; review PR bodies supply additional historical counts. No claim is made to have inspected the missing raw logs or rerun the sender's builds.
+- Read-only post-release confirmation on this machine: Git tag `v0.3.0` is annotated and resolves to `4b747350c6883497813bed33623a9937ad7a5894`; GitHub reports release `0.3.0` published at `2026-10-24T09:10:05Z`, draft=false and prerelease=false; the GitHub Pages documentation URL returned HTTP 200. Fresh-project install builds remain the sender's recorded verification.
+- Deferral spec reconciliation: cr-15, cr-51 and cr-52 delta requirements now name the approved 0.3.0 exceptions and the deferred work (#85–#88). This prevents archival from promoting false claims of completed history containment, blocking pre-purge checks, OIDC publication or signed v0.3.0 tags. No production code was changed.
+
+- cr-25-backend-contracts review task 4: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-19-dispatcher-semaphore review task 4: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-46-docs-theory review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-41-toolchain-baseline: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-41-toolchain-baseline/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-17-kbd-correction: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-17-kbd-correction/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-48-workspace-split: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-48-workspace-split/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-42-ci-rebuild: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-42-ci-rebuild/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-45-docs-site: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-45-docs-site/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-18-core-contracts: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-18-core-contracts/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-51-supply-chain-gates: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-51-supply-chain-gates/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-43-postgres18-image: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-43-postgres18-image/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-25-backend-contracts: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-25-backend-contracts/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-19-dispatcher-semaphore: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-19-dispatcher-semaphore/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-46-docs-theory: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-46-docs-theory/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-16-docs-truth: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-16-docs-truth/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- Closure tooling corrections: `end-task` owns the successful change-after boundary. Extra evaluations after cr-16 and cr-41 had already closed were rejected because their start receipts were consumed; the duplicate diagnostics were cleared with typed blocker resolutions citing the successful receipts. Do not repeat a completed guard as a validation query.
+- OpenSpec's managed runner uses a global operation lock: an overlapping archive pass caused cr-35's read-only task listing to return `status=contended` before begin-task. The archive pass completed, and task processing resumed sequentially from canonical pending work. No locks were removed, no task skipped, and no concurrent OpenSpec writers remain.
+
+- cr-35-test-targets review task 4: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-21-panic-containment review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-28-embedded-redb-queue review task 4: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-22-result-slots review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-26-pg-lease-queue review task 4: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-38-wasm-target review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-27-pg-mailbox review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-37-config-schema review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-30-pgmq-sql-backend review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-34-mailbox-composition review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-44-mobile-desktop-bindings review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-49-durable-dispatch review task 4: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-36-pg-matrix review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-29-shutdown-cancellation review task 4: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-31-hook-emission review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-20-skip-ahead review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-32-iggy-events review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-23-multi-resource review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-33-stream-replay review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-39-dependency-hygiene review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-40-benchmarks review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-47-docs-guides review task 4: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-53-wasm-parity review task 3: administrative closure using the cumulative independent reviews recorded in merged PRs #74/#75/#76/#83 and `evidence/2026-10-24-final-gate/` (ALL PASS); handoff supplement sections 2–3 and operator exit criteria apply. No new review or test run is claimed.
+
+- cr-52-release task 4 disposition: Released 0.3.0 at 4b74735; seven crates published, FFI excluded; annotated unsigned v0.3.0 and GitHub release. Evidence: decisions.md 2026-10-24 and handoff supplement.
+
+- cr-52-release task 5 disposition: Post-release installs and docs.rs verified by sender per decisions.md 2026-10-24; receiving machine confirmed annotated tag commit, published GitHub release and docs HTTP 200. No fresh Cargo builds rerun here.
+
+- cr-52-release task 1 disposition: DEFERRED to 0.4.0 #86 by operator closure decision 2026-10-24; administrative disposition, not implementation: Versioning ADR (SemVer, workspace version 0.3.0, inter-crate pins, MSRV policy); release-plz.toml and cliff.toml
+
+- cr-52-release task 2 disposition: DEFERRED to 0.4.0 #85 by operator closure decision 2026-10-24; administrative disposition, not implementation: Operator configures crates.io trusted publishing for each prometheus-parking-lot* crate and retires CARGO_REGISTRY_TOKEN from the shell profile
+
+- cr-52-release task 3 disposition: DEFERRED to 0.4.0 #85 by operator closure decision 2026-10-24; administrative disposition, not implementation: Release workflow: requires boundary receipt + operator approval environment, publishes in dependency order via OIDC, creates signed tag v0.3.0 and GitHub release, deploys docs
+
+- cr-52-release task 6 disposition: Cumulative independent reviews in PRs #74/#75/#76/#83 and adopted final-gate ALL PASS; release record verified; deferred OIDC/workflow/versioning/signing explicitly carried to #85/#86/#87 under operator closure approval.
+
+- cr-15-containment task 1 disposition: DEFERRED to issue #88 by operator closure decision 2026-10-24; no rotation, history rewrite, support purge or fresh-mirror containment verification performed: Operator rotates OPENAI_API_KEY and Codex OAuth tokens exposed in .codex/auth.json and records confirmation (no secret values) in execution.md
+
+- cr-15-containment task 2 disposition: DEFERRED to issue #88 by operator closure decision 2026-10-24; no rotation, history rewrite, support purge or fresh-mirror containment verification performed: After the plan branch merges and with explicit operator approval: the KBD driver (no team worktree) purges .codex/{auth.json,config.toml,history.jsonl,version.json,sessions/} with git filter-repo in a fresh mirror clone, force-pushes, records old/new main SHAs and the pre-purge root commit set, and the operator re-clones every checkout
+
+- cr-15-containment task 3 disposition: DEFERRED to issue #88 by operator closure decision 2026-10-24; no rotation, history rewrite, support purge or fresh-mirror containment verification performed: Operator asks GitHub Support to purge cached refs/pull/* for the removed paths and records the ticket ID
+
+- cr-15-containment task 4 disposition: DEFERRED to issue #88 by operator closure decision 2026-10-24; no rotation, history rewrite, support purge or fresh-mirror containment verification performed: Verify on a fresh mirror clone that the path-history query is empty and record the output
+
+- cr-15-containment: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-15-containment/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-35-test-targets: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-35-test-targets/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-21-panic-containment: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-21-panic-containment/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-28-embedded-redb-queue: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-28-embedded-redb-queue/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-22-result-slots: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-22-result-slots/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-26-pg-lease-queue: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-26-pg-lease-queue/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-38-wasm-target: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-38-wasm-target/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-27-pg-mailbox: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-27-pg-mailbox/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-37-config-schema: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-37-config-schema/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-30-pgmq-sql-backend: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-30-pgmq-sql-backend/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-34-mailbox-composition: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-34-mailbox-composition/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-44-mobile-desktop-bindings: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-44-mobile-desktop-bindings/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-49-durable-dispatch: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-49-durable-dispatch/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-36-pg-matrix: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-36-pg-matrix/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-29-shutdown-cancellation: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-29-shutdown-cancellation/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-31-hook-emission: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-31-hook-emission/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-20-skip-ahead: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-20-skip-ahead/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-32-iggy-events: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-32-iggy-events/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-23-multi-resource: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-23-multi-resource/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-33-stream-replay: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-33-stream-replay/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-39-dependency-hygiene: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-39-dependency-hygiene/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-40-benchmarks: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-40-benchmarks/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-47-docs-guides: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-47-docs-guides/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-53-wasm-parity: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-53-wasm-parity/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+- cr-52-release: `kbd-apply verify` exit 0 (OpenSpec validation), `kbd-apply archive` exit 0; destination `openspec/changes/archive/2026-10-24-cr-52-release/` exists and active directory is absent. Production-path evidence remains the adopted historical final gate.
+
+## Execute completion evidence — 2026-10-24
+
+- Canonical revision 871: 37/37 changes and 132/132 tasks settled; seven task summaries explicitly start `DEFERRED`. No unresolved blockers or task/change boundary obligations remain. Only the original phase boundary remains open for Reflect.
+- `kbd-apply reconcile phase-correctness-and-durability --json`: exit 0, `clean=true`, `drifted=0`, `errors=[]` after archival.
+- `kbd-apply verify` and `kbd-apply archive` succeeded for all 37 changes. All destinations exist under `openspec/changes/archive/2026-10-24-cr-*/`; all 37 active change directories are absent.
+- Managed OpenSpec `validate --all`: final run exit 0, 30 passed / 0 failed, no warnings. The initial pass exposed 30 archive-generated Purpose placeholders and two long requirement paragraphs; Purpose text and explicit deferral scenarios were completed in the generated canonical specs, then validation was rerun. No production source, Cargo manifests, lockfiles, bindings or workflows changed in this receiving session.
+- Cumulative production verification remains the sender's adopted 19-step ALL PASS summary and review-fix PRs, accepted under the handoff and operator exit criteria. This completion does not rerun or fabricate a historical gate, certify the deferred controls, or start a successor.
+
+## Final closure — 2026-10-24
+
+- Execute complete, Reflect complete, phase complete at revision 876, event `882072c6-10d7-4340-bf9f-a3a804b9218e`; phase-after receipt `e2357a4d1feed49ce39fc2f46f1fe9355e918d0240af4f018a9195699e04297e` is PASS with no findings or outstanding obligations.
+- Final reconciliation after closure remains clean: zero drift and no errors. All 37 archive destinations exist; 30 canonical specs validate without warnings. Seven task summaries explicitly preserve deferred disposition. No successor phase exists.
+- Accepted reflection and isolated document-critic PASS are saved; the Reflect-before zero-lesson refresh is disclosed and the original Execute context is preserved separately. The reflection's 37 archive links were checked against the filesystem.
+- Audit: `evidence/2026-10-24-codex-closure/README.md` and `summary.json`. Historical sender gate limits, queued memory delivery, public signing-key transfer risk and the approved carry-over remain explicit. Closure changes remain local and uncommitted.

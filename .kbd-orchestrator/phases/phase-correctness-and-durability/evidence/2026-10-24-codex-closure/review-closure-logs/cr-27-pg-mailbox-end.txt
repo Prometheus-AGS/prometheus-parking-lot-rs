@@ -1,0 +1,13 @@
+Completed task 3 out of 3: Independent review at the merge gate (consume-once race, TTL)
+Position: phase-correctness-and-durability › cr-27-pg-mailbox › 3 @ revision 734
+{"status": "queued", "eventId": "kpm-e3d888caad82c0a45f4d979803d7465a", "sessionLogAppended": true, "memory": {"transport": "outbox", "status": "queued", "operationId": "4e3cf70f866cc49200b1ca9b51704191b8eb4c018500cb6a7a274314a5ad5284", "pkError": "pk exited 1"}, "receipt": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs/.prometheus/progress-memory-receipts/a47f88d358691fad2a5da84da041f228ddf0583a872126259ffd013a6d715c4e.json"}
+[kbd-orchestrator] Change complete — record it with prometheus kbd change transition --status complete, then run /opsx:verify + /opsx:archive (if OpenSpec)
+Completed change 20 out of 37: Postgres mailbox: consume-once, TTL eviction, first-write-wins idempotency
+Position: phase-correctness-and-durability › cr-27-pg-mailbox @ revision 735
+{"status": "queued", "eventId": "kpm-c38f5774aecfe5ff5a58c404d26a77f9", "sessionLogAppended": true, "memory": {"transport": "outbox", "status": "queued", "operationId": "5c48b5433d349b63ee5bcb540d85b436650be7cada67a3de37ba650317933de5", "pkError": "pk exited 1"}, "receipt": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs/.prometheus/progress-memory-receipts/caa3c1150b5282471ed7781c22fa15d68b52bef91dc8f7c223e8ceeacdc5e6b1.json"}
+Remaining tasks after task 3: 0 out of 3 — none
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:25:17.030Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841117031-a5d804bd-70ef-4267-9e4e-d7d2d51e43da.json"}
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:25:19.750Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841119750-322ae23f-e210-45cc-a2b2-03950ddb4366.json"}
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:25:22.914Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841122915-feec5c98-7d71-48c4-979d-81490bced03a.json"}
+Completed task 3 out of 3:   cr-27-pg-mailbox:3
+Completed change 1 out of 1: cr-27-pg-mailbox

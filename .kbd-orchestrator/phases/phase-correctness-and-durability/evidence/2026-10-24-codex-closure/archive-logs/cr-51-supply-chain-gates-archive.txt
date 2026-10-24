@@ -1,0 +1,2 @@
+archived: cr-51-supply-chain-gates
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:22:06.627Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840926628-57fcff1a-6fb4-47c8-b673-9dd0e7b02ba8.json"}

@@ -1,0 +1,13 @@
+Completed task 4 out of 4: Independent review at the merge gate (examples compile and match the API)
+Position: phase-correctness-and-durability › cr-47-docs-guides › 4 @ revision 809
+{"status": "queued", "eventId": "kpm-799fbdae93acc5b7bad24bffeb6add24", "sessionLogAppended": true, "memory": {"transport": "outbox", "status": "queued", "operationId": "cddf090f42819130f1dc0faedf19bb3d8fce4e8d7164e7cbb26250c8b17bbe66", "pkError": "pk exited 1"}, "receipt": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs/.prometheus/progress-memory-receipts/91edcc381c7e11cd6200a8e4b25e8681cc5466775b13139823b483377a7f0724.json"}
+[kbd-orchestrator] Change complete — record it with prometheus kbd change transition --status complete, then run /opsx:verify + /opsx:archive (if OpenSpec)
+Completed change 35 out of 37: Guides and scenarios with compiled examples and agentic value
+Position: phase-correctness-and-durability › cr-47-docs-guides @ revision 810
+{"status": "queued", "eventId": "kpm-d2e9f0c284c7302a6c356f1b68512670", "sessionLogAppended": true, "memory": {"transport": "outbox", "status": "queued", "operationId": "d7e9cbbe972ac65e3d963d9262f734710d582dc953ff85329232e7b229cd6e38", "pkError": "pk exited 1"}, "receipt": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs/.prometheus/progress-memory-receipts/c0489678d63a1e5fb0899ca657e64bc24bf8986afb3fc848c5fa77fc92e1605b.json"}
+Remaining tasks after task 4: 0 out of 4 — none
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:32:33.716Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841553717-0a0567b2-e91e-4d9f-905e-c531236b95f9.json"}
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:32:36.735Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841556735-ee041cf8-6cb0-4efc-b62a-7b0069c1592e.json"}
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:32:40.125Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841560126-f60162ab-c0a7-442c-a505-2d434398af2a.json"}
+Completed task 4 out of 4:   cr-47-docs-guides:4
+Completed change 1 out of 1: cr-47-docs-guides
