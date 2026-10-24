@@ -60,11 +60,14 @@ OA-13 browser jobs remain in CI alongside the stricter OA-12 aggregate.
 | Adapter | Build and discovery prerequisites | Required runtime classifier |
 |---|---|---|
 | Native/redb/PG/Iggy/Loom | Separate nextest `run --no-run` exits 0; `list --message-format json` exits 0; nonempty actual listing includes every exact package/binary/test tuple | Normal/companion: exit 0, named `PASS`, summary one test run/one passed. Mutant oracle: nextest exit **100**, named `FAIL`, summary one test run/one failed, `panicked at`, and all designated diagnostic fragments. Where `diagnostic_any` exists, one listed alternative is also mandatory |
-| Browser | Real wasm32 target `test --no-run` exits 0; `-- --list` exits 0 and matches the exact OA-13 target export set (15 pool or 6 events) including the selected name | Actual `Running headless tests in Chrome`, no Node context marker, exactly one selected result. Normal/companion: Cargo exit 0 and `ok`; mutant: Cargo exit **101**, named per-test **FAIL**, summary 0 passed/1 failed, all named diagnostic fragments |
+| Browser | Real wasm32 target `test --no-run` exits 0; `-- --list` exits 0 and matches the exact OA-13 target export set (15 pool or 6 events) including the selected name | Actual `Running headless tests in Chrome`, no Node context marker, exactly one selected result. Normal/companion: Cargo exit 0 and `ok`; mutant: Cargo exit **1**, named per-test **FAIL**, summary 0 passed/1 failed, all named diagnostic fragments |
 | Upgrade | Both cfg modes separately compile/discover exactly `postgres_upgrade::postgres_upgrade_populated_0_3_to_schema3` before the delegate. The delegate then creates the real run-owned upgraded cluster | Outer owner adapter exits **0** only after its own classification. Normal inner suite exits 0 with real populated upgrade/independent backup restore PASS. Mutant inner nextest exits **100**, exactly one discovered test, its named FAIL/panic and `OA-14:seeded-result`, owner receipt `EXPECTED_FAILURE` |
 
 Native compilation exit 101 is not nextest test-failure exit 100. Browser Cargo
-101 is accepted only after the separate successful build and real browser
+exit 1 is the pinned Linux wasm-bindgen-test-runner 0.2.129 failure status: its
+[main returns an error](https://raw.githubusercontent.com/wasm-bindgen/wasm-bindgen/0.2.129/crates/cli/src/bin/wasm-bindgen-test-runner.rs)
+when [headless tests fail](https://raw.githubusercontent.com/wasm-bindgen/wasm-bindgen/0.2.129/crates/cli/src/wasm_bindgen_test_runner/headless.rs).
+It is accepted only after the separate successful build and real browser
 identity/result/diagnostic checks. An upgrade wrapper's 0 means it classified
 its inner outcome; it does not mean the defective upgrade fixture passed.
 The owner adapter supplies the upgrade control only after preparing its marked

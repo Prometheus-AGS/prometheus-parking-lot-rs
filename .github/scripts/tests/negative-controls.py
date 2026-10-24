@@ -285,7 +285,9 @@ def browser(runner: Runner, case: dict) -> None:
 
 
 def classify_browser(code: object, text: str, test: dict, negative: bool) -> None:
-    require(code == (101 if negative else 0), "OA-12:browser-exit: wrong runtime exit")
+    # Pinned wasm-bindgen-test-runner 0.2.129 returns Err from main on a
+    # failed headless test; its supported Linux browser invocation exits 1.
+    require(code == (1 if negative else 0), "OA-12:browser-exit: wrong runtime exit")
     outcomes = [(name.split("::")[-1], status)
                 for name, status in re.findall(r"^test (\S+) \.\.\. (ok|FAIL)$", text, re.M)]
     require(outcomes == [(test["name"], "FAIL" if negative else "ok")],
@@ -427,7 +429,8 @@ def verify_receipt(folder: Path, case: dict, manifest: dict, candidate: str) -> 
             and receipt["runner_sha256"] == sha(Path(__file__))
             and receipt["contract_digest"] == manifest["contract_digest"], "OA-12:receipt binding failed")
     commands = receipt["commands"]
-    require(commands and all(command["exit"] in (0, 100, 101) for command in commands), "invalid/timeout command")
+    allowed_exits = (0, 1) if case["adapter"] == "browser" else (0, 100, 101)
+    require(commands and all(command["exit"] in allowed_exits for command in commands), "invalid/timeout command")
     for command in commands:
         for stream in ("stdout", "stderr"):
             path = (folder / command[stream]).resolve()

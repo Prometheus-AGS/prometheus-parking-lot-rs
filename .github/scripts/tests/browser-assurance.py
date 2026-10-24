@@ -169,7 +169,9 @@ def run(args: argparse.Namespace) -> None:
         expected_failure = negative and target == manifest["negative_control"]["target"]
         failed = [name for name, status in outcomes if status == "FAIL"]
         if expected_failure:
-            require(rc == 101 and failed == [manifest["negative_control"]["test"]]
+            # Pinned wasm-bindgen-test-runner 0.2.129 returns Err from main
+            # for failed headless tests: Linux exit 1, not libtest's panic 101.
+            require(rc == 1 and failed == [manifest["negative_control"]["test"]]
                     and manifest["negative_control"]["diagnostic"] in executed
                     and f"test result: FAILED. {len(expected) - 1} passed; 1 failed; 0 ignored; 0 filtered out" in executed,
                     "budget-event control requires its named assertion, exactly one failure and all positive peers")
