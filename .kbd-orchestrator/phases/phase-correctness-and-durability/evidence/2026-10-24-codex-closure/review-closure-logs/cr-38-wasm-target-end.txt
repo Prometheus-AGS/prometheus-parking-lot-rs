@@ -1,0 +1,13 @@
+Completed task 3 out of 3: Independent review at the merge gate (no tokio runtime on wasm)
+Position: phase-correctness-and-durability › cr-38-wasm-target › 3 @ revision 729
+{"status": "queued", "eventId": "kpm-cd0cd9c5bdfc0f4bc20c3dde75d4bd5e", "sessionLogAppended": true, "memory": {"transport": "outbox", "status": "queued", "operationId": "8c9f80a251c80e73224bdfb7b965e950f8d15c74ec6393ddd152983e9247f527", "pkError": "pk exited 1"}, "receipt": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs/.prometheus/progress-memory-receipts/80b55a826dc00448044c247327c392d7dacc54b4621f0876a1c1882b777411eb.json"}
+[kbd-orchestrator] Change complete — record it with prometheus kbd change transition --status complete, then run /opsx:verify + /opsx:archive (if OpenSpec)
+Completed change 19 out of 37: WASM pool on spawn_local with a CI check job
+Position: phase-correctness-and-durability › cr-38-wasm-target @ revision 730
+{"status": "queued", "eventId": "kpm-e63daf35debbf3bed225ef46909c3488", "sessionLogAppended": true, "memory": {"transport": "outbox", "status": "queued", "operationId": "9e6559c7060f953c7e2a2d5d3311b9c1154e1c4a32cdba92ae8a8c77863092d1", "pkError": "pk exited 1"}, "receipt": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs/.prometheus/progress-memory-receipts/658a24fa1feef2507b607d8b35acded2faf8963ae37d9dc81eea74c9da026279.json"}
+Remaining tasks after task 3: 0 out of 3 — none
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:24:46.496Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841086497-071d1683-a945-4c19-a847-3b7621e7eb67.json"}
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:24:49.660Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841089661-5e0879a9-8f6f-4bc5-a34f-d4d8a43efbbd.json"}
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:24:53.556Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841093556-9039ff9a-96a3-40aa-90aa-a3f63bcb1bf9.json"}
+Completed task 3 out of 3:   cr-38-wasm-target:3
+Completed change 1 out of 1: cr-38-wasm-target

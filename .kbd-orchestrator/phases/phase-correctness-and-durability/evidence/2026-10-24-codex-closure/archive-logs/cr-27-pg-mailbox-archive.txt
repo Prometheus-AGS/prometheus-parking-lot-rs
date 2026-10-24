@@ -1,0 +1,2 @@
+archived: cr-27-pg-mailbox
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:39:34.890Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841974891-d080d320-db88-4597-b137-db242e09fb0b.json"}

@@ -1,0 +1,13 @@
+Completed task 3 out of 3: Independent review at the merge gate (backpressure, ID determinism)
+Position: phase-correctness-and-durability › cr-32-iggy-events › 3 @ revision 784
+{"status": "queued", "eventId": "kpm-787acc3c06160f2be6b9349ba29532e8", "sessionLogAppended": true, "memory": {"transport": "outbox", "status": "queued", "operationId": "a5abce2708c7f639e3193a4353ae501511df5020e5c24e39d699cf2bab013c74", "pkError": "pk exited 1"}, "receipt": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs/.prometheus/progress-memory-receipts/ee164ad94f77960bb4ae5e8d706cf688ba9774d1d4c09c1dd82b0af79825aa8b.json"}
+[kbd-orchestrator] Change complete — record it with prometheus kbd change transition --status complete, then run /opsx:verify + /opsx:archive (if OpenSpec)
+Completed change 30 out of 37: Iggy hook and notifier (events only, not storage or work queue)
+Position: phase-correctness-and-durability › cr-32-iggy-events @ revision 785
+{"status": "queued", "eventId": "kpm-6ebd622b9afc85cef7e5d6598420a343", "sessionLogAppended": true, "memory": {"transport": "outbox", "status": "queued", "operationId": "bec63346cf352f9787c049b7deb3a307d08138522bc19a4c4ab898a3966ef4bb", "pkError": "pk exited 1"}, "receipt": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs/.prometheus/progress-memory-receipts/9dae9a085e7711603b0af25eeadf5d48fd12f758c42691ec3914ad63a2fde044.json"}
+Remaining tasks after task 3: 0 out of 3 — none
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:30:02.008Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841402009-866574c0-898f-4bf8-b19d-078129e3c05a.json"}
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:30:04.853Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841404853-8cf849cb-8e10-45df-984c-79cbcfded458.json"}
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:30:08.099Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841408099-c79935c8-6583-4659-92e1-fc62c1f74470.json"}
+Completed task 3 out of 3:   cr-32-iggy-events:3
+Completed change 1 out of 1: cr-32-iggy-events

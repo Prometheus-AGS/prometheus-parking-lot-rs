@@ -1,0 +1,7 @@
+{
+  "phase": "phase-correctness-and-durability",
+  "clean": true,
+  "drifted": 0,
+  "drift": [],
+  "errors": []
+}

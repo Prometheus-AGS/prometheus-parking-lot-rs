@@ -1,0 +1,7 @@
+Starting change 37 out of 37: Version, publish and tag 0.3.0 (crates.io trusted publishing, signed tag, GitHub release, docs deploy)
+Position: phase-correctness-and-durability › cr-52-release @ revision 817
+Starting task 4 out of 6: Operator approves and triggers the 0.3.0 release; record crate versions, tag SHA and release URL
+Position: phase-correctness-and-durability › cr-52-release › 4 @ revision 818
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:33:26.313Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841606313-55784707-193f-4908-aa7f-505f5b1bf918.json"}
+Starting change 1 out of 1: cr-52-release
+Starting task 4 out of 6:   cr-52-release:4

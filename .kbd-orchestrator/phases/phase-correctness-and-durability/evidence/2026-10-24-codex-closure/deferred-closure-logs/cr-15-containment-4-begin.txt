@@ -1,0 +1,4 @@
+Starting task 4 out of 4: Verify on a fresh mirror clone that the path-history query is empty and record the output
+Position: phase-correctness-and-durability › cr-15-containment › 4 @ revision 857
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:37:03.712Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841823712-1b862b7a-5dc8-414f-99c8-b97c4727c64d.json"}
+Starting task 4 out of 4:   cr-15-containment:4

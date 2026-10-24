@@ -1,0 +1,7 @@
+Starting change 6 out of 37: Branded Docusaurus documentation site (know-me brand, Flat 2.0)
+Position: phase-correctness-and-durability › cr-45-docs-site @ revision 665
+Starting task 4 out of 6: Independent review at the merge gate (brand fidelity, a11y, sanitizer)
+Position: phase-correctness-and-durability › cr-45-docs-site › 4 @ revision 666
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:19:03.547Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840743547-d397f190-1303-417a-b478-fd9b901d3d77.json"}
+Starting change 1 out of 1: cr-45-docs-site
+Starting task 4 out of 6:   cr-45-docs-site:4

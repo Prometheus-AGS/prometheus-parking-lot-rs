@@ -1,0 +1,13 @@
+Completed task 3 out of 3: Independent review at the merge gate (event completeness, overhead)
+Position: phase-correctness-and-durability › cr-31-hook-emission › 3 @ revision 774
+{"status": "queued", "eventId": "kpm-3edc02fe9673e59083c20ae0f6771937", "sessionLogAppended": true, "memory": {"transport": "outbox", "status": "queued", "operationId": "b349b8cd482f3852f6fb6cc68c2936366a14d4b3c5481ff7d9c5e92a7bb6f373", "pkError": "pk exited 1"}, "receipt": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs/.prometheus/progress-memory-receipts/82bb08d8ffc6daad61f797d815a7086ed7de30df7f3d3785ddfd12aefe67f88c.json"}
+[kbd-orchestrator] Change complete — record it with prometheus kbd change transition --status complete, then run /opsx:verify + /opsx:archive (if OpenSpec)
+Completed change 28 out of 37: Emit lifecycle events at every transition
+Position: phase-correctness-and-durability › cr-31-hook-emission @ revision 775
+{"status": "queued", "eventId": "kpm-a566a51dae7f4de2212f05f435bc41c8", "sessionLogAppended": true, "memory": {"transport": "outbox", "status": "queued", "operationId": "a689848d3305b10b57d131eb42392f11863586cf5ee216909722096f158bb749", "pkError": "pk exited 1"}, "receipt": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs/.prometheus/progress-memory-receipts/33c140d1dcd538f33305a7f313e925eaed0f2dea373d8975b946ba4997b2c6c4.json"}
+Remaining tasks after task 3: 0 out of 3 — none
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:29:03.168Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841343169-c697f10f-6819-489f-ab9e-edc680ab4c0e.json"}
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:29:06.003Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841346003-ed1419dc-8a00-484f-98cf-fd516445cced.json"}
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:29:09.230Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841349230-3e547d5b-1929-40be-bafc-80994a7abd33.json"}
+Completed task 3 out of 3:   cr-31-hook-emission:3
+Completed change 1 out of 1: cr-31-hook-emission

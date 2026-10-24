@@ -1,0 +1,7 @@
+Starting change 4 out of 37: Split into a Cargo workspace with a wasm-safe core and per-backend crates
+Position: phase-correctness-and-durability › cr-48-workspace-split @ revision 653
+Starting task 4 out of 4: Independent review at the merge gate (dependency boundaries, no behaviour drift)
+Position: phase-correctness-and-durability › cr-48-workspace-split › 4 @ revision 654
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:18:07.476Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840687477-c5e3c6ca-3a4c-4c7f-b049-0a0ca7876fde.json"}
+Starting change 1 out of 1: cr-48-workspace-split
+Starting task 4 out of 4:   cr-48-workspace-split:4

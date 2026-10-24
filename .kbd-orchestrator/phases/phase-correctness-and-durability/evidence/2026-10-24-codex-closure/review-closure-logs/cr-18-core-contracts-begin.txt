@@ -1,0 +1,7 @@
+Starting change 7 out of 37: Core contracts: Arc<Inner>, Clock, Result executors, error taxonomy
+Position: phase-correctness-and-durability › cr-18-core-contracts @ revision 671
+Starting task 4 out of 4: Independent review at the merge gate (API soundness, Send/Sync bounds, semver notes)
+Position: phase-correctness-and-durability › cr-18-core-contracts › 4 @ revision 672
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:19:31.327Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840771328-5876f3df-3704-45e7-a3ce-856c4eadb65a.json"}
+Starting change 1 out of 1: cr-18-core-contracts
+Starting task 4 out of 4:   cr-18-core-contracts:4

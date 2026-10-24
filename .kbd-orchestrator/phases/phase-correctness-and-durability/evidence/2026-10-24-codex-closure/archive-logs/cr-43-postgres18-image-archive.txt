@@ -1,0 +1,2 @@
+archived: cr-43-postgres18-image
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:22:07.605Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840927606-69f96a23-1a36-4fd3-9fcf-69e083f69dca.json"}

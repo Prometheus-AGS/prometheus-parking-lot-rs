@@ -1,0 +1,32 @@
+✓ spec/backend-contracts
+✓ spec/build-baseline
+✓ spec/capacity-admission
+✓ spec/configuration
+✓ spec/continuous-integration
+✓ spec/core-contracts
+✓ spec/crate-structure
+✓ spec/delivery-record
+✓ spec/documentation-content
+✓ spec/documentation-integrity
+✓ spec/documentation-site
+✓ spec/durable-dispatch
+✓ spec/durable-mailbox-postgres
+✓ spec/durable-queue-pgmq
+✓ spec/durable-queue-postgres
+✓ spec/embedded-queue
+✓ spec/fault-containment
+✓ spec/iggy-events
+✓ spec/lifecycle-events
+✓ spec/performance-evidence
+✓ spec/platform-targets
+✓ spec/postgres-compatibility
+✓ spec/postgres-test-substrate
+✓ spec/release-management
+✓ spec/result-delivery
+✓ spec/result-retrieval
+✓ spec/shutdown-cancellation
+✓ spec/stream-replay
+✓ spec/supply-chain-safety
+✓ spec/test-infrastructure
+Totals: 30 passed, 0 failed (30 items)
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:41:12.015Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792842072016-2e85d6a1-7551-43dc-a2f3-33424edec6b8.json"}

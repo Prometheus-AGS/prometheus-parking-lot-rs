@@ -1,0 +1,4 @@
+Starting task 3 out of 3: Independent review at the merge gate (consume-once race, TTL)
+Position: phase-correctness-and-durability › cr-27-pg-mailbox › 3 @ revision 732
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:25:05.353Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841105353-bd38c7b0-3fc8-48a8-a432-21fbefa7ea75.json"}
+Starting task 3 out of 3:   cr-27-pg-mailbox:3

@@ -1,0 +1,2 @@
+archived: cr-30-pgmq-sql-backend
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:39:38.620Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841978621-dcfc35a3-2ec1-4ae0-ace2-df1c1672ce3a.json"}

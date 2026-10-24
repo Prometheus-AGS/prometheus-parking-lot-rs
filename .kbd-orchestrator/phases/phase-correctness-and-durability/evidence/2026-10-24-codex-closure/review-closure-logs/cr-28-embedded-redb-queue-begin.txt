@@ -1,0 +1,4 @@
+Starting task 4 out of 4: Independent review at the merge gate (durability under crash)
+Position: phase-correctness-and-durability › cr-28-embedded-redb-queue › 4 @ revision 712
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:23:14.059Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840994060-0ae3e82e-0426-4fd7-beb2-d19fbd96bfe4.json"}
+Starting task 4 out of 4:   cr-28-embedded-redb-queue:4

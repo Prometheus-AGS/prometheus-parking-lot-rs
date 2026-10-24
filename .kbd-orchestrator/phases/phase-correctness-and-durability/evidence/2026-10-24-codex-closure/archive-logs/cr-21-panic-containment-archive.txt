@@ -1,0 +1,2 @@
+archived: cr-21-panic-containment
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:39:21.902Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841961903-6cd663d9-64a7-4ea0-8f38-305cfda5451e.json"}

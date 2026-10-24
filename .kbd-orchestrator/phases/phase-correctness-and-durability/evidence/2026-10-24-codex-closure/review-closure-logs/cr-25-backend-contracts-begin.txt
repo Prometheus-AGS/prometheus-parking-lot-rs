@@ -1,0 +1,4 @@
+Starting task 4 out of 4: Independent review at the merge gate (contract completeness, cancellation safety of async fns)
+Position: phase-correctness-and-durability › cr-25-backend-contracts › 4 @ revision 687
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:20:47.694Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792840847695-7e2906e7-f152-462f-9279-736f62f41d50.json"}
+Starting task 4 out of 4:   cr-25-backend-contracts:4

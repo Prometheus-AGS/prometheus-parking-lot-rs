@@ -1,0 +1,2 @@
+verify: PASS
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:39:46.689Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841986690-9ca2aba8-0a7d-4100-b85a-a8f3c292dcbc.json"}

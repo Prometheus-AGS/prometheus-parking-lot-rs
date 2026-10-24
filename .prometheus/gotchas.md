@@ -11,3 +11,10 @@ Append-only. Dated entries. Mark superseded entries; do not delete them.
 
 ## 2026-10-23 — run the phase gate only on a quiet machine
 - The second gate run (`f5e1b10`) ran alongside four fix agents and three reviewers, at a load average of about 400. Three Docker tests that had passed on the first run failed on timing alone: pgmq `leased_task_is_invisible` (a 1 s pgmq lease expired before the depth check), `shutdown_durable_pg_drain_restart_runs_the_rest` ("never reached its start state"), and Iggy `lifecycle_events_arrive_in_order` (7 messages instead of 6, probably a retried send that had already landed). Each test is being made robust. Run the boundary gate only when no agents or other builds are running.
+
+## 2026-10-24 — Cross-machine KBD closure
+
+- The rev627 journal archive restores canonical state but not the original Mac's Keychain signer. Registration and read-only status can succeed while the first mutation is refused. Verify the enrolled signer is available before starting task bookkeeping; use a private transfer, not a public content gateway.
+- `kbd-apply end-task` evaluates and consumes the task-after and final change-after boundaries. Repeating change-after after a successful close creates a false blocker because the start receipt was already consumed. Inspect the saved receipt or canonical state instead.
+- The managed OpenSpec runner has a global `operation.lock`. Serialize task listing, task boundaries, validation and archival even when changes and files differ. A contended listing can be retried after the known owner exits; do not remove a live lock.
+- The transferred final-gate directory contains README, gate script and summary, but no raw `.log` files. Preserve that limitation when citing the sender's results; the summary is historical evidence, not a new local test run.

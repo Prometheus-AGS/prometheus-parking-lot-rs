@@ -1,0 +1,2 @@
+archived: cr-29-shutdown-cancellation
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:39:47.739Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841987740-6400068e-4edf-4d90-a78e-76feebd29c92.json"}

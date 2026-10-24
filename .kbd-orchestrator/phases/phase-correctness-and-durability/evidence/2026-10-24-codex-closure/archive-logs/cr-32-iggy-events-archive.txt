@@ -1,0 +1,2 @@
+archived: cr-32-iggy-events
+{"code":0,"schemaVersion":1,"time":"2026-10-24T11:39:53.714Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.14.3","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792841993715-f9d36388-6b73-4966-917c-4efbe3cdc79c.json"}
