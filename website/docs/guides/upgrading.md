@@ -12,14 +12,7 @@ has every change with the OpenSpec change that made it.
 
 ## Depending on it
 
-Until 0.3.0 is on crates.io, depend on the repository:
-
-```toml
-[dependencies]
-prometheus_parking_lot = { git = "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs" }
-```
-
-After the release, depend on the version and enable the backends you use:
+Depend on the version and enable the backends you use:
 
 ```toml
 [dependencies]

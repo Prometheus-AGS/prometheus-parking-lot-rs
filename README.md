@@ -32,7 +32,7 @@ Every execution runs under a budget: the task's deadline or the pool's default
 timeout, whichever is nearer. Work still running at its budget is cancelled and
 its units are released.
 
-This README describes `main`, which will be released as **0.3.0**. 0.3.0 is
+This README describes **0.3.0**, the first release on crates.io. 0.3.0 is
 source-breaking for 0.2 users; the [CHANGELOG](CHANGELOG.md) has the
 migration notes.
 
@@ -91,11 +91,9 @@ every queue and mailbox backend must pass.
 
 ## Quick start
 
-0.3.0 is not on crates.io yet. Until it is, depend on the repository:
-
 ```toml
 [dependencies]
-prometheus_parking_lot = { git = "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs" }
+prometheus_parking_lot = "0.3"
 async-trait = "0.1"
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
@@ -475,8 +473,8 @@ example per backend, each loaded and built by the test suite:
   Postgres backends on PostgreSQL 18.
 - [CHANGELOG.md](CHANGELOG.md): what changed, with migration notes.
 - [docs/README.md](docs/README.md): index of the rest.
-- Rustdoc: on [docs.rs](https://docs.rs/prometheus_parking_lot) from the 0.3.0
-  release; until then `cargo doc --workspace --no-deps --all-features --open`.
+- Rustdoc: on [docs.rs](https://docs.rs/prometheus_parking_lot), or locally with
+  `cargo doc --workspace --no-deps --all-features --open`.
 
 ## License
 
