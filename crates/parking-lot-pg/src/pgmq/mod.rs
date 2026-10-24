@@ -339,19 +339,23 @@ where
     /// once. Dropping the future rolls the transaction back.
     async fn enqueue(&self, task: ScheduledTask<P>) -> Result<Enqueued, SchedulerError> {
         let message = serde_json::json!({
-            "meta": serde_json::to_value(&task.meta).map_err(backend("serialize task metadata"))?,
-            "payload": serde_json::to_value(&task.payload).map_err(backend("serialize task payload"))?,
+            "meta": serde_json::to_value(&task.meta).map_err(not_stored("serialize task metadata"))?,
+            "payload": serde_json::to_value(&task.payload).map_err(not_stored("serialize task payload"))?,
         });
         let lane = sql::lane_of(priority_level(task.meta.priority));
         let key = task.meta.idempotency_key;
         let queue = &*self.queue_name;
 
-        let mut tx = self.pool.begin().await.map_err(backend("enqueue begin"))?;
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(not_stored("enqueue begin"))?;
         sqlx::query(ENQUEUE_LOCK)
             .bind(queue)
             .execute(&mut *tx)
             .await
-            .map_err(backend("enqueue lock"))?;
+            .map_err(not_stored("enqueue lock"))?;
 
         if let Some(key) = &key {
             let existing: Option<i64> = sqlx::query_scalar(ENQUEUE_EXISTING)
@@ -359,7 +363,7 @@ where
                 .bind(key)
                 .fetch_optional(&mut *tx)
                 .await
-                .map_err(backend("enqueue idempotency check"))?;
+                .map_err(not_stored("enqueue idempotency check"))?;
             if let Some(entry) = existing {
                 return Ok(Enqueued::Duplicate(entry_id(entry)?));
             }
@@ -370,7 +374,7 @@ where
             .bind(limit)
             .fetch_one(&mut *tx)
             .await
-            .map_err(backend("enqueue depth check"))?;
+            .map_err(not_stored("enqueue depth check"))?;
         let live = usize::try_from(live).unwrap_or(usize::MAX);
         if live >= self.max_depth {
             return Err(SchedulerError::queue_full(queue, live, self.max_depth));
@@ -381,7 +385,7 @@ where
             .bind(message)
             .fetch_one(&mut *tx)
             .await
-            .map_err(backend("enqueue send"))?;
+            .map_err(not_stored("enqueue send"))?;
         let entry = entry_of(msg_id, lane);
         if let Some(key) = &key {
             sqlx::query(ENQUEUE_KEY)
@@ -390,13 +394,13 @@ where
                 .bind(key)
                 .execute(&mut *tx)
                 .await
-                .map_err(backend("enqueue key"))?;
+                .map_err(not_stored("enqueue key"))?;
         }
         sqlx::query(ENQUEUE_NOTIFY)
             .bind(queue)
             .execute(&mut *tx)
             .await
-            .map_err(backend("enqueue notify"))?;
+            .map_err(not_stored("enqueue notify"))?;
         tx.commit().await.map_err(backend("enqueue commit"))?;
         Ok(Enqueued::Accepted(entry_id(entry)?))
     }
@@ -590,6 +594,15 @@ where
     E: std::error::Error + Send + Sync + 'static,
 {
     move |source| SchedulerError::backend(format!("pgmq lease queue: {operation}"), source)
+}
+
+/// A failure before the enqueue's commit: the transaction is rolled back, so
+/// nothing was stored and the pool can report the task as refused.
+fn not_stored<E>(operation: &'static str) -> impl FnOnce(E) -> SchedulerError
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    move |source| SchedulerError::not_stored(format!("pgmq lease queue: {operation}"), source)
 }
 
 /// Decode the stored message; the error is a human-readable reason.

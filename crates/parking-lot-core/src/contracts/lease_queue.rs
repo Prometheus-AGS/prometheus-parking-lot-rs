@@ -252,7 +252,8 @@ impl QueueDepth {
 ///
 /// # Errors
 ///
-/// Methods return [`SchedulerError::Backend`] for storage failures,
+/// Methods return [`SchedulerError::Backend`] for storage failures
+/// ([`SchedulerError::NotStored`] from `enqueue` when nothing was written),
 /// [`SchedulerError::QueueFull`] when `enqueue` finds the queue at its maximum
 /// depth, [`SchedulerError::InvalidConfig`] for a zero lease duration, and
 /// [`SchedulerError::LeaseLost`] for a stale token.
@@ -266,6 +267,11 @@ pub trait LeaseQueue<P: Send>: Send + Sync {
     ///
     /// Fails with [`SchedulerError::QueueFull`] when
     /// [`QueueDepth::live`] has reached [`max_depth`](Self::max_depth).
+    /// A backend failure that certainly stored nothing (the task cannot be
+    /// serialised, no transaction could be opened, a statement failed before
+    /// the commit) should be [`SchedulerError::NotStored`], so a pool can
+    /// report the task as refused; [`SchedulerError::Backend`] means the
+    /// outcome is unknown (the task may be stored).
     ///
     /// **Cancellation:** if the future is dropped before it resolves, the task
     /// may or may not have been stored. Callers that must not lose or duplicate
