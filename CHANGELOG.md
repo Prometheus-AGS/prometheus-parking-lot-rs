@@ -574,6 +574,21 @@ entry names the OpenSpec change that made it.
   `docs/runbooks/postgres18.md` (PG 18 data checksums by default, the Docker
   volume and `PGDATA` change, SCRAM, pgmq install, upgrading 17 to 18, bloat
   monitoring).
+- **Loom models in CI, with their negative controls.** A `loom` job in
+  `.github/workflows/ci.yml` runs every loom model (`loom_capacity`,
+  `loom_wakeup`, `loom_vector`, `loom_skip_ahead`, `loom_at_depth`) under
+  `--cfg parking_lot_loom` with `LOOM_MAX_PREEMPTIONS=3`. One leg per
+  negative control (S-1, S-2, S-19, S-20, S-20-depth) requires the models
+  that control breaks to fail, so a model that stops detecting its defect
+  fails the build. Each leg is one cfg build with a cache of its own. The new
+  `loom_at_depth` model uses `max_queue_depth = 1`, so submissions behind a
+  blocked head go through the at-depth admission path
+  (`Dispatcher::start_at_depth`), which `loom_skip_ahead` (depth 8) never
+  reached. It races those submissions against a completion, and against a
+  permit dropped outside the dispatch lock, and checks capacity, no lost
+  wakeup, the starvation bound and priority order. The new negative control
+  `--cfg parking_lot_negative_control="s-20-depth"` stops charging at-depth
+  skips to the head; only `loom_at_depth` catches it.
 
 ### Removed
 

@@ -93,6 +93,112 @@ jobs:
         timeout-minutes: 5
         run: cargo +${{ matrix.toolchain }} test --workspace --all-features --locked --doc
 
+  loom:
+    # The loom models of the scheduling core (crates/parking-lot-core/tests/loom_*.rs)
+    # and their negative controls. The models compile only under
+    # `--cfg parking_lot_loom`, so the `test` job never builds them. Each leg is one
+    # cfg build (RUSTFLAGS changes every fingerprint) with a cache of its own, so the
+    # legs neither rebuild the main caches nor each other's. The models themselves
+    # run in about a second; the build is the cost, so the job runs on every push and
+    # pull request rather than on a schedule.
+    #
+    # `models` must pass. Every other leg injects one defect with
+    # `--cfg parking_lot_negative_control="<id>"` and requires each listed model to
+    # FAIL: a control that passes means the model no longer detects the defect it was
+    # written for. A failure counts only when a model assertion fired (libtest's
+    # `test result: FAILED`, or a panic raised in parking-lot-core when loom aborts on
+    # a second panic while unwinding); the build runs first, so a compile error can
+    # never stand in for it. The lists are every model the control is known to break
+    # (s-20-depth breaks only loom_at_depth: loom_skip_ahead never reaches the
+    # at-depth path). Issue #79 extends this to the non-loom controls: one more leg per
+    # control, with a nextest filter in place of the model list.
+    name: Loom (${{ matrix.control }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - control: models
+            expect: pass
+            models: loom_capacity loom_wakeup loom_vector loom_skip_ahead loom_at_depth
+          - control: s-1 # no capacity check in the semaphore
+            expect: fail
+            models: loom_capacity loom_wakeup loom_skip_ahead loom_at_depth
+          - control: s-2 # admission and park in separate critical sections, no drain
+            expect: fail
+            models: loom_capacity loom_wakeup loom_vector loom_skip_ahead loom_at_depth
+          - control: s-19 # only the total dimension is checked
+            expect: fail
+            models: loom_vector
+          - control: s-20 # the starvation guard never engages
+            expect: fail
+            models: loom_skip_ahead loom_at_depth
+          - control: s-20-depth # at-depth skips are not charged to the head
+            expect: fail
+            models: loom_at_depth
+    env:
+      LOOM_MAX_PREEMPTIONS: "3"
+      CONTROL: ${{ matrix.control }}
+      EXPECT: ${{ matrix.expect }}
+      MODELS: ${{ matrix.models }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.PINNED_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: loom-${{ matrix.control }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Loom models (${{ matrix.control }}, expect ${{ matrix.expect }})
+        run: |
+          set -euo pipefail
+          # The quotes in RUSTFLAGS are literal on purpose: cargo splits it on spaces
+          # and rustc takes `--cfg parking_lot_negative_control="s-1"` as written.
+          RUSTFLAGS="--cfg parking_lot_loom"
+          if [ "$CONTROL" != models ]; then
+            # shellcheck disable=SC2089
+            RUSTFLAGS="$RUSTFLAGS --cfg parking_lot_negative_control=\"$CONTROL\""
+          fi
+          # shellcheck disable=SC2090
+          export RUSTFLAGS
+          read -r -a models <<< "$MODELS"
+          targets=()
+          for model in "${models[@]}"; do targets+=(--test "$model"); done
+          # Build first: a build error must not count as the failure a control needs.
+          cargo test -p prometheus-parking-lot-core --locked "${targets[@]}" --no-run
+          log="$(mktemp)"
+          status=0
+          for model in "${models[@]}"; do
+            set +e
+            cargo test -p prometheus-parking-lot-core --locked --test "$model" 2>&1 | tee "$log"
+            rc=${PIPESTATUS[0]}
+            set -e
+            failed=no
+            if grep -q -e '^test result: FAILED' -e 'panicked at crates/parking-lot-core/' "$log"; then
+              failed=yes
+            fi
+            if [ "$EXPECT" = pass ]; then
+              if [ "$rc" -eq 0 ]; then
+                echo "PASS: $model"
+              else
+                echo "::error title=Loom model failed::$model failed (exit $rc)"
+                status=1
+              fi
+            elif [ "$rc" -ne 0 ] && [ "$failed" = yes ]; then
+              finding="$(grep -m1 -A1 'panicked at crates/parking-lot-core/' "$log" | tail -n1)"
+              echo "PASS: negative control $CONTROL makes $model fail as required: $finding"
+            elif [ "$rc" -eq 0 ]; then
+              echo "::error title=Negative control not detected::$model PASSED under --cfg parking_lot_negative_control=\"$CONTROL\"; it must fail. The model no longer detects the defect this control injects."
+              status=1
+            else
+              echo "::error title=Negative control inconclusive::$model exited $rc under $CONTROL without a failing test; expected a test failure, not an error."
+              status=1
+            fi
+          done
+          exit "$status"
+
   postgres:
     # cr-36. Every Docker-gated Postgres test, once per supported major (17, 18):
     # the parking-lot-pg crate's suites (lease queue, mailbox, pgmq, per-table
