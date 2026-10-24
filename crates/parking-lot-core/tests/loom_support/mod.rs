@@ -1,5 +1,5 @@
 //! Shared fixtures for the loom models (`loom_capacity`, `loom_wakeup`,
-//! `loom_skip_ahead`, `loom_vector`).
+//! `loom_skip_ahead`, `loom_at_depth`, `loom_vector`).
 //!
 //! The models drive the real `Dispatcher` and `UnitSemaphore`: under
 //! `--cfg parking_lot_loom` their mutex and atomics are loom's, so loom
@@ -75,25 +75,50 @@ impl Oracle {
     pub fn ran(&self) -> u32 {
         self.ran.load(Ordering::SeqCst)
     }
+
+    /// A job of `units` units begins to execute: check the units held by
+    /// running jobs against `max_units`.
+    pub fn start(&self, units: u32, max_units: u32) {
+        let held = self.held.fetch_add(units, Ordering::SeqCst) + units;
+        assert!(
+            held <= max_units,
+            "capacity invariant violated: {held} units running, max_units {max_units}"
+        );
+    }
+
+    /// A job of `units` units has finished executing (before its permit is
+    /// returned).
+    pub fn finish(&self, units: u32) {
+        self.held.fetch_sub(units, Ordering::SeqCst);
+        self.ran.fetch_add(1, Ordering::SeqCst);
+    }
 }
 
 /// Run `grants` the way a pool does: each job "executes" (the oracle checks
 /// the units held by running jobs against `max_units`), then completes, and
 /// whatever its completion admits runs next on this thread.
 pub fn run(pool: &Arc<Pool>, oracle: &Arc<Oracle>, max_units: u32, grants: Vec<Grant<Job>>) {
+    run_observed(pool, oracle, max_units, grants, |_| {});
+}
+
+/// [`run`], calling `on_start(job)` as each job begins to execute, before it
+/// completes.
+pub fn run_observed(
+    pool: &Arc<Pool>,
+    oracle: &Arc<Oracle>,
+    max_units: u32,
+    grants: Vec<Grant<Job>>,
+    on_start: impl Fn(&Job),
+) {
     let mut pending = grants;
     while let Some(grant) = pending.pop() {
+        on_start(&grant.item);
         let units = grant.item.units;
-        let held = oracle.held.fetch_add(units, Ordering::SeqCst) + units;
-        assert!(
-            held <= max_units,
-            "capacity invariant violated: {held} units running, max_units {max_units}"
-        );
+        oracle.start(units, max_units);
         // A yield inside the critical window lets loom schedule another
         // thread's admission while this job holds its units.
         loom::thread::yield_now();
-        oracle.held.fetch_sub(units, Ordering::SeqCst);
-        oracle.ran.fetch_add(1, Ordering::SeqCst);
+        oracle.finish(units);
         pending.extend(pool.complete(grant.permit, 0).started);
     }
 }

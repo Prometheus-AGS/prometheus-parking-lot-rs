@@ -144,7 +144,9 @@
 //! Negative control S-20: under
 //! `--cfg parking_lot_negative_control="s-20"` the guard never engages
 //! (unbounded skip-ahead), and the `starvation_` tests must then find a head
-//! that starves.
+//! that starves. Under `--cfg parking_lot_negative_control="s-20-depth"` only
+//! the at-depth path forgets to charge its skips to the head, and the
+//! `loom_at_depth` model must fail.
 //!
 //! ## Capacity invariant
 //!
@@ -894,7 +896,7 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
         if state.max_head_skips == 0 || !state.queue.supports_skip_ahead() {
             return None;
         }
-        let mut blocked = Self::blocked_head(state, head);
+        let blocked = Self::blocked_head(state, head);
         if guard_engaged(blocked.skips, state.max_head_skips) {
             return None;
         }
@@ -910,11 +912,26 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
             Ok(Some(_)) | Err(_) => return None,
         }
         let permit = UnitSemaphore::try_acquire_vector(&self.semaphore, &ticket.demand)?;
-        blocked.skips = blocked.skips.saturating_add(1);
-        state.blocked = Some(blocked);
+        charge_skip_at_depth(&mut state.blocked, blocked);
         state.stats.skipped += 1;
         Some(permit)
     }
+}
+
+/// Charge one at-depth skip to the head's record `blocked` and store it.
+#[cfg(not(parking_lot_negative_control = "s-20-depth"))]
+const fn charge_skip_at_depth(record: &mut Option<BlockedHead>, mut blocked: BlockedHead) {
+    blocked.skips = blocked.skips.saturating_add(1);
+    *record = Some(blocked);
+}
+
+/// Negative control S-20-depth: the at-depth skip is counted in the stats
+/// but not charged to the head (the copy is never stored back), so
+/// submissions at `max_queue_depth` can skip a blocked head without bound
+/// while the drain path keeps its guard. The `loom_at_depth` model must fail.
+#[cfg(parking_lot_negative_control = "s-20-depth")]
+const fn charge_skip_at_depth(record: &mut Option<BlockedHead>, blocked: BlockedHead) {
+    let _ = (record, blocked);
 }
 
 #[cfg(all(test, not(parking_lot_loom)))]
