@@ -144,7 +144,10 @@
 //! Negative control S-20: under
 //! `--cfg parking_lot_negative_control="s-20"` the guard never engages
 //! (unbounded skip-ahead), and the `starvation_` tests must then find a head
-//! that starves.
+//! that starves. Under `--cfg parking_lot_negative_control="s-20-depth"` only
+//! the at-depth path forgets to charge its skips to the head, and under
+//! `"s-20-order"` it starts a submission ahead of a higher-priority item that
+//! fits; the `loom_at_depth` model must fail under either.
 //!
 //! ## Capacity invariant
 //!
@@ -894,27 +897,78 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
         if state.max_head_skips == 0 || !state.queue.supports_skip_ahead() {
             return None;
         }
-        let mut blocked = Self::blocked_head(state, head);
+        let blocked = Self::blocked_head(state, head);
         if guard_engaged(blocked.skips, state.max_head_skips) {
             return None;
         }
         let free = self.semaphore.available()?;
-        if head.demand.fits_in(&free) || !ticket.can_skip_ahead(&free, now_ms) {
+        if !ticket.can_skip_ahead(&free, now_ms)
+            || !Self::first_to_fit_at_depth(state, ticket, head, &free, now_ms)
+        {
             return None;
         }
-        // A parked item ahead of the new one that fits would be the drain's
-        // candidate instead.
-        match state.queue.fitting(&free, now_ms) {
-            Ok(None) => {}
-            Ok(Some(parked)) if ticket.runs_before(&parked) => {}
-            Ok(Some(_)) | Err(_) => return None,
-        }
         let permit = UnitSemaphore::try_acquire_vector(&self.semaphore, &ticket.demand)?;
-        blocked.skips = blocked.skips.saturating_add(1);
-        state.blocked = Some(blocked);
+        charge_skip_at_depth(&mut state.blocked, blocked);
         state.stats.skipped += 1;
         Some(permit)
     }
+}
+
+impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
+    /// Whether `ticket`, which fits `free`, is the item the drain would start
+    /// first: the head does not fit, and no parked item ahead of `ticket`
+    /// fits (it would be the drain's candidate instead). At
+    /// `max_queue_depth = 1` the head is the only parked item, so the two
+    /// checks cover the same case. Callers hold the dispatch lock.
+    #[cfg(not(parking_lot_negative_control = "s-20-order"))]
+    fn first_to_fit_at_depth(
+        state: &mut State<Q>,
+        ticket: &Ticket,
+        head: &Ticket,
+        free: &UnitVector,
+        now_ms: u128,
+    ) -> bool {
+        if head.demand.fits_in(free) {
+            return false;
+        }
+        match state.queue.fitting(free, now_ms) {
+            Ok(None) => true,
+            Ok(Some(parked)) => ticket.runs_before(&parked),
+            Err(_) => false,
+        }
+    }
+
+    /// Negative control S-20-order: neither check runs, so a submission at
+    /// `max_queue_depth` starts ahead of a higher-priority head (or parked
+    /// item) that fits. The `loom_at_depth` model must fail with its
+    /// priority-order message.
+    #[cfg(parking_lot_negative_control = "s-20-order")]
+    fn first_to_fit_at_depth(
+        state: &mut State<Q>,
+        ticket: &Ticket,
+        head: &Ticket,
+        free: &UnitVector,
+        now_ms: u128,
+    ) -> bool {
+        let _ = (state, ticket, head, free, now_ms);
+        true
+    }
+}
+
+/// Charge one at-depth skip to the head's record `blocked` and store it.
+#[cfg(not(parking_lot_negative_control = "s-20-depth"))]
+const fn charge_skip_at_depth(record: &mut Option<BlockedHead>, mut blocked: BlockedHead) {
+    blocked.skips = blocked.skips.saturating_add(1);
+    *record = Some(blocked);
+}
+
+/// Negative control S-20-depth: the at-depth skip is counted in the stats
+/// but not charged to the head (the copy is never stored back), so
+/// submissions at `max_queue_depth` can skip a blocked head without bound
+/// while the drain path keeps its guard. The `loom_at_depth` model must fail.
+#[cfg(parking_lot_negative_control = "s-20-depth")]
+const fn charge_skip_at_depth(record: &mut Option<BlockedHead>, blocked: BlockedHead) {
+    let _ = (record, blocked);
 }
 
 #[cfg(all(test, not(parking_lot_loom)))]

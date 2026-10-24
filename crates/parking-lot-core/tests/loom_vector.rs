@@ -73,9 +73,10 @@ fn run(pool: &Arc<Pool>, oracle: &Arc<Oracle>, grants: Vec<Grant<Job>>) {
             held_slots <= SLOTS,
             "capacity violated in Cpu: {held_slots} slots running, limit {SLOTS}"
         );
-        // A yield inside the critical window lets loom schedule another
-        // thread's admission while this job holds its units.
-        thread::yield_now();
+        // In one of the two passes (see `loom_support::model`), a yield
+        // inside the window lets loom schedule another thread's admission
+        // while this job holds its units.
+        loom_support::window_yield();
         oracle.vram.fetch_sub(vram, Ordering::SeqCst);
         oracle.slots.fetch_sub(slots, Ordering::SeqCst);
         oracle.ran.fetch_add(1, Ordering::SeqCst);
@@ -89,7 +90,7 @@ fn run(pool: &Arc<Pool>, oracle: &Arc<Oracle>, grants: Vec<Grant<Job>>) {
 /// in any dimension, and all three jobs run.
 #[test]
 fn loom_vector_no_schedule_exceeds_any_dimension() {
-    loom::model(|| {
+    loom_support::model(|| {
         let pool = pool();
         let oracle = Arc::new(Oracle::default());
 
@@ -136,7 +137,7 @@ fn loom_vector_no_schedule_exceeds_any_dimension() {
 /// parked.
 #[test]
 fn loom_vector_job_short_in_one_dimension_waits() {
-    loom::model(|| {
+    loom_support::model(|| {
         let pool = pool();
         let oracle = Arc::new(Oracle::default());
 

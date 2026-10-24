@@ -41,7 +41,7 @@ const MAX_HEAD_SKIPS: u32 = 1;
 /// completion frees a unit first.
 #[test]
 fn loom_skip_ahead_races_completion_and_keeps_every_invariant() {
-    loom::model(|| {
+    loom_support::model(|| {
         let pool = Arc::new(
             Pool::in_memory("loom", UnitSemaphore::new(MAX_UNITS), 8)
                 .with_max_head_skips(MAX_HEAD_SKIPS),

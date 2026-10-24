@@ -29,7 +29,7 @@ use prometheus_parking_lot_core::{Priority, SchedulerError};
 /// the dispatch lock admits them in, the submitted job runs.
 #[test]
 fn loom_wakeup_completion_racing_a_park_is_not_lost() {
-    loom::model(|| {
+    loom_support::model(|| {
         let pool = Arc::new(Pool::in_memory("loom", UnitSemaphore::new(1), 4));
         let oracle = Arc::new(Oracle::default());
 
@@ -74,7 +74,7 @@ fn loom_wakeup_completion_racing_a_park_is_not_lost() {
 /// capacity frees.
 #[test]
 fn loom_wakeup_depth_limit_is_exact() {
-    loom::model(|| {
+    loom_support::model(|| {
         let pool = Arc::new(Pool::in_memory("loom", UnitSemaphore::new(1), 1));
         let oracle = Arc::new(Oracle::default());
         let first = pool
