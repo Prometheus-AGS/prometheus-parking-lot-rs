@@ -1,0 +1,11 @@
+{
+  "candidate": "68bc5f80d47119decc16de4ab70acdcbe2176042",
+  "profile": "ios",
+  "status": "PASS",
+  "checks": 4,
+  "retained_root": "/Users/gqadonis/.local/state/prometheus/operational-assurance/68bc5f80d47119decc16de4ab70acdcbe2176042/ios",
+  "inventory": "/Users/gqadonis/.local/state/prometheus/operational-assurance/68bc5f80d47119decc16de4ab70acdcbe2176042/ios-retained-files.json",
+  "files": 21,
+  "byte_hashes_verified": true,
+  "scope": "iOS profile only; superseded candidates are never relabelled."
+}

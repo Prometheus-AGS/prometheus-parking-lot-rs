@@ -1,0 +1,1528 @@
+{
+  "schema_version": 1,
+  "purpose": "Read-only local platform environment readiness; not a build, test, GUI, certification, or source-control result",
+  "observed_at_utc": "2026-10-24T16:04:23.065318+00:00",
+  "phase": "phase-0-4-operational-assurance",
+  "stage": "Execute / OA-18 final boundary environment preparation",
+  "host": {
+    "system": "Darwin",
+    "release": "25.6.0",
+    "machine": "x86_64"
+  },
+  "source_sha256": {
+    ".github/operational-assurance.json": "b0794a1bb88e142cd70da152c0582ed1271b1e9759352d07b72fd2d78a31211e",
+    ".github/scripts/operational-assurance.py": "a4ee72bdc0a577cf33e32051da84ec7cf71f5f306b271cd67d6f9aff4c4e117f",
+    ".github/workflows/platform.yml": "011cf1c5fb7a58d3e2fc1599ab74c8e43bae7c0e9fbc1942799f7a64fa6496a7",
+    "bindings/generate.sh": "f844f5662f89dd519f9cf864cf8cccc2ce768a955c254233eddb450102a2cbc8",
+    "bindings/smoke/swift.sh": "87d634e638cc0b0ec6acf8e8f5f4c120cb5e24cf97b5beae9245e56dd3a862ac",
+    "bindings/smoke/kotlin.sh": "80dee9f20564351080af63c9ea796809fbb5d277e3befe1fcb57da7104f1edc8",
+    "bindings/tauri-desktop/assurance/desktop-assurance.py": "b19d857dea1a0ee8e1e1048cbba71e0c53de027855a963c6dedf8cc7fa424471",
+    "bindings/tauri-desktop/assurance/RUNBOOK.md": "ebae5909647f04ce276f3799151d7df5f7d76cb74ac26316928f26a87ef8a179"
+  },
+  "selected_public_path_environment": {
+    "DEVELOPER_DIR": null,
+    "SDKROOT": null,
+    "ANDROID_HOME": "/Users/gqadonis/Library/Android/sdk",
+    "ANDROID_SDK_ROOT": null,
+    "ANDROID_NDK_HOME": null,
+    "ANDROID_NDK_LATEST_HOME": null,
+    "JAVA_HOME": "/Library/Java/JavaVirtualMachines/jdk-18.jdk/Contents/Home",
+    "RUSTUP_HOME": null
+  },
+  "path_lookup_only": {
+    "xcrun": "/usr/bin/xcrun",
+    "xcodebuild": "/usr/bin/xcodebuild",
+    "swift": "/usr/bin/swift",
+    "swiftc": "/usr/bin/swiftc",
+    "javac": "/usr/bin/javac",
+    "java": "/usr/bin/java",
+    "kotlinc": null,
+    "sdkmanager": "/Users/gqadonis/Library/Android/sdk/tools/bin/sdkmanager",
+    "adb": "/usr/local/bin/adb",
+    "clang": "/usr/bin/clang",
+    "cmake": "/Users/gqadonis/miniconda3/bin/cmake",
+    "ninja": "/usr/local/bin/ninja",
+    "cargo-ndk": "/Users/gqadonis/.cargo/bin/cargo-ndk",
+    "cargo-tauri": "/Users/gqadonis/.cargo/bin/cargo-tauri",
+    "node": "/Users/gqadonis/.volta/bin/node",
+    "npm": "/Users/gqadonis/.volta/bin/npm",
+    "python3": "/Users/gqadonis/miniconda3/bin/python3"
+  },
+  "probes": [
+    {
+      "argv": [
+        "/usr/bin/xcode-select",
+        "-p"
+      ],
+      "exit_code": 0,
+      "stdout": "/Applications/Xcode.app/Contents/Developer\n",
+      "stderr": "",
+      "classification": "PROBE_OK"
+    },
+    {
+      "argv": [
+        "/usr/bin/xcodebuild",
+        "-version"
+      ],
+      "exit_code": 0,
+      "stdout": "Xcode 26.6\nBuild version 17F113\n",
+      "stderr": "",
+      "classification": "PROBE_OK"
+    },
+    {
+      "argv": [
+        "/usr/bin/xcrun",
+        "--find",
+        "swift"
+      ],
+      "exit_code": 0,
+      "stdout": "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift\n",
+      "stderr": "",
+      "classification": "PROBE_OK"
+    },
+    {
+      "argv": [
+        "/usr/bin/xcrun",
+        "swift",
+        "--version"
+      ],
+      "exit_code": 0,
+      "stdout": "Apple Swift version 6.3.3 (swiftlang-6.3.3.1.3 clang-2100.1.1.101)\nTarget: x86_64-apple-macosx26.0\n",
+      "stderr": "swift-driver version: 1.148.6 ",
+      "classification": "PROBE_OK"
+    },
+    {
+      "argv": [
+        "/usr/bin/xcrun",
+        "--find",
+        "swiftc"
+      ],
+      "exit_code": 0,
+      "stdout": "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc\n",
+      "stderr": "",
+      "classification": "PROBE_OK"
+    },
+    {
+      "argv": [
+        "/usr/bin/xcrun",
+        "--find",
+        "clang"
+      ],
+      "exit_code": 0,
+      "stdout": "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang\n",
+      "stderr": "",
+      "classification": "PROBE_OK"
+    },
+    {
+      "argv": [
+        "/usr/bin/xcrun",
+        "--sdk",
+        "macosx",
+        "--show-sdk-path"
+      ],
+      "exit_code": 0,
+      "stdout": "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk\n",
+      "stderr": "",
+      "classification": "PROBE_OK",
+      "sdk_directory_exists": true
+    },
+    {
+      "argv": [
+        "/usr/bin/xcrun",
+        "--sdk",
+        "macosx",
+        "--show-sdk-version"
+      ],
+      "exit_code": 0,
+      "stdout": "26.5\n",
+      "stderr": "",
+      "classification": "PROBE_OK"
+    },
+    {
+      "argv": [
+        "/usr/bin/xcrun",
+        "--sdk",
+        "iphoneos",
+        "--show-sdk-path"
+      ],
+      "exit_code": 0,
+      "stdout": "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.5.sdk\n",
+      "stderr": "",
+      "classification": "PROBE_OK",
+      "sdk_directory_exists": true
+    },
+    {
+      "argv": [
+        "/usr/bin/xcrun",
+        "--sdk",
+        "iphoneos",
+        "--show-sdk-version"
+      ],
+      "exit_code": 0,
+      "stdout": "26.5\n",
+      "stderr": "",
+      "classification": "PROBE_OK"
+    },
+    {
+      "argv": [
+        "/usr/bin/xcrun",
+        "--sdk",
+        "iphonesimulator",
+        "--show-sdk-path"
+      ],
+      "exit_code": 0,
+      "stdout": "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.5.sdk\n",
+      "stderr": "",
+      "classification": "PROBE_OK",
+      "sdk_directory_exists": true
+    },
+    {
+      "argv": [
+        "/usr/bin/xcrun",
+        "--sdk",
+        "iphonesimulator",
+        "--show-sdk-version"
+      ],
+      "exit_code": 0,
+      "stdout": "26.5\n",
+      "stderr": "",
+      "classification": "PROBE_OK"
+    },
+    {
+      "argv": [
+        "/Library/Java/JavaVirtualMachines/jdk-18.jdk/Contents/Home/bin/javac",
+        "-version"
+      ],
+      "exit_code": 0,
+      "stdout": "javac 18\n",
+      "stderr": "",
+      "classification": "PROBE_OK"
+    },
+    {
+      "argv": [
+        "/Library/Java/JavaVirtualMachines/jdk-18.jdk/Contents/Home/bin/java",
+        "-version"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "java version \"18\" 2022-03-22\nJava(TM) SE Runtime Environment (build 18+36-2087)\nJava HotSpot(TM) 64-Bit Server VM (build 18+36-2087, mixed mode, sharing)\n",
+      "classification": "PROBE_OK"
+    }
+  ],
+  "jdk_inventory": [
+    {
+      "home": "/Library/Java/JavaVirtualMachines/jdk-18.jdk/Contents/Home",
+      "exists": true,
+      "java": true,
+      "javac": true,
+      "release_properties": "IMPLEMENTOR=\"Oracle Corporation\"\nJAVA_VERSION=\"18\"\nJAVA_VERSION_DATE=\"2022-03-22\"\nLIBC=\"default\"\nMODULES=\"java.base java.compiler java.datatransfer java.xml java.prefs java.desktop java.instrument java.logging java.management java.security.sasl java.naming java.rmi java.management.rmi java.net.http java.scripting java.security.jgss java.transaction.xa java.sql java.sql.rowset java.xml.crypto java.se java.smartcardio jdk.accessibility jdk.internal.jvmstat jdk.attach jdk.charsets jdk.compiler jdk.crypto.ec jdk.crypto.cryptoki jdk.dynalink jdk.internal.ed jdk.editpad jdk.hotspot.agent jdk.httpserver jdk.incubator.foreign jdk.incubator.vector jdk.internal.le jdk.internal.opt jdk.internal.vm.ci jdk.internal.vm.compiler jdk.internal.vm.compiler.management jdk.jartool jdk.javadoc jdk.jcmd jdk.management jdk.management.agent jdk.jconsole jdk.jdeps jdk.jdwp.agent jdk.jdi jdk.jfr jdk.jlink jdk.jpackage jdk.jshell jdk.jsobject jdk.jstatd jdk.localedata jdk.management.jfr jdk.naming.dns jdk.naming.rmi jdk.net jdk.nio.mapmode jdk.random jdk.sctp jdk.security.auth jdk.security.jgss jdk.unsupported jdk.unsupported.desktop jdk.xml.dom jdk.zipfs\"\nOS_ARCH=\"x86_64\"\nOS_NAME=\"Darwin\"\nSOURCE=\".:git:1b20c5feddde open:git:0f2113cee79b\"\n"
+    },
+    {
+      "home": "/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home",
+      "exists": true,
+      "java": true,
+      "javac": true,
+      "release_properties": "IMPLEMENTOR=\"Oracle Corporation\"\nJAVA_VERSION=\"17\"\nJAVA_VERSION_DATE=\"2021-09-14\"\nLIBC=\"default\"\nMODULES=\"java.base java.compiler java.datatransfer java.xml java.prefs java.desktop java.instrument java.logging java.management java.security.sasl java.naming java.rmi java.management.rmi java.net.http java.scripting java.security.jgss java.transaction.xa java.sql java.sql.rowset java.xml.crypto java.se java.smartcardio jdk.accessibility jdk.internal.jvmstat jdk.attach jdk.charsets jdk.compiler jdk.crypto.ec jdk.crypto.cryptoki jdk.dynalink jdk.internal.ed jdk.editpad jdk.hotspot.agent jdk.httpserver jdk.incubator.foreign jdk.incubator.vector jdk.internal.le jdk.internal.opt jdk.internal.vm.ci jdk.internal.vm.compiler jdk.internal.vm.compiler.management jdk.jartool jdk.javadoc jdk.jcmd jdk.management jdk.management.agent jdk.jconsole jdk.jdeps jdk.jdwp.agent jdk.jdi jdk.jfr jdk.jlink jdk.jpackage jdk.jshell jdk.jsobject jdk.jstatd jdk.localedata jdk.management.jfr jdk.naming.dns jdk.naming.rmi jdk.net jdk.nio.mapmode jdk.random jdk.sctp jdk.security.auth jdk.security.jgss jdk.unsupported jdk.unsupported.desktop jdk.xml.dom jdk.zipfs\"\nOS_ARCH=\"x86_64\"\nOS_NAME=\"Darwin\"\nSOURCE=\".:git:149e1309d940 open:git:dfacda488bfb\"\n"
+    },
+    {
+      "home": "/Library/Java/JavaVirtualMachines/jdk-20.0.1.jdk/Contents/Home",
+      "exists": true,
+      "java": true,
+      "javac": true,
+      "release_properties": "IMPLEMENTOR=\"Oracle Corporation\"\nJAVA_VERSION=\"20.0.1\"\nJAVA_VERSION_DATE=\"2023-04-18\"\nLIBC=\"default\"\nMODULES=\"java.base java.compiler java.datatransfer java.xml java.prefs java.desktop java.instrument java.logging java.management java.security.sasl java.naming java.rmi java.management.rmi java.net.http java.scripting java.security.jgss java.transaction.xa java.sql java.sql.rowset java.xml.crypto java.se java.smartcardio jdk.accessibility jdk.internal.jvmstat jdk.attach jdk.charsets jdk.zipfs jdk.compiler jdk.crypto.ec jdk.crypto.cryptoki jdk.dynalink jdk.internal.ed jdk.editpad jdk.hotspot.agent jdk.httpserver jdk.incubator.concurrent jdk.incubator.vector jdk.internal.le jdk.internal.opt jdk.internal.vm.ci jdk.internal.vm.compiler jdk.internal.vm.compiler.management jdk.jartool jdk.javadoc jdk.jcmd jdk.management jdk.management.agent jdk.jconsole jdk.jdeps jdk.jdwp.agent jdk.jdi jdk.jfr jdk.jlink jdk.jpackage jdk.jshell jdk.jsobject jdk.jstatd jdk.localedata jdk.management.jfr jdk.naming.dns jdk.naming.rmi jdk.net jdk.nio.mapmode jdk.random jdk.sctp jdk.security.auth jdk.security.jgss jdk.unsupported jdk.unsupported.desktop jdk.xml.dom\"\nOS_ARCH=\"x86_64\"\nOS_NAME=\"Darwin\"\nSOURCE=\".:git:a0bfbb14e326\"\n"
+    },
+    {
+      "home": "/Library/Java/JavaVirtualMachines/jdk-20.jdk/Contents/Home",
+      "exists": true,
+      "java": true,
+      "javac": true,
+      "release_properties": "IMPLEMENTOR=\"Oracle Corporation\"\nJAVA_VERSION=\"20\"\nJAVA_VERSION_DATE=\"2023-03-21\"\nLIBC=\"default\"\nMODULES=\"java.base java.compiler java.datatransfer java.xml java.prefs java.desktop java.instrument java.logging java.management java.security.sasl java.naming java.rmi java.management.rmi java.net.http java.scripting java.security.jgss java.transaction.xa java.sql java.sql.rowset java.xml.crypto java.se java.smartcardio jdk.accessibility jdk.internal.jvmstat jdk.attach jdk.charsets jdk.zipfs jdk.compiler jdk.crypto.ec jdk.crypto.cryptoki jdk.dynalink jdk.internal.ed jdk.editpad jdk.hotspot.agent jdk.httpserver jdk.incubator.concurrent jdk.incubator.vector jdk.internal.le jdk.internal.opt jdk.internal.vm.ci jdk.internal.vm.compiler jdk.internal.vm.compiler.management jdk.jartool jdk.javadoc jdk.jcmd jdk.management jdk.management.agent jdk.jconsole jdk.jdeps jdk.jdwp.agent jdk.jdi jdk.jfr jdk.jlink jdk.jpackage jdk.jshell jdk.jsobject jdk.jstatd jdk.localedata jdk.management.jfr jdk.naming.dns jdk.naming.rmi jdk.net jdk.nio.mapmode jdk.random jdk.sctp jdk.security.auth jdk.security.jgss jdk.unsupported jdk.unsupported.desktop jdk.xml.dom\"\nOS_ARCH=\"x86_64\"\nOS_NAME=\"Darwin\"\nSOURCE=\".:git:74ac5df96fb4\"\n"
+    },
+    {
+      "home": "/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home",
+      "exists": true,
+      "java": true,
+      "javac": true,
+      "release_properties": "IMPLEMENTOR=\"Oracle Corporation\"\nJAVA_RUNTIME_VERSION=\"21-ea+26-2328\"\nJAVA_VERSION=\"21\"\nJAVA_VERSION_DATE=\"2023-09-19\"\nLIBC=\"default\"\nMODULES=\"java.base java.compiler java.datatransfer java.xml java.prefs java.desktop java.instrument java.logging java.management java.security.sasl java.naming java.rmi java.management.rmi java.net.http java.scripting java.security.jgss java.transaction.xa java.sql java.sql.rowset java.xml.crypto java.se java.smartcardio jdk.accessibility jdk.internal.jvmstat jdk.attach jdk.charsets jdk.internal.opt jdk.zipfs jdk.compiler jdk.crypto.ec jdk.crypto.cryptoki jdk.dynalink jdk.internal.ed jdk.editpad jdk.hotspot.agent jdk.httpserver jdk.incubator.vector jdk.internal.le jdk.internal.vm.ci jdk.internal.vm.compiler jdk.internal.vm.compiler.management jdk.jartool jdk.javadoc jdk.jcmd jdk.management jdk.management.agent jdk.jconsole jdk.jdeps jdk.jdwp.agent jdk.jdi jdk.jfr jdk.jlink jdk.jpackage jdk.jshell jdk.jsobject jdk.jstatd jdk.localedata jdk.management.jfr jdk.naming.dns jdk.naming.rmi jdk.net jdk.nio.mapmode jdk.random jdk.sctp jdk.security.auth jdk.security.jgss jdk.unsupported jdk.unsupported.desktop jdk.xml.dom\"\nOS_ARCH=\"x86_64\"\nOS_NAME=\"Darwin\"\nSOURCE=\".:git:bb377b26730f\"\n"
+    },
+    {
+      "home": "/Library/Java/JavaVirtualMachines/microsoft-11.jdk/Contents/Home",
+      "exists": true,
+      "java": true,
+      "javac": true,
+      "release_properties": "IMPLEMENTOR=\"Microsoft\"\nIMPLEMENTOR_VERSION=\"Microsoft-25199\"\nJAVA_VERSION=\"11.0.12\"\nJAVA_VERSION_DATE=\"2021-07-20\"\nMODULES=\"java.base java.compiler java.datatransfer java.xml java.prefs java.desktop java.instrument java.logging java.management java.security.sasl java.naming java.rmi java.management.rmi java.net.http java.scripting java.security.jgss java.transaction.xa java.sql java.sql.rowset java.xml.crypto java.se java.smartcardio jdk.accessibility jdk.internal.vm.ci jdk.management jdk.unsupported jdk.internal.vm.compiler jdk.aot jdk.internal.jvmstat jdk.attach jdk.charsets jdk.compiler jdk.crypto.ec jdk.crypto.cryptoki jdk.dynalink jdk.internal.ed jdk.editpad jdk.hotspot.agent jdk.httpserver jdk.internal.le jdk.internal.opt jdk.internal.vm.compiler.management jdk.jartool jdk.javadoc jdk.jcmd jdk.management.agent jdk.jconsole jdk.jdeps jdk.jdwp.agent jdk.jdi jdk.jfr jdk.jlink jdk.jshell jdk.jsobject jdk.jstatd jdk.localedata jdk.management.jfr jdk.naming.dns jdk.naming.ldap jdk.naming.rmi jdk.net jdk.pack jdk.rmic jdk.scripting.nashorn jdk.scripting.nashorn.shell jdk.sctp jdk.security.auth jdk.security.jgss jdk.unsupported.desktop jdk.xml.dom jdk.zipfs\"\nOS_ARCH=\"x86_64\"\nOS_NAME=\"Darwin\"\nSOURCE=\".:git:94673ecf7135\"\n"
+    },
+    {
+      "home": "/Library/Java/JavaVirtualMachines/temurin-8.jdk/Contents/Home",
+      "exists": true,
+      "java": true,
+      "javac": true,
+      "release_properties": "JAVA_VERSION=\"1.8.0_302\"\nOS_NAME=\"Darwin\"\nOS_VERSION=\"11.2\"\nOS_ARCH=\"x86_64\"\nSOURCE=\" .:OpenJDK: 63197bc5b8:\"\nIMPLEMENTOR=\"Eclipse Foundation\"\nBUILD_SOURCE=\"git:2349d4e\"\nBUILD_SOURCE_REPO=\"https://github.com/adoptium/temurin-build.git\"\nSOURCE_REPO=\"https://github.com/adoptium/jdk8u.git\"\nFULL_VERSION=\"1.8.0_302-b08\"\nSEMANTIC_VERSION=\"8.0.302+8\"\nBUILD_INFO=\"OS: Mac OS X Version: 10.14.6\n18G84\"\nJVM_VARIANT=\"Hotspot\"\nJVM_VERSION=\"25.302-b08\"\nIMAGE_TYPE=\"JDK\"\n"
+    },
+    {
+      "home": "/Library/Java/JavaVirtualMachines/zulu-11.jdk/Contents/Home",
+      "exists": true,
+      "java": true,
+      "javac": true,
+      "release_properties": "IMPLEMENTOR=\"Azul Systems, Inc.\"\nIMPLEMENTOR_VERSION=\"Zulu11.70+15-CA\"\nJAVA_RUNTIME_VERSION=\"11.0.22+7-LTS\"\nJAVA_VERSION=\"11.0.22\"\nJAVA_VERSION_DATE=\"2024-01-16\"\nLIBC=\"default\"\nMODULES=\"java.base com.azul.tooling java.management java.logging java.security.sasl java.naming jdk.jfr com.azul.crs.client java.compiler java.datatransfer java.xml java.prefs java.desktop java.instrument java.rmi java.management.rmi java.net.http java.scripting java.security.jgss java.transaction.xa java.sql java.sql.rowset java.xml.crypto java.se java.smartcardio jdk.accessibility jdk.internal.vm.ci jdk.management jdk.unsupported jdk.internal.vm.compiler jdk.aot jdk.internal.jvmstat jdk.attach jdk.charsets jdk.compiler jdk.crypto.ec jdk.crypto.cryptoki jdk.dynalink jdk.internal.ed jdk.editpad jdk.hotspot.agent jdk.httpserver jdk.internal.le jdk.internal.opt jdk.internal.vm.compiler.management jdk.jartool jdk.javadoc jdk.jcmd jdk.management.agent jdk.jconsole jdk.jdeps jdk.jdwp.agent jdk.jdi jdk.jlink jdk.jshell jdk.jsobject jdk.jstatd jdk.localedata jdk.management.jfr jdk.naming.dns jdk.naming.ldap jdk.naming.rmi jdk.net jdk.pack jdk.rmic jdk.scripting.nashorn jdk.scripting.nashorn.shell jdk.sctp jdk.security.auth jdk.security.jgss jdk.unsupported.desktop jdk.xml.dom jdk.zipfs\"\nOS_ARCH=\"x86_64\"\nOS_NAME=\"Darwin\"\nSOURCE=\".:git:9947735d077f\"\n"
+    }
+  ],
+  "android_sdk_inventory": [
+    {
+      "path": "/Users/gqadonis/Library/Android/sdk",
+      "exists": true,
+      "components": {
+        "ndk": {
+          "exists": true,
+          "names": [
+            "21.1.6352462",
+            "21.4.7075529",
+            "23.0.7599858",
+            "23.1.7779620",
+            "24.0.8215888",
+            "28.0.12433566"
+          ],
+          "public_component_properties": [
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/ndk/21.1.6352462/source.properties",
+              "text": "Pkg.Desc = Android NDK\nPkg.Revision = 21.1.6352462\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/ndk/21.4.7075529/source.properties",
+              "text": "Pkg.Desc = Android NDK\nPkg.Revision = 21.4.7075529\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/ndk/23.0.7599858/source.properties",
+              "text": "Pkg.Desc = Android NDK\nPkg.Revision = 23.0.7599858\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/ndk/23.1.7779620/source.properties",
+              "text": "Pkg.Desc = Android NDK\nPkg.Revision = 23.1.7779620\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/ndk/24.0.8215888/source.properties",
+              "text": "Pkg.Desc = Android NDK\nPkg.Revision = 24.0.8215888\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/ndk/28.0.12433566/source.properties",
+              "text": "Pkg.Desc = Android NDK\nPkg.Revision = 28.0.12433566-beta1\nPkg.BaseRevision = 28.0.12433566\nPkg.ReleaseName = r28-beta1\n"
+            }
+          ]
+        },
+        "ndk-bundle": {
+          "exists": true,
+          "names": [
+            "CHANGELOG.md",
+            "NOTICE",
+            "NOTICE.toolchain",
+            "README.md",
+            "build",
+            "meta",
+            "ndk-build",
+            "ndk-gdb",
+            "ndk-lldb",
+            "ndk-stack",
+            "ndk-which",
+            "package.xml",
+            "prebuilt",
+            "python-packages",
+            "shader-tools",
+            "simpleperf",
+            "source.properties",
+            "sources",
+            "toolchains",
+            "wrap.sh"
+          ],
+          "public_component_properties": [
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/ndk-bundle/source.properties",
+              "text": "Pkg.Desc = Android NDK\nPkg.Revision = 23.0.7344513-beta4\n"
+            }
+          ]
+        },
+        "platforms": {
+          "exists": true,
+          "names": [
+            "android-28",
+            "android-29",
+            "android-30",
+            "android-31",
+            "android-32",
+            "android-33",
+            "android-34",
+            "android-34-ext10",
+            "android-34-ext11",
+            "android-34-ext12",
+            "android-34-ext8",
+            "android-35",
+            "android-Sv2",
+            "android-Tiramisu",
+            "android-TiramisuPrivacySandbox"
+          ],
+          "public_component_properties": [
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/platforms/android-28/source.properties",
+              "text": "Pkg.Desc=Android SDK Platform 9\nPkg.UserSrc=false\nPlatform.Version=9\nPlatform.CodeName=\nPkg.Revision=6\nAndroidVersion.ApiLevel=28\nLayoutlib.Api=15\nLayoutlib.Revision=1\nPlatform.MinToolsRev=22\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/platforms/android-29/source.properties",
+              "text": "Pkg.Desc=Android SDK Platform 10\nPkg.UserSrc=false\nPlatform.Version=10\nPlatform.CodeName=\nPkg.Revision=5\nAndroidVersion.ApiLevel=29\nLayoutlib.Api=15\nLayoutlib.Revision=1\nPlatform.MinToolsRev=22\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/platforms/android-30/source.properties",
+              "text": "Pkg.Desc=Android SDK Platform 11\nPkg.UserSrc=false\nPlatform.Version=11\nPlatform.CodeName=\nPkg.Revision=3\nAndroidVersion.ApiLevel=30\nLayoutlib.Api=15\nLayoutlib.Revision=1\nPlatform.MinToolsRev=22\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/platforms/android-31/source.properties",
+              "text": "Pkg.Desc=Android SDK Platform 12\nPkg.UserSrc=false\nPlatform.Version=12\nPlatform.CodeName=\nPkg.Revision=1\nAndroidVersion.ApiLevel=31\nLayoutlib.Api=15\nLayoutlib.Revision=1\nPlatform.MinToolsRev=22\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/platforms/android-32/source.properties",
+              "text": "Pkg.Desc=Android SDK Platform 12\nPkg.UserSrc=false\nPlatform.Version=12\nPlatform.CodeName=\nPkg.Revision=1\nAndroidVersion.ApiLevel=32\nLayoutlib.Api=15\nLayoutlib.Revision=1\nPlatform.MinToolsRev=22\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/platforms/android-33/source.properties",
+              "text": "Pkg.Desc=Android SDK Platform 13\nPkg.UserSrc=false\nPlatform.Version=13\nPlatform.CodeName=\nPkg.Revision=3\nAndroidVersion.ApiLevel=33\nAndroidVersion.ExtensionLevel=3\nAndroidVersion.IsBaseSdk=true\nLayoutlib.Api=15\nLayoutlib.Revision=1\nPlatform.MinToolsRev=22\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/platforms/android-34/source.properties",
+              "text": "Pkg.Desc=Android SDK Platform 14\nPkg.UserSrc=false\nPlatform.Version=14\nPlatform.CodeName=\nPkg.Revision=3\nAndroidVersion.ApiLevel=34\nAndroidVersion.ExtensionLevel=7\nAndroidVersion.IsBaseSdk=true\nLayoutlib.Api=15\nLayoutlib.Revision=1\nPlatform.MinToolsRev=22\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/platforms/android-34-ext10/source.properties",
+              "text": "Pkg.Desc=Android SDK Platform 14\nPkg.UserSrc=false\nPlatform.Version=14\nPlatform.CodeName=\nPkg.Revision=1\nAndroidVersion.ApiLevel=34\nAndroidVersion.ExtensionLevel=10\nAndroidVersion.IsBaseSdk=false\nLayoutlib.Api=15\nLayoutlib.Revision=1\nPlatform.MinToolsRev=22\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/platforms/android-34-ext11/source.properties",
+              "text": "Pkg.Desc=Android SDK Platform 14\nPkg.UserSrc=false\nPlatform.Version=14\nPlatform.CodeName=\nPkg.Revision=1\nAndroidVersion.ApiLevel=34\nAndroidVersion.ExtensionLevel=11\nAndroidVersion.IsBaseSdk=false\nLayoutlib.Api=15\nLayoutlib.Revision=1\nPlatform.MinToolsRev=22\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/platforms/android-34-ext12/source.properties",
+              "text": "Pkg.Desc=Android SDK Platform 14\nPkg.UserSrc=false\nPlatform.Version=14\nPlatform.CodeName=\nPkg.Revision=1\nAndroidVersion.ApiLevel=34\nAndroidVersion.ExtensionLevel=12\nAndroidVersion.IsBaseSdk=false\nLayoutlib.Api=15\nLayoutlib.Revision=1\nPlatform.MinToolsRev=22\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/platforms/android-34-ext8/source.properties",
+              "text": "Pkg.Desc=Android SDK Platform 14\nPkg.UserSrc=false\nPlatform.Version=14\nPlatform.CodeName=\nPkg.Revision=1\nAndroidVersion.ApiLevel=34\nAndroidVersion.ExtensionLevel=8\nAndroidVersion.IsBaseSdk=true\nLayoutlib.Api=15\nLayoutlib.Revision=1\nPlatform.MinToolsRev=22\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/platforms/android-35/source.properties",
+              "text": "Pkg.Desc=Android SDK Platform 15\nPkg.UserSrc=false\nPlatform.Version=15\nPlatform.CodeName=\nPkg.Revision=2\nAndroidVersion.ApiLevel=35\nAndroidVersion.ExtensionLevel=13\nAndroidVersion.IsBaseSdk=true\nLayoutlib.Api=15\nLayoutlib.Revision=1\nPlatform.MinToolsRev=22\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/platforms/android-Sv2/source.properties",
+              "text": "Pkg.Desc=Android SDK Platform Sv2\nPkg.UserSrc=false\nPlatform.Version=Sv2\nPlatform.CodeName=\nPkg.Revision=1\nAndroidVersion.ApiLevel=31\nAndroidVersion.CodeName=Sv2\nLayoutlib.Api=15\nLayoutlib.Revision=1\nPlatform.MinToolsRev=22\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/platforms/android-Tiramisu/source.properties",
+              "text": "Pkg.Desc=Android SDK Platform Tiramisu\nPkg.UserSrc=false\nPlatform.Version=Tiramisu\nPlatform.CodeName=\nPkg.Revision=4\nAndroidVersion.ApiLevel=32\nAndroidVersion.CodeName=Tiramisu\nAndroidVersion.ExtensionLevel=2\nAndroidVersion.IsBaseSdk=true\nLayoutlib.Api=15\nLayoutlib.Revision=1\nPlatform.MinToolsRev=22\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/platforms/android-TiramisuPrivacySandbox/source.properties",
+              "text": "Pkg.Desc=Android SDK Platform TiramisuPrivacySandbox\nPkg.UserSrc=false\nPlatform.Version=TiramisuPrivacySandbox\nPlatform.CodeName=\nPkg.Revision=9\nAndroidVersion.ApiLevel=33\nAndroidVersion.CodeName=TiramisuPrivacySandbox\nAndroidVersion.ExtensionLevel=3\nAndroidVersion.IsBaseSdk=true\nLayoutlib.Api=15\nLayoutlib.Revision=1\nPlatform.MinToolsRev=22\n"
+            }
+          ]
+        },
+        "build-tools": {
+          "exists": true,
+          "names": [
+            "28.0.3",
+            "29.0.2",
+            "30.0.2",
+            "30.0.3",
+            "31.0.0",
+            "32.0.0",
+            "32.0.0-rc1",
+            "33.0.0",
+            "33.0.0-rc2",
+            "34.0.0",
+            "35.0.0"
+          ],
+          "public_component_properties": [
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/build-tools/28.0.3/source.properties",
+              "text": "Pkg.UserSrc=false\nPkg.Revision=28.0.3\n#Pkg.Revision=28.0.0\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/build-tools/29.0.2/source.properties",
+              "text": "Pkg.UserSrc=false\nPkg.Revision=29.0.2\n#Pkg.Revision=29.0.0 rc4\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/build-tools/30.0.2/source.properties",
+              "text": "Pkg.UserSrc=false\nPkg.Revision=30.0.2\n#Pkg.Revision=30.0.0 rc4\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/build-tools/30.0.3/source.properties",
+              "text": "Pkg.UserSrc=false\nPkg.Revision=30.0.3\n#Pkg.Revision=30.0.0 rc4\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/build-tools/31.0.0/source.properties",
+              "text": "Pkg.UserSrc=false\nPkg.Revision=31.0.0\n#Pkg.Revision=31.0.0 rc5\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/build-tools/32.0.0/source.properties",
+              "text": "Pkg.UserSrc=false\nPkg.Revision=32.0.0\n#Pkg.Revision=32.0.0 rc2\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/build-tools/32.0.0-rc1/source.properties",
+              "text": "Pkg.UserSrc=false\n#Pkg.Revision=31.0.0\nPkg.Revision=32.0.0 rc1\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/build-tools/33.0.0/source.properties",
+              "text": "Pkg.UserSrc=false\nPkg.Revision=33.0.0\n#Pkg.Revision=33.0.0 rc4\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/build-tools/33.0.0-rc2/source.properties",
+              "text": "Pkg.UserSrc=false\n#Pkg.Revision=32.0.0\nPkg.Revision=33.0.0 rc2\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/build-tools/34.0.0/source.properties",
+              "text": "Pkg.UserSrc=false\nPkg.Revision=34.0.0\n#Pkg.Revision=34.0.0 rc3\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/build-tools/35.0.0/source.properties",
+              "text": "Pkg.UserSrc=false\nPkg.Revision=35.0.0\n#Pkg.Revision=35.0.0 rc4\n"
+            }
+          ]
+        },
+        "cmdline-tools": {
+          "exists": true,
+          "names": [
+            "5.0",
+            "7.0",
+            "latest"
+          ],
+          "public_component_properties": [
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/cmdline-tools/5.0/source.properties",
+              "text": "Pkg.Revision=5.0\nPkg.Path=cmdline-tools;5.0\nPkg.Desc=Android SDK Command-line Tools\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/cmdline-tools/7.0/source.properties",
+              "text": "Pkg.Revision=7.0\nPkg.Path=cmdline-tools;7.0\nPkg.Desc=Android SDK Command-line Tools\n"
+            },
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/cmdline-tools/latest/source.properties",
+              "text": "Pkg.Revision=22.0\nPkg.Path=cmdline-tools;22.0\nPkg.Desc=Android SDK Command-line Tools\n"
+            }
+          ]
+        },
+        "platform-tools": {
+          "exists": true,
+          "names": [
+            "NOTICE.txt",
+            "adb",
+            "etc1tool",
+            "fastboot",
+            "hprof-conv",
+            "lib64",
+            "make_f2fs",
+            "make_f2fs_casefold",
+            "mke2fs",
+            "mke2fs.conf",
+            "package.xml",
+            "source.properties",
+            "sqlite3"
+          ],
+          "public_component_properties": [
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/platform-tools/source.properties",
+              "text": "Pkg.UserSrc=false\nPkg.Revision=37.0.0\n"
+            }
+          ]
+        },
+        "tools": {
+          "exists": true,
+          "names": [
+            "NOTICE.txt",
+            "android",
+            "bin",
+            "emulator",
+            "emulator-check",
+            "lib",
+            "mksdcard",
+            "monitor",
+            "package.xml",
+            "proguard",
+            "source.properties",
+            "support"
+          ],
+          "public_component_properties": [
+            {
+              "path": "/Users/gqadonis/Library/Android/sdk/tools/source.properties",
+              "text": "Pkg.UserSrc=false\nPkg.Revision=26.1.1\nPlatform.MinPlatformToolsRev=20\nPkg.Dependencies=emulator\nPkg.Path=tools\nPkg.Desc=Android SDK Tools\n"
+            }
+          ]
+        },
+        "licenses": {
+          "exists": true,
+          "note": "directory presence only; license file contents not read; acceptance not established",
+          "public_component_properties": []
+        }
+      },
+      "ndk_toolchain_paths": [
+        {
+          "ndk": "/Users/gqadonis/Library/Android/sdk/ndk/21.1.6352462",
+          "prebuilt_hosts": [
+            "darwin-x86_64"
+          ]
+        },
+        {
+          "ndk": "/Users/gqadonis/Library/Android/sdk/ndk/21.4.7075529",
+          "prebuilt_hosts": [
+            "darwin-x86_64"
+          ]
+        },
+        {
+          "ndk": "/Users/gqadonis/Library/Android/sdk/ndk/23.0.7599858",
+          "prebuilt_hosts": [
+            "darwin-x86_64"
+          ]
+        },
+        {
+          "ndk": "/Users/gqadonis/Library/Android/sdk/ndk/23.1.7779620",
+          "prebuilt_hosts": [
+            "darwin-x86_64"
+          ]
+        },
+        {
+          "ndk": "/Users/gqadonis/Library/Android/sdk/ndk/24.0.8215888",
+          "prebuilt_hosts": [
+            "darwin-x86_64"
+          ]
+        },
+        {
+          "ndk": "/Users/gqadonis/Library/Android/sdk/ndk/28.0.12433566",
+          "prebuilt_hosts": [
+            "darwin-x86_64"
+          ]
+        }
+      ]
+    },
+    {
+      "path": "/opt/homebrew/share/android-commandlinetools",
+      "exists": false
+    },
+    {
+      "path": "/opt/homebrew/share/android-sdk",
+      "exists": false
+    }
+  ],
+  "rustup_target_std_filesystem_inventory": [
+    {
+      "toolchain_directory": "/Users/gqadonis/.rustup/toolchains/1.89.0-x86_64-apple-darwin",
+      "targets": [
+        {
+          "target": "aarch64-apple-darwin",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-apple-ios",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-apple-ios-sim",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-linux-android",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "x86_64-linux-android",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "wasm32-unknown-unknown",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        }
+      ]
+    },
+    {
+      "toolchain_directory": "/Users/gqadonis/.rustup/toolchains/1.95-x86_64-apple-darwin",
+      "targets": [
+        {
+          "target": "aarch64-apple-darwin",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-apple-ios",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-apple-ios-sim",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-linux-android",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "x86_64-linux-android",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "wasm32-unknown-unknown",
+          "lib_directory_exists": true,
+          "libstd_files": [
+            "libstd-2c19544a9276d693.rlib",
+            "libstd-2c19544a9276d693.rmeta"
+          ],
+          "classification": "PRESENT_FILES_ONLY"
+        }
+      ]
+    },
+    {
+      "toolchain_directory": "/Users/gqadonis/.rustup/toolchains/1.96-x86_64-apple-darwin",
+      "targets": [
+        {
+          "target": "aarch64-apple-darwin",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-apple-ios",
+          "lib_directory_exists": true,
+          "libstd_files": [
+            "libstd-a92fd561f3d97112.dylib",
+            "libstd-a92fd561f3d97112.rlib",
+            "libstd-a92fd561f3d97112.rmeta"
+          ],
+          "classification": "PRESENT_FILES_ONLY"
+        },
+        {
+          "target": "aarch64-apple-ios-sim",
+          "lib_directory_exists": true,
+          "libstd_files": [
+            "libstd-4f4aa466b1358c09.dylib",
+            "libstd-4f4aa466b1358c09.rlib",
+            "libstd-4f4aa466b1358c09.rmeta"
+          ],
+          "classification": "PRESENT_FILES_ONLY"
+        },
+        {
+          "target": "aarch64-linux-android",
+          "lib_directory_exists": true,
+          "libstd_files": [
+            "libstd-19be40cc54d829bf.rlib",
+            "libstd-19be40cc54d829bf.rmeta",
+            "libstd-19be40cc54d829bf.so"
+          ],
+          "classification": "PRESENT_FILES_ONLY"
+        },
+        {
+          "target": "x86_64-linux-android",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "wasm32-unknown-unknown",
+          "lib_directory_exists": true,
+          "libstd_files": [
+            "libstd-c1abaa730ca06a0b.rlib",
+            "libstd-c1abaa730ca06a0b.rmeta"
+          ],
+          "classification": "PRESENT_FILES_ONLY"
+        }
+      ]
+    },
+    {
+      "toolchain_directory": "/Users/gqadonis/.rustup/toolchains/1.97.1-x86_64-apple-darwin",
+      "targets": [
+        {
+          "target": "aarch64-apple-darwin",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-apple-ios",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-apple-ios-sim",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-linux-android",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "x86_64-linux-android",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "wasm32-unknown-unknown",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        }
+      ]
+    },
+    {
+      "toolchain_directory": "/Users/gqadonis/.rustup/toolchains/1.99.1-x86_64-apple-darwin",
+      "targets": [
+        {
+          "target": "aarch64-apple-darwin",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-apple-ios",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-apple-ios-sim",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-linux-android",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "x86_64-linux-android",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "wasm32-unknown-unknown",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        }
+      ]
+    },
+    {
+      "toolchain_directory": "/Users/gqadonis/.rustup/toolchains/nightly-2026-05-01-x86_64-apple-darwin",
+      "targets": [
+        {
+          "target": "aarch64-apple-darwin",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-apple-ios",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-apple-ios-sim",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-linux-android",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "x86_64-linux-android",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "wasm32-unknown-unknown",
+          "lib_directory_exists": true,
+          "libstd_files": [
+            "libstd-2e59eff0dbd3a942.rlib",
+            "libstd-2e59eff0dbd3a942.rmeta"
+          ],
+          "classification": "PRESENT_FILES_ONLY"
+        }
+      ]
+    },
+    {
+      "toolchain_directory": "/Users/gqadonis/.rustup/toolchains/nightly-2026-07-18-x86_64-apple-darwin",
+      "targets": [
+        {
+          "target": "aarch64-apple-darwin",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-apple-ios",
+          "lib_directory_exists": true,
+          "libstd_files": [
+            "libstd-2537468788691f6c.dylib",
+            "libstd-2537468788691f6c.rlib",
+            "libstd-2537468788691f6c.rmeta"
+          ],
+          "classification": "PRESENT_FILES_ONLY"
+        },
+        {
+          "target": "aarch64-apple-ios-sim",
+          "lib_directory_exists": true,
+          "libstd_files": [
+            "libstd-8e42cdc5a8f03cd6.dylib",
+            "libstd-8e42cdc5a8f03cd6.rlib",
+            "libstd-8e42cdc5a8f03cd6.rmeta"
+          ],
+          "classification": "PRESENT_FILES_ONLY"
+        },
+        {
+          "target": "aarch64-linux-android",
+          "lib_directory_exists": true,
+          "libstd_files": [
+            "libstd-00895928321ce373.rlib",
+            "libstd-00895928321ce373.rmeta",
+            "libstd-00895928321ce373.so"
+          ],
+          "classification": "PRESENT_FILES_ONLY"
+        },
+        {
+          "target": "x86_64-linux-android",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "wasm32-unknown-unknown",
+          "lib_directory_exists": true,
+          "libstd_files": [
+            "libstd-52aec09eb0a29f6c.rlib",
+            "libstd-52aec09eb0a29f6c.rmeta"
+          ],
+          "classification": "PRESENT_FILES_ONLY"
+        }
+      ]
+    },
+    {
+      "toolchain_directory": "/Users/gqadonis/.rustup/toolchains/nightly-x86_64-apple-darwin",
+      "targets": [
+        {
+          "target": "aarch64-apple-darwin",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-apple-ios",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-apple-ios-sim",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "aarch64-linux-android",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "x86_64-linux-android",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        },
+        {
+          "target": "wasm32-unknown-unknown",
+          "lib_directory_exists": false,
+          "libstd_files": [],
+          "classification": "MISSING_TARGET_STD_FILES"
+        }
+      ]
+    },
+    {
+      "toolchain_directory": "/Users/gqadonis/.rustup/toolchains/stable-x86_64-apple-darwin",
+      "targets": [
+        {
+          "target": "aarch64-apple-darwin",
+          "lib_directory_exists": true,
+          "libstd_files": [
+            "libstd-c8df3f17af30326b.dylib",
+            "libstd-c8df3f17af30326b.rlib",
+            "libstd-c8df3f17af30326b.rmeta"
+          ],
+          "classification": "PRESENT_FILES_ONLY"
+        },
+        {
+          "target": "aarch64-apple-ios",
+          "lib_directory_exists": true,
+          "libstd_files": [
+            "libstd-bc1c6043dc7dc3c0.dylib",
+            "libstd-bc1c6043dc7dc3c0.rlib",
+            "libstd-bc1c6043dc7dc3c0.rmeta"
+          ],
+          "classification": "PRESENT_FILES_ONLY"
+        },
+        {
+          "target": "aarch64-apple-ios-sim",
+          "lib_directory_exists": true,
+          "libstd_files": [
+            "libstd-dab0ff70b6975a44.dylib",
+            "libstd-dab0ff70b6975a44.rlib",
+            "libstd-dab0ff70b6975a44.rmeta"
+          ],
+          "classification": "PRESENT_FILES_ONLY"
+        },
+        {
+          "target": "aarch64-linux-android",
+          "lib_directory_exists": true,
+          "libstd_files": [
+            "libstd-ace0f1a68f0b2446.rlib",
+            "libstd-ace0f1a68f0b2446.rmeta",
+            "libstd-ace0f1a68f0b2446.so"
+          ],
+          "classification": "PRESENT_FILES_ONLY"
+        },
+        {
+          "target": "x86_64-linux-android",
+          "lib_directory_exists": true,
+          "libstd_files": [
+            "libstd-6143df7bf7fb7999.rlib",
+            "libstd-6143df7bf7fb7999.rmeta",
+            "libstd-6143df7bf7fb7999.so"
+          ],
+          "classification": "PRESENT_FILES_ONLY"
+        },
+        {
+          "target": "wasm32-unknown-unknown",
+          "lib_directory_exists": true,
+          "libstd_files": [
+            "libstd-ff219504bf6f71ca.rlib",
+            "libstd-ff219504bf6f71ca.rmeta"
+          ],
+          "classification": "PRESENT_FILES_ONLY"
+        }
+      ]
+    }
+  ],
+  "profile_os_requirements": {
+    "baseline": "native",
+    "linux": "Linux",
+    "macos": "Darwin",
+    "windows": "Windows",
+    "android": "Linux",
+    "ios": "Darwin",
+    "macos-gui": "Darwin",
+    "quiet": "native"
+  },
+  "relevant_model_rows": [
+    {
+      "id": "desktop-macos",
+      "profile": "macos",
+      "argv": [
+        "python3",
+        "bindings/tauri-desktop/assurance/desktop-assurance.py",
+        "build",
+        "--output",
+        "{out}/desktop"
+      ],
+      "scenarios": [
+        "OA-15"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "receipt": "{out}/desktop/build-receipt.json",
+      "receipt_identity": {
+        "os": "Darwin",
+        "case_id": "OA15-BUILD-MACOS"
+      }
+    },
+    {
+      "id": "desktop-windows",
+      "profile": "windows",
+      "argv": [
+        "python3",
+        "bindings/tauri-desktop/assurance/desktop-assurance.py",
+        "build",
+        "--output",
+        "{out}/desktop"
+      ],
+      "scenarios": [
+        "OA-15"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "receipt": "{out}/desktop/build-receipt.json",
+      "receipt_identity": {
+        "os": "Windows",
+        "case_id": "OA15-BUILD-WINDOWS"
+      }
+    },
+    {
+      "id": "desktop-fmt",
+      "profile": "macos",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "scenarios": [
+        "OA-15"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "cwd": "bindings/tauri-desktop",
+      "tests": null
+    },
+    {
+      "id": "desktop-clippy",
+      "profile": "macos",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "scenarios": [
+        "OA-15"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "cwd": "bindings/tauri-desktop",
+      "tests": null
+    },
+    {
+      "id": "desktop-service-tests",
+      "profile": "macos",
+      "argv": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked"
+      ],
+      "scenarios": [
+        "OA-15"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "cwd": "bindings/tauri-desktop",
+      "tests": "libtest",
+      "discovery_argv": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked",
+        "--",
+        "--list"
+      ],
+      "discovery_kind": "libtest"
+    },
+    {
+      "id": "gui_positive",
+      "profile": "macos-gui",
+      "argv": [
+        "python3",
+        "bindings/tauri-desktop/assurance/desktop-assurance.py",
+        "classify",
+        "--root",
+        "{gui_positive}"
+      ],
+      "scenarios": [
+        "OA-15"
+      ],
+      "tools": [
+        "python3"
+      ],
+      "timeout": 3600,
+      "authority": "OA15-GUI",
+      "expected_exit": 0,
+      "contains": "TRACE_ORACLE_PASS:"
+    },
+    {
+      "id": "gui_control",
+      "profile": "macos-gui",
+      "argv": [
+        "python3",
+        "bindings/tauri-desktop/assurance/desktop-assurance.py",
+        "classify",
+        "--root",
+        "{gui_control}"
+      ],
+      "scenarios": [
+        "OA-15"
+      ],
+      "tools": [
+        "python3"
+      ],
+      "timeout": 3600,
+      "authority": "OA15-GUI",
+      "expected_exit": 1,
+      "contains": "FAIL: OA15_PERSISTED_RESULT_MISSING_AFTER_RESTART"
+    },
+    {
+      "id": "android",
+      "profile": "android",
+      "argv": [
+        "cargo",
+        "ndk",
+        "-t",
+        "arm64-v8a",
+        "-t",
+        "x86_64",
+        "build",
+        "--locked",
+        "-p",
+        "prometheus-parking-lot-ffi"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "ndk"
+      ],
+      "timeout": 3600,
+      "paths": [
+        "{android_ndk}"
+      ]
+    },
+    {
+      "id": "android-elf",
+      "profile": "android",
+      "argv": [
+        "python3",
+        ".github/scripts/operational-assurance.py",
+        "android-elf"
+      ],
+      "scenarios": [],
+      "tools": [
+        "python3"
+      ],
+      "timeout": 3600,
+      "paths": [
+        "{android_ndk}"
+      ]
+    },
+    {
+      "id": "android-generate",
+      "profile": "android",
+      "argv": [
+        "bash",
+        "bindings/generate.sh"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "android-smoke",
+      "profile": "android",
+      "argv": [
+        "bash",
+        "bindings/smoke/kotlin.sh"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "kotlinc",
+        "java"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "aarch64-apple-ios",
+      "profile": "ios",
+      "argv": [
+        "cargo",
+        "build",
+        "--locked",
+        "--target",
+        "aarch64-apple-ios",
+        "-p",
+        "prometheus-parking-lot-ffi"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "swift"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "aarch64-apple-ios-sim",
+      "profile": "ios",
+      "argv": [
+        "cargo",
+        "build",
+        "--locked",
+        "--target",
+        "aarch64-apple-ios-sim",
+        "-p",
+        "prometheus-parking-lot-ffi"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "swift"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "ios-generate",
+      "profile": "ios",
+      "argv": [
+        "bash",
+        "bindings/generate.sh"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "ios-smoke",
+      "profile": "ios",
+      "argv": [
+        "bash",
+        "bindings/smoke/swift.sh"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "swift"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "native-check-macos",
+      "argv": [
+        "cargo",
+        "check",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--locked"
+      ],
+      "profile": "macos",
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "native-check-windows",
+      "argv": [
+        "cargo",
+        "check",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--locked"
+      ],
+      "profile": "windows",
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600
+    }
+  ],
+  "limits": [
+    "No Cargo, rustup, rustc, build, test, syntax check, scan, GUI or installer was run.",
+    "No authentication configuration, credentials, private keys, full environment dump, or Android license file contents were read.",
+    "Version/SDK lookup success does not establish full SDK build/link health, license acceptance for builds, native app launch, persistence, or GUI certification.",
+    "Android profile requires Linux and android-elf uses the linux-x86_64 NDK toolchain. Mac-local SDK files cannot satisfy that profile.",
+    "Linux and Windows native builds require their own supported hosts; no such host was observed by this task.",
+    "macOS GUI submit/restart/retrieve and deletion-control evidence remain NOT_EXERCISED; native computer automation is disabled.",
+    "Quiet benchmark host conditions are not established while the parent Cargo matrix is running. No benchmark or quiet attestation was attempted.",
+    "Docker was not invoked; credential-helper stalls were not retried.",
+    "cargo-ndk presence was inspected only; its pinned 4.1.2 identity was not executed/established.",
+    "Rust target library files do not prove a successful cross build or guarantee target component integrity."
+  ],
+  "profile_execution_status": {
+    "macos": "NOT_EXERCISED",
+    "ios": "NOT_EXERCISED",
+    "android": "NOT_EXERCISED",
+    "macos-gui": "NOT_EXERCISED",
+    "linux": "NOT_EXERCISED",
+    "windows": "NOT_EXERCISED",
+    "quiet": "NOT_EXERCISED"
+  },
+  "readiness_findings": [
+    {
+      "id": "apple-sdk-lookup",
+      "status": "PROBE_OK",
+      "observed": "Xcode26.6 build17F113; Swift6.3.3; macOS/iPhoneOS/iPhoneSimulator SDK26.5. All14 recorded version/find/SDK probes exited0.",
+      "limit": "No compiler/link/build/GUI operation; no license acceptance inferred."
+    },
+    {
+      "id": "gate-private-targets",
+      "status": "PRESENT_FILES_ONLY",
+      "observed": "Private gate1.99.1 selection resolves to stable; host,iOS-device,iOS-simulator,Android-arm64,Android-x86_64 libstd counts3 each; WASM2.",
+      "limit": "No missing selected target components observed. No build/cross-link claim follows from file presence; toolchain executable version not probed in this task."
+    },
+    {
+      "id": "android-supported-host",
+      "status": "BLOCKED",
+      "observed": "Current host Darwin x86_64; model android requires Linux. All discovered installed NDK prebuilt hosts are darwin-x86_64.",
+      "required_prerequisite": "A supported Linux environment with selected NDK containing toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf and its own appropriate Linux-host toolchain. The current private Mac toolchain has both Android target std components."
+    },
+    {
+      "id": "android-kotlin",
+      "status": "BLOCKED",
+      "observed": "kotlinc not found on current PATH. cargo-ndk executable present but its4.1.2 version not invoked; Android SDK license directory presence does not prove acceptance.",
+      "required_prerequisite": "On supported Linux environment, existing/prepared cargo-ndk4.1.2 and kotlinc2.4.20 plus functional JVM; exact SDK/NDK path selection and license readiness established by its operator."
+    },
+    {
+      "id": "desktop-other-os",
+      "status": "BLOCKED",
+      "observed": "No Linux/Windows native build host observed in this task.",
+      "required_prerequisite": "Supported Linux and Windows environments for their required native builds; runtime claims require actual launches."
+    },
+    {
+      "id": "macos-gui",
+      "status": "NOT_EXERCISED",
+      "observed": "No GUI inspection, app launch, submit, restart, retrieval, or deletion control performed; native computer APIs disabled.",
+      "required_prerequisite": "Actual logged-in macOS desktop and operator following existing marked-fixture manual protocol, plus both GUI observation receipts."
+    },
+    {
+      "id": "quiet-host",
+      "status": "NOT_EXERCISED",
+      "observed": "Parent Cargo matrix is running; quiet-host conditions not assessed or attested.",
+      "required_prerequisite": "A quiet measurement window and actual existing quiet-attestation protocol after concurrent builds finish."
+    }
+  ],
+  "gate_selected_private_rustup": {
+    "authority": "Driver supplied actual gate selection; read-only filesystem resolve and libstd inventory observed here. No Rust executable invoked.",
+    "rustup_home": "/tmp/oa04-private-tools/rustup",
+    "selected_toolchain_path": "/tmp/oa04-private-tools/rustup/toolchains/1.99.1-x86_64-apple-darwin",
+    "is_symlink": true,
+    "resolved_root": "/Users/gqadonis/.rustup/toolchains/stable-x86_64-apple-darwin",
+    "targets": [
+      {
+        "target": "x86_64-apple-darwin",
+        "lib_directory": "/Users/gqadonis/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/x86_64-apple-darwin/lib",
+        "directory_exists": true,
+        "libstd_count": 3,
+        "libstd_files": [
+          "libstd-bd40bdc07610af03.dylib",
+          "libstd-bd40bdc07610af03.rlib",
+          "libstd-bd40bdc07610af03.rmeta"
+        ],
+        "classification": "PRESENT_FILES_ONLY"
+      },
+      {
+        "target": "aarch64-apple-ios",
+        "lib_directory": "/Users/gqadonis/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/aarch64-apple-ios/lib",
+        "directory_exists": true,
+        "libstd_count": 3,
+        "libstd_files": [
+          "libstd-bc1c6043dc7dc3c0.dylib",
+          "libstd-bc1c6043dc7dc3c0.rlib",
+          "libstd-bc1c6043dc7dc3c0.rmeta"
+        ],
+        "classification": "PRESENT_FILES_ONLY"
+      },
+      {
+        "target": "aarch64-apple-ios-sim",
+        "lib_directory": "/Users/gqadonis/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/aarch64-apple-ios-sim/lib",
+        "directory_exists": true,
+        "libstd_count": 3,
+        "libstd_files": [
+          "libstd-dab0ff70b6975a44.dylib",
+          "libstd-dab0ff70b6975a44.rlib",
+          "libstd-dab0ff70b6975a44.rmeta"
+        ],
+        "classification": "PRESENT_FILES_ONLY"
+      },
+      {
+        "target": "aarch64-linux-android",
+        "lib_directory": "/Users/gqadonis/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/aarch64-linux-android/lib",
+        "directory_exists": true,
+        "libstd_count": 3,
+        "libstd_files": [
+          "libstd-ace0f1a68f0b2446.rlib",
+          "libstd-ace0f1a68f0b2446.rmeta",
+          "libstd-ace0f1a68f0b2446.so"
+        ],
+        "classification": "PRESENT_FILES_ONLY"
+      },
+      {
+        "target": "x86_64-linux-android",
+        "lib_directory": "/Users/gqadonis/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/x86_64-linux-android/lib",
+        "directory_exists": true,
+        "libstd_count": 3,
+        "libstd_files": [
+          "libstd-6143df7bf7fb7999.rlib",
+          "libstd-6143df7bf7fb7999.rmeta",
+          "libstd-6143df7bf7fb7999.so"
+        ],
+        "classification": "PRESENT_FILES_ONLY"
+      },
+      {
+        "target": "wasm32-unknown-unknown",
+        "lib_directory": "/Users/gqadonis/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/wasm32-unknown-unknown/lib",
+        "directory_exists": true,
+        "libstd_count": 2,
+        "libstd_files": [
+          "libstd-ff219504bf6f71ca.rlib",
+          "libstd-ff219504bf6f71ca.rmeta"
+        ],
+        "classification": "PRESENT_FILES_ONLY"
+      }
+    ],
+    "observed_at_utc": "2026-10-24T16:05:49.184890+00:00"
+  },
+  "rustup_target_std_filesystem_inventory_scope": "Ambient global inventory only, not actual gate selection. The global numeric1.99.1 directory is not evidence of missing gate target components; gate private selection below resolves to stable.",
+  "correction_note": "Initial message mistakenly treated an unused global numeric1.99.1 directory as gate-selected. Driver clarified private RUSTUP_HOME; actual resolve+library reads show all requested gate components present. Earlier missing-target implication is withdrawn."
+}

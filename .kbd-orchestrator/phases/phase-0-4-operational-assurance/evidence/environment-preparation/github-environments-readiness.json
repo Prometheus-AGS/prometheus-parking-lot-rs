@@ -1,0 +1,144 @@
+{
+  "recorded_at": "2026-10-24T16:03:42.406679+00:00",
+  "repository": "Prometheus-AGS/prometheus-parking-lot-rs",
+  "scope": "Read-only GitHub API metadata and exact workflow source. No variable values, secrets, credentials, auth configuration or account settings were read or changed. No dispatch/publication/push/PR/comment.",
+  "source": {
+    "path": ".github/workflows/operational-assurance.yml",
+    "sha256": "8ce76a8736f212fe062ec8400b044d62b83625ec56d12ef3fb1d6ba41ac7a198"
+  },
+  "observations": {
+    "environments": {
+      "command": "gh api repos/Prometheus-AGS/prometheus-parking-lot-rs/environments --paginate --jq '{total_count, environments: [.environments[] | {name, protection_rules, deployment_branch_policy}]}'",
+      "exit": 0,
+      "total_count": 1,
+      "environments": [
+        {
+          "name": "github-pages",
+          "protection_rule_types": [
+            "branch_policy"
+          ],
+          "deployment_branch_policy": {
+            "custom_branch_policies": true,
+            "protected_branches": false
+          }
+        }
+      ],
+      "release_certification_listed": false,
+      "interpretation": "Successful repository environment listing contains only github-pages. This supplies concrete absence-from-list evidence for release-certification beyond the earlier ambiguous specific-endpoint404. It does not assert global account/environment state outside this repository listing."
+    },
+    "self_hosted_runners": {
+      "command": "gh api repos/Prometheus-AGS/prometheus-parking-lot-rs/actions/runners --paginate --jq '{total_count, runners: [.runners[] | {status, busy, labels: [.labels[] | {name,type}]}]}'",
+      "exit": 0,
+      "total_count": 0,
+      "runners": [],
+      "interpretation": "No self-hosted runners or required labels were observed in the repository runner listing. This is not a count of GitHub-hosted CI capacity and does not establish whether a future approved runner is healthy."
+    },
+    "repository_permissions": {
+      "command": "gh api repos/Prometheus-AGS/prometheus-parking-lot-rs --jq '{permissions}'",
+      "exit": 0,
+      "permissions": {
+        "admin": true,
+        "maintain": true,
+        "pull": true,
+        "push": true,
+        "triage": true
+      },
+      "interpretation": "Observed repository permission booleans only; technical access is not user authorization to change settings or dispatch work."
+    }
+  },
+  "workflow_requirements": {
+    "environment": "release-certification",
+    "profile_job": {
+      "runner_labels": [
+        "self-hosted",
+        "<profile>"
+      ],
+      "profiles": [
+        "baseline",
+        "linux",
+        "macos",
+        "windows",
+        "android",
+        "ios",
+        "macos-gui"
+      ]
+    },
+    "quiet_job": {
+      "runner_labels": [
+        "self-hosted",
+        "quiet"
+      ],
+      "depends_on": "profiles"
+    },
+    "collector_job": {
+      "runner_labels": [
+        "self-hosted",
+        "oa18-collector"
+      ],
+      "depends_on": [
+        "profiles",
+        "quiet"
+      ]
+    },
+    "required_profile_labels": [
+      "baseline",
+      "linux",
+      "macos",
+      "windows",
+      "android",
+      "ios",
+      "macos-gui",
+      "quiet",
+      "oa18-collector"
+    ],
+    "observed_satisfied_profile_labels": [],
+    "protected_environment_variable_references": [
+      "OA18_INPUTS_JSON",
+      "OA18_AUTHORITY_SHA256",
+      "RELEASE_TRUST_POLICY_JSON"
+    ],
+    "variable_values_or_presence_read": false,
+    "dispatch_conditions": [
+      "refs/heads/main",
+      "run_attempt==1",
+      "inputs.candidate==github.sha"
+    ],
+    "permissions": {
+      "contents": "read",
+      "actions": "read"
+    },
+    "hosted_ci_distinction": "Existing CI uses GitHub-hosted ubuntu-latest jobs. Those jobs do not match OA18 runs-on self-hosted+profile/quiet/oa18-collector; this audit did not run or assess hosted CI availability."
+  },
+  "readiness": {
+    "self_hosted_profile_execution": "BLOCKED",
+    "release_certification_environment": "BLOCKED",
+    "protected_main_configuration": "NOT_EXERCISED",
+    "independent_authority_configuration": "NOT_EXERCISED",
+    "tool_sdk_runner_health": "NOT_EXERCISED",
+    "real_workflow_execution": "NOT_EXERCISED",
+    "certification_publication_authority": "NOT_EXERCISED",
+    "reason": "Required environment is not in successful listing; all required self-hosted labels are unobserved because listing reports0runners. Public trust/source pins, external authority receipts and installed-tool/SDK health are not inferred from these metadata calls."
+  },
+  "operator_only_missing_actions": [
+    {
+      "action": "Approve runner resources, then provision/register or grant repository access to approved self-hosted runners covering all nine required labels with the actual native OS/SDK/tools and separately quiet benchmark conditions. Multiple labels may share a suitable host only within the existing serialized/quiet constraints.",
+      "basis": "Successful self-hosted runner listing0; explicit workflow label requirements.",
+      "authorization": "User approval required before registration/resource/account changes or paid jobs. No setup or remote run performed."
+    },
+    {
+      "action": "Approve and configure release-certification environment with the intended required reviewers and protected-main deployment restrictions; independently confirm protected main and the first-attempt workflow/source-digest trust policy.",
+      "basis": "Successful environment listing returns only github-pages; workflow requires release-certification. Protected-main/settings authority was not audited here.",
+      "authorization": "User approval required before settings/protection/environment changes."
+    },
+    {
+      "action": "Independently provide/approve public profile-path configuration, authority-config digest and incumbent release trust policy for the workflow variable references; supply actual candidate-bound review/G02/G03/G04/GUI evidence through the existing protocol. Confirm whether approved repository-level variables already exist before proposing duplicate setup.",
+      "basis": "Workflow references OA18_INPUTS_JSON, OA18_AUTHORITY_SHA256 and RELEASE_TRUST_POLICY_JSON; this audit intentionally did not inspect variable names or values. Missing namespace/environment does not prove absence of inherited repository variables.",
+      "authorization": "User approval required before writing variables/settings or signing/tag/account actions; no caller boolean substitutes for authority."
+    }
+  ],
+  "nonblocking_scope": {
+    "G01": "Credential rotation/signer replacement remains explicitly deferred and nonblocking; no credentials claimed retired.",
+    "code_delivery": "Missing runner/environment/certification authority does not prevent independent authorized local code verification or require publication authority for code.",
+    "next_step": "Parent combines these concrete gaps with remaining actual local findings into one operator question after independent work. No operator question or external mutation issued by this subagent."
+  }
+}

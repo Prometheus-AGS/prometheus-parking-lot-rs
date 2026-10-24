@@ -1,0 +1,10 @@
+{
+  "operation": "cargo fetch --manifest-path bindings/tauri-desktop/Cargo.toml --locked",
+  "cwd": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs",
+  "exit": 0,
+  "log": "/tmp/oa04-tauri-fetch-repaired.log",
+  "log_sha256": "bb2a2a92c67cd711f6349abb777976ed5575c2597d2a74df2211601ad24ca1c1",
+  "lock_sha256": "5143eef312046d0eff09f0e6d6f4b840f9545e2aa8cc531c2ad98d6086343c15",
+  "registry_package_records_unchanged": 434,
+  "scope": "Explicit online cache preparation accepted locked dependency graph; not a native desktop build result."
+}
