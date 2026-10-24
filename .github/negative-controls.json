@@ -730,7 +730,7 @@
       "oracles": [
         {
           "target": "scheduler",
-          "name": "durable_sigkill::pg::pool_sigkill_pg_between_execution_and_delivery",
+          "name": "durable_sigkill::postgres::pool_sigkill_pg_between_execution_and_delivery",
           "diagnostic": [
             "no result after restart: the accepted task was lost"
           ]
@@ -739,7 +739,7 @@
       "companions": [
         {
           "target": "scheduler",
-          "name": "durable_sigkill::pg::pool_sigkill_pg_mid_execution",
+          "name": "durable_sigkill::postgres::pool_sigkill_pg_mid_execution",
           "diagnostic": []
         }
       ],
@@ -753,14 +753,14 @@
       "oracles": [
         {
           "target": "scheduler",
-          "name": "durable_sigkill::pg::pool_sigkill_pg_failed_delivery_retained_after_restart",
+          "name": "durable_sigkill::postgres::pool_sigkill_pg_failed_delivery_retained_after_restart",
           "diagnostic": [
             "OA-07:terminal-event"
           ]
         },
         {
           "target": "scheduler",
-          "name": "durable_sigkill::pg::pool_sigkill_pg_failed_delivery_consumed_before_restart",
+          "name": "durable_sigkill::postgres::pool_sigkill_pg_failed_delivery_consumed_before_restart",
           "diagnostic": [
             "OA-07:terminal-event"
           ]
@@ -769,7 +769,7 @@
       "companions": [
         {
           "target": "scheduler",
-          "name": "durable_sigkill::pg::pool_sigkill_pg_between_delivery_and_ack",
+          "name": "durable_sigkill::postgres::pool_sigkill_pg_between_delivery_and_ack",
           "diagnostic": []
         }
       ],
@@ -783,7 +783,7 @@
       "oracles": [
         {
           "target": "scheduler",
-          "name": "durable_sigkill::pg::pool_sigkill_pg_between_execution_and_delivery",
+          "name": "durable_sigkill::postgres::pool_sigkill_pg_between_execution_and_delivery",
           "diagnostic": [
             "no result after restart: the accepted task was lost"
           ]
@@ -792,7 +792,7 @@
       "companions": [
         {
           "target": "scheduler",
-          "name": "durable_sigkill::pg::pool_sigkill_pg_mid_execution",
+          "name": "durable_sigkill::postgres::pool_sigkill_pg_mid_execution",
           "diagnostic": []
         }
       ],
@@ -806,14 +806,14 @@
       "oracles": [
         {
           "target": "scheduler",
-          "name": "durable_sigkill::pg::pool_sigkill_pg_failed_delivery_retained_after_restart",
+          "name": "durable_sigkill::postgres::pool_sigkill_pg_failed_delivery_retained_after_restart",
           "diagnostic": [
             "OA-07:terminal-event"
           ]
         },
         {
           "target": "scheduler",
-          "name": "durable_sigkill::pg::pool_sigkill_pg_failed_delivery_consumed_before_restart",
+          "name": "durable_sigkill::postgres::pool_sigkill_pg_failed_delivery_consumed_before_restart",
           "diagnostic": [
             "OA-07:terminal-event"
           ]
@@ -822,7 +822,7 @@
       "companions": [
         {
           "target": "scheduler",
-          "name": "durable_sigkill::pg::pool_sigkill_pg_between_delivery_and_ack",
+          "name": "durable_sigkill::postgres::pool_sigkill_pg_between_delivery_and_ack",
           "diagnostic": []
         }
       ],
@@ -1394,8 +1394,8 @@
   "iggy_image": "apache/iggy:0.9.0@sha256:b35fc2841964f2962a5f164d33b3ae3a9de99a66920defd3cd8a1c039470602d",
   "source_sha256": {
     ".github/scripts/check-wasm-graph.sh": "346147af0925cff1a5afcf4844fae6c8f514939b54ef3db7d79c25d8b426992a",
-    ".github/wasm-browser-assurance.json": "1b1f15341db1014c88e24375618f5c1f161d422f68f6643ac948c8ffed8d74f9",
-    ".github/workflows/ci.yml": "e506109620b4f5060f40f152808f0507c983c445ac3bf0d0f48cbe10f4445d0f",
+    ".github/wasm-browser-assurance.json": "c0914d1180577d6664a3e9e57ccf1cdda664fd4e8ff4ab1736b7b29a798b9379",
+    ".github/workflows/ci.yml": "2e4d7d08616368d89805464572dd8e724927bfeeb029968bedf649d46b3ce7d9",
     "Cargo.lock": "7a84a14ee557b99a95ea93a4a9e78ed6e3032920115edda63badfb85b52c3371",
     "Cargo.toml": "f628f145f4d317210688fff2a94aff0de1415f7cebe479a146b359c7c525e38b",
     "crates/parking-lot-core/Cargo.toml": "47a7961c72d26cf1813e06149e2447377fc225e695d4c0cce47a5e8af88d0fe0",
@@ -1440,11 +1440,11 @@
     "crates/parking-lot-pg/src/mailbox/mod.rs": "4068522019f33c6be8884391dac8af090f135e530e15268760860b6131fd009b",
     "crates/parking-lot-pg/src/mailbox/sql.rs": "abf43cde393d59f472c7255d21ec4000ea13b4a9c5e31c3030ca919a2b9a0ae6",
     "crates/parking-lot-pg/src/pgmq/sql.rs": "b4c20363d803b46a6b5fbc1d81c9a88fe6e4cfb337797a3d26edfa95b747b0f1",
-    "crates/parking-lot-pg/tests/fixtures/oa14/manifest.json": "c5f8bc1849151050c12b68ccfbda1b05ac410f734c4eb5b85520eaf4eda224bf",
+    "crates/parking-lot-pg/tests/fixtures/oa14/manifest.json": "871e2e1ab259e7c0d395948051c190a0de349b7ea5f57bb4a4041296a863a59a",
     "crates/parking-lot-pg/tests/lease_queue.rs": "93fd6cd9032100c37ba78f1f216b60f55d564ad59698cc119bf5f1b3858db530",
     "crates/parking-lot-pg/tests/mailbox.rs": "148b5c34f7cfd66d0a8d0e33688cf0ea1c21cc45162c8fc3a59ea28d6f05f97c",
-    "crates/parking-lot-pg/tests/mailbox_migration.rs": "8bc13799e70c697bedb567f9e1f60a5bac2d2fc390b19d95e7bfa264d7162747",
-    "crates/parking-lot-pg/tests/mailbox_status.rs": "de8657408d88c241b2865ea486221a87a2a168c07cec5a910d7797b13f192c6c",
+    "crates/parking-lot-pg/tests/mailbox_migration.rs": "1f9b26b8cf1b320c1a61ba014ad780635b8150bb3bdef49714ae41f836b2147d",
+    "crates/parking-lot-pg/tests/mailbox_status.rs": "c0cd489fa25ab5b66951c2f1fa8fe8563dd5fadfaa8071ddccde3fdfa04f563f",
     "crates/parking-lot-pg/tests/pgmq.rs": "89ea175abb196eb6bd661ec16f3b53227315f5b52971bcf3ceecaf2e81ceeb50",
     "crates/parking-lot-pg/tests/postgres_upgrade.rs": "4f57cfda9160c6024a12ee0b2318f196c78bca6a311f06a72b9e9bb3f358e79b",
     "crates/parking-lot-pg/tests/support/mod.rs": "14894e2fc69c219e7b562de289b63ff082166ffb1155b1a88eb35911f18c2322",
@@ -1491,6 +1491,7 @@
     "tests/scheduler/support.rs": "cf53516e40354a969831efd7570b4a0e8f7f8d8c05d02a4837fb22c4e053fd8f",
     "tests/unit/builders_test.rs": "23c57ed35a1ecbf19bddccf82ad5c67d57de696530df6f113dd3c1b2d7a4a362",
     "tests/unit/config_test.rs": "9c07d43db81ca0bfc8a3ecdb33ad8b9563726a39b1d467e7bb88dc58272b9997",
-    "tests/unit/main.rs": "5ca1af44e67b8c7e85478d0366a31eb7c4cdb6b4f2a3b2df9084eb99d1e9d39d"
+    "tests/unit/main.rs": "5ca1af44e67b8c7e85478d0366a31eb7c4cdb6b4f2a3b2df9084eb99d1e9d39d",
+    ".github/scripts/bootstrap-hosted-browser.py": "671a681ff7607d76ebd66e54dc1a057de3fafc9d21747531edeb39d5fefaddcd"
   }
 }

@@ -138,7 +138,8 @@ jobs:
 
   desktop:
     # OA-15: build the real native Tauri shell on all three OS. Linux libraries
-    # are a preprovisioned prerequisite; no host package install is implicit.
+    # are explicitly provisioned on default hosted CI; configured runners retain
+    # the preprovisioned prerequisite contract checked by desktop-assurance.py.
     # GUI restart certification is a separate actual macOS manual observation.
     name: Tauri desktop shell (${{ matrix.platform }})
     runs-on: ${{ (matrix.platform == 'linux' && vars.DESKTOP_LINUX_RUNNER) || matrix.os }}
@@ -158,6 +159,11 @@ jobs:
         working-directory: bindings/tauri-desktop
     steps:
       - uses: actions/checkout@v7
+      - name: Provision Linux Tauri build prerequisites on the default hosted runner
+        if: matrix.platform == 'linux' && runner.environment == 'github-hosted' && vars.DESKTOP_LINUX_RUNNER == ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.PINNED_TOOLCHAIN }}

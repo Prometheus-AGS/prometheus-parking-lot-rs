@@ -351,6 +351,11 @@ jobs:
         if: matrix.adapter == 'browser'
         with:
           tool: wasm-bindgen@0.2.129
+      - name: Provision pinned Chromium on the default hosted runner
+        if: matrix.adapter == 'browser' && runner.environment == 'github-hosted' && vars.WASM_BROWSER_RUNNER == '' && vars.WASM_CHROME_BIN == '' && vars.WASM_CHROMEDRIVER_BIN == ''
+        env:
+          BOOTSTRAP_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: python3 .github/scripts/bootstrap-hosted-browser.py
       - uses: docker/setup-buildx-action@v4
         if: matrix.adapter == 'pg'
       - name: Build the real project PostgreSQL collaborator
@@ -367,7 +372,8 @@ jobs:
       # Every Cargo process is awaited by one runner. Baseline and mutant use
       # different target directories/RUSTFLAGS; compile/discovery failures and
       # timeouts never count as a designated assertion. Browser/upgrade tools
-      # must already be provisioned; missing prerequisites fail with BLOCKED.
+      # must be provisioned before validation (hosted browser setup above, or
+      # explicit preconfigured environments); missing inputs fail with BLOCKED.
       - name: Compile, discover and exercise the production defect oracle
         run: python3 .github/scripts/tests/negative-controls.py run --case '${{ matrix.id }}' --output '${{ runner.temp }}/oa12-${{ matrix.id }}'
       - name: Preserve all raw control evidence
@@ -581,7 +587,8 @@ jobs:
 
   wasm-browser:
     # OA-13: pinned local headless Chromium, not a Node-only browser claim.
-    # Browser/driver provisioning is an explicit environment prerequisite.
+    # Default hosted CI provisions the checked pin in a separate setup step.
+    # Explicit runner/path settings retain the preprovisioned environment contract.
     name: Chromium WASM (${{ matrix.control }})
     runs-on: ${{ vars.WASM_BROWSER_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 25
@@ -607,6 +614,11 @@ jobs:
         with:
           # Exact CLI version matches Cargo.lock and the checked manifest.
           tool: wasm-bindgen@0.2.129
+      - name: Provision pinned Chromium on the default hosted runner
+        if: runner.environment == 'github-hosted' && vars.WASM_BROWSER_RUNNER == '' && vars.WASM_CHROME_BIN == '' && vars.WASM_CHROMEDRIVER_BIN == ''
+        env:
+          BOOTSTRAP_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: python3 .github/scripts/bootstrap-hosted-browser.py
       - name: Build, discover and classify real Chromium WASM suites
         run: python3 .github/scripts/tests/browser-assurance.py --mode '${{ matrix.control }}' --output '${{ runner.temp }}/oa13-${{ matrix.control }}'
       - name: Preserve raw Chromium and negative-control evidence

@@ -80,7 +80,9 @@ async fn snapshot(pool: &PgPool) -> TestResult<Value> {
             'results', (SELECT jsonb_agg(to_jsonb(r) ORDER BY id) FROM pl_result_mailbox r), \
             'fences', (SELECT jsonb_agg(to_jsonb(k) ORDER BY idempotency_key) \
                        FROM pl_result_mailbox_keys k), \
-            'sequence', (SELECT to_jsonb(s) FROM pl_result_mailbox_id_seq s), \
+            'sequence', (SELECT jsonb_build_object( \
+                'last_value', s.last_value, 'log_cnt', s.log_cnt, 'is_called', s.is_called) \
+                FROM pl_result_mailbox_id_seq s), \
             'relations', (SELECT jsonb_agg(jsonb_build_array(c.relname, c.oid::bigint, c.relkind) \
                             ORDER BY c.relname) FROM pg_class c \
                            WHERE c.relname LIKE 'pl_result_mailbox%'), \

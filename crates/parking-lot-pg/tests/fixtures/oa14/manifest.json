@@ -22,8 +22,8 @@
     "docker/postgres18/upgrade/rehearse.py": "c3761cbc959d754c361edca56de82dbd390dbd6268a92d0db23d5f152204d6e3",
     "scripts/rehearse-postgres-upgrade.sh": "aa5484755f7ab9377ada73b91b0028fbcc639c26615606c687378ab007b64232",
     "crates/parking-lot-pg/tests/support/mod.rs": "14894e2fc69c219e7b562de289b63ff082166ffb1155b1a88eb35911f18c2322",
-    "crates/parking-lot-pg/tests/mailbox_migration.rs": "8bc13799e70c697bedb567f9e1f60a5bac2d2fc390b19d95e7bfa264d7162747",
-    "crates/parking-lot-pg/tests/mailbox_status.rs": "de8657408d88c241b2865ea486221a87a2a168c07cec5a910d7797b13f192c6c",
+    "crates/parking-lot-pg/tests/mailbox_migration.rs": "1f9b26b8cf1b320c1a61ba014ad780635b8150bb3bdef49714ae41f836b2147d",
+    "crates/parking-lot-pg/tests/mailbox_status.rs": "c0cd489fa25ab5b66951c2f1fa8fe8563dd5fadfaa8071ddccde3fdfa04f563f",
     "crates/parking-lot-pg/tests/pg_image_smoke.rs": "8eedd6fa7a5cbf6951c732df3b3936dc8cafd5f5b76355d5553df3d69f659d9d",
     "crates/parking-lot-pg/tests/postgres_upgrade.rs": "4f57cfda9160c6024a12ee0b2318f196c78bca6a311f06a72b9e9bb3f358e79b",
     "crates/parking-lot-pg/tests/fixtures/oa14/004_lease_queue_0_3.sql": "206b3e316b3e091dbc2c166ced30e4be71a3edaad726fbf35623a0ce7c8a2719",
@@ -61,7 +61,8 @@
     "crates/parking-lot-pg/tests/pgmq.rs": "89ea175abb196eb6bd661ec16f3b53227315f5b52971bcf3ceecaf2e81ceeb50",
     "crates/parking-lot-pg/tests/queue_autovacuum.rs": "f0e8c82db26333eac5d0e951a65a5441b322b95633a358c410f04ce0a22ed657",
     "crates/parking-lot-pg/tests/fixtures/oa07/untouched_backup_0_3.sql": "84d351cb2f340c91ba4e4d863ffea6477c5cc53ad77a1ace1958cbbd9402f1a7",
-    "crates/parking-lot-pg/tests/fixtures/oa07/authoritative_metadata.json": "9f499bad0a6172608299fb5c2b7a20eded3b91745401566aeb5aa18d97548f52"
+    "crates/parking-lot-pg/tests/fixtures/oa07/authoritative_metadata.json": "9f499bad0a6172608299fb5c2b7a20eded3b91745401566aeb5aa18d97548f52",
+    ".github/scripts/bootstrap-hosted-browser.py": "671a681ff7607d76ebd66e54dc1a057de3fafc9d21747531edeb39d5fefaddcd"
   },
   "fixture_recipe": "Frozen 004 and 006 layouts; byte-identical OA07 untouched_backup_0_3.sql contains frozen005 plus populated0.3 and Failed overlay; explicit SQL queue/pgmq old-layout data. No new API creates the source fixture.",
   "native_data": "Retained, consumed, finite/permanent/expired mailbox generations and full Failed status; SQL ready/expired leased/delayed/dead rows; all4 pgmq priority lanes plus leased/delayed/archive/dead state, auxiliary idempotency and sequence high-water marks.",

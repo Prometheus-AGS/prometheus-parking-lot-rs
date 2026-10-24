@@ -1,0 +1,7 @@
+Starting change 1 out of 19: oa-19-ci-repairs
+Position: phase-0-4-operational-assurance › oa-19-ci-repairs @ revision 1125
+Starting task 1 out of 1: 1.1 Repair observed PR94 CI failures, review and verify the coherent fixes, and confirm latest-head CI before preparing operator merge
+Position: phase-0-4-operational-assurance › oa-19-ci-repairs › 1 @ revision 1126
+{"code":0,"schemaVersion":1,"time":"2026-10-24T18:38:46.872Z","operation":"run","project":"/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs","status":"completed","version":"1.15.0","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/79e427e7ccf7d8a94667a005/1792867126872-d6ae7f53-1d47-4714-80d9-b19fe12f1415.json"}
+Starting change 1 out of 1: oa-19-ci-repairs
+Starting task 1 out of 1:   oa-19-ci-repairs:1

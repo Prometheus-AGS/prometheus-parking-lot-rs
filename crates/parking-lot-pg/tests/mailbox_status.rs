@@ -119,7 +119,9 @@ async fn source_snapshot(pool: &PgPool, intermediate: bool) -> TestResult<Value>
         "SELECT jsonb_build_object( \
             'results', (SELECT jsonb_agg(to_jsonb(r) ORDER BY id) FROM {entries} r), \
             'fences', (SELECT jsonb_agg(to_jsonb(k) ORDER BY to_jsonb(k)::text) FROM {fences} k), \
-            'sequence', (SELECT to_jsonb(s) FROM {sequence} s), \
+            'sequence', (SELECT jsonb_build_object( \
+                'last_value', s.last_value, 'log_cnt', s.log_cnt, 'is_called', s.is_called) \
+                FROM {sequence} s), \
             'relations', (SELECT jsonb_agg(jsonb_build_array(c.relname, c.oid::bigint, c.relkind) \
                             ORDER BY c.relname) FROM pg_class c \
                            WHERE c.relname LIKE 'pl_result_mailbox%'), \

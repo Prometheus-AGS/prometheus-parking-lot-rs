@@ -2,18 +2,20 @@
   "schemaVersion": "1",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 1121,
-  "derivedRevision": 1121,
+  "sourceRevision": 1126,
+  "derivedRevision": 1126,
   "frontier": {
-    "3b637018-0150-4bf1-b8af-a19e9f09585f": 181,
+    "3b637018-0150-4bf1-b8af-a19e9f09585f": 186,
     "b4320c25-6bf5-4d74-9fe6-3d6b8b36bd69": 313,
     "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 627
   },
   "conflictCount": 0,
-  "updatedAt": "2026-10-24T17:17:54.601431Z",
+  "updatedAt": "2026-10-24T18:39:05.507974Z",
   "cursor": [
     "phase-0-4-operational-assurance",
-    "execute"
+    "execute",
+    "oa-19-ci-repairs",
+    "1"
   ],
   "root": {
     "type": "phase",
@@ -21,7 +23,7 @@
     "status": "ready",
     "progress": {
       "done": 69,
-      "total": 69
+      "total": 70
     },
     "children": [
       {
@@ -31,9 +33,18 @@
         "status": "IN_PROGRESS",
         "progress": {
           "done": 18,
-          "total": 18
+          "total": 19
         },
         "children": [
+          {
+            "type": "change",
+            "id": "oa-19-ci-repairs",
+            "status": "IN_PROGRESS",
+            "progress": {
+              "done": 0,
+              "total": 1
+            }
+          },
           {
             "type": "change",
             "id": "oa-01-containment-controls",

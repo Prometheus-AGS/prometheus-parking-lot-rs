@@ -14,7 +14,7 @@
     "chromedriver_url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/linux64/chromedriver-linux64.zip",
     "source": "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json",
     "source_timestamp": "2026-10-24T11:15:50.339Z",
-    "provisioning": "Deferred operator environment prerequisite; no automatic download, installation or host change"
+    "provisioning": "Normal CI explicitly downloads this exact pin into RUNNER_TEMP on default GitHub-hosted Linux runners before validation. Explicit runner/path configurations and certification require preprovisioned executables; validators never install."
   },
   "negative_control": {
     "cfg": "oa-13-budget-event",
