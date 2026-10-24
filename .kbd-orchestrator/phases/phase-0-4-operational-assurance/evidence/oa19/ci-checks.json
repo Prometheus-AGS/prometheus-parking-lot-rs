@@ -1,0 +1,553 @@
+{
+  "pr": 94,
+  "head": "2e65341989263a39b9dbe2500478646d9140a6be",
+  "ci_merge_candidate": "942e3612d2f8604474edd667ef39d569546fc4ec",
+  "checks": [
+    {
+      "name": "Format",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966125898"
+    },
+    {
+      "name": "Build and run the guide examples",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561999/job/120966117337"
+    },
+    {
+      "name": "Android and Kotlin",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125562008/job/120966117557"
+    },
+    {
+      "name": "Clippy",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126107"
+    },
+    {
+      "name": "iOS and Swift",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125562008/job/120966117577"
+    },
+    {
+      "name": "Test (1.99.1)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126060"
+    },
+    {
+      "name": "Tauri desktop shell (macos)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125562008/job/120966117478"
+    },
+    {
+      "name": "Test (1.95)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126028"
+    },
+    {
+      "name": "Tauri desktop shell (linux)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125562008/job/120966117606"
+    },
+    {
+      "name": "Tauri desktop shell (windows)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125562008/job/120966117373"
+    },
+    {
+      "name": "Loom (models)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126159"
+    },
+    {
+      "name": "Binding generator policy",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125562008/job/120966117519"
+    },
+    {
+      "name": "Loom (s-1)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126297"
+    },
+    {
+      "name": "Loom (s-2)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126058"
+    },
+    {
+      "name": "Loom (s-19)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126298"
+    },
+    {
+      "name": "Loom (s-20)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126041"
+    },
+    {
+      "name": "Loom (s-20-depth)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126051"
+    },
+    {
+      "name": "Loom (s-20-order)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126102"
+    },
+    {
+      "name": "Loom OA-11 (models-core)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126077"
+    },
+    {
+      "name": "Loom OA-11 (models-runtime)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126123"
+    },
+    {
+      "name": "Loom OA-11 (oa-11-kind-release)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126084"
+    },
+    {
+      "name": "Loom OA-11 (oa-11-ledger-order)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126108"
+    },
+    {
+      "name": "Negative-control inventory",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126130"
+    },
+    {
+      "name": "Postgres 17",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126038"
+    },
+    {
+      "name": "Postgres 18",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126127"
+    },
+    {
+      "name": "Iggy events",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126043"
+    },
+    {
+      "name": "Wasm (1.99.1)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126055"
+    },
+    {
+      "name": "Wasm (1.95)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126076"
+    },
+    {
+      "name": "Chromium WASM (browser)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126087"
+    },
+    {
+      "name": "Chromium WASM (browser-negative)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126067"
+    },
+    {
+      "name": "Unused dependencies",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126033"
+    },
+    {
+      "name": "Semver checks",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126125"
+    },
+    {
+      "name": "Orphan tests",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126153"
+    },
+    {
+      "name": "Docs",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126072"
+    },
+    {
+      "name": "Benchmarks",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126034"
+    },
+    {
+      "name": "Deny (licenses / advisories)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126042"
+    },
+    {
+      "name": "Supply chain",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126091"
+    },
+    {
+      "name": "Coverage",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966126049"
+    },
+    {
+      "name": "Negative control (oa-14-missing-result)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966454959"
+    },
+    {
+      "name": "Negative control (s-1)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966454963"
+    },
+    {
+      "name": "Negative control (s-2)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966455033"
+    },
+    {
+      "name": "Negative control (s-3)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966454937"
+    },
+    {
+      "name": "Negative control (s-4-resource)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966454957"
+    },
+    {
+      "name": "Negative control (s-4-worker)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966454966"
+    },
+    {
+      "name": "Negative control (s-4-browser)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966454997"
+    },
+    {
+      "name": "Negative control (s-5-pg17)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966455036"
+    },
+    {
+      "name": "Negative control (s-5-fencing-pg17)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966455149"
+    },
+    {
+      "name": "Negative control (s-6-pg17)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966455016"
+    },
+    {
+      "name": "Negative control (s-7-pg17)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966455019"
+    },
+    {
+      "name": "Negative control (s-18-pg17)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966455057"
+    },
+    {
+      "name": "Negative control (oa-06-pg17)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966454984"
+    },
+    {
+      "name": "Negative control (oa-07-pg17)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966455010"
+    },
+    {
+      "name": "Negative control (s-5-pg18)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966455930"
+    },
+    {
+      "name": "Negative control (s-5-fencing-pg18)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966456081"
+    },
+    {
+      "name": "Negative control (s-6-pg18)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966456031"
+    },
+    {
+      "name": "Negative control (s-7-pg18)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966456102"
+    },
+    {
+      "name": "Negative control (s-18-pg18)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966456163"
+    },
+    {
+      "name": "Negative control (oa-06-pg18)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966456151"
+    },
+    {
+      "name": "Negative control (oa-07-pg18)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966456231"
+    },
+    {
+      "name": "Negative control (s-8)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966456226"
+    },
+    {
+      "name": "Negative control (s-9)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966456219"
+    },
+    {
+      "name": "Negative control (s-10)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966456312"
+    },
+    {
+      "name": "Negative control (s-11)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966456838"
+    },
+    {
+      "name": "Negative control (s-16-redb)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966456894"
+    },
+    {
+      "name": "Negative control (oa-07-event-redb)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966457154"
+    },
+    {
+      "name": "Negative control (s-16-pg17)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966457195"
+    },
+    {
+      "name": "Negative control (oa-07-event-pg17)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966457156"
+    },
+    {
+      "name": "Negative control (s-16-pg18)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966457177"
+    },
+    {
+      "name": "Negative control (oa-07-event-pg18)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966457203"
+    },
+    {
+      "name": "Negative control (s-16-ordering)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966457199"
+    },
+    {
+      "name": "Negative control (s-17)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966457294"
+    },
+    {
+      "name": "Negative control (s-19)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966457428"
+    },
+    {
+      "name": "Negative control (s-20-drain)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966457799"
+    },
+    {
+      "name": "Negative control (s-20-at-depth)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966457904"
+    },
+    {
+      "name": "Negative control (s-20-depth)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966458315"
+    },
+    {
+      "name": "Negative control (s-20-order)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966458196"
+    },
+    {
+      "name": "Negative control (s-21-native)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966458187"
+    },
+    {
+      "name": "Negative control (s-21-browser)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966458246"
+    },
+    {
+      "name": "Negative control (s-22)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966458274"
+    },
+    {
+      "name": "Negative control (s-33)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966458407"
+    },
+    {
+      "name": "Negative control (oa-06-redb)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966458389"
+    },
+    {
+      "name": "Negative control (oa-07-redb)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966458585"
+    },
+    {
+      "name": "Negative control (oa-07-event-nonterminal)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966458778"
+    },
+    {
+      "name": "Negative control (oa-08)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966458964"
+    },
+    {
+      "name": "Negative control (oa-09)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966459281"
+    },
+    {
+      "name": "Negative control (oa-10-expiry)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966459321"
+    },
+    {
+      "name": "Negative control (oa-11-kind-release)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966459372"
+    },
+    {
+      "name": "Negative control (oa-11-ledger-order)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966459412"
+    },
+    {
+      "name": "Negative control (oa-13-budget-event)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966459443"
+    },
+    {
+      "name": "Negative control (oa-16)",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120966459585"
+    },
+    {
+      "name": "Negative-control completeness and verifier defects",
+      "status": "COMPLETED",
+      "conclusion": "SUCCESS",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40125561998/job/120975148024"
+    }
+  ]
+}

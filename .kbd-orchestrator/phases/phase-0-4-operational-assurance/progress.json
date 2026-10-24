@@ -2,10 +2,10 @@
   "schemaVersion": "2",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 1126,
-  "derivedRevision": 1126,
+  "sourceRevision": 1129,
+  "derivedRevision": 1129,
   "frontier": {
-    "3b637018-0150-4bf1-b8af-a19e9f09585f": 186,
+    "3b637018-0150-4bf1-b8af-a19e9f09585f": 189,
     "b4320c25-6bf5-4d74-9fe6-3d6b8b36bd69": 313,
     "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 627
   },
@@ -13,18 +13,18 @@
   "phase": "phase-0-4-operational-assurance",
   "phaseId": "phase-0-4-operational-assurance",
   "parentPhase": null,
-  "last_updated": "2026-10-24T18:39:05.507974Z",
+  "last_updated": "2026-10-24T20:10:51.055039Z",
   "last_updated_by": "kbd-runtime",
   "changes_total": 19,
-  "changes_completed": 18,
+  "changes_completed": 19,
   "implementation_total": 19,
-  "implementation_completed": 18,
+  "implementation_completed": 19,
   "completion": {
     "primaryCounter": "implementation",
     "implementation": {
-      "completed": 18,
+      "completed": 19,
       "total": 19,
-      "status": "IN_PROGRESS"
+      "status": "COMPLETE"
     },
     "evidence": {
       "status": "NOT_TRACKED",
@@ -51,9 +51,9 @@
     "runId": "phase-certification-remediation-20261022T103344Z",
     "primaryCounter": "implementation",
     "implementation": {
-      "completed": 69,
+      "completed": 70,
       "total": 70,
-      "status": "IN_PROGRESS"
+      "status": "COMPLETE"
     },
     "evidence": {
       "status": "PENDING",
@@ -75,12 +75,12 @@
     {
       "id": "oa-19-ci-repairs",
       "title": "oa-19-ci-repairs",
-      "status": "IN_PROGRESS",
-      "implementation_status": "IN_PROGRESS",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
       "tasks_total": 1,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "1.1 Repair observed PR94 CI failures, review and verify the coherent fixes, and confirm latest-head CI before preparing operator merge",
+      "tasks_done": 1,
+      "last_task_completed": "1.1 Repair observed PR94 CI failures, review and verify the coherent fixes, and confirm latest-head CI before preparing operator merge",
+      "next_task_pending": null,
       "blockers": []
     },
     {

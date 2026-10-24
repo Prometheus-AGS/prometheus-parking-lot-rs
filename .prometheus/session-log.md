@@ -1994,3 +1994,34 @@ Current canonical position remains OA18task2/Execute revision1118. Local source 
   - none recorded
 
 2026-10-24 OA18task2 trusted closeout: independent artifact critic ACCEPT with no material correction. End-task wrapper0; taskcomplete1120/changecomplete1121. Canonical18changes/36tasks complete; reconcile0 cleantrue drifted0 errors[]. Execute remainsin_progress and releasecertBLOCKED/publicationNOT_EXERCISED. Progress-memory task/change receipts were created by hooks. Final local closeout commit and approval-only ordinary push/draftPR proposal next; no remote action authorized.
+
+<!-- karpathy-progress-event:kpm-c42bd3f13d2f30f9ff10599bfeec255f -->
+## Progress boundary — 2026-10-24T20:10:54.037101Z
+
+- Event: `kpm-c42bd3f13d2f30f9ff10599bfeec255f`
+- Boundary: `task` / `complete`
+- Position: `phase-0-4-operational-assurance` / `oa-19-ci-repairs` / `1`
+- Class and elapsed time: `product` / `0.0` hours
+- Commit: `2e65341989263a39b9dbe2500478646d9140a6be`
+- Files: `.kbd-orchestrator/current-waypoint.json`, `.kbd-orchestrator/phases/phase-0-4-operational-assurance/hooks-status.json`, `.kbd-orchestrator/phases/phase-0-4-operational-assurance/hooks.log.jsonl`, `.kbd-orchestrator/phases/phase-0-4-operational-assurance/progress.json`, `.kbd-orchestrator/phases/phase-0-4-operational-assurance/tasks.md`, `.kbd-orchestrator/position-reminder.txt`, `.kbd-orchestrator/position.json`, `openspec/changes/oa-19-ci-repairs/tasks.md`
+- Blocker: none
+- Exact next work: /kbd-assess phase-0-4-operational-assurance
+- Verification:
+  - none recorded
+
+<!-- karpathy-progress-event:kpm-f0a43383c9e071092c0379d6503c1958 -->
+## Progress boundary — 2026-10-24T20:10:57.796972Z
+
+- Event: `kpm-f0a43383c9e071092c0379d6503c1958`
+- Boundary: `change` / `complete`
+- Position: `phase-0-4-operational-assurance` / `oa-19-ci-repairs` / `-`
+- Class and elapsed time: `product` / `0.0` hours
+- Commit: `2e65341989263a39b9dbe2500478646d9140a6be`
+- Files: `.kbd-orchestrator/current-waypoint.json`, `.kbd-orchestrator/phases/phase-0-4-operational-assurance/hooks-status.json`, `.kbd-orchestrator/phases/phase-0-4-operational-assurance/hooks.log.jsonl`, `.kbd-orchestrator/phases/phase-0-4-operational-assurance/progress.json`, `.kbd-orchestrator/phases/phase-0-4-operational-assurance/tasks.md`, `.kbd-orchestrator/position-reminder.txt`, `.kbd-orchestrator/position.json`, `openspec/changes/oa-19-ci-repairs/tasks.md`
+- Blocker: none
+- Exact next work: /kbd-assess phase-0-4-operational-assurance
+- Verification:
+  - none recorded
+
+## 2026-10-24 OA19 PR94 CI repair
+Completed repair task/change1128/1129; reconciliation clean0drift. Source2e65341 passes91checks, including52realcontrols and aggregate on merge942e361. See phase evidence/oa19/closeout.md. Final records-only delivery still requires latest-head CI. Credential rotation deferred; release packet remains separately uncertified.

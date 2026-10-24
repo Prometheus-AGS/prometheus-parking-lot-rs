@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "eventId": "kpm-f0a43383c9e071092c0379d6503c1958",
+  "eventSha256": "e9e39c207468fd4739810216dc7b030af76d2719c658b463e4da2d50d68c530e",
+  "eventIdentitySha256": "2b3a750a7c33ba3f5c9166a0d95fa011711a173071d9125219bc1c44d514cc84",
+  "event": {
+    "schemaVersion": 1,
+    "eventId": "kpm-f0a43383c9e071092c0379d6503c1958",
+    "observedAt": "2026-10-24T20:10:57.796972Z",
+    "runId": "phase-certification-remediation-20261022T103344Z",
+    "boundary": "change",
+    "status": "complete",
+    "phaseId": "phase-0-4-operational-assurance",
+    "changeId": "oa-19-ci-repairs",
+    "taskId": null,
+    "taskClass": "product",
+    "elapsedHours": 0.0,
+    "touchedFiles": [
+      ".kbd-orchestrator/current-waypoint.json",
+      ".kbd-orchestrator/phases/phase-0-4-operational-assurance/hooks-status.json",
+      ".kbd-orchestrator/phases/phase-0-4-operational-assurance/hooks.log.jsonl",
+      ".kbd-orchestrator/phases/phase-0-4-operational-assurance/progress.json",
+      ".kbd-orchestrator/phases/phase-0-4-operational-assurance/tasks.md",
+      ".kbd-orchestrator/position-reminder.txt",
+      ".kbd-orchestrator/position.json",
+      "openspec/changes/oa-19-ci-repairs/tasks.md"
+    ],
+    "verification": [],
+    "commitSha": "2e65341989263a39b9dbe2500478646d9140a6be",
+    "blocker": null,
+    "exactNextWork": "/kbd-assess phase-0-4-operational-assurance"
+  },
+  "sessionLogAppended": true,
+  "memory": {
+    "transport": "outbox",
+    "status": "queued",
+    "operationId": "192f1a3baaec6958cc556880eb7223425f9821236300acb669c5a17c55f2d61a",
+    "pkError": "pk exited 1"
+  },
+  "complete": true,
+  "recordedAt": "2026-10-24T20:10:58.132918Z"
+}
