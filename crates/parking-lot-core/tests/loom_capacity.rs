@@ -29,7 +29,7 @@ const MAX_UNITS: u32 = 2;
 /// two units: at most two units ever run, and all three jobs run.
 #[test]
 fn loom_capacity_never_exceeded_and_no_job_lost() {
-    loom::model(|| {
+    loom_support::model(|| {
         let pool = Arc::new(Pool::in_memory("loom", UnitSemaphore::new(MAX_UNITS), 8));
         let oracle = Arc::new(Oracle::default());
 
@@ -66,7 +66,7 @@ fn loom_capacity_never_exceeded_and_no_job_lost() {
 /// one permit, two one-unit jobs never run together.
 #[test]
 fn loom_capacity_permit_bound_holds() {
-    loom::model(|| {
+    loom_support::model(|| {
         let pool = Arc::new(Pool::in_memory(
             "loom",
             UnitSemaphore::with_max_permits(MAX_UNITS, 1),

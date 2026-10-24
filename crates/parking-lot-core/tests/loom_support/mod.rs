@@ -63,6 +63,47 @@ impl Parkable for Job {
 
 pub type Pool = Dispatcher<Job>;
 
+std::thread_local! {
+    /// Whether [`window_yield`] yields in the current [`model`] pass.
+    static YIELD_IN_WINDOW: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
+}
+
+/// Check `f` with `loom::model` twice: once with a `yield_now` inside each
+/// running job's window ([`window_yield`]) and once without.
+///
+/// Within the preemption bound the two passes reach different schedules.
+/// Loom deprioritizes a thread that yields until another thread has run, and
+/// DPOR adds no preemption to bring it back while its next step conflicts
+/// with nothing, so with the yield a completion is never scheduled between
+/// two dispatch-lock sections of a thread that keeps running (a submission
+/// racing a completion). Without it, the running job's later completions are
+/// no longer interleaved with the other threads' submissions for free. Each
+/// pass alone missed lock orders the other reached.
+///
+/// The switch is thread-local: loom runs a model's threads as generators on
+/// the calling OS thread, and libtest runs tests in parallel on separate ones.
+pub fn model<F>(f: F)
+where
+    F: Fn() + Sync + Send + 'static,
+{
+    let f = std::sync::Arc::new(f);
+    for yields in [true, false] {
+        YIELD_IN_WINDOW.with(|cell| cell.set(yields));
+        eprintln!("loom pass: yield in the running window = {yields}");
+        let f = std::sync::Arc::clone(&f);
+        loom::model(move || f());
+    }
+}
+
+/// The yield inside a running job's window, in the pass that has it (see
+/// [`model`]): it lets loom schedule another thread's admission while the job
+/// holds its units.
+pub fn window_yield() {
+    if YIELD_IN_WINDOW.with(std::cell::Cell::get) {
+        loom::thread::yield_now();
+    }
+}
+
 /// An observer independent of the semaphore: the units of the jobs actually
 /// "running" and the number of jobs that ran.
 #[derive(Debug, Default)]
@@ -115,9 +156,7 @@ pub fn run_observed(
         on_start(&grant.item);
         let units = grant.item.units;
         oracle.start(units, max_units);
-        // A yield inside the critical window lets loom schedule another
-        // thread's admission while this job holds its units.
-        loom::thread::yield_now();
+        window_yield();
         oracle.finish(units);
         pending.extend(pool.complete(grant.permit, 0).started);
     }
