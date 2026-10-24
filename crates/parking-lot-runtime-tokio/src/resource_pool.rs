@@ -223,8 +223,11 @@ where
     ///
     /// # Panics
     ///
-    /// When a task is running (it shares the pool's state): the name is part
-    /// of building the pool. Call it before the first `submit`.
+    /// After the first `submit`, even once the pool is idle again: the first
+    /// submission installs the dispatcher's release hook, which keeps a weak
+    /// reference to the pool's state, so the state is never exclusively owned
+    /// again. The name is part of building the pool; call it before the
+    /// first `submit`.
     #[must_use]
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         let Some(inner) = Arc::get_mut(&mut self.inner) else {
@@ -277,8 +280,11 @@ where
     ///
     /// # Panics
     ///
-    /// After the first `submit` (the pool's state is then shared): limits
-    /// are part of building the pool. Call it before the first `submit`.
+    /// After the first `submit`, even once the pool is idle again (the
+    /// dispatcher refuses new limits once it has seen a submission, and the
+    /// release hook the first submission installs keeps the pool's state
+    /// shared): limits are part of building the pool. Call it before the
+    /// first `submit`.
     #[must_use]
     pub fn with_resource_limit(mut self, kind: ResourceKind, limit: u32) -> Self {
         let set = Arc::get_mut(&mut self.inner)
