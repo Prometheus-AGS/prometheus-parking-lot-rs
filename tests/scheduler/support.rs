@@ -17,6 +17,12 @@ use prometheus_parking_lot::core::{
 };
 use prometheus_parking_lot::runtime::TokioSpawner;
 use prometheus_parking_lot::util::{MailboxKey, Priority, ResourceCost, ResourceKind, now_ms};
+use prometheus_parking_lot::{Hook, HookBus, LifecycleEvent};
+use tokio::sync::mpsc;
+
+/// Upper bound on any wait for an observed condition: it only keeps a broken
+/// test from hanging. A passing test proceeds as soon as the condition holds.
+pub const FAILSAFE: Duration = Duration::from_secs(120);
 
 /// What an [`Executor`] does with a task.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -129,6 +135,74 @@ where
             return None;
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+}
+
+/// Forwards every lifecycle event to a channel, so a test can wait for an
+/// event instead of polling on a timer.
+struct ChannelHook(mpsc::UnboundedSender<LifecycleEvent>);
+
+impl Hook for ChannelHook {
+    fn on_event(&self, event: &LifecycleEvent) {
+        let _ = self.0.send(event.clone());
+    }
+}
+
+/// The events a pool emitted on its bus, received in emission order.
+pub struct EventLog {
+    rx: mpsc::UnboundedReceiver<LifecycleEvent>,
+    /// Every event received so far.
+    pub seen: Vec<LifecycleEvent>,
+}
+
+/// A bus for a pool's `DurableOptions::with_hooks`, and the log its events
+/// arrive in.
+pub fn event_log() -> (HookBus, EventLog) {
+    let (tx, rx) = mpsc::unbounded_channel();
+    let bus = HookBus::new();
+    bus.register(Arc::new(ChannelHook(tx)));
+    (
+        bus,
+        EventLog {
+            rx,
+            seen: Vec::new(),
+        },
+    )
+}
+
+impl EventLog {
+    /// Wait for the next event matching `wanted` (recording every event on
+    /// the way); `None` only if [`FAILSAFE`] elapses first.
+    pub async fn wait_for(
+        &mut self,
+        wanted: impl Fn(&LifecycleEvent) -> bool,
+    ) -> Option<LifecycleEvent> {
+        let deadline = tokio::time::Instant::now() + FAILSAFE;
+        loop {
+            let event = tokio::time::timeout_at(deadline, self.rx.recv())
+                .await
+                .ok()??;
+            self.seen.push(event.clone());
+            if wanted(&event) {
+                return Some(event);
+            }
+        }
+    }
+
+    /// Record every event already delivered (call after `HookBus::flush`).
+    pub fn drain_ready(&mut self) {
+        while let Ok(event) = self.rx.try_recv() {
+            self.seen.push(event);
+        }
+    }
+
+    /// The recorded events of task `task_id`, by kind.
+    pub fn kinds_of(&self, task_id: u64) -> Vec<&'static str> {
+        self.seen
+            .iter()
+            .filter(|event| event.task_id() == task_id)
+            .map(LifecycleEvent::kind)
+            .collect()
     }
 }
 

@@ -525,9 +525,9 @@ async fn durable_admits_by_every_dimension() {
 /// share one database queue). `lose_acks` reports every ack as done without
 /// reaching the queue: the shape of a process that died after its delivery
 /// and before its ack landed.
-struct SharedQueue {
-    inner: Arc<InMemoryLeaseQueue<String>>,
-    lose_acks: bool,
+pub struct SharedQueue {
+    pub inner: Arc<InMemoryLeaseQueue<String>>,
+    pub lose_acks: bool,
 }
 
 impl LeaseQueue<String> for SharedQueue {
@@ -586,8 +586,8 @@ impl LeaseQueue<String> for SharedQueue {
 /// deliveries fail; with `hold_first` set, the first delivery waits for
 /// `release` (and sets `entered` when it starts waiting).
 #[derive(Clone, Default)]
-struct SharedMailbox {
-    inner: Arc<InMemoryResultMailbox<String>>,
+pub struct SharedMailbox {
+    pub inner: Arc<InMemoryResultMailbox<String>>,
     fail: Arc<Mutex<u32>>,
     hold_first: Arc<AtomicBool>,
     entered: Arc<AtomicBool>,
