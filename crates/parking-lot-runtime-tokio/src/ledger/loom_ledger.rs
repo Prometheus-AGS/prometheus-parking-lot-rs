@@ -12,6 +12,15 @@
 //! missed observation. SeqCst's total order excludes the store-buffering cycle;
 //! it does not create a synchronizes-with edge between independent atomics.
 //!
+//! Loom 0.7.2 does not implement that cross-atomic SeqCst access order. This
+//! exact admission litmus therefore uses a model-only supported SeqCst fence
+//! between each store/load pair. Its two-fence order excludes the same
+//! both-missed outcome; this is an explicit representation of this litmus's
+//! SC constraint, not a fence present in production or a general C11 adapter.
+//! The ordering control omits both model fences as it weakens the accesses.
+//! The publication companion below uses no such adapter. See Loom's pinned
+//! README Unsupported features and upstream issue180 for the tool limitation.
+//!
 //! The second model uses actual finish -> settle -> in_flight -> report calls.
 //! The SeqCst settlement decrement is a release operation; an acquiring load
 //! observing zero publishes the earlier Relaxed finished increment. The tally
@@ -40,6 +49,15 @@ const FLAG_LOAD_ORDER: Ordering = Ordering::SeqCst;
 #[cfg(parking_lot_negative_control = "oa-11-ledger-order")]
 const FLAG_LOAD_ORDER: Ordering = Ordering::Acquire;
 
+/// Represent the store/load SC constraint in this exact admission litmus.
+/// Real production uses SeqCst accesses without this fence. Loom instead
+/// applies acquire/release to those accesses, so the supported fence restores
+/// the two-pair RAW constraint for this SC-only observation projection.
+#[cfg(not(parking_lot_negative_control = "oa-11-ledger-order"))]
+fn model_admission_sc_boundary() {
+    loom::sync::atomic::fence(Ordering::SeqCst);
+}
+
 #[test]
 fn loom_ledger_submit_shutdown_cannot_both_miss() {
     loom::model(|| {
@@ -50,6 +68,8 @@ fn loom_ledger_submit_shutdown_cannot_both_miss() {
             let shutdown = Arc::clone(&shutdown);
             thread::spawn(move || {
                 ledger.accept();
+                #[cfg(not(parking_lot_negative_control = "oa-11-ledger-order"))]
+                model_admission_sc_boundary();
                 if shutdown.load(FLAG_LOAD_ORDER) {
                     // The real rejected submission returns its accounting.
                     ledger.settle(1);
@@ -63,6 +83,8 @@ fn loom_ledger_submit_shutdown_cannot_both_miss() {
             let ledger = Arc::clone(&ledger);
             thread::spawn(move || {
                 shutdown.store(true, FLAG_STORE_ORDER);
+                #[cfg(not(parking_lot_negative_control = "oa-11-ledger-order"))]
+                model_admission_sc_boundary();
                 ledger.in_flight()
             })
         };

@@ -1,0 +1,33 @@
+{
+  "candidate": "2c18c9a309daaa22d3d50301e15509fa23c2a829",
+  "baseline_exit": 2,
+  "status": "FAIL",
+  "counts": {
+    "PASS": 37,
+    "FAIL": 3,
+    "BLOCKED": 2
+  },
+  "native": {
+    "passed": 460,
+    "skipped": 119
+  },
+  "artifact_directory": "/Users/gqadonis/.local/state/prometheus/operational-assurance/2c18c9a309daaa22d3d50301e15509fa23c2a829",
+  "inventory_path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/2c18c9a309daaa22d3d50301e15509fa23c2a829/retained-files.json",
+  "inventory_digest": "728da6e1f0c2401b6c8006aee09ca0e28587ed605a8b37095cd0369fb90ef0b4",
+  "observed_failures": [
+    "Git2.33 lacks SSH tag signing; existing Apple Git2.50.1 selected for later runs",
+    "Loom0.7.2 does not implement SC access total order; direct admission model failed; production bug not established",
+    "Bindgen standalone locked dependencies absent from offline cache; explicit locked fetch now completed"
+  ],
+  "operator_blocks": [
+    "fresh_mirror",
+    "trust_policy"
+  ],
+  "stack_regression": {
+    "status": "PASS",
+    "directory": "/Users/gqadonis/.local/state/prometheus/operational-assurance/2c18c9a309daaa22d3d50301e15509fa23c2a829/stack-control",
+    "normal": "Frozen native suite passed the16384 task backlog regression",
+    "broken_control": "Compile/discovery0; exact regression101 with named child stack overflow; ordinary-spawner companion0 and1testpassed"
+  },
+  "publication": "NOT_EXERCISED"
+}

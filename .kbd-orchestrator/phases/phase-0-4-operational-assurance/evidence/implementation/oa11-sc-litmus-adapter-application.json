@@ -1,0 +1,8 @@
+{
+  "status": "APPLIED_PENDING_EXECUTION",
+  "path": "crates/parking-lot-runtime-tokio/src/ledger/loom_ledger.rs",
+  "source_digest": "0950b190a5b50279994b5519bf9834270485db956f35fb3a9e4fb04f19cc75b9",
+  "review": ".agent-team/reviews/oa04-runtime/oa11-sc-adapter-critique.md",
+  "production_ledger_unchanged": true,
+  "scope": "Exact four-event model-only abstraction; actual SC premise must be revalidated for each frozen candidate; no general C11 equivalence or direct unmodified-production Loom proof claimed. Prior FAIL remains preserved."
+}
