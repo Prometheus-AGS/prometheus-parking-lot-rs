@@ -1,0 +1,31 @@
+{
+  "candidate": "d6080b590a9663591066af4af15f1cb1453be7a2",
+  "status": "FAIL",
+  "records": [
+    {
+      "id": "desktop-macos",
+      "status": "PASS"
+    },
+    {
+      "id": "desktop-fmt",
+      "status": "FAIL"
+    },
+    {
+      "id": "desktop-clippy",
+      "status": "PASS"
+    },
+    {
+      "id": "desktop-service-tests",
+      "status": "PASS"
+    },
+    {
+      "id": "native-check-macos",
+      "status": "PASS"
+    }
+  ],
+  "retained_root": "/Users/gqadonis/.local/state/prometheus/operational-assurance/d6080b590a9663591066af4af15f1cb1453be7a2/macos",
+  "inventory": "/Users/gqadonis/.local/state/prometheus/operational-assurance/d6080b590a9663591066af4af15f1cb1453be7a2/macos-retained-files.json",
+  "files": 30,
+  "byte_hashes_verified": true,
+  "repair_scope": "Only failed formatting in bindings/tauri-desktop/src-tauri/src/assurance.rs; earlier receipt remains FAIL."
+}

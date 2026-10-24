@@ -55,9 +55,14 @@ impl Assurance {
         };
         let root = PathBuf::from(value);
         if !root.is_absolute() || root.canonicalize()? != root {
-            return Err(invalid("OA-15 root must be an existing absolute canonical path"));
+            return Err(invalid(
+                "OA-15 root must be an existing absolute canonical path",
+            ));
         }
-        let name = root.file_name().and_then(|name| name.to_str()).unwrap_or("");
+        let name = root
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("");
         if !name.starts_with("parking-lot-oa15-")
             || root.symlink_metadata()?.file_type().is_symlink()
         {
@@ -81,7 +86,9 @@ impl Assurance {
         }
         let store_dir = root.join("store");
         if store_dir.canonicalize()? != store_dir || !store_dir.is_dir() {
-            return Err(invalid("OA-15 store directory must not redirect outside its root"));
+            return Err(invalid(
+                "OA-15 store directory must not redirect outside its root",
+            ));
         }
         let store = store_dir.join("parking-lot.redb");
         if store.symlink_metadata().is_ok() {
@@ -123,7 +130,9 @@ impl Assurance {
             return Ok(());
         };
         if window != "main" {
-            return Err(invalid("OA-15 commands must originate from the main webview"));
+            return Err(invalid(
+                "OA-15 commands must originate from the main webview",
+            ));
         }
         let mut file = trace
             .lock()
