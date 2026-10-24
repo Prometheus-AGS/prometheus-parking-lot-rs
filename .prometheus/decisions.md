@@ -43,3 +43,32 @@ Append-only. Dated entries. Mark superseded entries; do not delete them.
 - cr-15 closes as deferred carry-over under #88. No credential rotation, history rewrite, GitHub Support purge or post-purge fresh-mirror verification is asserted. The operator-only actions remain outstanding outside this phase.
 - The receiving Codex driver records the completed cumulative reviews from PRs #74/#75/#76/#83 and the final gate summary at `a3e517f`, validates and archives OpenSpec artifacts, then closes Execute and writes Reflect. Administrative completion of deferred task records records their disposition, not implementation.
 - Uncomfortable part: archived scope does not neutralise the historical credential leak or supply the deferred release controls. The signing key provided to resume this journal was also delivered through a publicly reachable IPFS URL; that authority must be treated as exposed and replaced through the runtime's supported operator-authorized key process. No credential or enrollment changes are performed by this closure.
+
+## 2026-10-24 — 0.4.0 operational-assurance scope and operator gates
+
+- Operator requested assessment and planning of `phase-0-4-operational-assurance`, with explicit release blockers/exit criteria and one batched operator-gate question before Execute.
+- Operator answered: “Defer credential rotation for now and accept your recommendations on the rest. We need stuff to get finished before we start blocking things and making it hard to finish. We will handle keys and stuff later.”
+- Credential rotation and replacement of the exposed KBD signer are explicitly deferred, non-blocking for planned implementation and this release contract. Existing exposure is disclosed, not neutralized or certified away.
+- Accepted scope: #57, #64–#68, #71, #78–#82, #85–#89 (17 issues); 13 other milestone issues remain open outside this phase. Eighteen OpenSpec changes include one final boundary-assembly change.
+- History rewrite/cache work and real release publication remain separate scoped approvals. Operator merges PRs. No rewrite, credential/account change, publication or Execute stage is authorized by the planning artifacts alone.
+- Separate implementation completion from evidence, certification and publication: missing external authorization does not reopen finished code. Required absent/stale scenario evidence cannot be PASS.
+
+## 2026-10-24 — OA-06 legacy consumed idempotency migration
+
+Source inspection by tech-lead found that PostgreSQL0.3 idempotency tombstones retain mailbox_name/caller-key/expiry but no MailboxKey after consume, while redb retains caller-key/expiry only. Owner attribution can be irrecoverable. Implement conservative atomic refusal unless each unexpired legacy tombstone has one proven retained-result owner with matching generation/expiry or an explicit authoritative mapping. Preserve all data and TTL; do not discard unknown fences or silently Duplicate an unrelated tenant. Fixtures have known authoritative mappings and test refusal/success. Actual production migration/mapping collection remains an operator rollout action; no production stores are being changed. This implements the accepted preservation requirement and is unrelated to deferred credential rotation.
+
+## 2026-10-24 — OA-09 rejected dispatcher entries
+
+Scheduler source inspection found Dispatched only returns started/expired entries and ResourcePool::new initializes an empty accepted-work ledger for a prepopulated backend. Tech-lead approved scheduler-owned public Dispatched.rejected: Vec<(T,SchedulerError)> plus defaults/is_empty/literals/merging and required consumer handling; ResourcePool::new method-level Q:TaskQueue<P> bound seeds accepted count from initial queue.len before draining. Required by the accepted impossible-prefill oracle and prevention of observed source-level accounting underflow. Terminal callbacks remain outside dispatcher lock. Other owners receive exact diffs for out-of-role consumers; no parallel trait or new error taxonomy. Production verification deferred to phase boundary.
+
+## 2026-10-24 — OA-07 authoritative duplicate status
+
+Preserve the existing generic ResultMailbox acceptance of Queued and Running. DeliveryOutcome::Duplicate will carry the exact stored TaskStatus, including errors, retained past consume; no destructive consume or retry-status fallback. A durable consumer encountering a nonterminal duplicate diagnoses and uses its existing requeue path, without fabricating a terminal event or acknowledging the lease. A permanent nonterminal fence can retry indefinitely until authoritative remediation; an original TTL can expire normally. This is a guard at the existing public mailbox/durable boundary, observed during source inspection, rather than new terminal-only validation. Legacy owner and status conversions must share one transaction, including direct 0.3 and intermediate schema-2 upgrades; unknown historical metadata refuses atomically. No live upgrade or runtime evidence is implied.
+
+## 2026-10-24 — OA17 memory measurement scope
+
+Decision: measure and explicitly label per-sample benchmark-client/pool process peak RSS, normalizing Unix rusage units, and retain machine/Docker VM/resource/image identity. PostgreSQL server/daemon RSS is outside that process and is not claimed. Rationale: frozen issue71 asks Docker-backed throughput/latency and contention/memory use; neither it nor the adopted peak-RSS oracle requires database-process RSS. Adding that separate measurement would expand scope. Client samples include runtime/migration/warmup/teardown; no cgroup or Docker stats are mislabeled as RSS. No measurement has run.
+
+## 2026-10-24 — Resolve existing exact compiler without silent acquisition
+
+Read-only installed stable channel manifest records rustc1.99.1 even though no numeric1.99.1 directory exists. Do not infer absence from directory naming. Final native checks may use explicitly selected existing bytes only after actual binary version/hash verification; nested +1.99.1 wrappers still require a verified isolated numeric view or BLOCKED. Official Rustup docs confirm +selector precedence and RUSTUP_AUTO_INSTALL=0; freeze automatic installation off, preserve global configuration, and record every resolution input. No compiler/tool command or installation ran to make this decision.

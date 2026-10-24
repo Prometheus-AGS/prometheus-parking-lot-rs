@@ -1,0 +1,16 @@
+{
+  "worker": "/root/oa04_scheduler",
+  "sourceWorkspace": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs",
+  "imported": [
+    {
+      "path": "crates/parking-lot-runtime-tokio/src/resource_pool.rs",
+      "sha256": "aeedc8ae5ed8403c5738d929991d0d604025a464fcb85c0e2a88e124d4ff9e1c"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs",
+      "sha256": "941d442d5f849bc5aea47a6e07f0723564965375b47205651872a396bc6e4f82"
+    }
+  ],
+  "testsRun": false,
+  "status": "implementation imported; compilation and final integration pending"
+}

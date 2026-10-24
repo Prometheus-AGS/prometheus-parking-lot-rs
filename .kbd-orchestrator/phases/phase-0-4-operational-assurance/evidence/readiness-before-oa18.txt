@@ -1,0 +1,1 @@
+READY phase=phase-0-4-operational-assurance contract=.kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json digest=e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257 planRevision=1

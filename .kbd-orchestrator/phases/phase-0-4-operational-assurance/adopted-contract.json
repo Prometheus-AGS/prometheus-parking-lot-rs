@@ -1,0 +1,362 @@
+{
+  "contractVersion": "1",
+  "kind": "kbd.adopted-contract",
+  "identity": {
+    "projectId": "f6c384db-6ee1-4f1b-9bab-0e1602ec2615",
+    "runId": "phase-certification-remediation-20261022T103344Z",
+    "phaseId": "phase-0-4-operational-assurance",
+    "planRevision": 1,
+    "contractDigest": "e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257"
+  },
+  "digestNormalization": {
+    "algorithm": "sha256",
+    "command": "jq -S -c 'del(.identity.contractDigest) | del(.identity.planRevision)'",
+    "stalenessRule": "Reject a digest different from the latest non-superseded canonical adoption for this exact contract path; preserve historical receipts."
+  },
+  "adoptionSource": "2026-10-24 chat: operator requested Assess and Plan for phase-0-4-operational-assurance, then answered the one batched gate question: 'Defer credential rotation for now and accept your recommendations on the rest. We need stuff to get finished before we start blocking things and making it hard to finish. We will handle keys and stuff later.' Scope accepted: 17 listed issues; credential and exposed KBD signer rotation deferred and non-blocking. This is plan adoption, not publication/history-rewrite authorization.",
+  "decisionOwner": "Human operator GQAdonis",
+  "amendmentPolicy": "Material scope, API compatibility, safety, scenario/environment or budget changes need explicit operator adoption, a superseding canonical decision and supported signed amendment lineage. Do not re-add rotation as a blocker without an operator decision.",
+  "releaseClaim": {
+    "userOperation": "Prepare an approval-gated seven-crate 0.4.0 release whose supported pool/backend operations retain accepted work, isolate tenant result idempotency and emit terminal status consistent with stored results under the finite scenarios below.",
+    "supportedEnvironments": [
+      "Rust 1.99.1 native Tokio/runtime and existing WorkerPool contracts; MSRV 1.95",
+      "PostgreSQL 17 and 18 with project pgmq images",
+      "redb embedded store including populated 0.3.0 fixture migration",
+      "Pinned real Iggy server",
+      "WASM in headless Chromium plus existing Node coverage",
+      "Tauri builds macOS/Linux/Windows; actual macOS GUI restart/retrieve; no unverified Linux/Windows GUI runtime claim",
+      "Existing Android/iOS compile/binding regression jobs"
+    ],
+    "currentCapabilities": "0.3.0 published; 37 predecessor changes archived. Named correctness and verification gaps are open. No 0.4.0 implementation or fresh production test occurred during planning. Credential rotation and signer replacement explicitly deferred; exposure is not neutralized.",
+    "explicitUnknowns": [
+      "Fresh build/test health on receiving machine",
+      "Exact local/CI tool versions, browser/desktop runner availability and privileges",
+      "crates.io/GitHub account permission and trusted publisher/signing setup",
+      "Migration compatibility until populated-fixture tests run",
+      "Current validity of exposed credentials; operator deferred rotation",
+      "Configured access to proposed worker models; catalog only"
+    ]
+  },
+  "statusVocabulary": [
+    "PASS",
+    "FAIL",
+    "BLOCKED",
+    "NOT_EXERCISED"
+  ],
+  "scenarioMatrix": [
+    {
+      "id": "OA-01",
+      "name": "Prepare and enforce post-purge containment controls",
+      "ownerTask": "phase-0-4-operational-assurance/oa-01-containment-controls/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "productionEntry": "bash .github/scripts/supply-chain.sh tracked-credentials; post-purge secrets-history/path-history/pre-purge in an approved fresh mirror",
+      "realCollaborators": [
+        "Git/GitHub/crates.io controls or disposable rehearsals as applicable; actual writes require operator authority"
+      ],
+      "oracle": "After separately approved purge, history/path scans are blocking and clean, roots are nonempty, and a scratch branch with an old root is rejected; a clean candidate passes. Operator cache-removal evidence is recorded without credential values.",
+      "negativeControl": "A scratch clone/ref deliberately retaining one recorded pre-purge root must fail the pre-purge check; an intentionally tracked credential path must fail.",
+      "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
+      "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
+    },
+    {
+      "id": "OA-02",
+      "name": "Choose and automate seven-crate versioning",
+      "ownerTask": "phase-0-4-operational-assurance/oa-02-release-versioning/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "productionEntry": "Proposed release-tool dry run against a scratch copy of the seven-crate workspace, invoked by the boundary runner",
+      "realCollaborators": [
+        "Git/GitHub/crates.io controls or disposable rehearsals as applicable; actual writes require operator authority"
+      ],
+      "oracle": "The adopted ADR chooses lockstep 0.4.0 (proposal) or an operator-amended policy; a dry run yields consistent internal dependency versions and changelog entries for exactly seven publishable crates, excluding FFI; a second run is unchanged.",
+      "negativeControl": "Inject a mismatched internal dependency/version in the scratch copy; the release-preparation check must fail.",
+      "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
+      "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
+    },
+    {
+      "id": "OA-03",
+      "name": "Verify operator-signed release tags",
+      "ownerTask": "phase-0-4-operational-assurance/oa-03-signed-release-tags/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "productionEntry": "git verify-tag <candidate-tag> using the operator-selected SSH/GPG trust configuration",
+      "realCollaborators": [
+        "Git/GitHub/crates.io controls or disposable rehearsals as applicable; actual writes require operator authority"
+      ],
+      "oracle": "A scratch annotated tag signed by an operator-authorized identity verifies at the frozen candidate; an unsigned, wrong-identity or wrong-commit tag is rejected. Real v0.4.0 tag creation remains an approved publication step.",
+      "negativeControl": "Unsigned tag and a signed tag pointing at a different commit each fail candidate authorization.",
+      "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
+      "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
+    },
+    {
+      "id": "OA-04",
+      "name": "Gate trusted publishing on candidate evidence and approval",
+      "ownerTask": "phase-0-4-operational-assurance/oa-04-trusted-publishing/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "productionEntry": "Proposed approval-environment GitHub release workflow dispatch for the frozen candidate, initially a non-publishing rehearsal",
+      "realCollaborators": [
+        "Git/GitHub/crates.io controls or disposable rehearsals as applicable; actual writes require operator authority"
+      ],
+      "oracle": "Unapproved or stale boundary receipts, incorrect tag identities and missing environment approval prevent publication; approved candidate rehearsal resolves exactly seven crates and uses OIDC with minimum permissions and no long-lived token fallback. Actual publish/install evidence is required only after separate publication approval.",
+      "negativeControl": "Dispatch a scratch/rehearsal candidate with a stale receipt or unapproved environment; no cargo publish invocation may occur.",
+      "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
+      "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
+    },
+    {
+      "id": "OA-05",
+      "name": "Make template scans precise without hiding real secrets",
+      "ownerTask": "phase-0-4-operational-assurance/oa-05-template-secret-scan/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "productionEntry": "gitleaks detect --no-git --redact, plus repository staged/diff scans",
+      "realCollaborators": [
+        "Git/GitHub/crates.io controls or disposable rehearsals as applicable; actual writes require operator authority"
+      ],
+      "oracle": "The two known non-secret template examples no longer fail the full-tree scan; a synthetic nonfunctional secret-pattern canary outside narrowly scoped exceptions still fails. Scan metadata contains no unredacted secret.",
+      "negativeControl": "Synthetic canary outside the exact example paths/rules must be detected; a broad path or rule disable is rejected.",
+      "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
+      "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
+    },
+    {
+      "id": "OA-06",
+      "name": "Scope result idempotency to tenant/mailbox key",
+      "ownerTask": "phase-0-4-operational-assurance/oa-06-tenant-idempotency/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "productionEntry": "ResultMailbox::deliver/consume through PG17, PG18 and redb, including populated 0.3.0 stores",
+      "realCollaborators": [
+        "Real PG17/18 and redb; existing mailbox conformance and populated store fixtures"
+      ],
+      "oracle": "Two tenants reusing the same caller key independently retrieve their own first result; a duplicate within one tenant remains first-write-wins after consume/restart/TTL rules. Migration preserves existing results and dedup meaning under the recorded upgrade policy.",
+      "negativeControl": "The old mailbox-global-key behavior must fail the cross-tenant case; a duplicate within one tenant must not produce a second stored result.",
+      "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
+      "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
+    },
+    {
+      "id": "OA-07",
+      "name": "Emit durable terminal events from the stored result",
+      "ownerTask": "phase-0-4-operational-assurance/oa-07-stored-terminal-outcome/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "productionEntry": "DurableResourcePool deliver-before-resolve path on real PG/redb, killed after Failed delivery and before dead-letter/ack",
+      "realCollaborators": [
+        "Real PG17/18 and redb; existing mailbox conformance and populated store fixtures"
+      ],
+      "oracle": "After restart and redelivery, stored status and terminal event agree on Failed, exactly one result is consumable, and delivery still precedes lease resolution. The status remains knowable after consume while the idempotency record is retained.",
+      "negativeControl": "Old bool-only delivery handling that emits local Completed after a stored Failed must fail the event/result consistency oracle.",
+      "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
+      "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
+    },
+    {
+      "id": "OA-08",
+      "name": "Settle accepted work when a spawner discards its future",
+      "ownerTask": "phase-0-4-operational-assurance/oa-08-discarded-spawn/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "productionEntry": "ResourcePool::submit/launch with a legal Spawn implementation that discards supervise without polling, followed by shutdown_with",
+      "realCollaborators": [
+        "Production pool/dispatcher/hooks and collaborators specified in plan; no mock-only completion"
+      ],
+      "oracle": "Discarding an unpolled supervise future produces one documented Failed/Cancelled terminal outcome and mailbox result where configured, releases units and settles the ledger; shutdown does not wait out its deadline for the discarded task. A normal spawner still completes once.",
+      "negativeControl": "Constructing the settlement guard only inside the unpolled async body must fail the task-outcome/ledger oracle.",
+      "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
+      "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
+    },
+    {
+      "id": "OA-09",
+      "name": "Reject impossible pre-populated adapter work",
+      "ownerTask": "phase-0-4-operational-assurance/oa-09-backend-admission/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "productionEntry": "TaskQueueAdapter backend prefilled before ResourcePool startup with total-oversized and per-kind-oversized tasks",
+      "realCollaborators": [
+        "Production pool/dispatcher/hooks and collaborators specified in plan; no mock-only completion"
+      ],
+      "oracle": "An impossible head task is rejected/dead-lettered with a reason once first observed, valid following work runs, and active vector/kind cost never exceeds limits. Pre-populated valid work remains FIFO within the applicable policy.",
+      "negativeControl": "Skip first-observation capacity validation; the invalid head blocks valid followers and the oracle fails.",
+      "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
+      "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
+    },
+    {
+      "id": "OA-10",
+      "name": "Emit terminal events for explicitly pruned work",
+      "ownerTask": "phase-0-4-operational-assurance/oa-10-expiry-events/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "productionEntry": "ResourcePool::prune_expired on parked tasks through real TaskQueue implementations and recording hooks",
+      "realCollaborators": [
+        "Production pool/dispatcher/hooks and collaborators specified in plan; no mock-only completion"
+      ],
+      "oracle": "Each pruned task emits exactly one Expired terminal event, releases/settles its accepted-work accounting, and cannot execute; non-expired work still runs. The public return behavior is documented and all backends implement the changed metadata contract.",
+      "negativeControl": "Count-only pruning or suppressing Expired events must fail the per-task lifecycle sequence oracle.",
+      "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
+      "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
+    },
+    {
+      "id": "OA-11",
+      "name": "Model ledger races and kind-limited release",
+      "ownerTask": "phase-0-4-operational-assurance/oa-11-concurrency-models/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "productionEntry": "Loom model runs under --cfg parking_lot_loom with LOOM_MAX_PREEMPTIONS=3 and isolated target directories",
+      "realCollaborators": [
+        "Production pool/dispatcher/hooks and collaborators specified in plan; no mock-only completion"
+      ],
+      "oracle": "Ledger submit/shutdown and kind-limited permit release explore the bounded schedules without violation; each corresponding broken-order/release negative control compiles then triggers the intended model assertion.",
+      "negativeControl": "Remove the named happens-before edge or kind-release synchronization in an isolated cfg build and require the model to fail for that reason.",
+      "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
+      "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
+    },
+    {
+      "id": "OA-12",
+      "name": "Run every scenario negative control in CI",
+      "ownerTask": "phase-0-4-operational-assurance/oa-12-negative-control-ci/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "productionEntry": "CI matrix of every existing parking_lot_negative_control cfg plus each new OA regression control, compiled separately before test invocation",
+      "realCollaborators": [
+        "Production pool/dispatcher/hooks and collaborators specified in plan; no mock-only completion"
+      ],
+      "oracle": "All listed controls compile, discover the expected nonzero tests and fail only at their designated oracle; normal builds pass. Omitted controls, compile failures, timeouts and missing tests fail the CI job rather than count as successful negative controls.",
+      "negativeControl": "Remove one matrix row or let one defective control pass; the completeness/expected-failure verifier must fail.",
+      "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
+      "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
+    },
+    {
+      "id": "OA-13",
+      "name": "Exercise WASM admission and events in a browser",
+      "ownerTask": "phase-0-4-operational-assurance/oa-13-browser-assurance/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "productionEntry": "wasm-bindgen-test runner in pinned headless Chromium, exercising real browser event loop/timers",
+      "realCollaborators": [
+        "Pinned headless Chromium browser event loop and wasm-bindgen runner"
+      ],
+      "oracle": "Smoke, vector capacity, execution-budget, event-order and applicable expiry scenarios execute and pass in a real headless browser with nonzero test discovery; existing Node path also passes.",
+      "negativeControl": "A broken capacity/event-budget control fails in the browser; Node-only execution cannot satisfy the browser receipt.",
+      "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
+      "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
+    },
+    {
+      "id": "OA-14",
+      "name": "Rehearse a populated PostgreSQL 17\u219218 upgrade",
+      "ownerTask": "phase-0-4-operational-assurance/oa-14-postgres-upgrade/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "productionEntry": "Project PG17 image populated with queue/mailbox/pgmq fixtures, pg_upgrade into project PG18 image, then real integration suites",
+      "realCollaborators": [
+        "Disposable project PG17/18 images, pgmq, real queue/mailbox suites"
+      ],
+      "oracle": "Queued payloads, mailbox results, tenant dedup records and pgmq state survive the checksum-compatible upgrade; lease/mailbox/pgmq suites pass on upgraded PG18. Source fixture remains recoverable; version/checksum mismatch is detected before destructive work.",
+      "negativeControl": "Wrong checksum/version fixture must be rejected before upgrade; removing a seeded result must fail post-upgrade data verification.",
+      "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
+      "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
+    },
+    {
+      "id": "OA-15",
+      "name": "Build and launch the Tauri embedded example",
+      "ownerTask": "phase-0-4-operational-assurance/oa-15-desktop-assurance/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "productionEntry": "Real Tauri application launch on macOS and Linux/Windows shell builds, plus app submit/restart/retrieve operation",
+      "realCollaborators": [
+        "Real macOS Tauri shell/GUI and Linux/Windows build runners"
+      ],
+      "oracle": "Tauri shell builds on macOS/Linux/Windows. At least macOS actual GUI launch submits work, restarts the app and retrieves the persisted result; platform-specific manual checks are attributable and may not be replaced by queue-service unit tests.",
+      "negativeControl": "Delete only the test app's store before restart; retrieval oracle fails. A build-only or queue-service-only run cannot satisfy GUI evidence.",
+      "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
+      "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
+    },
+    {
+      "id": "OA-16",
+      "name": "Prove no stream publication beyond an abandoned chunk",
+      "ownerTask": "phase-0-4-operational-assurance/oa-16-iggy-poisoning/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "productionEntry": "IggyStreamSink/StreamWriter against a pinned real Iggy server with failure at one chosen chunk",
+      "realCollaborators": [
+        "Pinned real Iggy server and production reader/publisher"
+      ],
+      "oracle": "Exhausting the publish budget poisons the writer, later publishes return Poisoned, and a reader observes no sequence beyond the hole; reconnect semantics for valid prefixes remain correct.",
+      "negativeControl": "Disable writer poisoning or allow a later sequence to publish; the real-server reader oracle fails.",
+      "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
+      "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
+    },
+    {
+      "id": "OA-17",
+      "name": "Measure PG throughput, contention and memory",
+      "ownerTask": "phase-0-4-operational-assurance/oa-17-backend-benchmarks/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "productionEntry": "Docker-backed Postgres queue/mailbox/durable-pool benchmarks plus multi-thread contention and peak-memory measurement",
+      "realCollaborators": [
+        "Production pool/dispatcher/hooks and collaborators specified in plan; no mock-only completion"
+      ],
+      "oracle": "Quiet-machine baseline and candidate run the identical fixed workload with >=5 samples; report throughput, p50/p95/p99 latency, contention parameters and peak RSS, raw samples and environment. No performance gain or broad regression-budget claim is made from task counts or incomparable hosts; any observed regression is reported explicitly for the operator's release decision.",
+      "negativeControl": "Drop a raw sample or change workload/machine identity; report validation fails. A deliberately slowed workload validates regression classification.",
+      "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
+      "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
+    }
+  ],
+  "functionalScope": [
+    "Close issues #57,#64,#65,#66,#67,#68,#71,#78,#79,#80,#81,#82,#85,#86,#87,#88,#89 within their stated acceptance scope",
+    "Eighteen changes and 36 backend tasks listed in plan.md; no optional backlog inferred into totals",
+    "Implement code, fixtures, documentation and boundary machinery before one cumulative integration packet",
+    "Keep implementation, evidence/certification, authorization and publication outcomes separate"
+  ],
+  "resilienceScope": {
+    "policy": "Every adopted scenario remains mandatory for certification; environment/authority/budget exhaustion records BLOCKED, never silent PASS or automatic deferral. External pending work does not reopen completed implementation.",
+    "deferredOptional": [
+      "#70: Mark superseded ADRs and fix the stale WASM CI step name",
+      "#69: Remove the stale llm_inference_test and its reqwest dev-dependency",
+      "#63: Single-dimension dispatcher is 2\u20134% slower after multi-resource admission",
+      "#62: Iggy: a restarted publisher can store duplicate messages",
+      "#61: Attach IggyHook to pools from configuration",
+      "#60: Decide and test pgmq-backed durable pools",
+      "#59: Durable mode for the native WorkerPool",
+      "#58: Skip-ahead for DurableResourcePool",
+      "#56: Optional result_ttl_ms for WorkerPool result slots",
+      "#55: Allow a SchedulerConfig with no pools (events-only configuration)",
+      "#54: Durable pools should wake on Postgres LISTEN/NOTIFY instead of polling",
+      "#53: Config-built durable pools: result TTL, heartbeat and poll intervals are not configurable",
+      "#52: Config-built durable pools cannot take a notifier"
+    ]
+  },
+  "exclusions": [
+    "Credential revocation/rotation and exposed KBD signer replacement: operator-deferred, non-blocking for implementation and this release contract; preserve known exposure",
+    "No unattended history rewriting, force-push, Support submission, credential/enrollment change, registry publication or release tag creation",
+    "No durable WorkerPool, durable skip-ahead or new pgmq pool support",
+    "No FFI publication, global toolchain/MSRV upgrades or UI redesign",
+    "No claims of Linux/Windows GUI runtime execution without actual corresponding receipts"
+  ],
+  "requiredSafetyChecks": [
+    "No tracked credentials or new unredacted secret material; staged/diff/full-tree scans and package allowlist",
+    "Post-purge clean-history/path/root checks with old-branch negative control after exact separately approved rewrite; this does not revoke copied credentials",
+    "Core normal graph remains runtime/IO-free and wasm graph has no tokio; unsafe denied, pinned/MSRV compile/clippy/docs checks",
+    "Real PG/redb migration/crash and Iggy/browser/desktop production evidence, not mock-only assertions",
+    "Candidate/digest and signing-identity verification; actual publication requires separate operator approval",
+    "Fixture isolation and owned-resource cleanup; no broad prune or production store mutation"
+  ],
+  "budgets": {
+    "timeMinutes": 2880,
+    "toolCalls": 3000,
+    "repairAttempts": 2,
+    "noProgressLimit": 3,
+    "tokenBudget": "UNKNOWN",
+    "tokenFallback": "Record per-change measured usage where available; checkpoint at change boundaries and before ceilings, never claim a token measurement unavailable to the harness.",
+    "exhaustion": "Checkpoint completed implementation and preserve consumed budgets; record affected work BLOCKED, never waive adopted scenarios or return PASS. Ask for a scoped extension only when required."
+  },
+  "evidenceInvalidation": "Full candidate SHA + contract digest + scenario/test-manifest digest + Cargo.lock/toolchain + tool/image/browser/OS/fixture identities bind receipts. Changed dependencies invalidate affected evidence only; preserve history; no 0.3.0 historical receipt becomes a 0.4.0 PASS.",
+  "workerRoutes": {
+    "agent": "Codex native, parking-lot-core ownership roles; no implementation worker dispatched by this plan",
+    "model": "OpenAI/gpt-6.1-sol high reasoning recommended from 2026-10-24 exposed catalog; configured access unresolved, recheck before dispatch; inherited Claude registry preserved",
+    "billing": "No paid jobs or provider/account changes authorized by planning",
+    "subagents": "Future explicit execution may use native fresh workers within owned paths; independent artifact review now is same-family native isolation, not verified cross-model certification",
+    "reviewRoundsMax": 2
+  },
+  "boundaryPacket": {
+    "postImplementationOnly": true,
+    "singleRun": true,
+    "commands": [
+      "test -n \"$KBD_BOUNDARY_CANDIDATE\" && test -n \"$KBD_BOUNDARY_OUT\"",
+      "bash .github/scripts/operational-assurance-gate.sh --candidate \"$KBD_BOUNDARY_CANDIDATE\" --contract .kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json --out \"$KBD_BOUNDARY_OUT\""
+    ],
+    "expectedEffects": [
+      "One candidate-bound receipt collection covering OA-01\u2026OA-17, full baseline regression and approved operator evidence",
+      "No production publication, history rewrite, credential mutation or host acquisition inside unattended validation",
+      "Implementation may be complete while certification/publication remain pending; only observed scenario receipts can certify release readiness",
+      "The runner path is a planned deliverable of oa-18 task 1, not executable during planning; KBD_BOUNDARY_CANDIDATE and KBD_BOUNDARY_OUT are mandatory declared invocation inputs, resolved to literal values in the boundary receipt. The checked manifest includes every exact regression/scenario command from the plan, including the blocking core normal dependency-graph check; no missing dependency or failed cargo tree invocation is PASS."
+    ],
+    "requiredApprovals": "G-02 exact backup/ref/reclone plan before history purge; operator signing identity and OIDC account settings before external change; paid/host acquisition before use; G-05 candidate-naming approval before publish. G-01 rotation is deferred and not a prerequisite.",
+    "receipts": [
+      "Full candidate SHA, contract digest, checked boundary manifest",
+      "Raw logs and per-scenario/OS/backend discovery and oracle results",
+      "Image/tool/fixture identities, populated migrations and crash outcomes",
+      "Independent cumulative review and one batched correction/confirmation cycle",
+      "Separately authorized purge/signing/publisher/publication receipts; no private values"
+    ],
+    "cleanup": [
+      "Remove only test-owned DBs/volumes/streams/GUI stores",
+      "Retain raw logs, failed receipts, fixture backups and rewrite ref maps",
+      "No broad Docker prune, cargo clean, live lock deletion, credential cleanup or force-push"
+    ],
+    "stopConditions": [
+      "Required oracle fails: FAIL",
+      "Validator/environment/approval unavailable: BLOCKED; unattempted: NOT_EXERCISED",
+      "Changed candidate/digest or missing required receipts: reject stale packet",
+      "Compile-error/timeout/no-test negative control cannot count as detected failure",
+      "Unsafe fixture identity, concurrent build writer or unapproved external mutation: stop"
+    ]
+  },
+  "status": {
+    "implementationComplete": false
+  }
+}

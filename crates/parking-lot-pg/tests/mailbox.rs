@@ -245,7 +245,7 @@ docker_test! {
         let entry = mailbox.consume(&k).await.expect("consume").expect("the winner's entry");
         assert_eq!(entry.payload, Some(format!("writer-{}", stored[0])));
         assert!(mailbox.consume(&k).await.expect("consume").is_none());
-        assert_eq!(row_count(&pg, "pl_result_mailbox_keys", "fww").await, 1);
+        assert_eq!(row_count(&pg, "pl_result_mailbox_keys_v3", "fww").await, 1);
     }
 }
 
@@ -264,18 +264,18 @@ docker_test! {
         let kept = completed(&k, 2, "kept");
         let _ = mailbox.deliver(short.clone()).await.expect("deliver");
         let _ = mailbox.deliver(kept).await.expect("deliver");
-        assert_eq!(row_count(&pg, "pl_result_mailbox", "ttl").await, 2);
+        assert_eq!(row_count(&pg, "pl_result_mailbox_v3", "ttl").await, 2);
 
         tokio::time::sleep(Duration::from_millis(1500)).await;
 
         // Never delivered once expired, though the row is still in the table.
-        assert_eq!(row_count(&pg, "pl_result_mailbox", "ttl").await, 2);
+        assert_eq!(row_count(&pg, "pl_result_mailbox_v3", "ttl").await, 2);
         let seen = mailbox.peek(&k).await.expect("peek").expect("the unexpired entry");
         assert_eq!(seen.payload.as_deref(), Some("kept"));
 
         assert_eq!(mailbox.evict_expired().await.expect("evict"), 1);
-        assert_eq!(row_count(&pg, "pl_result_mailbox", "ttl").await, 1);
-        assert_eq!(row_count(&pg, "pl_result_mailbox_keys", "ttl").await, 0);
+        assert_eq!(row_count(&pg, "pl_result_mailbox_v3", "ttl").await, 1);
+        assert_eq!(row_count(&pg, "pl_result_mailbox_keys_v3", "ttl").await, 0);
         assert_eq!(mailbox.evict_expired().await.expect("evict again"), 0);
 
         // The key is forgotten, so the same delivery is stored again.
@@ -296,7 +296,7 @@ docker_test! {
         let _sweeper = mailbox.spawn_sweeper(Duration::from_millis(200));
 
         let deadline = Instant::now() + Duration::from_secs(10);
-        while row_count(&pg, "pl_result_mailbox", "sweep").await > 0 {
+        while row_count(&pg, "pl_result_mailbox_v3", "sweep").await > 0 {
             assert!(Instant::now() < deadline, "the sweeper did not evict in 10 s");
             tokio::time::sleep(Duration::from_millis(100)).await;
         }

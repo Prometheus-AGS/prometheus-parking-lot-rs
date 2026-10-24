@@ -1,0 +1,59 @@
+{
+  "owner": "/root/oa04_postgres",
+  "sourceWorkspace": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs",
+  "files": [
+    {
+      "path": "crates/parking-lot-pg/src/mailbox/mod.rs",
+      "sha256": "ba88ceb667b4b6ca44c1b0078ec2ca0ee228d24b744e1954280fb95151ed7ea7"
+    },
+    {
+      "path": "crates/parking-lot-pg/src/mailbox/sql.rs",
+      "sha256": "f7dc01a38ec5958ee8a2f9108f7d5246052b9a39ffef7783f11131e436929fae"
+    },
+    {
+      "path": "crates/parking-lot-pg/src/mailbox/migration.rs",
+      "sha256": "a38b03ec3b681c72a5d8def96132781fa81c5e81b419884b042f68d32c152499"
+    },
+    {
+      "path": "crates/parking-lot-pg/migrations/008_scoped_result_mailbox.sql",
+      "sha256": "f583b5e14927df5a0f09974b2d1656d4bab374d5982e315ecde853298fd971aa"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/mailbox.rs",
+      "sha256": "3773b44d451da7813739650203255e9ea7250484bda811625ad9e2329b0e944f"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/migrations.rs",
+      "sha256": "a04a8a1b1ec02f9ecb43b76b1c61f079df5919168ed676fdba06c88840d73353"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/queue_autovacuum.rs",
+      "sha256": "ce506bd35ff929debda36743715fec4bade8776313cc58826da7508a8956acd8"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/mailbox_migration.rs",
+      "sha256": "4ed406aadff569b49e66c7c0b83efa207ec0489a3323271fb615bd92679dd5f1"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa06/005_result_mailbox_0_3.sql",
+      "sha256": "bc5900ca7024444f36b8ac5f6746e8fc9af4d7e87bae84ba4895eba068279a05"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa06/populated_0_3.sql",
+      "sha256": "16b8706a04ff5b339b513452ff6b6994f66b50d34b38351741410c66c0eecfec"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa06/untouched_backup_0_3.sql",
+      "sha256": "9861a3281d5b763655be2ba2c2cb435b73914e51222a1327d888967522655bc7"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa06/legacy_keyed_delivery.sql",
+      "sha256": "5ee0eca59018719d0005426717d1c38a7744f17669d27f4ef838c88be9f7fd5b"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa06/manifest.json",
+      "sha256": "13047843169ddf20d438771c6409229a9bc99f295a2397e6015d9ae2a118818d"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED"
+}

@@ -1,0 +1,97 @@
+--- a/docs/API.md
++++ b/docs/API.md
+@@ -31,6 +31,22 @@
+ `with_cancellation_config`, `submit`, `prune_expired`, `active_units`,
+ `running_tasks`, `queued_tasks`, `shutdown` (refuse new work only),
+ `shutdown_with(policy)` (async; returns a `ShutdownReport`, cr-29).
++
++`ResourcePool::prune_expired().await` retains its public
++`Result<usize, SchedulerError>` removal count (oa-10, #57). Each removed task
++uses the normal per-task expiry path outside the dispatcher lock: `Expired`
++terminal event, one configured mailbox delivery attempt of `TaskStatus::Expired`
++with no result payload, individual expiry audit, and once-only accepted-work
++settlement. It cannot execute or be returned by a repeated prune. Equality at
++a deadline is live; tasks without deadlines remain queued. Active permits
++are unchanged, and live work unblocked by removal can start in the following
++drain. This path invokes no cancellation sink.
++
++Expiry counts as a failed task and a finished ledger outcome. Settlement
++precedes mailbox/audit callbacks as for head expiry; a shutdown report is not
++an acknowledgement that storage succeeded. Mailbox errors, callback failures
++and bounded hook delivery retain their existing limits. A conforming backend
++removes nothing on a pruning error, and no per-task expiry reporting runs then.
+ 
+ `ResourcePool::new` requires `Q: TaskQueue<P>` and includes the queue's
+ existing reported depth in shutdown accounting (oa-09). Construction does not
+@@ -154,6 +170,25 @@
+ | `LeaseQueue<P>` | async, leasing (`enqueue`, `lease`, `ack`, `nack`, `extend`, `depth`) | `infra::queue::InMemoryLeaseQueue` (reference); `infra::queue::RedbLeaseQueue` from `infra::EmbeddedStore` (`embedded`, crash-safe); `infra::queue::PgLeaseQueue` (`postgres`) |
+ | `ResultMailbox<T>` + `Notifier<T>` | async, idempotent (`deliver`, `consume`, `peek`, `evict_expired`) | `infra::mailbox::InMemoryResultMailbox` (reference); `infra::mailbox::RedbResultMailbox` (`embedded`, crash-safe); `infra::mailbox::PgResultMailbox` (`postgres`); `StorageMailbox<S, N>` composes storage and notifier |
+ 
++Synchronous pruning returns removed tasks rather than a count:
++`TaskQueue<P>::prune_expired(&mut self, now_ms)` returns
++`Result<Vec<ScheduledTask<P>>, SchedulerError>`. Each removed task retains its
++full original metadata and payload, exactly once, without requiring `P: Clone`.
++Expiry is strict `now_ms > deadline_ms`; equality and missing deadlines stay
++live. Survivors retain their ordering metadata, removed-item ordering is
++unspecified, and `Err` must leave every task queued. Custom backends must
++implement this ownership-returning contract rather than discarding removed
++metadata. The synchronous conformance helper is
++`prometheus_parking_lot_core::conformance::task_queue::prune_returns_all_removed_tasks`
++with feature `conformance`.
++
++Core-only `dispatch::ParkedQueue<T>::prune_expired` analogously returns
++`Result<Vec<T>, SchedulerError>`. `TaskQueueAdapter` completes fallible backend
++pruning before mutating its in-memory front. `Dispatcher::prune_expired` keeps
++its `(usize, Dispatched<T>)` result and places full removed tasks in `expired`;
++callers must report those outcomes outside the dispatch lock. Custom queue
++implementations and direct consumers must preserve that reporting obligation.
++
+ The async contracts live in `core::backend`; `DurableResourcePool` runs on them.
+ `StorageMailbox::new(storage, notifier)` takes a `DetachedNotifier`:
+ `NoopNotifier`, or `BackgroundNotifier::new(notifier, spawner, sleeper)`, which
+@@ -220,9 +255,9 @@
+ task, `Submitted`, then `Queued` if it parks, `Started` when the executor is
+ about to run, and exactly one terminal event: `Completed`, `Failed`,
+ `Rejected`, `Cancelled`, `Expired` or (durable pool) `Requeued`
+-(`LifecycleEvent::is_terminal`); a task removed by `prune_expired` emits no
+-terminal event (the `TaskQueue` contract does not return the pruned ids;
+-issue #57). `RejectionReason::CapacityExceeded { kind }` names the dimension
++(`LifecycleEvent::is_terminal`); explicit pruning emits `Expired` for each
++removed task, without `Started` (oa-10, #57).
++`RejectionReason::CapacityExceeded { kind }` names the dimension
+ that did not fit (`None`: the pool's total). For `DurableResourcePool` the one-terminal rule holds per
+ run, not per task: a run that ends in `Requeued` is followed by the task's
+ next run (`Queued`/`Started`, then its own terminal event), here or in another
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -8,6 +8,15 @@
+ ## [Unreleased]
+ 
+ ### Fixed
++
++- **Per-task explicit expiry (oa-10, #57).** `ResourcePool::prune_expired`
++  retains its public removal count and now reports each removed task through
++  the normal expiry path: `Expired` terminal event, one configured mailbox
++  delivery attempt of `TaskStatus::Expired`, per-task audit and once-only
++  ledger settlement. Removed work cannot execute, and live survivors keep
++  their order. Equality at a deadline remains live. Aggregate accounting and
++  the batch-only audit are replaced by per-task handling; callback/storage
++  failure limits remain unchanged. Final-boundary execution is unverified.
+ 
+ - **Address-scoped result idempotency (oa-06, #80).** Results now deduplicate
+   by the complete mailbox address plus caller key within the storage namespace.
+@@ -39,6 +48,14 @@
+ 
+ ### Changed (breaking)
+ 
++- **Pruned-task ownership (oa-10).** Synchronous `TaskQueue<P>::prune_expired`
++  now returns `Result<Vec<ScheduledTask<P>>, SchedulerError>`; core
++  `ParkedQueue<T>::prune_expired` returns `Result<Vec<T>, SchedulerError>`.
++  Custom implementations must return every removed task with original
++  metadata/payload, without requiring Clone, and leave tasks queued on error.
++  Adapter pruning performs the fallible backend step before changing its
++  front. Direct dispatcher consumers retain the count plus full removed
++  items in `Dispatched.expired` for terminal reporting outside the lock.
+ - **Persistent result-mailbox upgrade (oa-06).** Postgres uses protocol-2
+   versioned result/fence tables and rejects old mutation SQL; redb uses schema 2
+   and ordinary open refuses schema 1. Explicit migration APIs accept the new

@@ -1,0 +1,48 @@
+{
+  "scope": "explicit OA12 existing-runtime-test-only immediate classifier proposals; root applies",
+  "runtime_evidence": "NOT_EXERCISED",
+  "patch_sha256": "9e756e2c9c58283c77a5f625150ee5c83e6d4ef6dad7f7f7f5c4858c81e1116d",
+  "files": [
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/panic_test.rs",
+      "held_base_sha256": "f3a3106191be54aa94e61f1ec6cdcbf67c32f3b39c20d4ca28d1f2fdf74181b3",
+      "proposed_sha256": "7b90dbceaaaf419647302a5f772fb1bb3ac8b67c46ca22211efe43732287c2a1"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/result_slots_test.rs",
+      "held_base_sha256": "f6541de8476f9bb38d7b13633f6965666edc485d09abc65f2da0095545d547d3",
+      "proposed_sha256": "a320af8d25f1cae2811bc9f156b987cc714b0c1a275c14cf2c4e6717f80c0ab5"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/budget_test.rs",
+      "held_base_sha256": "2354152cbd0e30ac83e4de6cb5bd84e9adc651e5d912f03629f2f5474fc3702f",
+      "proposed_sha256": "4a74b805b6ecc7f1b11e780d8896df5ee121b7f43c9a5fa00a163209a28bcde5"
+    }
+  ],
+  "tokio_source": "/Users/gqadonis/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/blocking/pool.rs:508",
+  "tokio_api_source": "/Users/gqadonis/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.54.1/src/runtime/builder.rs:717",
+  "designated": {
+    "s-3": {
+      "target": "panic_test",
+      "test": "panic_resource_pool_one_in_100_is_contained",
+      "diagnostic": "OA12:S3: executor panic escaped the ResourcePool spawned future",
+      "positive_target": "budget_test",
+      "positive_test": "budget_resource_pool_in_budget_task_is_not_cancelled"
+    },
+    "s-4": {
+      "target": "budget_test",
+      "test": "budget_worker_pool_wedged_executor_is_cancelled",
+      "diagnostic": "OA12:S4:native-worker-budget",
+      "positive_target": "budget_test",
+      "positive_test": "budget_worker_pool_in_budget_task_is_not_cancelled"
+    },
+    "s-17": {
+      "target": "result_slots_test",
+      "test": "waiters_no_blocking_threads",
+      "diagnostic": "OA12:S17: pending retrieve_async started a blocking thread",
+      "positive_target": "result_slots_test",
+      "positive_test": "waiters_no_blocking_threads_unretrieved_result_expires_after_ttl"
+    }
+  },
+  "limits": "No new test identities, runtime API/behavior, unstable cfg, Cargo/manifest edits or execution. S3 join watchdog/S17 cleanup watchdogs are harness failures, not expected controls. S4 observes witness after unchanged budget plus fixed scheduling slack."
+}

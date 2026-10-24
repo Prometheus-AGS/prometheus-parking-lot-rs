@@ -259,7 +259,7 @@ impl ParkedQueue<Item> for VanishingHead {
         None
     }
 
-    fn prune_expired(&mut self, now_ms: u128) -> Result<usize, SchedulerError> {
+    fn prune_expired(&mut self, now_ms: u128) -> Result<Vec<Item>, SchedulerError> {
         self.inner.prune_expired(now_ms)
     }
 }
@@ -318,9 +318,13 @@ fn review_s5_prune_keeps_a_task_whose_deadline_is_now() {
     queue.enqueue(task(2, Some(99))).expect("enqueue");
     let ticket = task(1, Some(100)).ticket();
     assert!(!ticket.is_expired(100), "live at its deadline");
-    assert_eq!(queue.prune_expired(100).expect("prune"), 1, "only 99 < 100");
+    let removed = queue.prune_expired(100).expect("prune");
+    assert_eq!(removed.len(), 1, "only 99 < 100");
+    assert_eq!(removed[0].meta.id, 2);
     assert_eq!(queue.len(), 1);
-    assert_eq!(queue.prune_expired(101).expect("prune"), 1);
+    let removed = queue.prune_expired(101).expect("prune");
+    assert_eq!(removed.len(), 1);
+    assert_eq!(removed[0].meta.id, 1);
     assert_eq!(queue.len(), 0);
 }
 

@@ -1,0 +1,1496 @@
+{
+  "schema_version": 1,
+  "scenario": "OA-12",
+  "execution": "NOT_EXERCISED",
+  "contract_digest": "e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257",
+  "toolchain": "1.99.1",
+  "nextest": "0.9.149",
+  "source_sites": {
+    "oa-06": [
+      "crates/parking-lot-embedded/src/mailbox.rs",
+      "crates/parking-lot-pg/src/mailbox/mod.rs"
+    ],
+    "oa-07": [
+      "crates/parking-lot-embedded/src/mailbox.rs",
+      "crates/parking-lot-pg/src/mailbox/mod.rs"
+    ],
+    "oa-07-event": [
+      "crates/parking-lot-runtime-tokio/src/durable_pool/mod.rs"
+    ],
+    "oa-08": [
+      "crates/parking-lot-runtime-tokio/src/resource_pool.rs"
+    ],
+    "oa-09": [
+      "crates/parking-lot-core/src/dispatch/dispatcher.rs"
+    ],
+    "oa-10-expiry": [
+      "crates/parking-lot-runtime-tokio/src/resource_pool.rs"
+    ],
+    "oa-11-kind-release": [
+      "crates/parking-lot-core/src/semaphore/mod.rs"
+    ],
+    "oa-11-ledger-order": [
+      "crates/parking-lot-runtime-tokio/src/ledger.rs",
+      "crates/parking-lot-runtime-tokio/tests/loom_ledger.rs"
+    ],
+    "oa-13-budget-event": [
+      "crates/parking-lot-wasm/src/events.rs"
+    ],
+    "oa-14-missing-result": [
+      "crates/parking-lot-pg/tests/postgres_upgrade.rs"
+    ],
+    "oa-16": [
+      "crates/parking-lot-iggy/src/publisher.rs"
+    ],
+    "s-1": [
+      "crates/parking-lot-core/src/semaphore/mod.rs"
+    ],
+    "s-10": [
+      "crates/parking-lot-core/src/mailbox/notify.rs",
+      "crates/parking-lot-core/src/mailbox/storage.rs"
+    ],
+    "s-11": [
+      "crates/parking-lot-iggy/src/ids.rs",
+      "crates/parking-lot-iggy/src/publisher.rs"
+    ],
+    "s-16": [
+      "crates/parking-lot-runtime-tokio/src/durable_pool/mod.rs"
+    ],
+    "s-17": [
+      "crates/parking-lot-runtime-tokio/src/worker_pool/slots.rs"
+    ],
+    "s-18": [
+      "crates/parking-lot-pg/src/pgmq/sql.rs"
+    ],
+    "s-19": [
+      "crates/parking-lot-core/src/semaphore/mod.rs"
+    ],
+    "s-2": [
+      "crates/parking-lot-core/src/dispatch/dispatcher.rs"
+    ],
+    "s-20": [
+      "crates/parking-lot-core/src/dispatch/dispatcher.rs"
+    ],
+    "s-20-depth": [
+      "crates/parking-lot-core/src/dispatch/dispatcher.rs"
+    ],
+    "s-20-order": [
+      "crates/parking-lot-core/src/dispatch/dispatcher.rs"
+    ],
+    "s-21": [
+      "crates/parking-lot-runtime-tokio/src/events.rs",
+      "crates/parking-lot-wasm/src/events.rs"
+    ],
+    "s-22": [
+      "crates/parking-lot-core/src/config/worker_pool.rs",
+      "src/config/backend.rs",
+      "src/config/pool.rs"
+    ],
+    "s-3": [
+      "crates/parking-lot-runtime-tokio/src/contain.rs"
+    ],
+    "s-33": [
+      "crates/parking-lot-iggy/src/stream.rs"
+    ],
+    "s-4": [
+      "crates/parking-lot-runtime-tokio/src/resource_pool.rs",
+      "crates/parking-lot-runtime-tokio/src/worker_pool/native.rs",
+      "crates/parking-lot-wasm/src/pool.rs"
+    ],
+    "s-5": [
+      "crates/parking-lot-pg/src/lease_queue/sql.rs"
+    ],
+    "s-5-fencing": [
+      "crates/parking-lot-pg/src/lease_queue/sql.rs"
+    ],
+    "s-6": [
+      "crates/parking-lot-pg/src/lease_queue/sql.rs"
+    ],
+    "s-7": [
+      "crates/parking-lot-pg/src/mailbox/mod.rs",
+      "crates/parking-lot-pg/src/mailbox/sql.rs",
+      "crates/parking-lot-pg/tests/mailbox.rs"
+    ],
+    "s-8": [
+      "crates/parking-lot-embedded/src/store.rs"
+    ],
+    "s-9": [
+      "crates/parking-lot-runtime-tokio/src/worker_pool/native.rs"
+    ]
+  },
+  "cases": [
+    {
+      "id": "s-1",
+      "control": "s-1",
+      "adapter": "loom",
+      "package": "prometheus-parking-lot-core",
+      "oracles": [
+        {
+          "target": "loom_capacity",
+          "name": "loom_capacity_never_exceeded_and_no_job_lost",
+          "diagnostic": [
+            "capacity invariant violated:"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "unit",
+          "name": "util_test::priority_ordering",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-2",
+      "control": "s-2",
+      "adapter": "loom",
+      "package": "prometheus-parking-lot-core",
+      "oracles": [
+        {
+          "target": "loom_wakeup",
+          "name": "loom_wakeup_completion_racing_a_park_is_not_lost",
+          "diagnostic": [
+            "lost wakeup: a job is parked"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "unit",
+          "name": "util_test::priority_ordering",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-3",
+      "control": "s-3",
+      "adapter": "native",
+      "package": "prometheus-parking-lot-runtime-tokio",
+      "oracles": [
+        {
+          "target": "panic_test",
+          "name": "panic_resource_pool_one_in_100_is_contained",
+          "diagnostic": [
+            "OA12:S3: executor panic escaped the ResourcePool spawned future"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "budget_test",
+          "name": "budget_resource_pool_in_budget_task_is_not_cancelled",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-4-resource",
+      "control": "s-4",
+      "adapter": "native",
+      "package": "prometheus-parking-lot-runtime-tokio",
+      "oracles": [
+        {
+          "target": "execution_timeout_test",
+          "name": "work_exceeding_the_budget_is_cancelled",
+          "diagnostic": [
+            "the body must have been CANCELLED"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "execution_timeout_test",
+          "name": "work_within_the_budget_completes_normally",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-4-worker",
+      "control": "s-4",
+      "adapter": "native",
+      "package": "prometheus-parking-lot-runtime-tokio",
+      "oracles": [
+        {
+          "target": "budget_test",
+          "name": "budget_worker_pool_wedged_executor_is_cancelled",
+          "diagnostic": [
+            "OA12:S4:native-worker-budget"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "budget_test",
+          "name": "budget_worker_pool_in_budget_task_is_not_cancelled",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-4-browser",
+      "control": "s-4",
+      "adapter": "browser",
+      "package": "prometheus-parking-lot-wasm",
+      "oracles": [
+        {
+          "target": "wasm_pool",
+          "name": "budget_cancels_a_wedged_executor",
+          "diagnostic": [
+            "OA12:S4:wasm-budget: executor future was not dropped"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "wasm_pool",
+          "name": "smoke_submit_and_retrieve",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-5-pg17",
+      "control": "s-5",
+      "adapter": "pg",
+      "package": "prometheus-parking-lot-pg",
+      "oracles": [
+        {
+          "target": "lease_queue",
+          "name": "sigkill_redelivery",
+          "diagnostic": [
+            "the task was never redelivered after the dead consumer's lease expired"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "lease_queue",
+          "name": "undecodable_entry_does_not_wedge_the_queue",
+          "diagnostic": []
+        }
+      ],
+      "pg": "17"
+    },
+    {
+      "id": "s-5-fencing-pg17",
+      "control": "s-5-fencing",
+      "adapter": "pg",
+      "package": "prometheus-parking-lot-pg",
+      "oracles": [
+        {
+          "target": "lease_queue",
+          "name": "sigkill_redelivery",
+          "diagnostic": [
+            "queue.ack(killed.token).await",
+            "SchedulerError::LeaseLost"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "lease_queue",
+          "name": "notify_wakes_an_idle_dispatcher",
+          "diagnostic": []
+        }
+      ],
+      "pg": "17"
+    },
+    {
+      "id": "s-6-pg17",
+      "control": "s-6",
+      "adapter": "pg",
+      "package": "prometheus-parking-lot-pg",
+      "oracles": [
+        {
+          "target": "lease_queue",
+          "name": "concurrent_dispatchers",
+          "diagnostic": [
+            "a task was leased twice"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "lease_queue",
+          "name": "sigkill_redelivery",
+          "diagnostic": []
+        }
+      ],
+      "pg": "17"
+    },
+    {
+      "id": "s-7-pg17",
+      "control": "s-7",
+      "adapter": "pg",
+      "package": "prometheus-parking-lot-pg",
+      "oracles": [
+        {
+          "target": "mailbox",
+          "name": "mailbox_consume_once_race",
+          "diagnostic": [
+            "consumers received the one entry"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "mailbox",
+          "name": "mailbox_first_write_wins_race",
+          "diagnostic": []
+        }
+      ],
+      "pg": "17"
+    },
+    {
+      "id": "s-18-pg17",
+      "control": "s-18",
+      "adapter": "pg",
+      "package": "prometheus-parking-lot-pg",
+      "oracles": [
+        {
+          "target": "pgmq",
+          "name": "pgmq_priority_order",
+          "diagnostic": [
+            "right: [\"high-1\", \"high-2\", \"normal-1\", \"low-1\", \"low-2\"]"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "pgmq",
+          "name": "pgmq_stale_token_is_rejected",
+          "diagnostic": []
+        }
+      ],
+      "pg": "17"
+    },
+    {
+      "id": "oa-06-pg17",
+      "control": "oa-06",
+      "adapter": "pg",
+      "package": "prometheus-parking-lot-pg",
+      "oracles": [
+        {
+          "target": "mailbox_migration",
+          "name": "mailbox_scoped_fences_survive_reconnect_and_expire_independently",
+          "diagnostic": [
+            "OA-06:address-scope oracle"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "mailbox",
+          "name": "mailbox_consume_once_race",
+          "diagnostic": []
+        }
+      ],
+      "pg": "17"
+    },
+    {
+      "id": "oa-07-pg17",
+      "control": "oa-07",
+      "adapter": "pg",
+      "package": "prometheus-parking-lot-pg",
+      "oracles": [
+        {
+          "target": "mailbox_status",
+          "name": "mailbox_status_direct_and_v2_refuse_atomically_then_preserve_failed_provenance",
+          "diagnostic": [
+            "OA-07:stored-status"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "mailbox",
+          "name": "mailbox_consume_once_race",
+          "diagnostic": []
+        }
+      ],
+      "pg": "17"
+    },
+    {
+      "id": "s-5-pg18",
+      "control": "s-5",
+      "adapter": "pg",
+      "package": "prometheus-parking-lot-pg",
+      "oracles": [
+        {
+          "target": "lease_queue",
+          "name": "sigkill_redelivery",
+          "diagnostic": [
+            "the task was never redelivered after the dead consumer's lease expired"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "lease_queue",
+          "name": "undecodable_entry_does_not_wedge_the_queue",
+          "diagnostic": []
+        }
+      ],
+      "pg": "18"
+    },
+    {
+      "id": "s-5-fencing-pg18",
+      "control": "s-5-fencing",
+      "adapter": "pg",
+      "package": "prometheus-parking-lot-pg",
+      "oracles": [
+        {
+          "target": "lease_queue",
+          "name": "sigkill_redelivery",
+          "diagnostic": [
+            "queue.ack(killed.token).await",
+            "SchedulerError::LeaseLost"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "lease_queue",
+          "name": "notify_wakes_an_idle_dispatcher",
+          "diagnostic": []
+        }
+      ],
+      "pg": "18"
+    },
+    {
+      "id": "s-6-pg18",
+      "control": "s-6",
+      "adapter": "pg",
+      "package": "prometheus-parking-lot-pg",
+      "oracles": [
+        {
+          "target": "lease_queue",
+          "name": "concurrent_dispatchers",
+          "diagnostic": [
+            "a task was leased twice"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "lease_queue",
+          "name": "sigkill_redelivery",
+          "diagnostic": []
+        }
+      ],
+      "pg": "18"
+    },
+    {
+      "id": "s-7-pg18",
+      "control": "s-7",
+      "adapter": "pg",
+      "package": "prometheus-parking-lot-pg",
+      "oracles": [
+        {
+          "target": "mailbox",
+          "name": "mailbox_consume_once_race",
+          "diagnostic": [
+            "consumers received the one entry"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "mailbox",
+          "name": "mailbox_first_write_wins_race",
+          "diagnostic": []
+        }
+      ],
+      "pg": "18"
+    },
+    {
+      "id": "s-18-pg18",
+      "control": "s-18",
+      "adapter": "pg",
+      "package": "prometheus-parking-lot-pg",
+      "oracles": [
+        {
+          "target": "pgmq",
+          "name": "pgmq_priority_order",
+          "diagnostic": [
+            "right: [\"high-1\", \"high-2\", \"normal-1\", \"low-1\", \"low-2\"]"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "pgmq",
+          "name": "pgmq_stale_token_is_rejected",
+          "diagnostic": []
+        }
+      ],
+      "pg": "18"
+    },
+    {
+      "id": "oa-06-pg18",
+      "control": "oa-06",
+      "adapter": "pg",
+      "package": "prometheus-parking-lot-pg",
+      "oracles": [
+        {
+          "target": "mailbox_migration",
+          "name": "mailbox_scoped_fences_survive_reconnect_and_expire_independently",
+          "diagnostic": [
+            "OA-06:address-scope oracle"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "mailbox",
+          "name": "mailbox_consume_once_race",
+          "diagnostic": []
+        }
+      ],
+      "pg": "18"
+    },
+    {
+      "id": "oa-07-pg18",
+      "control": "oa-07",
+      "adapter": "pg",
+      "package": "prometheus-parking-lot-pg",
+      "oracles": [
+        {
+          "target": "mailbox_status",
+          "name": "mailbox_status_direct_and_v2_refuse_atomically_then_preserve_failed_provenance",
+          "diagnostic": [
+            "OA-07:stored-status"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "mailbox",
+          "name": "mailbox_consume_once_race",
+          "diagnostic": []
+        }
+      ],
+      "pg": "18"
+    },
+    {
+      "id": "s-8",
+      "control": "s-8",
+      "adapter": "redb",
+      "package": "prometheus-parking-lot-embedded",
+      "oracles": [
+        {
+          "target": "crash_points",
+          "name": "crash_point_between_enqueue_a_and_enqueue_b",
+          "diagnostic": [
+            "between:ENQUEUED a: ACCEPTED TASK LOST: a was enqueued, never acked, yet is gone"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "restart",
+          "name": "second_open_of_the_same_file_is_an_error",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-9",
+      "control": "s-9",
+      "adapter": "native",
+      "package": "prometheus-parking-lot-runtime-tokio",
+      "oracles": [
+        {
+          "target": "shutdown_test",
+          "name": "shutdown_worker_pool_drain_accounts_for_every_task",
+          "diagnostic": [
+            "tasks with neither an outcome nor a capture (lost):"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "shutdown_test",
+          "name": "shutdown_worker_pool_cancel_immediately_accounts_for_every_task",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-10",
+      "control": "s-10",
+      "adapter": "native",
+      "package": "prometheus-parking-lot-core",
+      "oracles": [
+        {
+          "target": "prometheus_parking_lot_core",
+          "name": "mailbox::storage_tests::storage_mailbox_notifier_failure_every_call_still_stores_and_consumes",
+          "diagnostic": [
+            "a failing notifier must not fail delivery"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "prometheus_parking_lot_core",
+          "name": "mailbox::storage_tests::storage_mailbox_storage_only_has_no_notifier_cost",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-11",
+      "control": "s-11",
+      "adapter": "iggy",
+      "package": "prometheus-parking-lot-iggy",
+      "oracles": [
+        {
+          "target": "iggy_events",
+          "name": "iggy_same_idempotency_key_yields_one_message_id",
+          "diagnostic": [
+            "one message id for one idempotency key:"
+          ]
+        },
+        {
+          "target": "iggy_events",
+          "name": "iggy_paused_server_does_not_slow_dispatch",
+          "diagnostic": [
+            "on_event took",
+            "with the server paused"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "iggy_events",
+          "name": "iggy_retention_option_sets_the_topic_expiry",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-16-redb",
+      "control": "s-16",
+      "adapter": "redb",
+      "package": "prometheus_parking_lot",
+      "oracles": [
+        {
+          "target": "scheduler",
+          "name": "durable_sigkill::redb::pool_sigkill_redb_between_execution_and_delivery",
+          "diagnostic": [
+            "no result after restart: the accepted task was lost"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "scheduler",
+          "name": "durable_sigkill::redb::pool_sigkill_redb_mid_execution",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "oa-07-event-redb",
+      "control": "oa-07-event",
+      "adapter": "redb",
+      "package": "prometheus_parking_lot",
+      "oracles": [
+        {
+          "target": "scheduler",
+          "name": "durable_sigkill::redb::pool_sigkill_redb_failed_delivery_retained_after_restart",
+          "diagnostic": [
+            "OA-07:terminal-event"
+          ]
+        },
+        {
+          "target": "scheduler",
+          "name": "durable_sigkill::redb::pool_sigkill_redb_failed_delivery_consumed_before_restart",
+          "diagnostic": [
+            "OA-07:terminal-event"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "scheduler",
+          "name": "durable_sigkill::redb::pool_sigkill_redb_between_delivery_and_ack",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-16-pg17",
+      "control": "s-16",
+      "adapter": "pg",
+      "package": "prometheus_parking_lot",
+      "oracles": [
+        {
+          "target": "scheduler",
+          "name": "durable_sigkill::pg::pool_sigkill_pg_between_execution_and_delivery",
+          "diagnostic": [
+            "no result after restart: the accepted task was lost"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "scheduler",
+          "name": "durable_sigkill::pg::pool_sigkill_pg_mid_execution",
+          "diagnostic": []
+        }
+      ],
+      "pg": "17"
+    },
+    {
+      "id": "oa-07-event-pg17",
+      "control": "oa-07-event",
+      "adapter": "pg",
+      "package": "prometheus_parking_lot",
+      "oracles": [
+        {
+          "target": "scheduler",
+          "name": "durable_sigkill::pg::pool_sigkill_pg_failed_delivery_retained_after_restart",
+          "diagnostic": [
+            "OA-07:terminal-event"
+          ]
+        },
+        {
+          "target": "scheduler",
+          "name": "durable_sigkill::pg::pool_sigkill_pg_failed_delivery_consumed_before_restart",
+          "diagnostic": [
+            "OA-07:terminal-event"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "scheduler",
+          "name": "durable_sigkill::pg::pool_sigkill_pg_between_delivery_and_ack",
+          "diagnostic": []
+        }
+      ],
+      "pg": "17"
+    },
+    {
+      "id": "s-16-pg18",
+      "control": "s-16",
+      "adapter": "pg",
+      "package": "prometheus_parking_lot",
+      "oracles": [
+        {
+          "target": "scheduler",
+          "name": "durable_sigkill::pg::pool_sigkill_pg_between_execution_and_delivery",
+          "diagnostic": [
+            "no result after restart: the accepted task was lost"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "scheduler",
+          "name": "durable_sigkill::pg::pool_sigkill_pg_mid_execution",
+          "diagnostic": []
+        }
+      ],
+      "pg": "18"
+    },
+    {
+      "id": "oa-07-event-pg18",
+      "control": "oa-07-event",
+      "adapter": "pg",
+      "package": "prometheus_parking_lot",
+      "oracles": [
+        {
+          "target": "scheduler",
+          "name": "durable_sigkill::pg::pool_sigkill_pg_failed_delivery_retained_after_restart",
+          "diagnostic": [
+            "OA-07:terminal-event"
+          ]
+        },
+        {
+          "target": "scheduler",
+          "name": "durable_sigkill::pg::pool_sigkill_pg_failed_delivery_consumed_before_restart",
+          "diagnostic": [
+            "OA-07:terminal-event"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "scheduler",
+          "name": "durable_sigkill::pg::pool_sigkill_pg_between_delivery_and_ack",
+          "diagnostic": []
+        }
+      ],
+      "pg": "18"
+    },
+    {
+      "id": "s-16-ordering",
+      "control": "s-16",
+      "adapter": "native",
+      "package": "prometheus_parking_lot",
+      "oracles": [
+        {
+          "target": "scheduler",
+          "name": "durable_dispatch::durable_ack_after_delivery_orders_every_outcome",
+          "diagnostic": [
+            "lease was resolved before its outcome was delivered"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "unit",
+          "name": "config_test::config_pool_limits_are_validated",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-17",
+      "control": "s-17",
+      "adapter": "native",
+      "package": "prometheus-parking-lot-runtime-tokio",
+      "oracles": [
+        {
+          "target": "result_slots_test",
+          "name": "waiters_no_blocking_threads",
+          "diagnostic": [
+            "OA12:S17: pending retrieve_async started a blocking thread"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "result_slots_test",
+          "name": "waiters_no_blocking_threads_unretrieved_result_expires_after_ttl",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-19",
+      "control": "s-19",
+      "adapter": "loom",
+      "package": "prometheus-parking-lot-core",
+      "oracles": [
+        {
+          "target": "loom_vector",
+          "name": "loom_vector_no_schedule_exceeds_any_dimension",
+          "diagnostic": [
+            "capacity violated in"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "unit",
+          "name": "util_test::priority_ordering",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-20-drain",
+      "control": "s-20",
+      "adapter": "loom",
+      "package": "prometheus-parking-lot-core",
+      "oracles": [
+        {
+          "target": "loom_skip_ahead",
+          "name": "loom_skip_ahead_races_completion_and_keeps_every_invariant",
+          "diagnostic": [],
+          "diagnostic_any": [
+            "starvation bound violated:",
+            "the guard did not engage"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "unit",
+          "name": "util_test::priority_ordering",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-20-at-depth",
+      "control": "s-20",
+      "adapter": "loom",
+      "package": "prometheus-parking-lot-core",
+      "oracles": [
+        {
+          "target": "loom_at_depth",
+          "name": "loom_at_depth_skip_races_completion_and_keeps_every_invariant",
+          "diagnostic": [
+            "starvation bound violated:"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "unit",
+          "name": "util_test::priority_ordering",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-20-depth",
+      "control": "s-20-depth",
+      "adapter": "loom",
+      "package": "prometheus-parking-lot-core",
+      "oracles": [
+        {
+          "target": "loom_at_depth",
+          "name": "loom_at_depth_skip_races_completion_and_keeps_every_invariant",
+          "diagnostic": [
+            "starvation bound violated:"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "unit",
+          "name": "util_test::priority_ordering",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-20-order",
+      "control": "s-20-order",
+      "adapter": "loom",
+      "package": "prometheus-parking-lot-core",
+      "oracles": [
+        {
+          "target": "loom_at_depth",
+          "name": "loom_at_depth_leaves_a_fitting_head_its_capacity",
+          "diagnostic": [
+            "priority order violated: a Low job started ahead of the High head"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "unit",
+          "name": "util_test::priority_ordering",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-21-native",
+      "control": "s-21",
+      "adapter": "native",
+      "package": "prometheus-parking-lot-runtime-tokio",
+      "oracles": [
+        {
+          "target": "lifecycle_events_test",
+          "name": "lifecycle_events_resource_pool_cancelled_under_every_policy",
+          "diagnostic": [
+            "tasks broke the lifecycle order:",
+            "no terminal event"
+          ]
+        },
+        {
+          "target": "lifecycle_events_test",
+          "name": "lifecycle_events_worker_pool_cancelled_under_every_policy",
+          "diagnostic": [
+            "tasks broke the lifecycle order:",
+            "no terminal event"
+          ]
+        },
+        {
+          "target": "lifecycle_events_test",
+          "name": "lifecycle_events_durable_pool_requeued_at_shutdown",
+          "diagnostic": [
+            "tasks broke the lifecycle order:",
+            "no terminal event"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "lifecycle_events_test",
+          "name": "lifecycle_events_rejected_capacity_names_the_exceeded_kind",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-21-browser",
+      "control": "s-21",
+      "adapter": "browser",
+      "package": "prometheus-parking-lot-wasm",
+      "oracles": [
+        {
+          "target": "wasm_events",
+          "name": "lifecycle_events_cancelled_at_shutdown",
+          "diagnostic": [
+            "[\"submitted\", \"queued\", \"cancelled\"]"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "wasm_events",
+          "name": "lifecycle_events_completed_failed_and_timed_out",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-22",
+      "control": "s-22",
+      "adapter": "native",
+      "package": "prometheus_parking_lot",
+      "oracles": [
+        {
+          "target": "unit",
+          "name": "config_test::config_misspelled_pool_field_is_rejected_naming_it",
+          "diagnostic": [
+            "expected a parse error, loaded"
+          ]
+        },
+        {
+          "target": "unit",
+          "name": "config_test::config_misspelled_top_level_field_is_rejected_naming_it",
+          "diagnostic": [
+            "expected a parse error, loaded"
+          ]
+        },
+        {
+          "target": "unit",
+          "name": "config_test::config_misspelled_postgres_backend_field_is_rejected_naming_it",
+          "diagnostic": [
+            "expected a parse error, loaded"
+          ]
+        },
+        {
+          "target": "unit",
+          "name": "config_test::config_misspelled_redb_backend_field_is_rejected_naming_it",
+          "diagnostic": [
+            "expected a parse error, loaded"
+          ]
+        },
+        {
+          "target": "unit",
+          "name": "config_test::config_misspelled_worker_pool_field_is_rejected_naming_it",
+          "diagnostic": [
+            "a misspelled field must not load"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "unit",
+          "name": "config_test::config_worker_pool_config_loads_every_field_on_every_target",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "s-33",
+      "control": "s-33",
+      "adapter": "iggy",
+      "package": "prometheus-parking-lot-iggy",
+      "oracles": [
+        {
+          "target": "iggy_stream",
+          "name": "iggy_stream_reconnect_midstream_receives_remaining_chunks_once",
+          "diagnostic": [
+            "tokens 51-200 then the end marker, no gap, no duplicate"
+          ]
+        },
+        {
+          "target": "iggy_stream",
+          "name": "iggy_stream_missing_chunk_is_reported_as_a_gap",
+          "diagnostic": [
+            "left: None",
+            "right: Some(Gap { expected: 3, got: 4 })"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "iggy_stream",
+          "name": "iggy_stream_uses_the_topics_real_partition_count",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "oa-06-redb",
+      "control": "oa-06",
+      "adapter": "redb",
+      "package": "prometheus-parking-lot-embedded",
+      "oracles": [
+        {
+          "target": "mailbox_migration",
+          "name": "mailbox_scope_distinguishes_optional_and_delimited_addresses",
+          "diagnostic": [
+            "OA-06:address-scope: another complete address suppressed"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "conformance",
+          "name": "result_mailbox::deliveries_without_key_all_stored",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "oa-07-redb",
+      "control": "oa-07",
+      "adapter": "redb",
+      "package": "prometheus-parking-lot-embedded",
+      "oracles": [
+        {
+          "target": "mailbox_status",
+          "name": "duplicate_status_survives_consume_restart_and_original_expiry",
+          "diagnostic": [
+            "OA-07:stored-status: retry hid durable failure"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "mailbox_status",
+          "name": "malformed_authoritative_status_is_an_error_without_consuming_result",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "oa-07-event-nonterminal",
+      "control": "oa-07-event",
+      "adapter": "redb",
+      "package": "prometheus_parking_lot",
+      "oracles": [
+        {
+          "target": "scheduler",
+          "name": "durable_sigkill::redb::pool_duplicate_redb_nonterminal_status_requeues_without_false_terminal",
+          "diagnostic": [
+            "OA-07:nonterminal-event"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "scheduler",
+          "name": "durable_sigkill::redb::pool_sigkill_redb_between_delivery_and_ack",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "oa-08",
+      "control": "oa-08",
+      "adapter": "native",
+      "package": "prometheus-parking-lot-runtime-tokio",
+      "oracles": [
+        {
+          "target": "discarded_spawn_test",
+          "name": "discarded_spawn_reports_once_and_returns_capacity_without_polling",
+          "diagnostic": [
+            "OA-08:discarded-terminal: each discarded run reports failure"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "discarded_spawn_test",
+          "name": "discarded_spawn_ordinary_spawner_preserves_success_panic_and_timeout_once",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "oa-09",
+      "control": "oa-09",
+      "adapter": "native",
+      "package": "prometheus-parking-lot-core",
+      "oracles": [
+        {
+          "target": "backend_admission_test",
+          "name": "backend_admission_rejects_total_and_kind_heads_once_before_fifo_followers",
+          "diagnostic": [
+            "both impossible heads leave once"
+          ]
+        },
+        {
+          "target": "backend_admission_test",
+          "name": "backend_admission_rejected_only_batch_requires_terminal_reporting",
+          "diagnostic": [
+            "rejected-only batches cannot be ignored"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "backend_admission_test",
+          "name": "backend_admission_temporary_total_or_kind_pressure_is_not_rejection",
+          "diagnostic": []
+        },
+        {
+          "target": "backend_admission_test",
+          "name": "backend_admission_direct_submit_keeps_its_capacity_error",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "oa-10-expiry",
+      "control": "oa-10-expiry",
+      "adapter": "native",
+      "package": "prometheus-parking-lot-runtime-tokio",
+      "oracles": [
+        {
+          "target": "prune_expiry_test",
+          "name": "prune_expiry_reports_each_front_and_backend_task_once_without_execution",
+          "diagnostic": [
+            "task 1",
+            "[\"submitted\", \"queued\", \"expired\"]"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "prune_expiry_test",
+          "name": "prune_expiry_live_deadline_control_still_completes",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "oa-11-kind-release",
+      "control": "oa-11-kind-release",
+      "adapter": "loom",
+      "package": "prometheus-parking-lot-core",
+      "oracles": [
+        {
+          "target": "loom_kind_release",
+          "name": "loom_kind_release_parallel_returns_preserve_all_kind_units",
+          "diagnostic": [
+            "OA-11 kind release lost a GpuVram subtraction"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "loom_kind_release",
+          "name": "loom_kind_release_reacquire_publishes_previous_holder_work",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "oa-11-ledger-order",
+      "control": "oa-11-ledger-order",
+      "adapter": "loom",
+      "package": "prometheus-parking-lot-runtime-tokio",
+      "oracles": [
+        {
+          "target": "loom_ledger",
+          "name": "loom_ledger_submit_shutdown_cannot_both_miss",
+          "diagnostic": [
+            "OA-11 ledger admission and shutdown both missed accepted work"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "loom_ledger",
+          "name": "loom_ledger_settlement_publishes_finished_before_zero",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "oa-13-budget-event",
+      "control": "oa-13-budget-event",
+      "adapter": "browser",
+      "package": "prometheus-parking-lot-wasm",
+      "oracles": [
+        {
+          "target": "wasm_events",
+          "name": "lifecycle_events_completed_failed_and_timed_out",
+          "diagnostic": [
+            "OA-13 execution-budget terminal event missing"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "wasm_events",
+          "name": "lifecycle_events_rejected_at_submit",
+          "diagnostic": []
+        }
+      ]
+    },
+    {
+      "id": "oa-14-missing-result",
+      "control": "oa-14-missing-result",
+      "adapter": "upgrade",
+      "package": "prometheus-parking-lot-pg",
+      "oracles": [],
+      "companions": [],
+      "delegate": "scripts/rehearse-postgres-upgrade.sh",
+      "oracle": "postgres_upgrade_populated_0_3_to_schema3",
+      "diagnostic": "OA-14:seeded-result",
+      "positive": "real populated PG17-to-PG18 copy plus backup restore and full PG suites, control absent"
+    },
+    {
+      "id": "oa-16",
+      "control": "oa-16",
+      "adapter": "iggy",
+      "package": "prometheus-parking-lot-iggy",
+      "oracles": [
+        {
+          "target": "iggy_stream",
+          "name": "iggy_stream_abandoned_chunk_poisons_writer_and_preserves_prefix",
+          "diagnostic": [
+            "OA-16:no-publication-past-hole: expected only seqs 1-2, got",
+            "Ok(Err(Gap { expected: 3, got: 4 }))"
+          ]
+        }
+      ],
+      "companions": [
+        {
+          "target": "iggy_stream",
+          "name": "iggy_stream_reconnect_midstream_receives_remaining_chunks_once",
+          "diagnostic": []
+        }
+      ]
+    }
+  ],
+  "sources": [
+    "https://nexte.st/docs/machine-readable/list/",
+    "https://nexte.st/docs/filtersets/reference/",
+    "https://raw.githubusercontent.com/nextest-rs/nextest/cargo-nextest-0.9.149/nextest-metadata/src/exit_codes.rs",
+    "https://nexte.st/docs/reporting/",
+    "https://wasm-bindgen.github.io/wasm-bindgen/wasm-bindgen-test/browsers.html",
+    "https://raw.githubusercontent.com/wasm-bindgen/wasm-bindgen/0.2.129/crates/cli/src/wasm_bindgen_test_runner.rs",
+    "https://raw.githubusercontent.com/actions/download-artifact/v8/action.yml",
+    "https://raw.githubusercontent.com/Swatinem/rust-cache/v2/action.yml"
+  ],
+  "prerequisites": {
+    "native": "POSIX Linux, preinstalled pinned Rust and nextest; separate compile/list/run, one test process per oracle",
+    "pg": "approved local parking-lot-pg:17/:18 project images and real Docker; pgmq pins remain in project Dockerfiles",
+    "iggy": "real Docker with source-pinned Iggy testcontainers image; fixtures may pause only their owned container",
+    "browser": "OA13 checked Chromium/driver156.0.8078.47 linux64 and wasm-bindgen0.2.129 installed paths; actual Chrome invocation; no Node substitute",
+    "upgrade": "OA14 run-owned actual PG17-to-PG18 adapter, approved exact prebuilt local image IDs, private fresh output; never ordinary PG URL"
+  },
+  "limits": "Authored only. No builds, discovery, tests, syntax checks, scans or reviews executed. Full baseline and cumulative certification belong to OA18. Unsupported/missing collaborators are BLOCKED; unexpected runtime/build/classifier outcomes FAIL. No blanket generic nonzero acceptance.",
+  "runtime_fixture_handoff": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-12-runtime-classifiers.json",
+  "iggy_image": "apache/iggy:0.9.0@sha256:b35fc2841964f2962a5f164d33b3ae3a9de99a66920defd3cd8a1c039470602d",
+  "source_sha256": {
+    ".github/scripts/check-wasm-graph.sh": "346147af0925cff1a5afcf4844fae6c8f514939b54ef3db7d79c25d8b426992a",
+    ".github/wasm-browser-assurance.json": "1b1f15341db1014c88e24375618f5c1f161d422f68f6643ac948c8ffed8d74f9",
+    ".github/workflows/ci.yml": "4cd405c55f0534aa588e3ce9b9f469861f5924f4f8cd5d2b42f945934cbd3163",
+    "Cargo.lock": "439ea114f906832d2cff9d0379e99af21f9ffa7aed30067189aa3333c088040c",
+    "Cargo.toml": "1a3b1372d490bd70fc0f4c725de719d13bda891957a3706545d063e3648d78b4",
+    "crates/parking-lot-core/Cargo.toml": "47a7961c72d26cf1813e06149e2447377fc225e695d4c0cce47a5e8af88d0fe0",
+    "crates/parking-lot-core/src/config/worker_pool.rs": "fd197ab3bf20785be2e01c06f63d5b6f581f95b739fc06bba8b6f8c5e65810aa",
+    "crates/parking-lot-core/src/dispatch/dispatcher.rs": "35ba05d5e1652476345e3a7eb0a4095856d8c8f9c2abe95fab5b4fde104cb2e8",
+    "crates/parking-lot-core/src/lib.rs": "187b145cbe8309a37b74e82ef29e4373d3f958524aff28a27f924bbbcda05939",
+    "crates/parking-lot-core/src/mailbox/notify.rs": "fb7384120a0449b0d534c3eb8b8354dfd1fe6af7896d37c27c36ece8bc4ea3bb",
+    "crates/parking-lot-core/src/mailbox/storage.rs": "e31e7675512cf9eb259733b1df2a22ddf105a396c81ca20fd0fab7915c497597",
+    "crates/parking-lot-core/src/mailbox/storage_tests.rs": "0225e93c6b7adb411766a5c94eae00bea56508a5ec5f80cd3e193da65752d29f",
+    "crates/parking-lot-core/src/semaphore/mod.rs": "418c2aab96fc1a67da4c0a50faaf7ea5309ff523ab6d82d734a2709c77d9e7a4",
+    "crates/parking-lot-core/tests/backend_admission_test.rs": "55edd214d14c794d8d1371d0845c9ad35cbb9ad07195a0e34fe5543a8e3bcc15",
+    "crates/parking-lot-core/tests/loom_at_depth.rs": "c03ec865026f78d029ba5346df07fe94fdb3a502a2e78dbfb1e3c7c00d24ae9f",
+    "crates/parking-lot-core/tests/loom_capacity.rs": "480395ec947b0567148968158fba31094f961b5a4b1c16187ca95df385e3003b",
+    "crates/parking-lot-core/tests/loom_kind_release.rs": "6e081f68b69d1829abd3470566982e5c0ea0c3cea465675bd931403d838b048c",
+    "crates/parking-lot-core/tests/loom_skip_ahead.rs": "4f4c423f2af5afa1e1e76968edf7e82f0b5a54d7e4b87370c7b4b680e37463a1",
+    "crates/parking-lot-core/tests/loom_support/mod.rs": "ca600fc77d24279ef8cf38120ee4c38ae3e96f77a52b8bcf62c36230a503d6df",
+    "crates/parking-lot-core/tests/loom_vector.rs": "85e9b927a289a97374a82bd1809604e71ce7d85eca3a7fd0861909c968e97be5",
+    "crates/parking-lot-core/tests/loom_wakeup.rs": "7c0077748f76fd63a9a85d54759512ccd2a40696e92aaa7c21e82237e2bcd60e",
+    "crates/parking-lot-core/tests/unit/audit_test.rs": "29fc394c2f372e1a34561483c0827d237b91dba518a2b934708498bc9eae9525",
+    "crates/parking-lot-core/tests/unit/error_test.rs": "ce45273e3825cbb7fea715404acb01c32085cca7fbfb7f18fc4522bd69d83261",
+    "crates/parking-lot-core/tests/unit/mailbox_test.rs": "034426c2ce65f006bc02efe9f0b19d53298deab66f3a0f8bce23b864cc9cf1aa",
+    "crates/parking-lot-core/tests/unit/main.rs": "d42736da8acd87deb0279aded01413697c49d70147ad0c008c162a46e6ede7b2",
+    "crates/parking-lot-core/tests/unit/review_test.rs": "ac60189c1db00d810552c981c6e7c1450a389293af13357f3b92a789432d0e2c",
+    "crates/parking-lot-core/tests/unit/util_test.rs": "83b837ec1c66cd863624223400c06372fe8d4120aebc21e3b78ae6f5f59f9757",
+    "crates/parking-lot-embedded/Cargo.toml": "9cfb2f7a0ac4a5d6d0f527dde32ee3b7255abc88cb6ef29df29f1ff31f6269a4",
+    "crates/parking-lot-embedded/src/mailbox.rs": "aa96416ca40b775ddb43131396030569ee9efe0d8a4f4c6be9c56ea795bcebb2",
+    "crates/parking-lot-embedded/src/store.rs": "ac1b8b1bc5b819d2690d4084f45df8e07cc9080f700046a2a058bd40b6d7dfc5",
+    "crates/parking-lot-embedded/tests/conformance.rs": "28de565ef902043cec4c0be9a032b807f38e70ec4f2b7feefcc1b6cdfe4c6339",
+    "crates/parking-lot-embedded/tests/crash_points.rs": "f9b76122ccdfc1086c9c1875dc5aa579eaaa0b0c4a5ba9d421441d3bee8dcf7d",
+    "crates/parking-lot-embedded/tests/mailbox_migration.rs": "cfade4ff544c97ff79490731c66d970f98a143827efca97801b1b9d793b7473f",
+    "crates/parking-lot-embedded/tests/mailbox_status.rs": "9e3c93c624d9cdeb6831a715304ea16c12ffd622c315d59e2aa34102bf90f5da",
+    "crates/parking-lot-embedded/tests/restart.rs": "2a703325c40f1a905cde69071c27835577d616f3bef3f646e3aa984d3d612430",
+    "crates/parking-lot-iggy/Cargo.toml": "a47bcd42b8eb18f35a9f277bf2801ae3c71aa79df362173cd4657326ffaac603",
+    "crates/parking-lot-iggy/src/ids.rs": "a6e1cd2aa7f2619e6d69d844e7567b80237178a4e47d9facc3db709c394fbadb",
+    "crates/parking-lot-iggy/src/publisher.rs": "0d45308e7a32c556a831942468bc1114717950702bedef22d45a12ef6b544d07",
+    "crates/parking-lot-iggy/src/stream.rs": "0dab6306df9bde8e81c9192c76bb235d96faf90c5d041f940727d7b2eeaa08a3",
+    "crates/parking-lot-iggy/tests/iggy_events.rs": "06613384fd8e2506939f57e3e56cf5db20f6833baef718291e370218b8077b49",
+    "crates/parking-lot-iggy/tests/iggy_stream.rs": "40a5a8099d1bf8c1a3d6fa060215af7fc6f328e43b2f5086bbf58971cfba11f3",
+    "crates/parking-lot-iggy/tests/support/mod.rs": "d0ae623e54462208648eb29df179374a55ea60f8e1c13dbf3d2824d924c5ce4b",
+    "crates/parking-lot-pg/Cargo.toml": "d4cb0ad9e6d9cdf0410fda490be00d69b13f1bba2939b45cc3f977777045486a",
+    "crates/parking-lot-pg/src/lease_queue/sql.rs": "054f018e58619d2aa9cc0ff9c0f53c3fa73a6f46c647ec430197941f555d27f5",
+    "crates/parking-lot-pg/src/mailbox/mod.rs": "9545206851d999605da4c276d450039c321050df737d41c8dfe7108ec6a65d25",
+    "crates/parking-lot-pg/src/mailbox/sql.rs": "abf43cde393d59f472c7255d21ec4000ea13b4a9c5e31c3030ca919a2b9a0ae6",
+    "crates/parking-lot-pg/src/pgmq/sql.rs": "b4c20363d803b46a6b5fbc1d81c9a88fe6e4cfb337797a3d26edfa95b747b0f1",
+    "crates/parking-lot-pg/tests/fixtures/oa14/manifest.json": "f514920dcb2a84e9b9aaa3d6199084f7c9ae4925209803cb96f3a7f6c8e38257",
+    "crates/parking-lot-pg/tests/lease_queue.rs": "93fd6cd9032100c37ba78f1f216b60f55d564ad59698cc119bf5f1b3858db530",
+    "crates/parking-lot-pg/tests/mailbox.rs": "148b5c34f7cfd66d0a8d0e33688cf0ea1c21cc45162c8fc3a59ea28d6f05f97c",
+    "crates/parking-lot-pg/tests/mailbox_migration.rs": "8bc13799e70c697bedb567f9e1f60a5bac2d2fc390b19d95e7bfa264d7162747",
+    "crates/parking-lot-pg/tests/mailbox_status.rs": "de8657408d88c241b2865ea486221a87a2a168c07cec5a910d7797b13f192c6c",
+    "crates/parking-lot-pg/tests/pgmq.rs": "89ea175abb196eb6bd661ec16f3b53227315f5b52971bcf3ceecaf2e81ceeb50",
+    "crates/parking-lot-pg/tests/postgres_upgrade.rs": "4f57cfda9160c6024a12ee0b2318f196c78bca6a311f06a72b9e9bb3f358e79b",
+    "crates/parking-lot-pg/tests/support/mod.rs": "14894e2fc69c219e7b562de289b63ff082166ffb1155b1a88eb35911f18c2322",
+    "crates/parking-lot-runtime-tokio/Cargo.toml": "aa5998d3042f569c931aa0dc0afe10c46cc355b8dd592117b7cec266abc9960c",
+    "crates/parking-lot-runtime-tokio/src/contain.rs": "53505193551f3864b5bb68ad1a9faadd73762052a8b7b9beb08eb22fab4a46ca",
+    "crates/parking-lot-runtime-tokio/src/durable_pool/mod.rs": "ca892b41e83cb3e4e9b9247428acc97f1bdd41c116c00efcb5fdd611b962689e",
+    "crates/parking-lot-runtime-tokio/src/events.rs": "f111d9b976fd8b7b111f4700b58cbc80b8c39630f67d65b0b9ad8b24607b7cc0",
+    "crates/parking-lot-runtime-tokio/src/ledger.rs": "dde628e2afa5dcd67ebf1263ce201a50b520413c59016499fa77961929ade7d9",
+    "crates/parking-lot-runtime-tokio/src/resource_pool.rs": "4ef1c88a2e3c60ee48d165f578837266a1f59b88ddaa419bf32f7ed28690aaec",
+    "crates/parking-lot-runtime-tokio/src/worker_pool/native.rs": "fd21a74fc877f5029e1c9897e95a3d00b3c6da5be21a855f89160e6793f57cf2",
+    "crates/parking-lot-runtime-tokio/src/worker_pool/slots.rs": "a8ece770c292db251fb15c57d11af5f58875a8e3ec3d4e1c35d2828d8354be01",
+    "crates/parking-lot-runtime-tokio/tests/budget_test.rs": "4a74b805b6ecc7f1b11e780d8896df5ee121b7f43c9a5fa00a163209a28bcde5",
+    "crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs": "b2cb481503d65c9fcd7bb47d36a9a5f9a0f91b3792b31b00bc6b5d0e264ae68d",
+    "crates/parking-lot-runtime-tokio/tests/execution_timeout_test.rs": "70f28962fa5bca0420a4870c853c9487e92620b8180a32be2db26b5087d69889",
+    "crates/parking-lot-runtime-tokio/tests/lifecycle_events_test.rs": "135edb7822b12842bc6d7ff2b26be63efd5d0c88855a480e8d6912bf9bbc9fa3",
+    "crates/parking-lot-runtime-tokio/tests/loom_ledger.rs": "1ce540848d5575a8baa2fb14e464e6fd721c350cdf83ff5a7e22381c96ceee9f",
+    "crates/parking-lot-runtime-tokio/tests/panic_test.rs": "7cb850171171a890e72c90f68adb7ce093a51e0a06e35173d6639e4bc394b43c",
+    "crates/parking-lot-runtime-tokio/tests/prune_expiry_test.rs": "d499b40da3973fa3655032d24bf8852da899774177f8d31cce451076a4ffb7f9",
+    "crates/parking-lot-runtime-tokio/tests/result_slots_test.rs": "8898eceebe895455eea6d5e58dc9bd89d74ec5ceb14ee86c80a2bb4828aebd2a",
+    "crates/parking-lot-runtime-tokio/tests/shutdown_test.rs": "03e1ce0274d4dc41d8183c96dae292c41aef750a36756109b0710b0faef776d1",
+    "crates/parking-lot-wasm/Cargo.toml": "cc1b3fb8e197d0d7f88b08a97051b59a91a36e52f64303e987d210c9d2064d64",
+    "crates/parking-lot-wasm/src/events.rs": "900f886ec987fca629a35a421b34609263ea7ead0d0fd81ed38d3dffa078f8b3",
+    "crates/parking-lot-wasm/src/pool.rs": "99b1e13ab9d50bfb62b79e06ad969631555907ad7fdd2fd1e5d749d67ddc04c9",
+    "crates/parking-lot-wasm/tests/common/mod.rs": "1c307272dc1c1b350acabc158842cd0074c3d40c8903f1efa78f9e92c63c4172",
+    "crates/parking-lot-wasm/tests/wasm_events.rs": "d5d4be539b88590af806088c9e0c53989cb2c4f849d2203a6c927e2639194f56",
+    "crates/parking-lot-wasm/tests/wasm_pool.rs": "6fb41b3e4c3225cc8c3e984eac0621c0c3f42605087b1030872075866a2a1a4b",
+    "docker/postgres17/Dockerfile": "78c0e2d1d5d94916254af0a67eee1749577f2abcc748952c8071deab75160f7f",
+    "docker/postgres18/Dockerfile": "bcfd4f37852b8a86a415bff2db668ac78e2bde8ce8980fd72f2361b067e85102",
+    "docker/postgres18/upgrade/rehearse.py": "c3761cbc959d754c361edca56de82dbd390dbd6268a92d0db23d5f152204d6e3",
+    "rust-toolchain.toml": "5e7517b95a2b4e810124f84091dd4a6e3f2192523fcac7b6d52abc7fc6aff91d",
+    "scripts/rehearse-postgres-upgrade.sh": "aa5484755f7ab9377ada73b91b0028fbcc639c26615606c687378ab007b64232",
+    "src/config/backend.rs": "854680b1efb5129d7b08131b6393402e1ba3a66f4202bb7c29dee3ffe086feac",
+    "src/config/pool.rs": "e01349cd0ba2bef2eb1f849ccc11d7e22dc2ecc877c1e84fe3e2e9d0c5a9a813",
+    "tests/scheduler/durable_dispatch.rs": "e07843ff86c8452fb217382c3525adc682c8a3d7a40226d3c6f0a9d062cd0970",
+    "tests/scheduler/durable_lease.rs": "6a0848217b8a3425c68d65509c766bb392ee9ae57c9d0788b567084db7634719",
+    "tests/scheduler/durable_not_stored.rs": "6a2486417bf453d9b0a4f920e24ee2ba281a93721674ed284f56977662467a95",
+    "tests/scheduler/durable_oversize.rs": "55c82760b2471fdc1d07759475549ab77feedec8deb481f7b86521c233b8eeae",
+    "tests/scheduler/durable_panic_race.rs": "ecf3075c1505f65974feea2f2a4b8dc79a45e107948ebe93872985f7445b79a7",
+    "tests/scheduler/durable_shutdown.rs": "dac333ed471f57dfbd7f05bc7e4e150094a1605719f992f30e1cecbb35e6c27a",
+    "tests/scheduler/durable_sigkill.rs": "f196619f0f355db788287c53e2009e51cb094dd0949701a852df209763c0a4a2",
+    "tests/scheduler/main.rs": "d0b8b7e03391db485bf67cb345f1b975f95eaa85fe95ab95bb80d64917bcf82c",
+    "tests/scheduler/pool_builders.rs": "acd642fb8d67b82bcb83f75f18b3e7be470a02c744fc6c28bc6263a80a77fbaa",
+    "tests/scheduler/skip_ahead.rs": "5fa4bb14554531e1c60f3babf0107053902686e88c71d193f94ae530fb259bc2",
+    "tests/scheduler/support.rs": "cf53516e40354a969831efd7570b4a0e8f7f8d8c05d02a4837fb22c4e053fd8f",
+    "tests/unit/builders_test.rs": "23c57ed35a1ecbf19bddccf82ad5c67d57de696530df6f113dd3c1b2d7a4a362",
+    "tests/unit/config_test.rs": "9c07d43db81ca0bfc8a3ecdb33ad8b9563726a39b1d467e7bb88dc58272b9997",
+    "tests/unit/main.rs": "5ca1af44e67b8c7e85478d0366a31eb7c4cdb6b4f2a3b2df9084eb99d1e9d39d"
+  }
+}

@@ -2,39 +2,40 @@
   "schemaVersion": "5",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 876,
-  "derivedRevision": 876,
+  "sourceRevision": 1118,
+  "derivedRevision": 1118,
   "frontier": {
-    "b4320c25-6bf5-4d74-9fe6-3d6b8b36bd69": 249,
+    "3b637018-0150-4bf1-b8af-a19e9f09585f": 178,
+    "b4320c25-6bf5-4d74-9fe6-3d6b8b36bd69": 313,
     "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 627
   },
   "conflictCount": 0,
   "projectId": "f6c384db-6ee1-4f1b-9bab-0e1602ec2615",
   "runId": "phase-certification-remediation-20261022T103344Z",
   "path": [
-    "phase-correctness-and-durability"
+    "phase-0-4-operational-assurance"
   ],
   "phaseIds": [
-    "phase-correctness-and-durability"
+    "phase-0-4-operational-assurance"
   ],
-  "activePhaseId": "phase-correctness-and-durability",
-  "activePhase": "phase-correctness-and-durability",
-  "phase": "phase-correctness-and-durability",
+  "activePhaseId": "phase-0-4-operational-assurance",
+  "activePhase": "phase-0-4-operational-assurance",
+  "phase": "phase-0-4-operational-assurance",
   "parentPhase": null,
   "childPointer": null,
-  "change": null,
-  "currentTask": null,
+  "change": "oa-18-release-boundary",
+  "currentTask": "2",
   "status": "ready",
   "lifecycle": "ready",
-  "stageId": "reflect",
-  "stageStatus": "COMPLETE",
+  "stageId": "execute",
+  "stageStatus": "IN_PROGRESS",
   "completionMetric": "implementation",
-  "implementationCompleted": 51,
-  "implementationTotal": 51,
+  "implementationCompleted": 68,
+  "implementationTotal": 69,
   "planRevision": 1,
-  "revision": 876,
-  "exactNextCommand": "/kbd-assess phase-correctness-and-durability",
-  "nextChange": null,
-  "nextTask": null,
-  "updatedAt": "2026-10-24T11:44:11.050525Z"
+  "revision": 1118,
+  "exactNextCommand": "/kbd-assess phase-0-4-operational-assurance",
+  "nextChange": "oa-18-release-boundary",
+  "nextTask": "2",
+  "updatedAt": "2026-10-24T14:31:01.745489Z"
 }

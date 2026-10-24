@@ -13,16 +13,21 @@
 //! With `--cfg parking_lot_negative_control="s-33"` the cursor forgets where
 //! the client was and tracks no sequence numbers; the reconnect and duplicate
 //! tests below must then fail.
+//!
+//! OA-16 uses a server-side frame cap to abandon exactly one chunk. With
+//! `--cfg parking_lot_negative_control="oa-16"` the publisher does not poison
+//! the writer, and the real-reader `OA-16:no-publication-past-hole` assertion
+//! below must fail with `Gap { expected: 3, got: 4 }`.
 
 mod support;
 
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use prometheus_parking_lot_iggy::{
-    IggyOptions, IggyStreamReader, IggyStreamSink, ResumePoint, StreamCursor, StreamError,
-    StreamItem, StreamOutcome, partition_for,
+    IggyOptions, IggyStreamReader, IggyStreamSink, ResumePoint, RetryPolicy, StreamCursor,
+    StreamError, StreamItem, StreamOutcome, partition_for,
 };
-use support::{IggyServer, TestResult, read_topic};
+use support::{IggyServer, TestResult, distinct_by_id, read_topic, read_topic_strict};
 
 const FLUSH: Duration = Duration::from_secs(30);
 const STEP: Duration = Duration::from_secs(30);
@@ -58,6 +63,142 @@ fn seqs(items: &[StreamItem]) -> Vec<u64> {
 
 fn token(seq: u64) -> String {
     format!("tok-{seq}")
+}
+
+/// OA-16: the real server refuses seq 3 before reading its oversized body.
+/// Already queued seqs 4-5 must be suppressed, while another writer continues
+/// on the same publisher. Disabling poisoning makes the reader see a gap.
+#[tokio::test(flavor = "current_thread")]
+#[ignore = "needs Docker: starts a pinned apache/iggy container"]
+async fn iggy_stream_abandoned_chunk_poisons_writer_and_preserves_prefix() -> TestResult<()> {
+    let server = IggyServer::start_with_frame_limit(Some("16 KiB")).await?;
+    let mut failure_logs = server.failure_logs();
+    let run = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+    let stream = format!("oa16-{}-{run}", std::process::id());
+    let topic = format!("chunks-{run}");
+    let options = options(&server, &stream, 1)
+        .with_stream_topic(&topic)
+        .with_queue_capacity(8)
+        .with_send_timeout(Duration::from_secs(5))
+        .with_retry(RetryPolicy::new(
+            3,
+            Duration::from_millis(100),
+            Duration::from_millis(100),
+        ));
+    eprintln!(
+        "OA-16 fixture: stream={stream}, topic={topic}, frame_limit=16 KiB, failed_seq=3, attempts=3"
+    );
+    let sink = IggyStreamSink::start(&options)?;
+    let mut writer = sink.writer("job-hole");
+    for seq in 1..=2 {
+        assert_eq!(writer.send(token(seq)).await?, seq);
+    }
+    assert!(sink.flush(FLUSH).await, "valid prefix drained");
+    let before = sink.stats();
+    assert_eq!(before.published, 2, "prefix must reach the real server");
+    assert_eq!(before.failed, 0, "prefix has no abandoned chunk");
+
+    // 64 KiB is below iggy_common 0.11.0's 64,000,000-byte client payload
+    // limit, but above this server's 16 KiB wire-frame cap. The wire decoder
+    // rejects seq 3 before accepting its body on every attempt; unlike a
+    // paused server, it cannot persist the failed chunk after the test resumes.
+    // On this current-thread runtime, these five sends fit in the empty queue
+    // without yielding to the worker, so 4-5 are queued before 3 can fail.
+    assert_eq!(writer.send("x".repeat(64 * 1024)).await?, 3);
+    assert_eq!(writer.send(token(4)).await?, 4);
+    assert_eq!(writer.send(token(5)).await?, 5);
+    let mut healthy = sink.writer("job-healthy");
+    assert_eq!(healthy.send("still connected").await?, 1);
+    assert_eq!(healthy.finish(StreamOutcome::Completed).await?, 2);
+    let queued = sink.stats();
+    assert_eq!(queued.enqueued, 7, "all later chunks already queued");
+    assert_eq!(queued.published, before.published, "worker has not run yet");
+    assert_eq!(queued.failed, before.failed, "tail queued before failure");
+    assert!(sink.flush(FLUSH).await, "fault schedule drained");
+    eprintln!("OA-16 publisher after fault: {:?}", sink.stats());
+
+    let reader = IggyStreamReader::connect(&options).await?;
+    let mut cursor = reader.open("job-hole");
+    let prefix = take(&mut cursor, 2).await?;
+    assert_eq!(seqs(&prefix), [1, 2]);
+    for (item, seq) in prefix.iter().zip(1..=2) {
+        let StreamItem::Chunk(chunk) = item else {
+            return Err("OA-16 prefix unexpectedly ended".into());
+        };
+        assert_eq!(chunk.data, token(seq));
+    }
+    // This is deliberately the first poisoning oracle. The oa-16 control
+    // must fail here with Gap(3,4), not at a counter or writer-only assertion.
+    let after_prefix = tokio::time::timeout(Duration::from_secs(2), cursor.next()).await;
+    assert!(
+        after_prefix.is_err(),
+        "OA-16:no-publication-past-hole: expected only seqs 1-2, got {after_prefix:?}"
+    );
+    let resume = prefix.last().ok_or("missing prefix")?.resume_point();
+    drop(cursor);
+    drop(reader);
+
+    assert!(writer.is_poisoned(), "exhausted chunk poisons its writer");
+    assert_eq!(writer.send("too late").await, Err(StreamError::Poisoned));
+    assert_eq!(
+        writer.finish(StreamOutcome::Completed).await,
+        Err(StreamError::Poisoned)
+    );
+    assert_eq!(
+        writer.next_seq(),
+        6,
+        "rejected operations consume no sequence"
+    );
+    assert_eq!(sink.stats().enqueued, 7, "poison rejects before enqueue");
+    let stats = sink.stats();
+    assert_eq!(stats.failed, 3, "abandoned seq 3 and suppressed seqs 4-5");
+    assert_eq!(
+        stats.retried - before.retried,
+        2,
+        "only seq 3 spent retries"
+    );
+    assert_eq!(stats.published, 4, "prefix and healthy chunk/end published");
+    assert_eq!(stats.dropped, 0, "backpressure never dropped a chunk");
+
+    // Poll errors propagate: an unreadable topic cannot pass the absence check.
+    let client = server.client().await?;
+    let raw = distinct_by_id(
+        tokio::time::timeout(STEP, read_topic_strict(&client, &stream, &topic, 1)).await??,
+    );
+    let hole_seqs: Vec<_> = raw
+        .iter()
+        .filter(|message| message.body["key"] == "job-hole")
+        .map(|message| message.body["seq"].as_u64())
+        .collect();
+    assert_eq!(
+        hole_seqs,
+        [Some(1), Some(2)],
+        "no failed chunk or queued tail in log"
+    );
+
+    // A fresh client resumes both with and without an offset hint. A poisoned
+    // stream remains live at the valid prefix; it has no fabricated end marker.
+    let reconnected = IggyStreamReader::connect(&options).await?;
+    for point in [
+        resume,
+        ResumePoint {
+            after_seq: 2,
+            offset: None,
+        },
+    ] {
+        let mut resumed = reconnected.resume("job-hole", point);
+        let tail = tokio::time::timeout(Duration::from_secs(2), resumed.next()).await;
+        assert!(tail.is_err(), "poisoned-prefix resume must wait: {tail:?}");
+    }
+    let mut healthy_cursor = reconnected.open("job-healthy");
+    let healthy_items = take(&mut healthy_cursor, usize::MAX).await?;
+    assert_eq!(seqs(&healthy_items), [1, 2], "publisher remains usable");
+    assert!(matches!(
+        healthy_items.last(),
+        Some(StreamItem::End(end)) if end.outcome == StreamOutcome::Completed
+    ));
+    failure_logs.disarm();
+    Ok(())
 }
 
 /// 200 tokens are streamed while the client reads; it disconnects after token

@@ -1,0 +1,60 @@
+✓ spec/backend-contracts
+✓ spec/build-baseline
+✓ spec/capacity-admission
+✓ spec/configuration
+✓ spec/continuous-integration
+✓ spec/core-contracts
+✓ spec/crate-structure
+✓ spec/delivery-record
+✓ spec/documentation-content
+✓ spec/documentation-integrity
+✓ spec/documentation-site
+✓ spec/durable-dispatch
+✓ spec/durable-mailbox-postgres
+✓ spec/durable-queue-pgmq
+✓ spec/durable-queue-postgres
+✓ spec/embedded-queue
+✓ spec/fault-containment
+✓ spec/iggy-events
+✓ spec/lifecycle-events
+✓ change/oa-01-containment-controls
+  ℹ [INFO] file: skip_specs is set in .openspec.yaml: change declares no spec-level behavior changes, zero deltas accepted
+✓ change/oa-02-release-versioning
+✓ change/oa-03-signed-release-tags
+✓ change/oa-04-trusted-publishing
+✓ change/oa-05-template-secret-scan
+  ℹ [INFO] file: skip_specs is set in .openspec.yaml: change declares no spec-level behavior changes, zero deltas accepted
+✓ change/oa-06-tenant-idempotency
+✓ change/oa-07-stored-terminal-outcome
+✓ change/oa-08-discarded-spawn
+✓ change/oa-09-backend-admission
+✓ change/oa-10-expiry-events
+✓ change/oa-11-concurrency-models
+  ℹ [INFO] file: skip_specs is set in .openspec.yaml: change declares no spec-level behavior changes, zero deltas accepted
+✓ change/oa-12-negative-control-ci
+  ℹ [INFO] file: skip_specs is set in .openspec.yaml: change declares no spec-level behavior changes, zero deltas accepted
+✓ change/oa-13-browser-assurance
+  ℹ [INFO] file: skip_specs is set in .openspec.yaml: change declares no spec-level behavior changes, zero deltas accepted
+✓ change/oa-14-postgres-upgrade
+  ℹ [INFO] file: skip_specs is set in .openspec.yaml: change declares no spec-level behavior changes, zero deltas accepted
+✓ change/oa-15-desktop-assurance
+  ℹ [INFO] file: skip_specs is set in .openspec.yaml: change declares no spec-level behavior changes, zero deltas accepted
+✓ change/oa-16-iggy-poisoning
+  ℹ [INFO] file: skip_specs is set in .openspec.yaml: change declares no spec-level behavior changes, zero deltas accepted
+✓ change/oa-17-backend-benchmarks
+  ℹ [INFO] file: skip_specs is set in .openspec.yaml: change declares no spec-level behavior changes, zero deltas accepted
+✓ change/oa-18-release-boundary
+  ℹ [INFO] file: skip_specs is set in .openspec.yaml: change declares no spec-level behavior changes, zero deltas accepted
+✓ spec/performance-evidence
+✓ spec/platform-targets
+✓ spec/postgres-compatibility
+✓ spec/postgres-test-substrate
+✓ spec/release-management
+✓ spec/result-delivery
+✓ spec/result-retrieval
+✓ spec/shutdown-cancellation
+✓ spec/stream-replay
+✓ spec/supply-chain-safety
+✓ spec/test-infrastructure
+Totals: 48 passed, 0 failed (48 items)
+{"code":0,"schemaVersion":1,"time":"2026-10-24T12:02:25.400Z","operation":"run","project":"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot-rs","status":"completed","version":"1.15.0","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/21e81246db856c4e6ef02d70/1792843345401-25a5475e-252d-4249-a46c-c0780b1c0baa.json"}

@@ -1,0 +1,7 @@
+Starting change 9 out of 18: Reject impossible pre-populated adapter work
+Position: phase-0-4-operational-assurance › oa-09-backend-admission @ revision 986
+Starting task 1 out of 2: 1.1 Implement reject impossible pre-populated adapter work with the specified regression fixtures; verify OA-09 fixture/manifest coverage by static inspection
+Position: phase-0-4-operational-assurance › oa-09-backend-admission › 1 @ revision 987
+{"code":0,"schemaVersion":1,"time":"2026-10-24T12:26:50.550Z","operation":"run","project":"/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs","status":"completed","version":"1.15.0","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/79e427e7ccf7d8a94667a005/1792844810550-55757615-833f-4dce-8830-875ff065cfd3.json"}
+Starting change 1 out of 1: oa-09-backend-admission
+Starting task 1 out of 2:   oa-09-backend-admission:1

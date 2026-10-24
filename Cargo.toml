@@ -162,6 +162,11 @@ required-features = ["tokio-runtime"]
 name = "utilization"
 harness = false
 
+[[bench]]
+name = "pg_backend"
+harness = false
+required-features = ["tokio-runtime", "postgres"]
+
 [[example]]
 name = "postgres_pool"
 required-features = ["postgres"]

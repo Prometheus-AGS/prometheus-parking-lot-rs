@@ -387,7 +387,9 @@ async fn verify_mailbox(
         if existed {
             assert_eq!(
                 outcome,
-                DeliveryOutcome::Duplicate,
+                DeliveryOutcome::Duplicate {
+                    status: TaskStatus::Completed
+                },
                 "{context}: a second result for {name} was stored"
             );
         }

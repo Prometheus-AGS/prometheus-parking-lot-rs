@@ -16,8 +16,9 @@
 //! ```
 //!
 //! Negative control: under `--cfg parking_lot_negative_control="s-3"` panics
-//! are not caught, and every `panic_*` test fails (it waits, bounded by
-//! `WAIT`, for an outcome or a worker that never comes).
+//! are not caught. The designated one-in-100 ResourcePool fixture joins its
+//! actual spawned runs before looking up outcomes, so an escaped panic fails
+//! OA12:S3 directly. Other panic fixtures retain their bounded outcome waits.
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -128,6 +129,22 @@ impl Spawn for TokioSpawner {
         F: std::future::Future<Output = ()> + Send + 'static,
     {
         tokio::spawn(fut);
+    }
+}
+
+/// Record actual ResourcePool runs without retaining a lock while joining.
+#[derive(Clone, Default)]
+struct CollectedSpawner {
+    spawned: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
+}
+
+impl Spawn for CollectedSpawner {
+    fn spawn<F>(&self, future: F)
+    where
+        F: std::future::Future<Output = ()> + Send + 'static,
+    {
+        let handle = tokio::spawn(future);
+        self.spawned.lock().push(handle);
     }
 }
 
@@ -281,10 +298,41 @@ fn left(deadline: Instant) -> Duration {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn panic_resource_pool_one_in_100_is_contained() {
     let mailbox = SharedMailbox::default();
-    let pool = resource_pool(&mailbox);
+    let spawner = CollectedSpawner::default();
+    let pool = ResourcePool::new(
+        PoolLimits {
+            max_units: 1,
+            max_queue_depth: 128,
+            default_timeout: WAIT,
+        },
+        InMemoryQueue::new(128),
+        mailbox.clone(),
+        PanicExecutor::new(),
+        spawner.clone(),
+    );
 
     for id in 0..TASKS {
         pool.submit(task(id, job_for(id))).await.expect("accepted");
+    }
+
+    // Joining a run observes the actual containment boundary. Completions
+    // may spawn parked followers, so drain handles in rounds, outside locks.
+    // The watchdog is only harness failure; the mutant must fail is_panic.
+    loop {
+        let handles = std::mem::take(&mut *spawner.spawned.lock());
+        if handles.is_empty() {
+            break;
+        }
+        for handle in handles {
+            let joined = tokio::time::timeout(WAIT, handle)
+                .await
+                .expect("spawned-run join watchdog");
+            assert!(
+                !matches!(&joined, Err(error) if error.is_panic()),
+                "OA12:S3: executor panic escaped the ResourcePool spawned future: {joined:?}"
+            );
+            joined.expect("ResourcePool run was unexpectedly cancelled");
+        }
     }
 
     let deadline = Instant::now() + WAIT;

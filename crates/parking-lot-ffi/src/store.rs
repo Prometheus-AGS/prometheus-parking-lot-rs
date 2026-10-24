@@ -214,7 +214,7 @@ impl ParkingLotStore {
             let outcome = inner.mailbox.deliver(delivery.into_delivery()).await?;
             Ok(match outcome {
                 prometheus_parking_lot_core::DeliveryOutcome::Stored => DeliveryResult::Stored,
-                prometheus_parking_lot_core::DeliveryOutcome::Duplicate => {
+                prometheus_parking_lot_core::DeliveryOutcome::Duplicate { .. } => {
                     DeliveryResult::Duplicate
                 }
             })

@@ -1,0 +1,12 @@
+{
+  "worker": "/root/oa04_events",
+  "sourceWorkspace": "/Users/gqadonis/.codex/worktrees/oa04-events/prometheus-parking-lot-rs",
+  "imported": [
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-16.md",
+      "sha256": "b47a34329866f151aee0c680bca094979735d1789c4da9ee199332ee0333dc75"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED",
+  "canonicalClosureRevision": 994
+}

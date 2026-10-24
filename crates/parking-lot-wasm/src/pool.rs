@@ -170,7 +170,21 @@ where
     /// Start every admitted task on the local executor and fail every task
     /// found expired at the head of the queue.
     fn launch(self: &Arc<Self>, dispatched: Dispatched<WorkerTask<P>>) {
-        let Dispatched { started, expired } = dispatched;
+        let Dispatched {
+            started,
+            expired,
+            rejected,
+        } = dispatched;
+        // Normal submissions are validated; settle invalid pre-populated items.
+        for (task, error) in rejected {
+            self.events().rejected(task.meta.id, &error);
+            self.finish(
+                &task.mailbox_key,
+                Err(TaskError::Cancelled {
+                    reason: error.to_string(),
+                }),
+            );
+        }
         for task in expired {
             warn!(
                 task_id = task.meta.id,

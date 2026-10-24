@@ -1,0 +1,15 @@
+{
+  "task": "oa-14-postgres-upgrade:2",
+  "execution": "NOT_EXERCISED",
+  "held_runbook_path": "docs/runbooks/postgres18.md",
+  "held_runbook_base_sha256": "67d1732395e5decfb6dd011b7bbb4c0b29ea32abbd5ad127f6be70357bb3f120",
+  "proposed_runbook_target_sha256": "72857cf274c946f604211cfee2a1d93ff536bd1770fb78b6059fb7cc9bb97e4e",
+  "artifacts": {
+    "docker/postgres18/upgrade/handoffs/postgres18-runbook.patch": "38137255ebc7c3fa281e9d62a044cd5f06a30cd56323fbd21a79a194d57f1635",
+    "docker/postgres18/upgrade/handoffs/postgres18.runbook.proposed.md": "72857cf274c946f604211cfee2a1d93ff536bd1770fb78b6059fb7cc9bb97e4e",
+    ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-14.md": "8fa7d60b0cb9e850d18327fe1ef0ac84bdeb5a3d5b4f700fb0a3fe9b32881a61"
+  },
+  "task1_package_sha256": "7864e5eca31ec429901532b60ec8674070dd3b9d2f8b0221b1fb94b885735f41",
+  "shared_mutations": "No direct docs/runbooks or CI edits; no backend/source changes; no KBD runtime transitions. Driver applies patch/imports evidence.",
+  "acceptance": "Pending driver import; canonical task state is driver-owned. Static source/docs handoff is not final certification."
+}

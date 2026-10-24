@@ -1,0 +1,34 @@
+{
+  "owner": "/root/oa04_scheduler",
+  "sourceWorkspace": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs",
+  "destinations": [
+    "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs"
+  ],
+  "files": [
+    {
+      "path": "crates/parking-lot-core/src/dispatch/dispatcher.rs",
+      "sha256": "dc33fe90a7ac9f0a0f1badaf8f48771157cd786f7b3ad6a33e1f718a6775b7ec"
+    },
+    {
+      "path": "crates/parking-lot-core/src/dispatch/parked.rs",
+      "sha256": "16d905e70fd3d26bd18d661125f2d05728b0e096542f1abb82c2ea25a3127cde"
+    },
+    {
+      "path": "crates/parking-lot-core/tests/unit/review_test.rs",
+      "sha256": "ac60189c1db00d810552c981c6e7c1450a389293af13357f3b92a789432d0e2c"
+    },
+    {
+      "path": "crates/parking-lot-core/tests/prune_metadata_test.rs",
+      "sha256": "34ce0cb0adf74fb1ce9c6f7519e549a266eaa0437db3071ae9d93ba16bdfa1e3"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/src/resource_pool.rs",
+      "sha256": "c7543cf15fc61b7d8f1a5ee506c4bce0c2e8f2240bb5cf40e788cbbe2be83b04"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/prune_expiry_test.rs",
+      "sha256": "081e8d5dbd344d30363df0501ebb5ff5a450a5615c5b153929bc8618599cd206"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED"
+}

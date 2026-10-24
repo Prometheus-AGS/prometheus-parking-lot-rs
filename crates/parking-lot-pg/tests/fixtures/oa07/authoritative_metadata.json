@@ -1,0 +1,131 @@
+{
+  "authority": "Synthetic fixture source records before consume; no assertion of live production provenance.",
+  "direct_source": [
+    "../oa06/005_result_mailbox_0_3.sql",
+    "../oa06/populated_0_3.sql",
+    "failed_generation_0_3.sql"
+  ],
+  "intermediate_source": [
+    "../oa06/005_result_mailbox_0_3.sql",
+    "../oa06/populated_0_3.sql",
+    "008_scoped_result_mailbox_v2.sql",
+    "populated_v2.sql",
+    "failed_generation_v2.sql"
+  ],
+  "direct_owners": [
+    {
+      "mailbox_name": "legacy",
+      "idempotency_key": "consumed-finite",
+      "key": {
+        "tenant": "tenant-a",
+        "user_id": "user",
+        "session_id": null
+      }
+    },
+    {
+      "mailbox_name": "legacy",
+      "idempotency_key": "consumed-permanent",
+      "key": {
+        "tenant": "tenant-a",
+        "user_id": "user",
+        "session_id": null
+      }
+    },
+    {
+      "mailbox_name": "legacy",
+      "idempotency_key": "consumed-failed",
+      "key": {
+        "tenant": "tenant-failed",
+        "user_id": "user",
+        "session_id": null
+      }
+    }
+  ],
+  "direct_statuses": [
+    {
+      "mailbox_name": "legacy",
+      "idempotency_key": "consumed-finite",
+      "key": {
+        "tenant": "tenant-a",
+        "user_id": "user",
+        "session_id": null
+      },
+      "status": "Completed"
+    },
+    {
+      "mailbox_name": "legacy",
+      "idempotency_key": "consumed-permanent",
+      "key": {
+        "tenant": "tenant-a",
+        "user_id": "user",
+        "session_id": null
+      },
+      "status": "Completed"
+    },
+    {
+      "mailbox_name": "legacy",
+      "idempotency_key": "consumed-failed",
+      "key": {
+        "tenant": "tenant-failed",
+        "user_id": "user",
+        "session_id": null
+      },
+      "status": {
+        "Failed": {
+          "kind": "executor",
+          "message": "original failure",
+          "retryable": false
+        }
+      }
+    }
+  ],
+  "intermediate_statuses": [
+    {
+      "mailbox_name": "legacy",
+      "idempotency_key": "consumed-finite",
+      "key": {
+        "tenant": "tenant-a",
+        "user_id": "user",
+        "session_id": null
+      },
+      "status": "Completed"
+    },
+    {
+      "mailbox_name": "legacy",
+      "idempotency_key": "consumed-permanent",
+      "key": {
+        "tenant": "tenant-a",
+        "user_id": "user",
+        "session_id": null
+      },
+      "status": "Completed"
+    },
+    {
+      "mailbox_name": "legacy",
+      "idempotency_key": "consumed-failed",
+      "key": {
+        "tenant": "tenant-failed",
+        "user_id": "user",
+        "session_id": null
+      },
+      "status": {
+        "Failed": {
+          "kind": "executor",
+          "message": "original failure",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "mailbox_name": "legacy",
+      "idempotency_key": "consumed-failed",
+      "key": {
+        "tenant": "second-address",
+        "user_id": "user",
+        "session_id": null
+      },
+      "status": "Running"
+    }
+  ],
+  "dynamic_ttl_case": "A consumed v2 short-consumed fence is seeded on the real DB clock with an original 10-second lifetime; test supplies known original Failed status. Capture its exact native forget_at and runtime fixture identity in the boundary receipt."
+}

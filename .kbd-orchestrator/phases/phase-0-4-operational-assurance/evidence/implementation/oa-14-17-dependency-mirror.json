@@ -1,0 +1,275 @@
+{
+  "purpose": "Freeze integrated schema3 and scheduler dependency interfaces before OA14/OA17 source work",
+  "destinations": [
+    "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs",
+    "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs"
+  ],
+  "updatedFiles": [
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-core/src/dispatch/dispatcher.rs",
+      "path": "crates/parking-lot-core/src/dispatch/dispatcher.rs",
+      "sha256": "35ba05d5e1652476345e3a7eb0a4095856d8c8f9c2abe95fab5b4fde104cb2e8"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-core/src/dispatch/parked.rs",
+      "path": "crates/parking-lot-core/src/dispatch/parked.rs",
+      "sha256": "1fd7220ab3c9ed1d33047485a2dd6d2aca7bb62c61ad9c422d689974f1b72aa2"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-core/src/hooks/mod.rs",
+      "path": "crates/parking-lot-core/src/hooks/mod.rs",
+      "sha256": "ca21fa47da50bf95d558dabdca4426e314e28adaf12bbbcb423b1e6d806bcc3f"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-core/src/mailbox/storage_tests.rs",
+      "path": "crates/parking-lot-core/src/mailbox/storage_tests.rs",
+      "sha256": "06bd5b92e2e41ab7834aa55360e964851734890f017f607642ca83569cd3a253"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-core/src/semaphore/mod.rs",
+      "path": "crates/parking-lot-core/src/semaphore/mod.rs",
+      "sha256": "a0a0b965e3937c4a8f93b2ffc4145faf77cdccd02e66c68ad5b426e476864537"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-core/tests/backend_admission_test.rs",
+      "path": "crates/parking-lot-core/tests/backend_admission_test.rs",
+      "sha256": "f20533697ab14e1ee4e84a460504090096a82c2616ef6b3a399bbe01f019f115"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-core/tests/loom_kind_release.rs",
+      "path": "crates/parking-lot-core/tests/loom_kind_release.rs",
+      "sha256": "6e081f68b69d1829abd3470566982e5c0ea0c3cea465675bd931403d838b048c"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-core/tests/prune_metadata_test.rs",
+      "path": "crates/parking-lot-core/tests/prune_metadata_test.rs",
+      "sha256": "34ce0cb0adf74fb1ce9c6f7519e549a266eaa0437db3071ae9d93ba16bdfa1e3"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-core/tests/unit/review_test.rs",
+      "path": "crates/parking-lot-core/tests/unit/review_test.rs",
+      "sha256": "ac60189c1db00d810552c981c6e7c1450a389293af13357f3b92a789432d0e2c"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-embedded/src/mailbox.rs",
+      "path": "crates/parking-lot-embedded/src/mailbox.rs",
+      "sha256": "695b6177dac06548e890575d392d9a0a992b295d00087724574d44e7373cd38c"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-embedded/src/store.rs",
+      "path": "crates/parking-lot-embedded/src/store.rs",
+      "sha256": "ac1b8b1bc5b819d2690d4084f45df8e07cc9080f700046a2a058bd40b6d7dfc5"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-embedded/tests/crash_points.rs",
+      "path": "crates/parking-lot-embedded/tests/crash_points.rs",
+      "sha256": "a0b9f16ebf6feecb5610f65bf49c285f24d4ec7d295536c8bf2f7b55debf0513"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-embedded/tests/mailbox_migration.rs",
+      "path": "crates/parking-lot-embedded/tests/mailbox_migration.rs",
+      "sha256": "a722e93add2b8f033aa6319d276245d079fe4ff66c70981326185bd81bee2f5c"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-embedded/tests/mailbox_status.rs",
+      "path": "crates/parking-lot-embedded/tests/mailbox_status.rs",
+      "sha256": "c05453fafb3322a8a13d60bdf7700633e58c8761da71f8896cc371de77589cf2"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-embedded/tests/restart.rs",
+      "path": "crates/parking-lot-embedded/tests/restart.rs",
+      "sha256": "1c10fe39f7be8fc3acf928f096b933f236dc8b168495f31543615a51be554e8a"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-embedded/tests/support/legacy_metadata.rs",
+      "path": "crates/parking-lot-embedded/tests/support/legacy_metadata.rs",
+      "sha256": "101a6ed2b2bd7a24fb9e05a933cf570fbfdc06161233f58cb4c6a41f2d61191e"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-embedded/tests/support/legacy_v03.rs",
+      "path": "crates/parking-lot-embedded/tests/support/legacy_v03.rs",
+      "sha256": "5692bcdf5797a2877ff9c338059f56c2d57fb1d5bc1a75bfb3fe7eb662a32d6e"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-ffi/src/store.rs",
+      "path": "crates/parking-lot-ffi/src/store.rs",
+      "sha256": "07abf8982997146dda99145af5e1697bfa71416f7c78ab5e88b03876f66b052d"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-iggy/src/publisher.rs",
+      "path": "crates/parking-lot-iggy/src/publisher.rs",
+      "sha256": "0d45308e7a32c556a831942468bc1114717950702bedef22d45a12ef6b544d07"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-iggy/tests/iggy_stream.rs",
+      "path": "crates/parking-lot-iggy/tests/iggy_stream.rs",
+      "sha256": "fcde38b8d1d114e6a9e09e1f888e4d1a3579f6d498e3bd5f029c3bee9a79196c"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-iggy/tests/support/mod.rs",
+      "path": "crates/parking-lot-iggy/tests/support/mod.rs",
+      "sha256": "d0ae623e54462208648eb29df179374a55ea60f8e1c13dbf3d2824d924c5ce4b"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-runtime-tokio/src/durable_pool/mod.rs",
+      "path": "crates/parking-lot-runtime-tokio/src/durable_pool/mod.rs",
+      "sha256": "814fbb307815de3a14c8b1b932405771f2b4243b7cfeea4e633a04049414b32b"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-runtime-tokio/src/ledger.rs",
+      "path": "crates/parking-lot-runtime-tokio/src/ledger.rs",
+      "sha256": "dde628e2afa5dcd67ebf1263ce201a50b520413c59016499fa77961929ade7d9"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-runtime-tokio/src/resource_pool.rs",
+      "path": "crates/parking-lot-runtime-tokio/src/resource_pool.rs",
+      "sha256": "84c441bd0d2030d747cb10fce5ab2eaf385864aa015160413702df1cc292791c"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-runtime-tokio/src/worker_pool/native.rs",
+      "path": "crates/parking-lot-runtime-tokio/src/worker_pool/native.rs",
+      "sha256": "fd21a74fc877f5029e1c9897e95a3d00b3c6da5be21a855f89160e6793f57cf2"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-runtime-tokio/tests/backend_admission_test.rs",
+      "path": "crates/parking-lot-runtime-tokio/tests/backend_admission_test.rs",
+      "sha256": "a6ec617f9685681d532ca0256ee61330113ad7fa605b594f469e7fc937fe9568"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs",
+      "path": "crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs",
+      "sha256": "941d442d5f849bc5aea47a6e07f0723564965375b47205651872a396bc6e4f82"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-runtime-tokio/tests/loom_ledger.rs",
+      "path": "crates/parking-lot-runtime-tokio/tests/loom_ledger.rs",
+      "sha256": "1ce540848d5575a8baa2fb14e464e6fd721c350cdf83ff5a7e22381c96ceee9f"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-runtime-tokio/tests/prune_expiry_test.rs",
+      "path": "crates/parking-lot-runtime-tokio/tests/prune_expiry_test.rs",
+      "sha256": "081e8d5dbd344d30363df0501ebb5ff5a450a5615c5b153929bc8618599cd206"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-wasm/README.md",
+      "path": "crates/parking-lot-wasm/README.md",
+      "sha256": "f94d80e60dbfe13a115ef95982f959b8e420d8592f23f7ac9d42bb1b78845d40"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-wasm/src/events.rs",
+      "path": "crates/parking-lot-wasm/src/events.rs",
+      "sha256": "900f886ec987fca629a35a421b34609263ea7ead0d0fd81ed38d3dffa078f8b3"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-wasm/src/pool.rs",
+      "path": "crates/parking-lot-wasm/src/pool.rs",
+      "sha256": "99b1e13ab9d50bfb62b79e06ad969631555907ad7fdd2fd1e5d749d67ddc04c9"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-wasm/tests/common/mod.rs",
+      "path": "crates/parking-lot-wasm/tests/common/mod.rs",
+      "sha256": "47bd8fd8a34c68b98f7fe3fb9bcf481116da775e57c3f975c59eaaf6269b9cf4"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-wasm/tests/wasm_events.rs",
+      "path": "crates/parking-lot-wasm/tests/wasm_events.rs",
+      "sha256": "d5d4be539b88590af806088c9e0c53989cb2c4f849d2203a6c927e2639194f56"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/crates/parking-lot-wasm/tests/wasm_pool.rs",
+      "path": "crates/parking-lot-wasm/tests/wasm_pool.rs",
+      "sha256": "80884cd19bc36a53a48aaa6ece8e1bf64922fc81edb22b6d0e248ebcc06c0f3b"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/docs/API.md",
+      "path": "docs/API.md",
+      "sha256": "5e91e54e2623d0a6dad0fc42feb633769019cd206ca38a6c7c9754dbd4f2823f"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/docs/adr/0006-tenant-scoped-result-idempotency.md",
+      "path": "docs/adr/0006-tenant-scoped-result-idempotency.md",
+      "sha256": "24cd864411a94a0d14cd72332f6da957dbaae407fee497f2813c97f9e13167f0"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/docs/adr/0007-authoritative-duplicate-status.md",
+      "path": "docs/adr/0007-authoritative-duplicate-status.md",
+      "sha256": "55cdff3f0ff96fc940115ee6546ef365ac76c299772c493d5424eab022a1a02f"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/tests/scheduler/durable_sigkill.rs",
+      "path": "tests/scheduler/durable_sigkill.rs",
+      "sha256": "2994064b5ce171347779e192d9879b8071d8f1082f716b784791a84f88fc1657"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs/tests/scheduler/support.rs",
+      "path": "tests/scheduler/support.rs",
+      "sha256": "cf53516e40354a969831efd7570b4a0e8f7f8d8c05d02a4837fb22c4e053fd8f"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs/crates/parking-lot-ffi/src/store.rs",
+      "path": "crates/parking-lot-ffi/src/store.rs",
+      "sha256": "07abf8982997146dda99145af5e1697bfa71416f7c78ab5e88b03876f66b052d"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs/crates/parking-lot-iggy/src/publisher.rs",
+      "path": "crates/parking-lot-iggy/src/publisher.rs",
+      "sha256": "0d45308e7a32c556a831942468bc1114717950702bedef22d45a12ef6b544d07"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs/crates/parking-lot-iggy/tests/iggy_stream.rs",
+      "path": "crates/parking-lot-iggy/tests/iggy_stream.rs",
+      "sha256": "fcde38b8d1d114e6a9e09e1f888e4d1a3579f6d498e3bd5f029c3bee9a79196c"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs/crates/parking-lot-iggy/tests/support/mod.rs",
+      "path": "crates/parking-lot-iggy/tests/support/mod.rs",
+      "sha256": "d0ae623e54462208648eb29df179374a55ea60f8e1c13dbf3d2824d924c5ce4b"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs/crates/parking-lot-wasm/README.md",
+      "path": "crates/parking-lot-wasm/README.md",
+      "sha256": "f94d80e60dbfe13a115ef95982f959b8e420d8592f23f7ac9d42bb1b78845d40"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs/crates/parking-lot-wasm/src/events.rs",
+      "path": "crates/parking-lot-wasm/src/events.rs",
+      "sha256": "900f886ec987fca629a35a421b34609263ea7ead0d0fd81ed38d3dffa078f8b3"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs/crates/parking-lot-wasm/src/pool.rs",
+      "path": "crates/parking-lot-wasm/src/pool.rs",
+      "sha256": "99b1e13ab9d50bfb62b79e06ad969631555907ad7fdd2fd1e5d749d67ddc04c9"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs/crates/parking-lot-wasm/tests/common/mod.rs",
+      "path": "crates/parking-lot-wasm/tests/common/mod.rs",
+      "sha256": "47bd8fd8a34c68b98f7fe3fb9bcf481116da775e57c3f975c59eaaf6269b9cf4"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs/crates/parking-lot-wasm/tests/wasm_events.rs",
+      "path": "crates/parking-lot-wasm/tests/wasm_events.rs",
+      "sha256": "d5d4be539b88590af806088c9e0c53989cb2c4f849d2203a6c927e2639194f56"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs/crates/parking-lot-wasm/tests/wasm_pool.rs",
+      "path": "crates/parking-lot-wasm/tests/wasm_pool.rs",
+      "sha256": "80884cd19bc36a53a48aaa6ece8e1bf64922fc81edb22b6d0e248ebcc06c0f3b"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs/docs/API.md",
+      "path": "docs/API.md",
+      "sha256": "5e91e54e2623d0a6dad0fc42feb633769019cd206ca38a6c7c9754dbd4f2823f"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs/docs/adr/0006-tenant-scoped-result-idempotency.md",
+      "path": "docs/adr/0006-tenant-scoped-result-idempotency.md",
+      "sha256": "24cd864411a94a0d14cd72332f6da957dbaae407fee497f2813c97f9e13167f0"
+    },
+    {
+      "destination": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs/docs/adr/0007-authoritative-duplicate-status.md",
+      "path": "docs/adr/0007-authoritative-duplicate-status.md",
+      "sha256": "55cdff3f0ff96fc940115ee6546ef365ac76c299772c493d5424eab022a1a02f"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED"
+}

@@ -18,3 +18,7 @@ Append-only. Dated entries. Mark superseded entries; do not delete them.
 - `kbd-apply end-task` evaluates and consumes the task-after and final change-after boundaries. Repeating change-after after a successful close creates a false blocker because the start receipt was already consumed. Inspect the saved receipt or canonical state instead.
 - The managed OpenSpec runner has a global `operation.lock`. Serialize task listing, task boundaries, validation and archival even when changes and files differ. A contended listing can be retried after the known owner exits; do not remove a live lock.
 - The transferred final-gate directory contains README, gate script and summary, but no raw `.log` files. Preserve that limitation when citing the sender's results; the summary is historical evidence, not a new local test run.
+
+## 2026-10-24 — Source-derived negative-control classifier placement
+
+- OA12 requires build/discovery plus a designated defect assertion; a watchdog, compile failure or missing-test exit cannot stand in. Existing discarded/panic/budget/slot fixtures can await a missing outcome before their later observable check. Put the existing production-path witness before the wait through its owner, retain positive assertions, and prove the final normal/control runs at the completed phase boundary. Source inspection is not proof those classifiers execute.

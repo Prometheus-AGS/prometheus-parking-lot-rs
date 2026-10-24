@@ -1,0 +1,19 @@
+{
+  "revision": 940,
+  "lastEventId": "09f05f54-f727-44ca-81fd-94dca16ac2fc",
+  "phase": "phase-0-4-operational-assurance",
+  "assess": "complete",
+  "plan": "complete",
+  "executeEntered": false,
+  "changes": 18,
+  "tasks": 36,
+  "allTasksPending": true,
+  "scenarios": 17,
+  "contractDigest": "e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257",
+  "predecessorStillComplete": true,
+  "readiness": "READY phase=phase-0-4-operational-assurance contract=.kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json digest=e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257 planRevision=1",
+  "openSpecValidation": "48 passed, 0 failed (strict)",
+  "productionTestsRun": false,
+  "credentialRotation": "operator-deferred; non-blocking",
+  "publicationOrHistoryRewriteAuthorized": false
+}

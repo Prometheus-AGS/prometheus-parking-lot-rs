@@ -1,0 +1,7 @@
+Starting change 2 out of 18: Choose and automate seven-crate versioning
+Position: phase-0-4-operational-assurance › oa-02-release-versioning @ revision 946
+Starting task 1 out of 2: 1.1 Implement choose and automate seven-crate versioning with the specified regression fixtures; verify OA-02 fixture/manifest coverage by static inspection
+Position: phase-0-4-operational-assurance › oa-02-release-versioning › 1 @ revision 947
+{"code":0,"schemaVersion":1,"time":"2026-10-24T12:11:05.781Z","operation":"run","project":"/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs","status":"completed","version":"1.15.0","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/79e427e7ccf7d8a94667a005/1792843865782-2adf2be3-e23e-447b-9e5b-5896d139275d.json"}
+Starting change 1 out of 1: oa-02-release-versioning
+Starting task 1 out of 2:   oa-02-release-versioning:1

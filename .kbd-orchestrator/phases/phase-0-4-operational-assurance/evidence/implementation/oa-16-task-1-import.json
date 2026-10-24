@@ -1,0 +1,20 @@
+{
+  "worker": "/root/oa04_events",
+  "sourceWorkspace": "/Users/gqadonis/.codex/worktrees/oa04-events/prometheus-parking-lot-rs",
+  "imported": [
+    {
+      "path": "crates/parking-lot-iggy/tests/iggy_stream.rs",
+      "sha256": "fcde38b8d1d114e6a9e09e1f888e4d1a3579f6d498e3bd5f029c3bee9a79196c"
+    },
+    {
+      "path": "crates/parking-lot-iggy/tests/support/mod.rs",
+      "sha256": "d0ae623e54462208648eb29df179374a55ea60f8e1c13dbf3d2824d924c5ce4b"
+    },
+    {
+      "path": "crates/parking-lot-iggy/src/publisher.rs",
+      "sha256": "0d45308e7a32c556a831942468bc1114717950702bedef22d45a12ef6b544d07"
+    }
+  ],
+  "testsRun": false,
+  "status": "real-server fixture source and one negative-control cfg imported; final execution pending"
+}

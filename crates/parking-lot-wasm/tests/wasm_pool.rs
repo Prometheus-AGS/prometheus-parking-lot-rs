@@ -1,9 +1,11 @@
-//! The WASM pool on a real JS event loop (`wasm-bindgen-test`, Node.js).
+//! The WASM pool on a real JS event loop (`wasm-bindgen-test`, Node.js/Chromium).
 //!
 //! Smoke, capacity, priority order, budgets and shutdown, through the public
 //! API only. Run with
 //! `cargo test --target wasm32-unknown-unknown -p prometheus-parking-lot-wasm`
 //! (needs `wasm-bindgen-test-runner` matching the `wasm-bindgen` in Cargo.lock).
+//! OA-13 also runs this same suite with `WASM_BINDGEN_USE_BROWSER=1` and a
+//! pinned local ChromeDriver; Node remains the default.
 //!
 //! Executors wait with `prometheus_parking_lot_wasm::sleep`, the `Send` JS
 //! timer; a raw `gloo_timers` future cannot be awaited inside a
@@ -27,6 +29,8 @@ use prometheus_parking_lot_core::{
 };
 use prometheus_parking_lot_wasm::{WorkerPool, sleep};
 use wasm_bindgen_test::wasm_bindgen_test;
+
+mod common;
 
 const LONG: Duration = Duration::from_secs(10);
 
@@ -56,6 +60,8 @@ fn config(workers: usize, units: u32, depth: usize, timeout_ms: u64) -> WorkerPo
 struct Tracking {
     held: Arc<AtomicU32>,
     peak: Arc<AtomicU32>,
+    vram_held: Arc<AtomicU32>,
+    vram_peak: Arc<AtomicU32>,
     started: Arc<Mutex<Vec<u64>>>,
 }
 
@@ -65,15 +71,20 @@ impl WorkerExecutor<u64, u64> for Tracking {
         let units = meta.cost.total_units();
         let now = self.held.fetch_add(units, Ordering::SeqCst) + units;
         self.peak.fetch_max(now, Ordering::SeqCst);
+        let vram = meta.cost.units_of(ResourceKind::GpuVram);
+        let held_vram = self.vram_held.fetch_add(vram, Ordering::SeqCst) + vram;
+        self.vram_peak.fetch_max(held_vram, Ordering::SeqCst);
         self.started.lock().push(meta.id);
         sleep(Duration::from_millis(payload)).await;
         self.held.fetch_sub(units, Ordering::SeqCst);
+        self.vram_held.fetch_sub(vram, Ordering::SeqCst);
         Ok(meta.id)
     }
 }
 
 #[wasm_bindgen_test]
 async fn smoke_submit_and_retrieve() {
+    common::assert_execution_environment();
     let pool = WorkerPool::new(config(2, 10, 8, 5_000), Tracking::default()).expect("pool");
     let key = pool
         .submit_async(5, meta(7, Priority::Normal, 1))
@@ -85,6 +96,47 @@ async fn smoke_submit_and_retrieve() {
     assert_eq!(stats.submitted_tasks, 1);
     assert_eq!(stats.completed_tasks, 1);
     assert_eq!(stats.used_units, 0);
+}
+
+/// Mixed CPU+VRAM costs share the scalar ceiling while each dimension keeps
+/// its own ceiling. A CPU-only task can run beside the full VRAM dimension.
+#[wasm_bindgen_test]
+async fn vector_capacity_respects_total_and_kind_limits() {
+    let executor = Tracking::default();
+    let pool = WorkerPool::new(
+        config(8, 6, 8, 5_000)
+            .with_resource_limit(ResourceKind::Cpu, 3)
+            .with_resource_limit(ResourceKind::GpuVram, 2),
+        executor.clone(),
+    )
+    .expect("pool");
+    let mixed = |id: u64, vram: u32| TaskMetadata {
+        cost: ResourceCost::new(ResourceKind::Cpu, 1).with(ResourceKind::GpuVram, vram),
+        ..meta(id, Priority::Normal, 0)
+    };
+    assert!(matches!(
+        pool.submit(1, mixed(9, 3)),
+        Err(SchedulerError::CapacityExceeded {
+            kind: Some(ResourceKind::GpuVram),
+            ..
+        })
+    ));
+    let keys = [
+        pool.submit(40, mixed(0, 2)).expect("mixed running"),
+        pool.submit(5, mixed(1, 2)).expect("mixed parked"),
+        pool.submit(5, meta(2, Priority::Normal, 2))
+            .expect("CPU skip"),
+    ];
+    assert_eq!(pool.stats().used_units, 5);
+    assert_eq!(pool.stats().queued_tasks, 1);
+    for key in &keys {
+        pool.retrieve_async(key, LONG).await.expect("vector result");
+    }
+    assert_eq!(*executor.started.lock(), vec![0, 2, 1]);
+    assert_eq!(executor.peak.load(Ordering::SeqCst), 5);
+    assert_eq!(executor.vram_peak.load(Ordering::SeqCst), 2);
+    assert_eq!(executor.vram_held.load(Ordering::SeqCst), 0);
+    assert_eq!(pool.stats().used_units, 0);
 }
 
 /// cr-23: per-kind limits from the configuration reach admission. 100 total
@@ -241,6 +293,13 @@ async fn budget_cancels_a_wedged_executor() {
     let wedged = pool
         .submit(3_600_000, meta(2, Priority::Normal, 1))
         .expect("submit");
+    // Observe the actual executor drop before a missing result can reach the
+    // retrieve watchdog. S-4 must fail this cancellation oracle, not a wait.
+    sleep(Duration::from_millis(700)).await;
+    assert!(
+        executor.cancelled.load(Ordering::SeqCst),
+        "OA12:S4:wasm-budget: executor future was not dropped"
+    );
     let result = pool.retrieve_async(&wedged, LONG).await;
     assert!(
         matches!(

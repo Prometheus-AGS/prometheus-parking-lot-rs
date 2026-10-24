@@ -1,0 +1,107 @@
+{
+  "kind": "read-only environment inventory; no listed tool executed",
+  "host": {
+    "system": "Darwin",
+    "machine": "x86_64",
+    "python": "3.12.1"
+  },
+  "paths": {
+    "git": "/usr/local/bin/git",
+    "timeout": "/usr/local/bin/timeout",
+    "python3": "/Users/gqadonis/miniconda3/bin/python3",
+    "rustup": "/usr/local/bin/rustup",
+    "cargo": "/Users/gqadonis/.cargo/bin/cargo",
+    "cargo-nextest": null,
+    "cargo-deny": "/Users/gqadonis/.cargo/bin/cargo-deny",
+    "release-plz": null,
+    "git-cliff": null,
+    "gitleaks": "/usr/local/bin/gitleaks",
+    "wasm-bindgen-test-runner": null,
+    "node": "/Users/gqadonis/.volta/bin/node",
+    "npm": "/Users/gqadonis/.volta/bin/npm",
+    "pnpm": "/Users/gqadonis/.volta/bin/pnpm",
+    "docker": "/usr/local/bin/docker",
+    "gpg": "/usr/local/bin/gpg",
+    "ssh-keygen": "/usr/bin/ssh-keygen",
+    "chromedriver": null,
+    "chromium": null,
+    "google-chrome": null,
+    "pkg-config": "/usr/local/bin/pkg-config"
+  },
+  "installedRustToolchainDirectories": [
+    "1.89.0-x86_64-apple-darwin",
+    "1.95-x86_64-apple-darwin",
+    "1.96-x86_64-apple-darwin",
+    "1.97.1-x86_64-apple-darwin",
+    "nightly-2026-05-01-x86_64-apple-darwin",
+    "nightly-2026-07-18-x86_64-apple-darwin",
+    "nightly-x86_64-apple-darwin",
+    "stable-x86_64-apple-darwin"
+  ],
+  "functionalHealth": "UNVERIFIED; presence is not runnable or version evidence",
+  "rustupHomePath": "/Users/gqadonis/.rustup",
+  "pathInventoryLimits": "Only selected executable paths and toolchain directories were read. No Cargo/Rustup/Docker/browser/version or health command executed.",
+  "installedCompilerManifestMetadata": [
+    {
+      "directory": "1.89.0-x86_64-apple-darwin",
+      "manifest": "/Users/gqadonis/.rustup/toolchains/1.89.0-x86_64-apple-darwin/lib/rustlib/multirust-channel-manifest.toml",
+      "rustcPackageVersion": "1.89.0 (29483883e 2025-08-04)",
+      "manifestDate": "2025-08-07"
+    },
+    {
+      "directory": "1.95-x86_64-apple-darwin",
+      "manifest": "/Users/gqadonis/.rustup/toolchains/1.95-x86_64-apple-darwin/lib/rustlib/multirust-channel-manifest.toml",
+      "rustcPackageVersion": "1.95.0 (59807616e 2026-04-14)",
+      "manifestDate": "2026-04-16"
+    },
+    {
+      "directory": "1.96-x86_64-apple-darwin",
+      "manifest": "/Users/gqadonis/.rustup/toolchains/1.96-x86_64-apple-darwin/lib/rustlib/multirust-channel-manifest.toml",
+      "rustcPackageVersion": "1.96.1 (31fca3adb 2026-06-26)",
+      "manifestDate": "2026-06-30"
+    },
+    {
+      "directory": "1.97.1-x86_64-apple-darwin",
+      "manifest": "/Users/gqadonis/.rustup/toolchains/1.97.1-x86_64-apple-darwin/lib/rustlib/multirust-channel-manifest.toml",
+      "rustcPackageVersion": "1.97.1 (8bab26f4f 2026-07-14)",
+      "manifestDate": "2026-07-16"
+    },
+    {
+      "directory": "nightly-2026-05-01-x86_64-apple-darwin",
+      "manifest": "/Users/gqadonis/.rustup/toolchains/nightly-2026-05-01-x86_64-apple-darwin/lib/rustlib/multirust-channel-manifest.toml",
+      "rustcPackageVersion": "1.97.0-nightly (f53b654a8 2026-04-30)",
+      "manifestDate": "2026-05-01"
+    },
+    {
+      "directory": "nightly-2026-07-18-x86_64-apple-darwin",
+      "manifest": "/Users/gqadonis/.rustup/toolchains/nightly-2026-07-18-x86_64-apple-darwin/lib/rustlib/multirust-channel-manifest.toml",
+      "rustcPackageVersion": "1.99.0-nightly (b6839f4d0 2026-07-17)",
+      "manifestDate": "2026-07-18"
+    },
+    {
+      "directory": "nightly-x86_64-apple-darwin",
+      "manifest": "/Users/gqadonis/.rustup/toolchains/nightly-x86_64-apple-darwin/lib/rustlib/multirust-channel-manifest.toml",
+      "rustcPackageVersion": "1.101.0-nightly (19833af72 2026-10-20)",
+      "manifestDate": "2026-10-21"
+    },
+    {
+      "directory": "stable-x86_64-apple-darwin",
+      "manifest": "/Users/gqadonis/.rustup/toolchains/stable-x86_64-apple-darwin/lib/rustlib/multirust-channel-manifest.toml",
+      "rustcPackageVersion": "1.99.1 (58cf8f9c3 2026-10-13)",
+      "manifestDate": "2026-10-15"
+    }
+  ],
+  "officialRustupSources": [
+    {
+      "url": "https://rust-lang.github.io/rustup/environment-variables.html",
+      "read": "2026-10-24",
+      "fact": "RUSTUP_TOOLCHAIN accepts installed name/absolute path; RUSTUP_AUTO_INSTALL=0 disables automatic toolchain installation"
+    },
+    {
+      "url": "https://rust-lang.github.io/rustup/overrides.html",
+      "read": "2026-10-24",
+      "fact": "Explicit +selector precedes environment toolchain override"
+    }
+  ],
+  "resolutionPlan": "Existing stable manifest records exact1.99.1. Actual binary version/hash/components must be verified after production source boundary. Nested numeric selectors require an explicitly provisioned isolated Rustup view or BLOCKED; no global alias/install or inner-argv rewriting."
+}

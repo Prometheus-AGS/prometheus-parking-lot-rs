@@ -43,7 +43,8 @@ pub use memory_queue::InMemoryQueue;
 pub use memory_result_mailbox::InMemoryResultMailbox;
 pub use queue::TaskQueue;
 pub use result_mailbox::{
-    Delivery, DeliveryOutcome, MailboxEntry, NoopNotifier, Notifier, ResultMailbox, StorageMailbox,
+    Delivery, DeliveryOutcome, LegacyDeliveryStatus, LegacyIdempotencyOwner, MailboxEntry,
+    NoopNotifier, Notifier, ResultMailbox, StorageMailbox,
 };
 pub use spawn::Spawn;
 pub use task::{PoolLimits, ScheduledTask, SubmissionSequence, TaskMetadata, TaskStatus};

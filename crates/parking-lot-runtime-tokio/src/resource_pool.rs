@@ -36,6 +36,92 @@
 //! through the dispatcher, which starts whatever the freed units admit under
 //! the same lock (no lost wakeup; see the dispatcher's module docs).
 //!
+//! ## Pre-filled backend work (oa-09)
+//!
+//! [`new`](ResourcePool::new) takes ownership of the queue's existing depth
+//! in shutdown accounting and requires `Q: TaskQueue<P>`. Construction does
+//! not spawn work. After builders set limits and observers, the first
+//! submission or [`shutdown_with`](ResourcePool::shutdown_with) installs the
+//! release hook and drains pre-filled work. Other draining operations can
+//! also observe the head.
+//!
+//! An observed head over the pool's absolute total or per-kind limit is
+//! removed without execution, emits `Rejected` with a capacity reason, and
+//! receives one delivery attempt of [`TaskStatus::Dropped`] containing the
+//! capacity error's text when a mailbox key is configured. It counts in
+//! [`failed_tasks`](ResourcePool::failed_tasks) and as a finished outcome in
+//! the shutdown ledger, then settles. It invokes no cancellation sink.
+//! Tasks placed directly in the backend get no fabricated `Submitted` or
+//! `Queued` event from this pool.
+//! Expired or completed pre-filled tasks use their usual accounting paths.
+//! Rejection reports run outside the dispatcher lock; a valid head waiting
+//! only for currently held units stays parked.
+//!
+//! FIFO follows the backend's stored tickets and the configured dispatch
+//! policy. The pool does not recover a global submission sequence across an
+//! arbitrary imported sequence epoch and new submissions. The initial ledger
+//! count relies on the backend's reported depth; external additions after
+//! ownership transfer are outside this accounting. Mailbox errors, callback
+//! panics, blocking collaborators and bounded hook delivery retain their
+//! existing limits; this in-memory pool adds no persistent dead-letter store.
+//!
+//! ## Explicit expiry pruning (oa-10)
+//!
+//! [`prune_expired`](ResourcePool::prune_expired) still returns a removal count.
+//! The queue now returns every removed task through the dispatcher, so each
+//! gets the normal `Expired` terminal event, one configured mailbox delivery
+//! attempt of [`TaskStatus::Expired`] without a result payload, and its own
+//! expiry audit record. Removed tasks cannot execute or be pruned again.
+//! Equality at a deadline is live; tasks without deadlines remain queued.
+//!
+//! Pruning and the following drain share the dispatch lock. Per-task expiry
+//! handling runs after that lock is released and counts each removal once in
+//! [`failed_tasks`](ResourcePool::failed_tasks) and the shutdown ledger.
+//! Settlement precedes mailbox/audit callbacks, as for an expired head, so a
+//! shutdown accounting report is not an acknowledgement of stored results.
+//! Mailbox errors and callback failures retain their existing limits. A
+//! conforming backend removes nothing on a pruning error; the adapter finishes
+//! fallible backend pruning before changing its in-memory front. This path
+//! calls no cancellation sink and leaves active permits unchanged. Live work
+//! that becomes startable after pruning is launched by the following drain.
+//!
+//! ## Discarded spawns (oa-08)
+//!
+//! The [`Spawn`] contract permits an implementation to drop its supplied
+//! future without polling it. The pool establishes ownership before that
+//! handoff. Dropping an unpolled run emits one `Failed` event, without
+//! `Started`, and attempts one mailbox delivery when a key is configured:
+//! [`TaskStatus::Failed`] containing [`TaskError::Cancelled`] with reason
+//! `"spawner discarded resource pool task before its first poll"`, and no
+//! result payload. The executor is never called for that run.
+//!
+//! The completion path returns its permit through the dispatcher and launches
+//! admitted parked work before calling the mailbox or audit sink. Discarded
+//! successors enter a pool-owned worklist: one synchronous drainer settles
+//! them iteratively, so an inline discarding spawner cannot recurse through a
+//! parked backlog. The worklist lock is released before dispatch or callbacks.
+//! It counts
+//! the run in [`failed_tasks`](ResourcePool::failed_tasks) and as a finished
+//! outcome in the shutdown ledger, then settles it when the discard action
+//! ends. A shutdown already waiting counts it in [`ShutdownReport::completed`];
+//! a run settled before shutdown begins is outside that report's interval.
+//! A dropped run therefore does not remain unsettled until the drain deadline.
+//!
+//! This is synchronous failure settlement: it emits `Failed`, does not emit
+//! the shutdown `Cancelled` event or invoke the asynchronous
+//! [`CancellationSink`], and does not increment the report's `cancelled` tally.
+//! On first poll, ownership transfers to the normal execution path, preserving
+//! its executor panic, timeout and shutdown cancellation handling.
+//!
+//! This does not provide a runtime or make a retained, unpolled future run:
+//! a spawner that neither polls nor drops a future can keep it unsettled.
+//! Collaborators must return for settlement to finish. The discard path
+//! contains unwinding from a mailbox or audit callback and still settles the
+//! ledger, but cannot guarantee storage if a mailbox fails or panics before
+//! storing. Panicking clocks or queue backends can interrupt completion;
+//! process aborts do not run drop guards. Hook delivery retains the bus's
+//! bounded-queue semantics, and this in-memory pool provides no crash recovery.
+//!
 //! ## Panics
 //!
 //! An executor panic is contained (cr-21): the task fails with
@@ -67,19 +153,19 @@
 //! | event | emitted |
 //! |---|---|
 //! | `Submitted` | first thing in `submit`, before any check |
-//! | `Rejected` | `submit` refuses the task (shutdown, deadline passed, cost over capacity, queue full, backend error) |
+//! | `Rejected` | `submit` refuses the task (shutdown, deadline passed, cost over capacity, queue full, backend error), or a pre-filled head exceeds an absolute capacity limit |
 //! | `Queued` | the dispatcher parks it, under the dispatch lock |
 //! | `Started` | the spawned task is about to call the executor (`worker_id` 0) |
-//! | `Completed` / `Failed` | the executor returned a value / an error, panicked or ran past its budget (before the units are returned) |
-//! | `Expired` | it reached the head of the queue after its deadline |
+//! | `Completed` / `Failed` | the executor returned a value / an error, panicked or ran past its budget, or the spawner discarded an unpolled run (before the units are returned) |
+//! | `Expired` | it reached the head after its deadline, or explicit pruning removed it |
 //! | `Cancelled` | `shutdown_with` cancelled it (queued: no `Started`; running straggler) |
 //!
 //! A panic that escapes the executor containment reports `Failed` from the
-//! backstop unless the terminal event was already emitted. Not covered:
-//! tasks removed by [`prune_expired`](ResourcePool::prune_expired), whose ids
-//! the `TaskQueue` contract does not return (they get no terminal event, as
-//! they get no mailbox delivery).
+//! backstop unless the terminal event was already emitted. Explicit pruning
+//! returns every removed task through the dispatcher and uses the same
+//! per-task expiry reporting and mailbox delivery as an expired queue head.
 
+use std::collections::VecDeque;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -114,6 +200,28 @@ const POOL_NAME: &str = "resource_pool";
 /// Extra wait, beyond the sink's `delta`, for cancelled stragglers to settle.
 const SETTLE_MARGIN: Duration = Duration::from_secs(1);
 
+/// Owns a run before its first poll. Taking `run` transfers settlement to the
+/// running-task guard; otherwise dropping the unpolled future settles it.
+struct UnpolledRun<R, F: FnOnce(R)> {
+    run: Option<R>,
+    discarded: Option<F>,
+}
+
+impl<R, F: FnOnce(R)> Drop for UnpolledRun<R, F> {
+    fn drop(&mut self) {
+        if let (Some(run), Some(discarded)) = (self.run.take(), self.discarded.take()) {
+            discarded(run);
+        }
+    }
+}
+
+/// Runs discarded before their first poll. One caller drains outside this
+/// lock; recursive or concurrent drops only transfer ownership into `pending`.
+struct DiscardedRuns<P> {
+    pending: VecDeque<(ScheduledTask<P>, Permit)>,
+    draining: bool,
+}
+
 /// The error a cancelled task's mailbox receives.
 fn shutdown_cancelled() -> TaskError {
     TaskError::Cancelled {
@@ -146,6 +254,7 @@ struct Inner<P, T, Q, M, E, S> {
     /// Owns the semaphore (units held by running tasks) and the parked queue.
     dispatcher: Dispatcher<ScheduledTask<P>, TaskQueueAdapter<P, Q>>,
     mailbox: Mutex<M>,
+    discarded: Mutex<DiscardedRuns<P>>,
     executor: E,
     spawner: S,
     audit: Mutex<Option<Box<dyn AuditSink>>>,
@@ -186,7 +295,16 @@ where
     ///
     /// `queue` stores the parked tasks; `limits.max_queue_depth` bounds how
     /// many may be parked (a backend with a smaller own limit rejects earlier).
-    pub fn new(limits: PoolLimits, queue: Q, mailbox: M, executor: E, spawner: S) -> Self {
+    /// Existing queued tasks enter the pool's shutdown accounting here and
+    /// are first drained after builders run, on submission or shutdown.
+    pub fn new(limits: PoolLimits, queue: Q, mailbox: M, executor: E, spawner: S) -> Self
+    where
+        Q: TaskQueue<P>,
+    {
+        let ledger = Ledger::default();
+        for _ in 0..queue.len() {
+            ledger.accept();
+        }
         let dispatcher = Dispatcher::new(
             POOL_NAME,
             UnitSemaphore::new(limits.max_units),
@@ -198,6 +316,10 @@ where
                 limits,
                 dispatcher,
                 mailbox: Mutex::new(mailbox),
+                discarded: Mutex::new(DiscardedRuns {
+                    pending: VecDeque::new(),
+                    draining: false,
+                }),
                 executor,
                 spawner,
                 audit: Mutex::new(None),
@@ -205,7 +327,7 @@ where
                 shutdown: AtomicBool::new(false),
                 parked_closed: AtomicBool::new(false),
                 cancel: CancellationToken::new(),
-                ledger: Ledger::default(),
+                ledger,
                 sink: RwLock::new(None),
                 cancellation: RwLock::new(CancellationConfig::default()),
                 hooks: HookBus::new(),
@@ -514,6 +636,7 @@ where
         let inner = &self.inner;
         let since = inner.ledger.tally();
         self.shutdown();
+        inner.ensure_release_hook();
         tracing::info!(?policy, "shutting down resource pool");
         let deadline = policy.drain_deadline();
         let drained = inner
@@ -541,13 +664,15 @@ where
     /// Remove queued tasks whose deadline has passed by the pool's clock and
     /// return how many were removed.
     ///
-    /// Queued tasks are also checked when they reach the head of the queue: a
-    /// task found expired there is never started and its mailbox receives
-    /// [`TaskStatus::Expired`].
+    /// Every removed task is reported as `Expired`, receives a configured
+    /// mailbox delivery of [`TaskStatus::Expired`], and settles once without
+    /// executing. Equality at a deadline is still live. Queued tasks are also
+    /// checked when they reach the head, using the same expiry reporting path.
     ///
     /// # Errors
     ///
-    /// Returns the queue backend's error when pruning fails.
+    /// Returns the queue backend's error when pruning fails. A conforming
+    /// backend leaves queued work unchanged; no expiry reporting runs then.
     #[expect(
         clippy::unused_async,
         clippy::unused_async_trait_impl,
@@ -557,26 +682,11 @@ where
         let inner = &self.inner;
         let now_ms = inner.now_ms();
         let (removed, dispatched) = inner.dispatcher.prune_expired(now_ms)?;
-        let removed_count = u64::try_from(removed).unwrap_or(u64::MAX);
-        inner.ledger.finish(removed_count);
-        inner.ledger.settle(removed_count);
         // Removing an expired head that did not fit can admit the tasks
         // behind it.
         inner.launch(dispatched, None);
 
         if removed > 0 {
-            // Generic expiration event: the pruned task ids are not reported
-            // by the queue contract.
-            if let Some(sink) = inner.audit.lock().as_mut() {
-                sink.record(prometheus_parking_lot_core::build_audit_event(
-                    format!("expire-batch-{now_ms}"),
-                    "batch",
-                    "unknown_pool",
-                    "unknown_tenant",
-                    "expire",
-                    None,
-                ));
-            }
             tracing::warn!(removed, "pruned expired tasks");
         }
         Ok(removed)
@@ -639,14 +749,14 @@ where
     /// so the units it frees reach parked work. Every other path returns its
     /// permit through `complete`, or pokes after catching a panic.
     ///
-    /// Installed at the first submission rather than in `new`: the hook holds
-    /// a `Weak` to this state, and the builder methods need the state
-    /// unshared.
+    /// Installed at the first submission or shutdown rather than in `new`:
+    /// the hook holds a `Weak` to this state, and the builder methods need the
+    /// state unshared. The first installation also observes pre-filled work.
     fn ensure_release_hook(self: &Arc<Self>) {
         if self.dispatcher.has_release_hook() {
             return;
         }
-        self.dispatcher.install_release_hook(|| {
+        let installed = self.dispatcher.install_release_hook(|| {
             let weak = Arc::downgrade(self);
             move || {
                 if let Some(inner) = weak.upgrade() {
@@ -654,6 +764,13 @@ where
                 }
             }
         });
+        if installed {
+            // A pre-filled backend has never passed through submit's checks
+            // or drain. Observe it once after builders have set all limits,
+            // including when shutdown is the pool's first operation.
+            let observed = self.dispatcher.poke(self.now_ms());
+            self.launch(observed, None);
+        }
     }
 
     /// Spawn a drain of the parked queue and start what it admits (the
@@ -672,7 +789,14 @@ where
     /// whose submission produced `dispatched`, which is audited as "start"
     /// rather than "wake".
     fn launch(self: &Arc<Self>, dispatched: Dispatched<ScheduledTask<P>>, submitted: Option<u64>) {
-        let Dispatched { started, expired } = dispatched;
+        let Dispatched {
+            started,
+            expired,
+            rejected,
+        } = dispatched;
+        for (task, error) in rejected {
+            self.reject_parked(&task.meta, &error);
+        }
         for meta in expired.iter().map(|task| &task.meta) {
             self.expire(meta);
         }
@@ -685,7 +809,14 @@ where
             tracing::debug!(task_id = task.meta.id, action, "starting task");
             self.record_audit(&task.meta, action);
             let inner = Arc::clone(self);
+            #[cfg(not(parking_lot_negative_control = "oa-08"))]
             self.spawner.spawn(inner.supervise(task, permit));
+            // OA-08 negative control: put ownership inside an async body,
+            // recreating the lost outcome/ledger when Spawn never polls it.
+            #[cfg(parking_lot_negative_control = "oa-08")]
+            self.spawner.spawn(async move {
+                inner.supervise(task, permit).await;
+            });
         }
     }
 
@@ -700,36 +831,100 @@ where
     /// reported as panicked; one whose completion had started is not reported
     /// twice. The completion starts the tasks it wakes before it calls the
     /// `Mailbox` or `AuditSink`, so a panic there loses none of them.
-    async fn supervise(self: Arc<Self>, task: ScheduledTask<P>, permit: Permit) {
-        // Settles the task however `run` ends, unwinding included.
-        let _settle = SettleOnDrop(&self.ledger);
-        let task_id = task.meta.id;
-        let mailbox_key = task.meta.mailbox.clone();
-        // Set by `run` just before it starts the completion. Relaxed: it is
-        // written and read by this one task; tokio orders its polls.
-        let reported = AtomicBool::new(false);
-        let ran = contain(Arc::clone(&self).run(task, permit, &reported)).await;
-        if let Err(panicked) = ran {
-            tracing::error!(
-                task_id,
-                %panicked,
-                "panic escaped the executor containment"
-            );
-            if !reported.load(Ordering::Relaxed) {
-                self.failed.fetch_add(1, Ordering::Relaxed);
-                let error = TaskError::from(panicked);
-                self.events().failed(task_id, &error);
-                if let Some(key) = mailbox_key.as_ref() {
-                    let status = TaskStatus::Failed(error);
-                    self.deliver(task_id, key, status, None);
+    fn supervise(
+        self: Arc<Self>,
+        task: ScheduledTask<P>,
+        permit: Permit,
+    ) -> impl std::future::Future<Output = ()> + Send {
+        // Spawn is allowed to discard its future without polling it. Own the
+        // task and permit here, before handing that future to user code.
+        let inner = Arc::clone(&self);
+        let pending = UnpolledRun {
+            run: Some((task, permit)),
+            discarded: Some(move |(task, permit): (ScheduledTask<P>, Permit)| {
+                inner.discard(task, permit);
+            }),
+        };
+        async move {
+            // Capture the whole guard, including its Drop implementation.
+            let mut pending = pending;
+            // Settles the task however `run` ends, unwinding included. This
+            // guard exists before ownership leaves the unpolled guard.
+            let _settle = SettleOnDrop(&self.ledger);
+            let (task, permit) = pending.run.take().expect("run owned until its first poll");
+            let task_id = task.meta.id;
+            let mailbox_key = task.meta.mailbox.clone();
+            // Set by `run` just before it starts the completion. Relaxed: it is
+            // written and read by this one task; tokio orders its polls.
+            let reported = AtomicBool::new(false);
+            let ran = contain(Arc::clone(&self).run(task, permit, &reported)).await;
+            if let Err(panicked) = ran {
+                tracing::error!(
+                    task_id,
+                    %panicked,
+                    "panic escaped the executor containment"
+                );
+                if !reported.load(Ordering::Relaxed) {
+                    self.failed.fetch_add(1, Ordering::Relaxed);
+                    let error = TaskError::from(panicked);
+                    self.events().failed(task_id, &error);
+                    if let Some(key) = mailbox_key.as_ref() {
+                        let status = TaskStatus::Failed(error);
+                        self.deliver(task_id, key, status, None);
+                    }
+                    let tenant = mailbox_key
+                        .as_ref()
+                        .map_or("unknown", |key| key.tenant.as_str());
+                    self.record_event(task_id, tenant, "fail");
                 }
-                let tenant = mailbox_key
-                    .as_ref()
-                    .map_or("unknown", |key| key.tenant.as_str());
-                self.record_event(task_id, tenant, "fail");
+                let woken = self.dispatcher.poke(self.now_ms());
+                self.launch(woken, None);
             }
-            let woken = self.dispatcher.poke(self.now_ms());
-            self.launch(woken, None);
+        }
+    }
+
+    /// Settle discarded runs without recursively dropping their successors.
+    /// The mutex publishes each owned task/permit to the sole drainer. Its
+    /// empty check and release of drainer ownership share that same lock, so
+    /// a concurrent enqueue either joins this drain or becomes the next one.
+    fn discard(self: &Arc<Self>, task: ScheduledTask<P>, permit: Permit) {
+        {
+            let mut discarded = self.discarded.lock();
+            discarded.pending.push_back((task, permit));
+            if discarded.draining {
+                return;
+            }
+            discarded.draining = true;
+        }
+        loop {
+            let next = {
+                let mut discarded = self.discarded.lock();
+                let next = discarded.pending.pop_front();
+                if next.is_none() {
+                    discarded.draining = false;
+                }
+                next
+            };
+            let Some((task, permit)) = next else {
+                return;
+            };
+            let _settle = SettleOnDrop(&self.ledger);
+            let settled = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let error = TaskError::Cancelled {
+                    reason: "spawner discarded resource pool task before its first poll".into(),
+                };
+                self.events().failed(task.meta.id, &error);
+                // finish returns capacity and hands off every successor before
+                // callbacks. An inline discard only enqueues that successor;
+                // this loop settles it after the current task, at fixed depth.
+                self.finish(task.meta.id, permit, task.meta.mailbox.as_ref(), Err(error));
+                drop(task);
+            }));
+            if let Err(panicked) = settled {
+                // A callback (or its panic payload destructor) must not unwind
+                // through Spawn or abandon the remaining owned worklist.
+                std::mem::forget(panicked);
+            }
         }
     }
 
@@ -855,8 +1050,28 @@ where
         self.record_event(task_id, tenant, action);
     }
 
-    /// Record a queued task that reached the head after its deadline.
+    /// Report a pre-filled task whose cost can never fit this pool.
+    fn reject_parked(&self, meta: &TaskMetadata, error: &SchedulerError) {
+        let _settle = SettleOnDrop(&self.ledger);
+        self.failed.fetch_add(1, Ordering::Relaxed);
+        self.ledger.finish(1);
+        self.events().rejected(meta.id, error);
+        tracing::warn!(task_id = meta.id, %error, "parked task exceeds pool capacity");
+        if let Some(key) = meta.mailbox.as_ref() {
+            self.deliver(meta.id, key, TaskStatus::Dropped(error.to_string()), None);
+        }
+        let tenant = meta
+            .mailbox
+            .as_ref()
+            .map_or("unknown", |key| key.tenant.as_str());
+        self.record_event(meta.id, tenant, "reject");
+    }
+
+    /// Report one queued task expired at the head or removed by explicit prune.
     fn expire(&self, meta: &TaskMetadata) {
+        // OA-10 negative control: retain removal, mailbox delivery and ledger
+        // settlement but omit the terminal event, isolating the sequence oracle.
+        #[cfg(not(parking_lot_negative_control = "oa-10-expiry"))]
         self.events().expired(meta.id);
         self.failed.fetch_add(1, Ordering::Relaxed);
         self.ledger.finish(1);

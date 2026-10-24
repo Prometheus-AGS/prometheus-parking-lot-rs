@@ -1,0 +1,45 @@
+{
+  "owner": "/root/oa04_release",
+  "sourceWorkspace": "/Users/gqadonis/.codex/worktrees/oa04-release/prometheus-parking-lot-rs",
+  "destinations": [
+    "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs",
+    "/Users/gqadonis/.codex/worktrees/oa04-events/prometheus-parking-lot-rs",
+    "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs",
+    "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs"
+  ],
+  "files": [
+    {
+      "path": "crates/parking-lot-core/src/contracts/result_mailbox.rs",
+      "sha256": "29f92f98eeafbcadc785ee7415df16eae3aede0fd82fb9cfd6e1a8045fa40420"
+    },
+    {
+      "path": "crates/parking-lot-core/src/contracts/memory_result_mailbox.rs",
+      "sha256": "f8d56a7d7265094d8d80c0e4b7a43cbc85887a05c90dcd0eb8151b8b498f82bc"
+    },
+    {
+      "path": "crates/parking-lot-core/src/contracts/mod.rs",
+      "sha256": "b7c757a0ab5909ffe7f70196bbf369812f176d86880757c7669a9237ea83db56"
+    },
+    {
+      "path": "crates/parking-lot-core/src/lib.rs",
+      "sha256": "5fd26b4e94a1f5ad39356c086571d79f7832767dffacec3dfa41623acabf6631"
+    },
+    {
+      "path": "crates/parking-lot-core/src/contracts/conformance/mailbox.rs",
+      "sha256": "e20e9ccd26f24bd38bd5d3382394d2ed39b7856b9b0aa85dbc421c6345ed3e7b"
+    },
+    {
+      "path": "crates/parking-lot-core/src/contracts/conformance/mod.rs",
+      "sha256": "68934fd2efbc42e182eb816188ff9b651564fb7143c779018b29dc8226885825"
+    },
+    {
+      "path": "crates/parking-lot-core/src/contracts/conformance/negative.rs",
+      "sha256": "6dbe1443936cf5839ff247dfe74162b49c713970c0d3c045fa62d7644cd6bd2b"
+    },
+    {
+      "path": "docs/adr/0007-authoritative-duplicate-status.md",
+      "sha256": "ac989f48c44e5342afe4351e2a7a7f73a3a3f085e53eb279e7fdda762885a797"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED; backend/runtime consumers pending"
+}

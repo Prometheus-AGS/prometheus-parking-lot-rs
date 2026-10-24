@@ -1,0 +1,95 @@
+--- a/docs/API.md
++++ b/docs/API.md
+@@ -1,6 +1,6 @@
+ # API overview
+ 
+-A map of the public API at 0.3.0 (unreleased). The rustdoc is the reference;
++A map of the public API, including implemented 0.4 changes awaiting final verification. The rustdoc is the reference;
+ build it with `cargo doc --workspace --no-deps --all-features --open`. Compiled
+ examples are in the [README](../README.md). Design decisions are in
+ [`adr/`](adr/).
+@@ -162,6 +162,51 @@
+ are in `core::backend` and at `core::*`.
+ The backend conformance suite is `prometheus_parking_lot_core::conformance`
+ behind that crate's `conformance` feature.
++
++### Address-scoped result idempotency (0.4, oa-06)
++
++A result's first-write-wins identity is `(storage namespace, complete MailboxKey,
++caller idempotency key)`. Tenant, user and session all participate; `None` and
++an empty optional identifier are distinct. Two addresses may reuse the same
++caller key independently. Within one address, retries retain the first result
++even after consume/reopen, until its original TTL elapses; a no-TTL fence stays
++permanent. Expiry at one address never releases another address's fence.
++`DeliveryOutcome` remains `Stored` or `Duplicate`; unkeyed delivery is unchanged.
++
++The pure-core mapping type is
++`prometheus_parking_lot_core::LegacyIdempotencyOwner` (`new(caller_key, key)`,
++public `idempotency_key: String` and `key: MailboxKey`, serde with unknown fields
++rejected). It is exported by the core crate, not by the facade's `core::backend`.
++The supported backend entry points are:
++
++| Entry | Upgrade behavior |
++| --- | --- |
++| `PgResultMailbox::<T>::migrate(&pool).await` | Fresh protocol-2 schema or locked conversion using only uniquely proven retained-result owners; refuses unresolved active legacy fences. |
++| `PgResultMailbox::<T>::migrate_with_idempotency_owners(&pool, &owners).await` | Explicit evidence is `&[(String, LegacyIdempotencyOwner)]`; each outer string is the exact PG mailbox name. |
++| `EmbeddedStore::open(path)` / `open_with_clock(path, clock)` | Create/reopen schema 2; refuse schema 1 rather than converting it silently. |
++| `EmbeddedStore::open_with_idempotency_owners(path, &owners)` / `open_with_clock_and_idempotency_owners(path, clock, &owners)` | Explicit schema-1 conversion with `&[LegacyIdempotencyOwner]`, or schema-2 mapping validation. |
++
++Legacy consumed tombstones contain no owner address. Unexpired tombstones
++require authoritative ownership evidence or migration refuses atomically;
++permanent consumed tombstones cannot be resolved merely by waiting. A retained
++row proves an owner only when its caller key and original expiry generation
++match exactly. Multiple candidates require a mapping selecting one candidate.
++Existing results, original expiry, consumed fences, queue identity and ordering
++are preserved. Expired ownerless fences remain legacy provenance rather than
++being assigned an invented tenant.
++
++Resolved-owner provenance remains independent of active fences: replaying a
++recorded mapping validates it without resetting TTL or resurrecting an evicted
++fence. Stop old readers/writers before conversion. Old PG mutation SQL is
++rejected at the database boundary; the old redb open protocol rejects schema 2.
++Rollback requires the untouched pre-upgrade backup with new writers stopped;
++it does not recover subsequent new writes. Configuration builders do not
++collect owner evidence or convert schema-1 embedded files automatically.
++
++Use the [ADR 0006 migration runbook](adr/0006-tenant-scoped-result-idempotency.md#operational-runbook-isolated-rehearsal-and-future-store-conversion)
++for exact mapping, backup, replay and rollback rules. These entry points and
++fixtures are implemented; PG17/PG18/redb final-boundary execution is unverified.
++No live migration or owner mapping is authorized by this API description.
+ 
+ ## Hooks and audit
+ 
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -8,6 +8,14 @@
+ ## [Unreleased]
+ 
+ ### Fixed
++
++- **Address-scoped result idempotency (oa-06, #80).** Results now deduplicate
++  by the complete mailbox address plus caller key within the storage namespace.
++  Different tenants, users or sessions can independently reuse one caller key;
++  same-address retries retain the first result through consume/reopen until
++  its original TTL, and no-TTL fences remain permanent. The memory reference,
++  Postgres and redb implementations share these semantics. Final-boundary
++  execution remains unverified.
+ 
+ - **Pre-filled ResourcePool admission (oa-09, #82).** A stored head exceeding
+   the current total or per-kind capacity is removed once without execution,
+@@ -31,6 +39,15 @@
+ 
+ ### Changed (breaking)
+ 
++- **Persistent result-mailbox upgrade (oa-06).** Postgres uses protocol-2
++  versioned result/fence tables and rejects old mutation SQL; redb uses schema 2
++  and ordinary open refuses schema 1. Explicit migration APIs accept the new
++  core `LegacyIdempotencyOwner` mapping type. Unexpired consumed legacy fences
++  without authoritative owner evidence refuse conversion atomically; no tenant
++  or TTL is invented. Legacy data and resolved-owner provenance are retained,
++  mapping replay cannot reset expired fences, and rollback requires an untouched
++  pre-upgrade backup with new writers stopped. See ADR 0006 before upgrading;
++  this implementation is not live-upgrade authorization or execution evidence.
+ - **Core dispatcher result (oa-09).** `Dispatched<T>` adds
+   `rejected: Vec<(T, SchedulerError)>`; callers must report every returned
+   rejection outside the dispatch lock. Struct literals/destructuring must

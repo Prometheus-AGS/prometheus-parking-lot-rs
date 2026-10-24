@@ -29,6 +29,8 @@ pub const FAILSAFE: Duration = Duration::from_secs(120);
 pub enum Behaviour {
     /// Return `done:<payload>` at once.
     Succeed,
+    /// Fail independently of the payload (the OA-07 child fails, retry succeeds).
+    Fail(&'static str),
     /// Sleep this long, then return `done:<payload>`.
     SleepThenSucceed(Duration),
     /// Print `EXECUTING` to stdout and never return (the S-16 kill point).
@@ -62,6 +64,7 @@ impl TaskExecutor<String, String> for Executor {
         self.runs.fetch_add(1, Ordering::SeqCst);
         match self.behaviour {
             Behaviour::Succeed => {}
+            Behaviour::Fail(reason) => return Err(TaskError::executor(reason)),
             Behaviour::SleepThenSucceed(duration) => tokio::time::sleep(duration).await,
             Behaviour::HangAfterAnnouncing => {
                 announce("EXECUTING");

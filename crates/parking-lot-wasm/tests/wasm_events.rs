@@ -14,6 +14,8 @@
 //! pool suppresses the `Cancelled` event of a task cancelled at shutdown, so
 //! `lifecycle_events_cancelled_at_shutdown` must fail ("no terminal event").
 //! It does not prove the other paths; the exact-sequence assertions do.
+//! OA-13 runs the same target in headless Chromium and Node. Its additional
+//! `oa-13-budget-event` control suppresses only the timeout's terminal event.
 #![cfg(target_arch = "wasm32")]
 #![expect(
     clippy::future_not_send,
@@ -34,6 +36,8 @@ use prometheus_parking_lot_core::{
 };
 use prometheus_parking_lot_wasm::{WorkerPool, sleep};
 use wasm_bindgen_test::wasm_bindgen_test;
+
+mod common;
 
 const LONG: Duration = Duration::from_secs(10);
 
@@ -199,6 +203,7 @@ fn pool_with_log(config: WorkerPoolConfig) -> (WorkerPool<(u64, Act), u64, Runne
 /// sequence, with the payload fields the native pools carry.
 #[wasm_bindgen_test]
 async fn lifecycle_events_completed_failed_and_timed_out() {
+    common::assert_execution_environment();
     // One unit: task 1 runs, 2 and 3 park behind it (Queued), 3 times out.
     let (pool, log) = pool_with_log(config(1, 1, 8, 40));
     let ok = pool.submit((5, Act::Succeed), meta(1, 1)).expect("submit");
@@ -223,7 +228,11 @@ async fn lifecycle_events_completed_failed_and_timed_out() {
         "a task that starts at once is never queued"
     );
     assert_eq!(log.kinds(2), ["submitted", "queued", "started", "failed"]);
-    assert_eq!(log.kinds(3), ["submitted", "queued", "started", "failed"]);
+    assert_eq!(
+        log.kinds(3),
+        ["submitted", "queued", "started", "failed"],
+        "OA-13 execution-budget terminal event missing"
+    );
     assert_eq!(log.snapshot().len(), 3 + 4 + 4, "an unexpected extra event");
 
     let Some(LifecycleEvent::Queued {

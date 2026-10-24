@@ -2813,6 +2813,7 @@ dependencies = [
  "crossbeam-channel",
  "flume",
  "futures",
+ "loom",
  "parking_lot",
  "prometheus-parking-lot-core",
  "proptest",

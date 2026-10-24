@@ -35,6 +35,34 @@ Through the facade, depend on `prometheus_parking_lot` with
 `default-features = false` on `wasm32-unknown-unknown`; it pulls this crate in
 by target.
 
+## Browser and Node assurance
+
+OA-13 adds the same real scheduler/JS-timer suites to headless Chromium while
+preserving wasm-bindgen's Node default. The checked
+[manifest](../../.github/wasm-browser-assurance.json) names 15 pool and 6 event
+tests. The [boundary runner](../../.github/scripts/tests/browser-assurance.py)
+requires exact nonzero discovery, complete execution and an actual in-WASM
+browser Document/user-agent marker; Node-only results cannot satisfy browser
+evidence. A source-derived control must detect a missing timeout terminal event.
+
+After the complete phase implementation set, from the workspace root with a
+clean frozen candidate and fresh external output paths:
+
+```bash
+python3 .github/scripts/tests/browser-assurance.py --mode node --toolchain 1.99.1 \
+  --output "$OA13_NODE_OUT"
+python3 .github/scripts/tests/browser-assurance.py --mode browser \
+  --chrome "$APPROVED_CHROME" --chromedriver "$APPROVED_CHROMEDRIVER" \
+  --output "$OA13_BROWSER_OUT"
+```
+
+Browser provisioning is separate: the authored path requires Linux x86_64,
+preinstalled matching Chrome/ChromeDriver `156.0.8078.47`, Rust `1.99.1` with the
+WASM target and wasm-bindgen runner `0.2.129`; Node lanes require Node 24 and
+also retain the `1.95` MSRV leg. No browser installation or execution is claimed.
+All OA-13 runtime results remain NOT_EXERCISED until the final boundary. This
+in-memory browser pool offers no durable page-loss recovery or panic containment.
+
 ## License
 
 MIT. See `LICENSE-MIT`.

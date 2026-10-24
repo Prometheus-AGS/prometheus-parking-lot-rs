@@ -18,6 +18,12 @@
 //! `DELIVERED` kill the restarted run's delivery must be recognised as a
 //! duplicate although the pools are named differently), and that the queue is
 //! empty (acked).
+//!
+//! OA-07 adds a Failed `DELIVERED` kill point. The renamed restarted pool
+//! locally succeeds, but must emit the original failure and dead-letter the
+//! lease. Both retained and consumed-before-retry results use the same real
+//! child/SIGKILL protocol. A separate real-store fixture seeds a nonterminal
+//! fence and requires hand-back instead of a fabricated terminal outcome.
 
 use std::future::Future;
 use std::io::{BufRead, BufReader};
@@ -25,12 +31,15 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
 use prometheus_parking_lot::core::{
-    Delivery, DeliveryOutcome, LeaseQueue, MailboxEntry, ResultMailbox, SchedulerError, TaskStatus,
+    Delivery, DeliveryOutcome, LeaseQueue, MailboxEntry, ResultMailbox, SchedulerError,
+    ShutdownPolicy, TaskError, TaskStatus,
 };
 use prometheus_parking_lot::util::MailboxKey;
-use prometheus_parking_lot::{DurableOptions, DurableResourcePool};
+use prometheus_parking_lot::{DurableOptions, DurableResourcePool, LifecycleEvent};
 
-use crate::support::{Behaviour, Executor, announce, eventually, key, limits, spawner, task};
+use crate::support::{
+    Behaviour, Executor, announce, event_log, eventually, key, limits, spawner, task,
+};
 
 const ENV_BACKEND: &str = "PLQ_S16_BACKEND";
 const ENV_TARGET: &str = "PLQ_S16_TARGET";
@@ -46,6 +55,9 @@ const LEASE: Duration = Duration::from_secs(2);
 const SESSION: &str = "job-1";
 /// How long the parent waits for the child to reach the kill point.
 const CHILD_TIMEOUT: Duration = Duration::from_secs(120);
+/// A payload-independent child error, so `work-1` succeeds after restart.
+const ORIGINAL_FAILURE: &str = "OA-07 original executor failure before SIGKILL";
+const FAILED_CALLER_KEY: &str = "oa-07-failed-before-resolve";
 
 fn options() -> DurableOptions {
     DurableOptions::new(LEASE)
@@ -62,6 +74,7 @@ enum KillAt {
     Execution,
     Delivery,
     AfterDelivery,
+    FailedAfterDelivery,
 }
 
 impl KillAt {
@@ -70,6 +83,7 @@ impl KillAt {
             Self::Execution => "execute",
             Self::Delivery => "deliver",
             Self::AfterDelivery => "delivered",
+            Self::FailedAfterDelivery => "failed-delivered",
         }
     }
 
@@ -77,15 +91,20 @@ impl KillAt {
         match self {
             Self::Execution => "EXECUTING",
             Self::Delivery => "DELIVERING",
-            Self::AfterDelivery => "DELIVERED",
+            Self::AfterDelivery | Self::FailedAfterDelivery => "DELIVERED",
         }
     }
 
     fn from_env(value: &str) -> Self {
-        [Self::Execution, Self::Delivery, Self::AfterDelivery]
-            .into_iter()
-            .find(|kill_at| kill_at.env() == value)
-            .unwrap_or_else(|| panic!("child: unknown kill point {value}"))
+        [
+            Self::Execution,
+            Self::Delivery,
+            Self::AfterDelivery,
+            Self::FailedAfterDelivery,
+        ]
+        .into_iter()
+        .find(|kill_at| kill_at.env() == value)
+        .unwrap_or_else(|| panic!("child: unknown kill point {value}"))
     }
 }
 
@@ -206,7 +225,7 @@ where
                 options(),
             )
             .expect("child: start the pool");
-            accept_and_wait(&pool).await;
+            accept_and_wait(&pool, false).await;
         }
         KillAt::Delivery => {
             let executor = Executor::new(Behaviour::Succeed);
@@ -219,10 +238,15 @@ where
                 options(),
             )
             .expect("child: start the pool");
-            accept_and_wait(&pool).await;
+            accept_and_wait(&pool, false).await;
         }
-        KillAt::AfterDelivery => {
-            let executor = Executor::new(Behaviour::Succeed);
+        KillAt::AfterDelivery | KillAt::FailedAfterDelivery => {
+            let failed = kill_at == KillAt::FailedAfterDelivery;
+            let executor = Executor::new(if failed {
+                Behaviour::Fail(ORIGINAL_FAILURE)
+            } else {
+                Behaviour::Succeed
+            });
             let pool = DurableResourcePool::start(
                 limits(4),
                 queue,
@@ -232,7 +256,7 @@ where
                 options(),
             )
             .expect("child: start the pool");
-            accept_and_wait(&pool).await;
+            accept_and_wait(&pool, failed).await;
         }
     }
 }
@@ -246,14 +270,16 @@ async fn accept_and_wait<Q, M>(
         Executor,
         prometheus_parking_lot::runtime::TokioSpawner,
     >,
+    failed: bool,
 ) where
     Q: LeaseQueue<String> + 'static,
     M: ResultMailbox<String> + 'static,
 {
-    let status = pool
-        .submit(task(SESSION, "work-1"))
-        .await
-        .expect("child: submit");
+    let mut submitted = task(SESSION, "work-1");
+    if failed {
+        submitted.meta.idempotency_key = Some(FAILED_CALLER_KEY.to_owned());
+    }
+    let status = pool.submit(submitted).await.expect("child: submit");
     assert_eq!(status, TaskStatus::Queued);
     announce("ACCEPTED");
     std::future::pending::<()>().await;
@@ -370,15 +396,257 @@ where
     assert_eq!((depth.live(), depth.dead_lettered), (0, 0), "{depth:?}");
 }
 
+/// OA-07: the child stored a failure but died before resolving its lease.
+/// The same task retries successfully under a different pool name. Await any
+/// terminal event so bool-only handling fails at the event oracle immediately,
+/// rather than timing out while waiting specifically for Failed.
+async fn restart_failed_and_check<Q, M>(queue: Q, mailbox: M, consume_before_retry: bool)
+where
+    Q: LeaseQueue<String> + 'static,
+    M: ResultMailbox<String> + 'static,
+{
+    let address = key(SESSION);
+    let original = mailbox
+        .peek(&address)
+        .await
+        .expect("peek")
+        .expect("stored child failure");
+    let error = TaskError::executor(ORIGINAL_FAILURE);
+    assert_eq!(
+        original.status,
+        TaskStatus::Failed(error.clone()),
+        "OA-07:stored-status"
+    );
+    assert_eq!(original.task_id, 1);
+    assert_eq!(original.idempotency_key.as_deref(), Some(FAILED_CALLER_KEY));
+    assert_eq!(
+        original.payload, None,
+        "the child's failure has no success payload"
+    );
+    if consume_before_retry {
+        assert_eq!(
+            mailbox
+                .consume(&address)
+                .await
+                .expect("consume before retry"),
+            Some(original.clone()),
+            "the sole original failure is consumed before the pool restarts"
+        );
+        assert!(
+            mailbox
+                .consume(&address)
+                .await
+                .expect("consume again")
+                .is_none()
+        );
+    }
+
+    let executor = Executor::new(Behaviour::Succeed);
+    let (bus, mut log) = event_log();
+    let pool = DurableResourcePool::start(
+        limits(4),
+        queue,
+        mailbox,
+        executor.clone(),
+        spawner(),
+        options().with_name(RESTARTED_NAME).with_hooks(bus.clone()),
+    )
+    .expect("start the restarted pool");
+    let terminal = log
+        .wait_for(|event| event.task_id() == 1 && event.is_terminal())
+        .await;
+    assert!(
+        matches!(&terminal, Some(LifecycleEvent::Failed { pool, error: stored, .. })
+            if pool == RESTARTED_NAME && stored == &error.to_string()),
+        "OA-07:terminal-event: retry must report original Failed, got {terminal:?}"
+    );
+
+    let pool_ref = &pool;
+    let drained = eventually(Duration::from_secs(60), || async move {
+        let depth = pool_ref.queue().depth().await.expect("depth");
+        (depth.live() == 0).then_some(depth)
+    })
+    .await
+    .expect("OA-07:lease-resolution: the retried lease must resolve");
+    assert_eq!(
+        (drained.live(), drained.dead_lettered),
+        (0, 1),
+        "OA-07:lease-resolution: original Failed must dead-letter, never ack: {drained:?}"
+    );
+    let report = pool
+        .shutdown_with(ShutdownPolicy::Drain {
+            deadline: Duration::from_secs(30),
+        })
+        .await;
+    assert_eq!(
+        report.unsettled, 0,
+        "failure settlement drained: {report:?}"
+    );
+    assert!(bus.flush(Duration::from_secs(5)), "flush restarted hooks");
+    assert_eq!(bus.dropped_events(), 0);
+    log.drain_ready();
+    assert_eq!(
+        log.seen
+            .iter()
+            .filter(|event| event.task_id() == 1 && event.is_terminal())
+            .count(),
+        1,
+        "OA-07:terminal-event: exactly one restarted terminal event: {:?}",
+        log.kinds_of(1)
+    );
+    assert!(
+        !log.seen
+            .iter()
+            .any(|event| matches!(event, LifecycleEvent::Completed { .. }))
+    );
+    assert_eq!(
+        executor.runs(),
+        1,
+        "the renamed retry really executed work-1 successfully once"
+    );
+
+    let after_retry = pool
+        .mailbox()
+        .consume(&address)
+        .await
+        .expect("consume after retry");
+    if consume_before_retry {
+        assert_eq!(
+            after_retry, None,
+            "OA-07:one-result: retry must not replace the consumed failure"
+        );
+    } else {
+        assert_eq!(
+            after_retry,
+            Some(original),
+            "OA-07:one-result: preserve the original failure"
+        );
+    }
+    tokio::time::sleep(LEASE + Duration::from_secs(1)).await;
+    assert!(
+        pool.mailbox()
+            .consume(&address)
+            .await
+            .expect("consume after another lease")
+            .is_none(),
+        "OA-07:one-result: no second consumable result"
+    );
+    let depth = pool
+        .queue()
+        .depth()
+        .await
+        .expect("depth after another lease");
+    assert_eq!(
+        (depth.live(), depth.dead_lettered),
+        (0, 1),
+        "OA-07:lease-resolution: {depth:?}"
+    );
+    assert_eq!(executor.runs(), 1);
+}
+
+/// A legal generic mailbox may remember a current, nonterminal status.
+/// Exercise the real pool/backend boundary; the local successful retry cannot
+/// turn that record into terminal truth or destroy the accepted queue entry.
+async fn nonterminal_duplicate_and_check<Q, M>(queue: Q, mailbox: M, status: TaskStatus)
+where
+    Q: LeaseQueue<String> + 'static,
+    M: ResultMailbox<String> + 'static,
+{
+    let address = key("oa-07-nonterminal");
+    let caller_key = "oa-07-nonterminal-fence";
+    assert_eq!(
+        mailbox
+            .deliver(
+                Delivery::<String>::new(address.clone(), 1, status.clone(), None)
+                    .with_idempotency_key(caller_key)
+            )
+            .await
+            .expect("seed current status"),
+        DeliveryOutcome::Stored
+    );
+    let mut pending = task("oa-07-nonterminal", "work-1");
+    pending.meta.idempotency_key = Some(caller_key.to_owned());
+    queue.enqueue(pending).await.expect("enqueue the real task");
+    let executor = Executor::new(Behaviour::Succeed);
+    let (bus, mut log) = event_log();
+    let pool = DurableResourcePool::start(
+        limits(4),
+        queue,
+        mailbox,
+        executor.clone(),
+        spawner(),
+        options().with_name(RESTARTED_NAME).with_hooks(bus.clone()),
+    )
+    .expect("start the nonterminal-fence consumer");
+    let terminal = log.wait_for(LifecycleEvent::is_terminal).await;
+    // Stop further leasing once the first run ending is observable; more than
+    // one immediate hand-back may already have raced the asynchronous hook.
+    pool.shutdown();
+    assert!(
+        matches!(terminal, Some(LifecycleEvent::Requeued { task_id: 1, .. })),
+        "OA-07:nonterminal-event: stored {status:?} must hand back, got {terminal:?}"
+    );
+    let report = pool
+        .shutdown_with(ShutdownPolicy::Drain {
+            deadline: Duration::from_secs(30),
+        })
+        .await;
+    assert_eq!(
+        report.unsettled, 0,
+        "nonterminal hand-back settled: {report:?}"
+    );
+    assert!(bus.flush(Duration::from_secs(5)), "flush hand-back hooks");
+    assert_eq!(bus.dropped_events(), 0);
+    log.drain_ready();
+    assert!(
+        log.seen
+            .iter()
+            .filter(|event| event.is_terminal())
+            .all(|event| matches!(event, LifecycleEvent::Requeued { .. })),
+        "OA-07:nonterminal-event: no fabricated terminal outcome: {:?}",
+        log.kinds_of(1)
+    );
+    assert!(
+        executor.runs() >= 1,
+        "the real executor retried the queued task"
+    );
+    let depth = pool.queue().depth().await.expect("nonterminal queue depth");
+    assert_eq!(
+        (depth.live(), depth.dead_lettered),
+        (1, 0),
+        "OA-07:nonterminal-resolution: nonterminal metadata cannot ack or dead-letter: {depth:?}"
+    );
+    assert_eq!(
+        (depth.ready, depth.delayed, depth.leased),
+        (1, 0, 0),
+        "OA-07:nonterminal-resolution: the entry is handed back ready for another consumer: {depth:?}"
+    );
+    let entry = pool
+        .mailbox()
+        .consume(&address)
+        .await
+        .expect("consume original current status")
+        .expect("original current status is retained");
+    assert_eq!(entry.status, status);
+    assert_eq!(entry.payload, None);
+    assert!(
+        pool.mailbox()
+            .consume(&address)
+            .await
+            .expect("consume again")
+            .is_none()
+    );
+}
+
 #[cfg(feature = "postgres")]
 mod postgres {
     use prometheus_parking_lot::infra::mailbox::PgResultMailbox;
     use prometheus_parking_lot::infra::queue::PgLeaseQueue;
 
-    use super::{KillAt, PG_NAME, restart_and_check, run_and_kill};
+    use super::{KillAt, PG_NAME, restart_and_check, restart_failed_and_check, run_and_kill};
     use crate::support::pg::{Pg18, connect};
 
-    async fn killed_and_restarted(kill_at: KillAt) {
+    async fn killed_and_restarted(kill_at: KillAt, consume_before_retry: bool) {
         let pg = Pg18::start().await;
         let pool = connect(&pg.url).await;
         PgLeaseQueue::<String>::migrate(&pool)
@@ -393,29 +661,43 @@ mod postgres {
             .await
             .expect("pool process");
 
-        restart_and_check(
-            PgLeaseQueue::<String>::new(pool.clone(), PG_NAME, 100),
-            PgResultMailbox::<String>::new(pool, PG_NAME),
-        )
-        .await;
+        let queue = PgLeaseQueue::<String>::new(pool.clone(), PG_NAME, 100);
+        let mailbox = PgResultMailbox::<String>::new(pool, PG_NAME);
+        if kill_at == KillAt::FailedAfterDelivery {
+            restart_failed_and_check(queue, mailbox, consume_before_retry).await;
+        } else {
+            restart_and_check(queue, mailbox).await;
+        }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[ignore = "needs Docker: starts a parking-lot-pg:18 container; kills a child process"]
     async fn pool_sigkill_pg_mid_execution() {
-        killed_and_restarted(KillAt::Execution).await;
+        killed_and_restarted(KillAt::Execution, false).await;
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[ignore = "needs Docker: starts a parking-lot-pg:18 container; kills a child process"]
     async fn pool_sigkill_pg_between_execution_and_delivery() {
-        killed_and_restarted(KillAt::Delivery).await;
+        killed_and_restarted(KillAt::Delivery, false).await;
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     #[ignore = "needs Docker: starts a parking-lot-pg:18 container; kills a child process"]
     async fn pool_sigkill_pg_between_delivery_and_ack() {
-        killed_and_restarted(KillAt::AfterDelivery).await;
+        killed_and_restarted(KillAt::AfterDelivery, false).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore = "needs Docker: PARKING_LOT_PG_MAJOR=17|18; kills a child after Failed delivery"]
+    async fn pool_sigkill_pg_failed_delivery_retained_after_restart() {
+        killed_and_restarted(KillAt::FailedAfterDelivery, false).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[ignore = "needs Docker: PARKING_LOT_PG_MAJOR=17|18; consumes Failed before the retry"]
+    async fn pool_sigkill_pg_failed_delivery_consumed_before_restart() {
+        killed_and_restarted(KillAt::FailedAfterDelivery, true).await;
     }
 }
 
@@ -423,9 +705,13 @@ mod postgres {
 mod redb {
     use prometheus_parking_lot::infra::EmbeddedStore;
 
-    use super::{KillAt, restart_and_check, run_and_kill};
+    use super::{
+        KillAt, nonterminal_duplicate_and_check, restart_and_check, restart_failed_and_check,
+        run_and_kill,
+    };
+    use prometheus_parking_lot::core::TaskStatus;
 
-    async fn killed_and_restarted(kill_at: KillAt) {
+    async fn killed_and_restarted(kill_at: KillAt, consume_before_retry: bool) {
         let dir = tempfile::tempdir().expect("tempdir");
         let file = dir.path().join("s16.redb");
         let path = file.to_str().expect("utf-8 path").to_owned();
@@ -435,21 +721,55 @@ mod redb {
 
         // The killed process held the file; its lock went with it.
         let store = EmbeddedStore::open(&file).expect("reopen the store");
-        restart_and_check(store.lease_queue::<String>(100), store.result_mailbox()).await;
+        if kill_at == KillAt::FailedAfterDelivery {
+            restart_failed_and_check(
+                store.lease_queue::<String>(100),
+                store.result_mailbox(),
+                consume_before_retry,
+            )
+            .await;
+        } else {
+            restart_and_check(store.lease_queue::<String>(100), store.result_mailbox()).await;
+        }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn pool_sigkill_redb_mid_execution() {
-        killed_and_restarted(KillAt::Execution).await;
+        killed_and_restarted(KillAt::Execution, false).await;
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn pool_sigkill_redb_between_execution_and_delivery() {
-        killed_and_restarted(KillAt::Delivery).await;
+        killed_and_restarted(KillAt::Delivery, false).await;
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn pool_sigkill_redb_between_delivery_and_ack() {
-        killed_and_restarted(KillAt::AfterDelivery).await;
+        killed_and_restarted(KillAt::AfterDelivery, false).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn pool_sigkill_redb_failed_delivery_retained_after_restart() {
+        killed_and_restarted(KillAt::FailedAfterDelivery, false).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn pool_sigkill_redb_failed_delivery_consumed_before_restart() {
+        killed_and_restarted(KillAt::FailedAfterDelivery, true).await;
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn pool_duplicate_redb_nonterminal_status_requeues_without_false_terminal() {
+        for status in [TaskStatus::Queued, TaskStatus::Running] {
+            let dir = tempfile::tempdir().expect("tempdir");
+            let store = EmbeddedStore::open(dir.path().join("oa07-nonterminal.redb"))
+                .expect("open real nonterminal-fence store");
+            nonterminal_duplicate_and_check(
+                store.lease_queue::<String>(100),
+                store.result_mailbox(),
+                status,
+            )
+            .await;
+        }
     }
 }

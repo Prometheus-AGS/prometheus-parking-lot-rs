@@ -1,0 +1,11 @@
+{
+  "task": "oa-12-negative-control-ci/1",
+  "proposedBy": "scheduler owner /root/oa04_scheduler",
+  "path": "crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs",
+  "beforeSha256": "941d442d5f849bc5aea47a6e07f0723564965375b47205651872a396bc6e4f82",
+  "sha256": "c0693f884219a464bb24feb6338af0c274b4c49e66b9eefea2e41644a7534853",
+  "reason": "Explicit OA12 requirement rejects timeouts as negative-control evidence; OA08 source would wait on shutdown before terminal counter oracle",
+  "change": "Assert synchronous failed_tasks3 immediately after discarded submits, before shutdown wait",
+  "classifier": "OA-08:discarded-terminal",
+  "runtimeEvidence": "NOT_EXERCISED"
+}

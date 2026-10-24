@@ -1,0 +1,221 @@
+{
+  "purpose": "Authored scenario-to-backend task coverage index; no runtime statuses or counters. Runtime owns canonical task records. Backend ordinals reconciled by kbd-apply list.",
+  "tasks": [
+    {
+      "id": "phase-0-4-operational-assurance/oa-01-containment-controls/1",
+      "changeId": "oa-01-containment-controls",
+      "backendTaskId": "1",
+      "title": "1.1 Implement prepare and enforce post-purge containment controls with the specified regression fixtures"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-01-containment-controls/2",
+      "changeId": "oa-01-containment-controls",
+      "backendTaskId": "2",
+      "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-02-release-versioning/1",
+      "changeId": "oa-02-release-versioning",
+      "backendTaskId": "1",
+      "title": "1.1 Implement choose and automate seven-crate versioning with the specified regression fixtures"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-02-release-versioning/2",
+      "changeId": "oa-02-release-versioning",
+      "backendTaskId": "2",
+      "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-03-signed-release-tags/1",
+      "changeId": "oa-03-signed-release-tags",
+      "backendTaskId": "1",
+      "title": "1.1 Implement verify operator-signed release tags with the specified regression fixtures"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-03-signed-release-tags/2",
+      "changeId": "oa-03-signed-release-tags",
+      "backendTaskId": "2",
+      "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-04-trusted-publishing/1",
+      "changeId": "oa-04-trusted-publishing",
+      "backendTaskId": "1",
+      "title": "1.1 Implement gate trusted publishing on candidate evidence and approval with the specified regression fixtures"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-04-trusted-publishing/2",
+      "changeId": "oa-04-trusted-publishing",
+      "backendTaskId": "2",
+      "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-05-template-secret-scan/1",
+      "changeId": "oa-05-template-secret-scan",
+      "backendTaskId": "1",
+      "title": "1.1 Implement make template scans precise without hiding real secrets with the specified regression fixtures"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-05-template-secret-scan/2",
+      "changeId": "oa-05-template-secret-scan",
+      "backendTaskId": "2",
+      "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-06-tenant-idempotency/1",
+      "changeId": "oa-06-tenant-idempotency",
+      "backendTaskId": "1",
+      "title": "1.1 Implement scope result idempotency to tenant/mailbox key with the specified regression fixtures"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-06-tenant-idempotency/2",
+      "changeId": "oa-06-tenant-idempotency",
+      "backendTaskId": "2",
+      "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-07-stored-terminal-outcome/1",
+      "changeId": "oa-07-stored-terminal-outcome",
+      "backendTaskId": "1",
+      "title": "1.1 Implement emit durable terminal events from the stored result with the specified regression fixtures"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-07-stored-terminal-outcome/2",
+      "changeId": "oa-07-stored-terminal-outcome",
+      "backendTaskId": "2",
+      "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-08-discarded-spawn/1",
+      "changeId": "oa-08-discarded-spawn",
+      "backendTaskId": "1",
+      "title": "1.1 Implement settle accepted work when a spawner discards its future with the specified regression fixtures"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-08-discarded-spawn/2",
+      "changeId": "oa-08-discarded-spawn",
+      "backendTaskId": "2",
+      "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-09-backend-admission/1",
+      "changeId": "oa-09-backend-admission",
+      "backendTaskId": "1",
+      "title": "1.1 Implement reject impossible pre-populated adapter work with the specified regression fixtures"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-09-backend-admission/2",
+      "changeId": "oa-09-backend-admission",
+      "backendTaskId": "2",
+      "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-10-expiry-events/1",
+      "changeId": "oa-10-expiry-events",
+      "backendTaskId": "1",
+      "title": "1.1 Implement emit terminal events for explicitly pruned work with the specified regression fixtures"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-10-expiry-events/2",
+      "changeId": "oa-10-expiry-events",
+      "backendTaskId": "2",
+      "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-11-concurrency-models/1",
+      "changeId": "oa-11-concurrency-models",
+      "backendTaskId": "1",
+      "title": "1.1 Implement model ledger races and kind-limited release with the specified regression fixtures"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-11-concurrency-models/2",
+      "changeId": "oa-11-concurrency-models",
+      "backendTaskId": "2",
+      "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-12-negative-control-ci/1",
+      "changeId": "oa-12-negative-control-ci",
+      "backendTaskId": "1",
+      "title": "1.1 Implement run every scenario negative control in ci with the specified regression fixtures"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-12-negative-control-ci/2",
+      "changeId": "oa-12-negative-control-ci",
+      "backendTaskId": "2",
+      "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-13-browser-assurance/1",
+      "changeId": "oa-13-browser-assurance",
+      "backendTaskId": "1",
+      "title": "1.1 Implement exercise wasm admission and events in a browser with the specified regression fixtures"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-13-browser-assurance/2",
+      "changeId": "oa-13-browser-assurance",
+      "backendTaskId": "2",
+      "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-14-postgres-upgrade/1",
+      "changeId": "oa-14-postgres-upgrade",
+      "backendTaskId": "1",
+      "title": "1.1 Implement rehearse a populated postgresql 17\u219218 upgrade with the specified regression fixtures"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-14-postgres-upgrade/2",
+      "changeId": "oa-14-postgres-upgrade",
+      "backendTaskId": "2",
+      "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-15-desktop-assurance/1",
+      "changeId": "oa-15-desktop-assurance",
+      "backendTaskId": "1",
+      "title": "1.1 Implement build and launch the tauri embedded example with the specified regression fixtures"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-15-desktop-assurance/2",
+      "changeId": "oa-15-desktop-assurance",
+      "backendTaskId": "2",
+      "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-16-iggy-poisoning/1",
+      "changeId": "oa-16-iggy-poisoning",
+      "backendTaskId": "1",
+      "title": "1.1 Implement prove no stream publication beyond an abandoned chunk with the specified regression fixtures"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-16-iggy-poisoning/2",
+      "changeId": "oa-16-iggy-poisoning",
+      "backendTaskId": "2",
+      "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-17-backend-benchmarks/1",
+      "changeId": "oa-17-backend-benchmarks",
+      "backendTaskId": "1",
+      "title": "1.1 Implement measure pg throughput, contention and memory with the specified regression fixtures"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-17-backend-benchmarks/2",
+      "changeId": "oa-17-backend-benchmarks",
+      "backendTaskId": "2",
+      "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-18-release-boundary/1",
+      "changeId": "oa-18-release-boundary",
+      "backendTaskId": "1",
+      "title": "1.1 Implement the candidate-bound boundary runner and receipt/approval verifier"
+    },
+    {
+      "id": "phase-0-4-operational-assurance/oa-18-release-boundary/2",
+      "changeId": "oa-18-release-boundary",
+      "backendTaskId": "2",
+      "title": "1.2 Assemble the completed candidate and record the final integration, review and publication dispositions"
+    }
+  ]
+}

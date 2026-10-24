@@ -1,0 +1,41 @@
+{
+  "owner": "/root/oa04_release",
+  "task": "oa-18-release-boundary:2",
+  "correction_cycle": 1,
+  "runtimeEvidence": "NOT_EXERCISED",
+  "files": [
+    {
+      "path": ".github/scripts/operational-assurance.py",
+      "base_sha256": "aea1ed6026fdc08d5b421f0fe0c8e48ba58c10b3566f4d407218cc517b534a4e",
+      "sha256": "a4ee72bdc0a577cf33e32051da84ec7cf71f5f306b271cd67d6f9aff4c4e117f"
+    },
+    {
+      "path": ".github/operational-assurance.json",
+      "base_sha256": "f7e30cd7b96c938e4e05d894199a6b9fda463ea2433709a7be8197dc0288f57c",
+      "sha256": "d77f170b21dc05a6fbde6e740290b82ce178ef94d947111d4bd35d6074e5824d"
+    },
+    {
+      "path": ".github/scripts/OPERATIONAL_ASSURANCE.md",
+      "base_sha256": "e98375ecbb7f2204492a58ac08f37daed8fcccc6e6b1d204a57931edff0d401d",
+      "sha256": "7e6b9653afd07c877cdd37c670f5772ae77c614674bc95978ecf839dc7904981"
+    },
+    {
+      "path": ".github/scripts/tests/boundary-packet.py",
+      "base_sha256": "65b4fc303fcb52ca41a2fe672b403b5a1c85bc913e6023f0b2807c697220e83b",
+      "sha256": "31a0434ee29d24174b922ab9a997ec236dd9f26adf51ee5884c7f3b7ee83881f"
+    },
+    {
+      "path": "scripts/release/test-preparation.py",
+      "base_sha256": "261262e8260237fcb31e2aa85167419dd2a3d3b2731c7a84ee5049894d1fcb54",
+      "sha256": "d9a79ab3b80534b5d511215193fe5462547255bc15fd5f7c3c0902971e9f5d0a"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-18-techlead-correction.md",
+      "sha256": "f4f6eb67b867e5f2b8c83eff10bdeb370569fc84e138e878df909963b8916033"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-18-techlead-correction.patch",
+      "sha256": "60563a0c3123c4b0af0a818849968b2d51666b0153c2166610a5ff4489e6e7e7"
+    }
+  ]
+}

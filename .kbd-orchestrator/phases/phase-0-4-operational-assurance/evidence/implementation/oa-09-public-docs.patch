@@ -1,0 +1,68 @@
+--- a/docs/API.md
++++ b/docs/API.md
+@@ -31,6 +31,30 @@
+ `with_cancellation_config`, `submit`, `prune_expired`, `active_units`,
+ `running_tasks`, `queued_tasks`, `shutdown` (refuse new work only),
+ `shutdown_with(policy)` (async; returns a `ShutdownReport`, cr-29).
++
++`ResourcePool::new` requires `Q: TaskQueue<P>` and includes the queue's
++existing reported depth in shutdown accounting (oa-09). Construction does not
++spawn work. After builder configuration, the first submission or
++`shutdown_with` installs the release hook and drains pre-filled entries;
++other draining operations can also observe the head.
++
++A stored head exceeding the absolute total or per-kind limit is removed once
++without execution, emits `Rejected` with `CapacityExceeded` identifying the
++dimension, and gets one configured mailbox delivery attempt of
++`TaskStatus::Dropped(capacity_error.to_string())`, with no result payload.
++It counts in `failed_tasks` and as a finished ledger outcome, then settles;
++it does not invoke the cancellation sink. Pre-filled tasks get no fabricated
++`Submitted`/`Queued` event from this pool. Valid heads waiting only for units
++held by running tasks remain parked. Head expiry and valid completion use
++their usual per-task accounting, including when shutdown is the first pool
++operation. An impossible head is capacity-rejected before its expiry is checked.
++
++FIFO follows the stored tickets and configured dispatch policy. The pool does
++not recover a global sequence counter across an arbitrary imported sequence
++epoch and new submissions. The initial ledger count relies on the backend's
++reported depth; external additions after ownership transfer are outside this
++accounting. Mailbox errors, callback panics and bounded hook delivery retain
++their existing limits. This in-memory path adds no persistent dead-letter store.
+ 
+ `Spawn` may legally drop a supplied future without polling it. For an accepted
+ `ResourcePool` run discarded this way (oa-08), the executor is never called:
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -9,6 +9,16 @@
+ 
+ ### Fixed
+ 
++- **Pre-filled ResourcePool admission (oa-09, #82).** A stored head exceeding
++  the current total or per-kind capacity is removed once without execution,
++  emits `Rejected(CapacityExceeded)`, and gets one configured mailbox delivery
++  attempt of `TaskStatus::Dropped(capacity_error.to_string())` with no result
++  payload. Valid followers proceed; valid heads waiting for temporarily held
++  units remain parked. Pre-filled depth now enters shutdown accounting at
++  construction and is first drained after builder configuration on submission
++  or shutdown, so rejection, head expiry and completion settle counted work.
++  FIFO retains the stored-ticket policy; no cross-epoch global sequence
++  recovery or persistent dead-letter store is added.
+ - **Discarded ResourcePool spawns (oa-08, #81).** An accepted run whose
+   spawner drops its future before first poll now emits `Failed` and attempts
+   one configured mailbox delivery of `TaskStatus::Failed(TaskError::Cancelled)`
+@@ -18,6 +28,15 @@
+   the async cancellation sink or increment `ShutdownReport::cancelled`.
+   Retained futures, unavailable execution runtimes and failed mailbox storage
+   retain their existing progress/delivery limits; this adds no crash durability.
++
++### Changed (breaking)
++
++- **Core dispatcher result (oa-09).** `Dispatched<T>` adds
++  `rejected: Vec<(T, SchedulerError)>`; callers must report every returned
++  rejection outside the dispatch lock. Struct literals/destructuring must
++  account for the field, and rejection-only batches are nonempty.
++- **ResourcePool constructor bound (oa-09).** `ResourcePool::new` now requires
++  `Q: TaskQueue<P>` to count already queued work before observing it.
+ 
+ ## [0.3.0] - 2026-10-24
+ 

@@ -1,0 +1,35 @@
+{
+  "owner": "/root/oa04_platform",
+  "files": [
+    {
+      "path": ".github/workflows/platform.yml",
+      "sha256": "011cf1c5fb7a58d3e2fc1599ab74c8e43bae7c0e9fbc1942799f7a64fa6496a7"
+    },
+    {
+      "path": "bindings/tauri-desktop/src-tauri/src/lib.rs",
+      "sha256": "55cfd8318d296431093971d1069722fe2d36116500e7c32e70c0c88810746f50"
+    },
+    {
+      "path": "bindings/tauri-desktop/src-tauri/src/assurance.rs",
+      "sha256": "9c29828678e232930c54d98ed5549f90bdf0b4ea2230cd231f85e597bae91590"
+    },
+    {
+      "path": "bindings/tauri-desktop/src-tauri/tauri.conf.json",
+      "sha256": "6e12b206a6ac069bb2d22bc975021f00473ec6852621a345edcadd9c046346e5"
+    },
+    {
+      "path": "bindings/tauri-desktop/src-tauri/icons/icon.ico",
+      "sha256": "9facc22cd7c910f9eff95a7ec2a114511f319e00015fa543e7d178b0b9477313"
+    },
+    {
+      "path": "bindings/tauri-desktop/assurance/protocol.json",
+      "sha256": "b2f3e304a4dffb00e27f64e01bf1209f062d30041016f204dc5249cca8e8dbb2"
+    },
+    {
+      "path": "bindings/tauri-desktop/assurance/desktop-assurance.py",
+      "sha256": "b19d857dea1a0ee8e1e1048cbba71e0c53de027855a963c6dedf8cc7fa424471"
+    }
+  ],
+  "frontend": "incumbent bytes preserved; Windows ICO wraps existing PNG",
+  "runtimeEvidence": "NOT_EXERCISED; no build, GUI launch, script execution or other QA"
+}

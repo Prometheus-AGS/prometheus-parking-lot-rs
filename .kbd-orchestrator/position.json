@@ -2,27 +2,205 @@
   "schemaVersion": "1",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 876,
-  "derivedRevision": 876,
+  "sourceRevision": 1118,
+  "derivedRevision": 1118,
   "frontier": {
-    "b4320c25-6bf5-4d74-9fe6-3d6b8b36bd69": 249,
+    "3b637018-0150-4bf1-b8af-a19e9f09585f": 178,
+    "b4320c25-6bf5-4d74-9fe6-3d6b8b36bd69": 313,
     "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 627
   },
   "conflictCount": 0,
-  "updatedAt": "2026-10-24T11:44:11.050525Z",
+  "updatedAt": "2026-10-24T14:31:01.745489Z",
   "cursor": [
-    "phase-correctness-and-durability",
-    "reflect"
+    "phase-0-4-operational-assurance",
+    "execute",
+    "oa-18-release-boundary",
+    "2"
   ],
   "root": {
     "type": "phase",
     "id": "f6c384db-6ee1-4f1b-9bab-0e1602ec2615",
     "status": "ready",
     "progress": {
-      "done": 51,
-      "total": 51
+      "done": 68,
+      "total": 69
     },
     "children": [
+      {
+        "type": "phase",
+        "id": "phase-0-4-operational-assurance",
+        "canonicalId": "phase-0-4-operational-assurance",
+        "status": "IN_PROGRESS",
+        "progress": {
+          "done": 17,
+          "total": 18
+        },
+        "children": [
+          {
+            "type": "change",
+            "id": "oa-01-containment-controls",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 2,
+              "total": 2
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-02-release-versioning",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 2,
+              "total": 2
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-03-signed-release-tags",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 2,
+              "total": 2
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-04-trusted-publishing",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 2,
+              "total": 2
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-05-template-secret-scan",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 2,
+              "total": 2
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-06-tenant-idempotency",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 2,
+              "total": 2
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-07-stored-terminal-outcome",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 2,
+              "total": 2
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-08-discarded-spawn",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 2,
+              "total": 2
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-09-backend-admission",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 2,
+              "total": 2
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-10-expiry-events",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 2,
+              "total": 2
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-11-concurrency-models",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 2,
+              "total": 2
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-12-negative-control-ci",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 2,
+              "total": 2
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-13-browser-assurance",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 2,
+              "total": 2
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-14-postgres-upgrade",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 2,
+              "total": 2
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-15-desktop-assurance",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 2,
+              "total": 2
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-16-iggy-poisoning",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 2,
+              "total": 2
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-17-backend-benchmarks",
+            "status": "COMPLETE",
+            "progress": {
+              "done": 2,
+              "total": 2
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-18-release-boundary",
+            "status": "IN_PROGRESS",
+            "progress": {
+              "done": 1,
+              "total": 2
+            }
+          }
+        ],
+        "annotations": []
+      },
       {
         "type": "phase",
         "id": "phase-certification-remediation",

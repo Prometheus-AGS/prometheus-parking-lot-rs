@@ -1,0 +1,60 @@
+# Preparation only. Publication, signed tags and GitHub releases belong to the
+# separately approved release workflow (ADR 0005).
+[workspace]
+release = false
+release_always = false
+publish = false
+git_tag_enable = false
+git_release_enable = false
+dependencies_update = false
+changelog_update = false
+
+[[package]]
+name = "prometheus-parking-lot-core"
+release = true
+version_group = "parking-lot"
+changelog_path = "CHANGELOG.md"
+
+[[package]]
+name = "prometheus-parking-lot-runtime-tokio"
+release = true
+version_group = "parking-lot"
+changelog_path = "CHANGELOG.md"
+
+[[package]]
+name = "prometheus-parking-lot-pg"
+release = true
+version_group = "parking-lot"
+changelog_path = "CHANGELOG.md"
+
+[[package]]
+name = "prometheus-parking-lot-embedded"
+release = true
+version_group = "parking-lot"
+changelog_path = "CHANGELOG.md"
+
+[[package]]
+name = "prometheus-parking-lot-iggy"
+release = true
+version_group = "parking-lot"
+changelog_path = "CHANGELOG.md"
+
+[[package]]
+name = "prometheus-parking-lot-wasm"
+release = true
+version_group = "parking-lot"
+changelog_path = "CHANGELOG.md"
+
+[[package]]
+name = "prometheus_parking_lot"
+release = true
+version_group = "parking-lot"
+changelog_path = "CHANGELOG.md"
+
+[[package]]
+name = "prometheus-parking-lot-ffi"
+release = false
+publish = false
+# set-version visits inherited members even when release=false. Reuse the
+# existing shared file; no FFI release section or FFI changelog is generated.
+changelog_path = "CHANGELOG.md"

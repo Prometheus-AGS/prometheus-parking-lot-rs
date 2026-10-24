@@ -1,0 +1,23 @@
+# The preparation script supplies a frozen commit range, package paths and date.
+# No current-time interpolation, remote metadata or executable preprocessors.
+[changelog]
+header = ""
+body = """
+{% for commit in commits %}
+- {{ commit.message | split(pat="\n") | first }} ({{ commit.id }})
+{% endfor %}
+"""
+footer = ""
+trim = true
+
+[git]
+conventional_commits = false
+filter_unconventional = false
+split_commits = false
+filter_commits = false
+tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+# Treat the explicit base..candidate range as one release, even across tags.
+ignore_tags = ".*"
+topo_order = true
+topo_order_commits = true
+sort_commits = "oldest"

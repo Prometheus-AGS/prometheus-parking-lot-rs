@@ -1,0 +1,14 @@
+{
+  "owner": "/root/oa04_platform",
+  "files": [
+    {
+      "path": ".github/scripts/tests/README-negative-controls.md",
+      "sha256": "981fe59490bd5142bd6582a9bb9e77f3768143d65a21cad0e297da7234ba4505"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-12.md",
+      "sha256": "1b580b2b21e68af8f6da52369ffb4a35d54b686fa9625655ad05683024020675"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED"
+}

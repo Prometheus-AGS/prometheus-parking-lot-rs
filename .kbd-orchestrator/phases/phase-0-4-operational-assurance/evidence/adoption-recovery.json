@@ -1,0 +1,9 @@
+{
+  "reason": "Canonical binding committed; companion decision refused stale frontier while registration was in progress. After registration exited, completed exact helper decision/stamp sequence serially. No runtime projection or journal file edited.",
+  "contractPath": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json",
+  "contractDigest": "e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257",
+  "decisionId": "contract-adoption-phase-0-4-operational-assurance-e77aa4ac",
+  "planRevision": 1,
+  "snapshotMatches": true,
+  "digestNeutralStamp": true
+}

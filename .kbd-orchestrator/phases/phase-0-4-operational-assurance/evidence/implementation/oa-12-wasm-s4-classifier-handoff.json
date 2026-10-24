@@ -1,0 +1,9 @@
+{
+  "task": "oa-12-negative-control-ci/1",
+  "owner": "/root/oa04_platform",
+  "path": "crates/parking-lot-wasm/tests/wasm_pool.rs",
+  "sha256": "f86703b8dec85223e10c014fcc1344ba75e944d30bcac761202215fbc898e14f",
+  "scope": "Existing S4 budget fixture cancellation witness before retrieval; all 15 identities/host markers and positive retrieval assertions retained",
+  "classifier": "OA12:S4:wasm-budget: executor future was not dropped",
+  "runtimeEvidence": "NOT_EXERCISED"
+}

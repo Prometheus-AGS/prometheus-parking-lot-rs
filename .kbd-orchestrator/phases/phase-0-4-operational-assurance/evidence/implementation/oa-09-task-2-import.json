@@ -1,0 +1,23 @@
+{
+  "owner": "/root/oa04_scheduler",
+  "sourceWorkspace": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs",
+  "files": [
+    {
+      "path": "crates/parking-lot-core/src/dispatch/dispatcher.rs",
+      "sha256": "4db88d632939cebd08c5c9f3f793fe2703e3aff6a2ef3b313df828b38326f57e"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/src/resource_pool.rs",
+      "sha256": "1dff4ca980fdec207a7b330b3ac0e1d74c8836e63fae59091ac2d96380941a70"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-09.md",
+      "sha256": "bd58011269ad2588a2f746dd772f3cab3d0eb7901dd6f4541cf8a73664aaaa13"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-09-public-docs.patch",
+      "sha256": "6a45719f6cdc7827505188d1da647be57b8b33cb9526a4bb766444d7c820df1b"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED"
+}
