@@ -145,11 +145,13 @@ calls `migrate`/`prepare`.
 
 ### Locks taken by a re-run
 
-A re-run takes **no table lock stronger than the catalog read it needs**. Three
+A re-run takes **no table lock stronger than the catalog read it needs**. Four
 statements would, even when there is nothing to change, so each is guarded by a
 catalog check and runs only when the object is missing or the option differs
 (observed on the PG 17 and 18 images by holding an open transaction that had
-written to the table, see `crates/parking-lot-pg/tests/migrations.rs`):
+written to the table, and by holding `SHARE UPDATE EXCLUSIVE` and
+`ACCESS EXCLUSIVE` on every queue table during a full re-run; see
+`crates/parking-lot-pg/tests/migrations.rs`):
 
 | Statement | Lock | Effect while held |
 |---|---|---|
@@ -157,6 +159,7 @@ written to the table, see `crates/parking-lot-pg/tests/migrations.rs`):
 | `DROP TRIGGER` / `CREATE TRIGGER` | `ACCESS EXCLUSIVE` | blocks readers too |
 | `CREATE OR REPLACE TRIGGER` | `SHARE ROW EXCLUSIVE` | blocks every writer |
 | `ALTER TABLE ... SET (...)` | `SHARE UPDATE EXCLUSIVE` | does not block reads or writes |
+| `COMMENT ON TABLE / COLUMN` | `SHARE UPDATE EXCLUSIVE` | does not block reads or writes, but conflicts with manual `VACUUM`/`ANALYZE`, anti-wraparound autovacuum, `CREATE INDEX CONCURRENTLY` and `pg_repack`, so under `lock_timeout` a re-run would fail start-up |
 
 A lock request that waits also holds up every request behind it, so a re-run
 queued behind one long transaction would stall the queue. The first run on a

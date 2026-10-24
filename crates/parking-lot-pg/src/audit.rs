@@ -11,9 +11,12 @@
 //! - **Events are written shortly after `record`, not during it.** Call
 //!   [`shutdown`](PostgresAuditSink::shutdown) before exit to wait for the
 //!   queue to drain.
-//! - **A failed batch is lost, counted and logged at `error`.** There is no
-//!   retry; an audit sink that retried forever would hold events (and memory)
-//!   during an outage. For a replayable event log use the Iggy events backend.
+//! - **A failed write is lost, counted and logged at `error`.** There is no
+//!   retry of the same write; an audit sink that retried forever would hold
+//!   events (and memory) during an outage. If the database rejects a batch (one
+//!   event it cannot store, such as a NUL byte), its events are written one at a
+//!   time so only the rejected ones are lost; a connection or pool failure loses
+//!   the whole batch. For a replayable event log use the Iggy events backend.
 //!
 //! The write is idempotent: `event_id` is the primary key and a repeated event
 //! is ignored.
@@ -89,7 +92,7 @@ impl PostgresAuditSink {
     }
 
     /// Events that never reached the table: dropped because the buffer was
-    /// full, or part of a batch whose insert failed.
+    /// full, or an event whose insert failed.
     #[must_use]
     pub fn lost(&self) -> u64 {
         self.lost.load(Ordering::Relaxed)
@@ -134,11 +137,34 @@ async fn write_loop(pool: PgPool, mut queue: mpsc::Receiver<AuditEvent>, lost: A
                 Err(_) => break,
             }
         }
-        if let Err(error) = insert(&pool, &batch).await {
-            lost.fetch_add(batch.len() as u64, Ordering::Relaxed);
-            tracing::error!(%error, events = batch.len(), "audit batch not written");
-        }
+        write_batch(&pool, &batch, &lost).await;
     }
+}
+
+/// Write `batch`; count what could not be written.
+///
+/// A statement fails as a whole, so one event the database rejects (a NUL byte
+/// in a text column, say) would take the other events of its batch with it.
+/// When the database itself answered with an error, the events are retried one
+/// at a time and only the rejected ones are lost. Any other failure (the
+/// connection, the pool) says nothing about individual events and would repeat
+/// for each of them, so there the whole batch is lost at once.
+async fn write_batch(pool: &PgPool, batch: &[AuditEvent], lost: &AtomicU64) {
+    let Err(error) = insert(pool, batch).await else {
+        return;
+    };
+    if batch.len() > 1 && matches!(error, sqlx::Error::Database(_)) {
+        tracing::warn!(%error, events = batch.len(), "audit batch rejected; retrying its events one by one");
+        for event in batch {
+            if let Err(error) = insert(pool, std::slice::from_ref(event)).await {
+                lost.fetch_add(1, Ordering::Relaxed);
+                tracing::error!(%error, event_id = %event.event_id, "audit event not written");
+            }
+        }
+        return;
+    }
+    lost.fetch_add(batch.len() as u64, Ordering::Relaxed);
+    tracing::error!(%error, events = batch.len(), "audit batch not written");
 }
 
 async fn insert(pool: &PgPool, batch: &[AuditEvent]) -> Result<(), sqlx::Error> {

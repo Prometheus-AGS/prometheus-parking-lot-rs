@@ -204,6 +204,19 @@ entry names the OpenSpec change that made it.
   forever. The pools already reject `worker_count == 0` in their
   configuration.
 
+### Fixed
+
+- **Postgres pre-release re-review (postgres-engineer).** `COMMENT ON` in
+  migrations 004, 005 and 007 took `SHARE UPDATE EXCLUSIVE` on every re-run, so
+  a manual `VACUUM` or `pg_repack` could fail start-up under the 5 s
+  `lock_timeout`; each comment is now set only when it differs. A heartbeat
+  `extend` already waiting on the row lock behind `nack(Requeue { delay > 0 })`
+  no longer re-arms the nacked pgmq token (the fence reads the delay mark
+  through the volatile `pl_pgmq_is_delayed`, migration 006). A pgmq `lease`
+  whose read of a lower lane fails now returns the tasks higher lanes already
+  leased instead of discarding them. One audit event the database rejects no
+  longer loses the rest of its batch.
+
 ### Added
 
 - **`PostgresAuditSink` writes events (audit finding).** It was an empty stub
@@ -211,8 +224,9 @@ entry names the OpenSpec change that made it.
   now queues `record`ed events on a bounded channel and a background task
   inserts them in batches into `pl_audit_events` (migration
   `007_audit_events.sql`, applied by `PostgresAuditSink::migrate`). It never
-  blocks `record`; events dropped on a full buffer or lost with a failed batch
-  are counted (`lost()`) and logged, and `shutdown().await` drains the queue.
+  blocks `record`; events dropped on a full buffer or that the database rejects
+  (a batch it rejects is retried event by event, so one bad event, such as a NUL
+  byte, loses only itself) are counted (`lost()`) and logged, and `shutdown().await` drains the queue.
   `payload` is `TEXT` (the old, never-applied DDL said `JSONB`). Needs a Tokio
   runtime.
 - **Iggy topic retention (review W5).** `IggyOptions::with_retention` and

@@ -177,5 +177,19 @@ BEGIN
 END
 $$;
 
-COMMENT ON TABLE pl_lease_queue IS 'Leasing task queue: at-least-once delivery with fenced leases (cr-26)';
-COMMENT ON COLUMN pl_lease_queue.attempts IS 'Leases granted so far; also the fencing token of the current lease';
+-- COMMENT ON takes SHARE UPDATE EXCLUSIVE, which conflicts with manual VACUUM
+-- and ANALYZE, anti-wraparound autovacuum, CREATE INDEX CONCURRENTLY and
+-- pg_repack, so a re-run under lock_timeout could fail start-up. Each comment is
+-- set only when the catalog text differs (obj_description takes no table lock).
+DO $$
+BEGIN
+    IF obj_description('pl_lease_queue'::regclass, 'pg_class') IS DISTINCT FROM 'Leasing task queue: at-least-once delivery with fenced leases (cr-26)' THEN
+        COMMENT ON TABLE pl_lease_queue IS 'Leasing task queue: at-least-once delivery with fenced leases (cr-26)';
+    END IF;
+    IF col_description('pl_lease_queue'::regclass,
+           (SELECT attnum FROM pg_attribute WHERE attrelid = 'pl_lease_queue'::regclass AND attname = 'attempts'))
+       IS DISTINCT FROM 'Leases granted so far; also the fencing token of the current lease' THEN
+        COMMENT ON COLUMN pl_lease_queue.attempts IS 'Leases granted so far; also the fencing token of the current lease';
+    END IF;
+END
+$$;

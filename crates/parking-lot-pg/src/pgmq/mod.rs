@@ -406,6 +406,10 @@ where
     /// dispatchers never receive the same message). A message past
     /// `max_attempts`, or one that cannot be decoded, is dead-lettered and
     /// does not count toward `max`.
+    ///
+    /// If reading a lower lane fails after higher lanes already leased tasks,
+    /// those tasks are returned and the error is logged; the error is returned
+    /// only when nothing was leased.
     async fn lease(
         &self,
         max: usize,
@@ -414,50 +418,20 @@ where
         ensure_duration(lease_for, "lease duration")?;
         let vt = lease_seconds(lease_for);
         let mut leased = Vec::new();
-        for lane in (0..LANES).rev() {
-            while leased.len() < max {
-                let want = i32::try_from(max - leased.len()).unwrap_or(i32::MAX);
-                let rows = sqlx::query(LEASE_READ)
-                    .bind(&*self.lanes[lane])
-                    .bind(vt)
-                    .bind(want)
-                    .fetch_all(&self.pool)
-                    .await
-                    .map_err(backend("lease"))?;
-                if rows.is_empty() {
-                    break;
-                }
-                for row in &rows {
-                    let msg_id: i64 = row.try_get("msg_id").map_err(backend("decode msg_id"))?;
-                    let read_ct: i32 = row.try_get("read_ct").map_err(backend("decode read_ct"))?;
-                    let attempts = u32::try_from(read_ct).map_err(|_| {
-                        SchedulerError::internal(format!("negative read_ct {read_ct}"))
-                    })?;
-                    if let Some(limit) = self.max_attempts_i64()
-                        && i64::from(read_ct) > limit
-                    {
-                        let reason = format!("max attempts ({limit}) exceeded");
-                        self.dead_letter_or_log(lane, msg_id, read_ct, reason).await;
-                        continue;
-                    }
-                    match decode_task::<P>(row) {
-                        Ok(task) => {
-                            let token = LeaseToken::new(
-                                entry_id(entry_of(msg_id, lane))?,
-                                u64::from(attempts),
-                            );
-                            leased.push(LeasedTask::new(task, token, attempts));
-                        }
-                        Err(reason) => {
-                            // Not retryable: redelivery would fail the same way.
-                            let reason = format!("undecodable task: {reason}");
-                            self.dead_letter_or_log(lane, msg_id, read_ct, reason).await;
-                        }
-                    }
-                }
+        match self.lease_lanes(max, vt, &mut leased).await {
+            Ok(()) => Ok(leased),
+            // Messages already read are invisible to everyone else until their
+            // leases run out: returning the error would strand them for a whole
+            // lease. Hand them over; the failing lane is read again next call.
+            Err(error) if !leased.is_empty() => {
+                tracing::error!(
+                    %error, queue = &*self.queue_name, leased = leased.len(),
+                    "lease failed on a lower lane; returning the tasks already leased"
+                );
+                Ok(leased)
             }
+            Err(error) => Err(error),
         }
-        Ok(leased)
     }
 
     async fn ack(&self, token: LeaseToken) -> Result<(), SchedulerError> {
@@ -520,6 +494,65 @@ where
     /// deliver both into one mailbox without task idempotency keys.
     fn identity(&self) -> &str {
         &self.identity
+    }
+}
+
+impl<P> PgmqLeaseQueue<P>
+where
+    P: DeserializeOwned,
+{
+    /// Read the lanes from the highest down into `leased` until it holds `max`
+    /// tasks. `leased` keeps what was read even when a later read fails.
+    async fn lease_lanes(
+        &self,
+        max: usize,
+        vt: i32,
+        leased: &mut Vec<LeasedTask<P>>,
+    ) -> Result<(), SchedulerError> {
+        for lane in (0..LANES).rev() {
+            while leased.len() < max {
+                let want = i32::try_from(max - leased.len()).unwrap_or(i32::MAX);
+                let rows = sqlx::query(LEASE_READ)
+                    .bind(&*self.lanes[lane])
+                    .bind(vt)
+                    .bind(want)
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(backend("lease"))?;
+                if rows.is_empty() {
+                    break;
+                }
+                for row in &rows {
+                    let msg_id: i64 = row.try_get("msg_id").map_err(backend("decode msg_id"))?;
+                    let read_ct: i32 = row.try_get("read_ct").map_err(backend("decode read_ct"))?;
+                    let attempts = u32::try_from(read_ct).map_err(|_| {
+                        SchedulerError::internal(format!("negative read_ct {read_ct}"))
+                    })?;
+                    if let Some(limit) = self.max_attempts_i64()
+                        && i64::from(read_ct) > limit
+                    {
+                        let reason = format!("max attempts ({limit}) exceeded");
+                        self.dead_letter_or_log(lane, msg_id, read_ct, reason).await;
+                        continue;
+                    }
+                    match decode_task::<P>(row) {
+                        Ok(task) => {
+                            let token = LeaseToken::new(
+                                entry_id(entry_of(msg_id, lane))?,
+                                u64::from(attempts),
+                            );
+                            leased.push(LeasedTask::new(task, token, attempts));
+                        }
+                        Err(reason) => {
+                            // Not retryable: redelivery would fail the same way.
+                            let reason = format!("undecodable task: {reason}");
+                            self.dead_letter_or_log(lane, msg_id, read_ct, reason).await;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 

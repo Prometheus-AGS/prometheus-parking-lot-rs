@@ -150,5 +150,17 @@ BEGIN
 END
 $$;
 
-COMMENT ON TABLE pl_result_mailbox IS 'Result mailbox: consume-once delivery with TTL eviction (cr-27)';
-COMMENT ON TABLE pl_result_mailbox_keys IS 'Remembered idempotency keys of the result mailbox; first write wins (cr-27)';
+-- COMMENT ON takes SHARE UPDATE EXCLUSIVE, which conflicts with manual VACUUM
+-- and ANALYZE, anti-wraparound autovacuum, CREATE INDEX CONCURRENTLY and
+-- pg_repack, so a re-run under lock_timeout could fail start-up. Each comment is
+-- set only when the catalog text differs (obj_description takes no table lock).
+DO $$
+BEGIN
+    IF obj_description('pl_result_mailbox'::regclass, 'pg_class') IS DISTINCT FROM 'Result mailbox: consume-once delivery with TTL eviction (cr-27)' THEN
+        COMMENT ON TABLE pl_result_mailbox IS 'Result mailbox: consume-once delivery with TTL eviction (cr-27)';
+    END IF;
+    IF obj_description('pl_result_mailbox_keys'::regclass, 'pg_class') IS DISTINCT FROM 'Remembered idempotency keys of the result mailbox; first write wins (cr-27)' THEN
+        COMMENT ON TABLE pl_result_mailbox_keys IS 'Remembered idempotency keys of the result mailbox; first write wins (cr-27)';
+    END IF;
+END
+$$;

@@ -697,3 +697,125 @@ async fn pgmq_failed_dead_letter_does_not_discard_leased_tasks() -> TestResult<(
     assert_eq!(leased[0].task.payload, "good");
     Ok(())
 }
+
+// ── fence vs. in-flight statements (S2) ─────────────────────────────────────
+
+/// Number of backends (other than this one) waiting on a lock.
+async fn lock_waiters(pool: &sqlx::PgPool) -> TestResult<i64> {
+    Ok(sqlx::query_scalar(
+        "SELECT count(*) FROM pg_stat_activity
+          WHERE wait_event_type = 'Lock' AND pid <> pg_backend_pid()",
+    )
+    .fetch_one(pool)
+    .await?)
+}
+
+async fn wait_for_lock_waiters(pool: &sqlx::PgPool, want: i64) -> TestResult<()> {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while lock_waiters(pool).await? < want {
+        assert!(
+            Instant::now() < deadline,
+            "{want} lock waiter(s) never appeared"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    Ok(())
+}
+
+/// A heartbeat `extend` already waiting on the row lock behind a delayed nack
+/// must not re-arm the nacked token. Dropping a Rust future does not cancel its
+/// SQL statement, so such an `extend` can outlive the call that issued it; once
+/// the nack commits it re-checks from its old snapshot, passes, and would set
+/// `vt = now + lease`: after the delay the nacked token would hold the message
+/// again. Two connections and an ordered lock queue make the interleaving
+/// deterministic: the lock holder releases only after the nack and then the
+/// extend are both parked on the row.
+#[tokio::test]
+#[ignore = "needs Docker: starts a parking-lot-pg container"]
+async fn pgmq_extend_in_flight_cannot_rearm_a_nacked_token() -> TestResult<()> {
+    use sqlx::Connection;
+
+    let pg = start().await?;
+    let queue = queue(&pg, "fence", 100).await?;
+    let _ = queue.enqueue(task(Priority::Normal, "t", None)).await?;
+    let leased = queue.lease(1, Duration::from_secs(60)).await?.remove(0);
+    let token = leased.token;
+    let msg_id = i64::try_from(token.entry().0)? / 4;
+
+    // Hold the message row so both statements park on it, in a known order.
+    let mut holder = sqlx::PgConnection::connect(&pg.url).await?;
+    sqlx::query("BEGIN").execute(&mut holder).await?;
+    sqlx::query("SELECT 1 FROM pgmq.q_pl_fence_p1 WHERE msg_id = $1 FOR UPDATE")
+        .bind(msg_id)
+        .execute(&mut holder)
+        .await?;
+
+    let nack = tokio::spawn({
+        let queue = queue.clone();
+        async move {
+            queue
+                .nack(token, NackAction::requeue_after(Duration::from_secs(2)))
+                .await
+        }
+    });
+    wait_for_lock_waiters(&pg.pool, 1).await?;
+    let extend = tokio::spawn({
+        let queue = queue.clone();
+        async move { queue.extend(token, Duration::from_secs(60)).await }
+    });
+    wait_for_lock_waiters(&pg.pool, 2).await?;
+    sqlx::query("ROLLBACK").execute(&mut holder).await?;
+
+    nack.await??;
+    let extended = extend.await?;
+    assert!(
+        matches!(extended, Err(SchedulerError::LeaseLost { .. })),
+        "an extend queued behind a nack must lose the lease: {extended:?}"
+    );
+
+    // After the delay the token must still be dead and the message deliverable.
+    tokio::time::sleep(Duration::from_millis(2500)).await;
+    let acked = queue.ack(token).await;
+    assert!(
+        matches!(acked, Err(SchedulerError::LeaseLost { .. })),
+        "the nacked token held the message again: {acked:?}"
+    );
+    let again = queue.lease(1, Duration::from_secs(30)).await?;
+    assert_eq!(again.len(), 1, "the nacked message is redelivered");
+    assert_eq!(again[0].attempt, 2);
+    Ok(())
+}
+
+/// A read error on a lower lane must not discard what higher lanes already
+/// leased in the same call: those messages are invisible until their leases
+/// run out, so dropping them would stall them for a whole lease. With nothing
+/// leased yet the error still surfaces.
+#[tokio::test]
+#[ignore = "needs Docker: starts a parking-lot-pg container"]
+async fn pgmq_lease_read_error_keeps_what_higher_lanes_leased() -> TestResult<()> {
+    let pg = start().await?;
+    let queue = queue(&pg, "partial", 100).await?;
+    let _ = queue
+        .enqueue(task(Priority::Critical, "urgent", None))
+        .await?;
+    // Lane 0 is read last; make its read fail.
+    sqlx::query("ALTER TABLE pgmq.q_pl_partial_p0 RENAME TO q_pl_partial_p0_broken")
+        .execute(&pg.pool)
+        .await?;
+
+    let leased = queue.lease(5, Duration::from_secs(30)).await?;
+    assert_eq!(
+        leased.len(),
+        1,
+        "the critical task was leased and must be returned"
+    );
+    assert_eq!(leased[0].task.payload, "urgent");
+
+    // Nothing left in the higher lanes: the lane-0 failure is reported.
+    let result = queue.lease(5, Duration::from_secs(30)).await;
+    assert!(
+        matches!(result, Err(SchedulerError::Backend { .. })),
+        "{result:?}"
+    );
+    Ok(())
+}
