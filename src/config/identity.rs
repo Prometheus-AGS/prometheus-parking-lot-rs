@@ -10,11 +10,11 @@ use super::backend::BackendConfig;
 use super::error::ConfigError;
 
 /// Longest pool or backend name, in bytes.
-pub(crate) const MAX_NAME_LEN: usize = 64;
+pub const MAX_NAME_LEN: usize = 64;
 
 /// The dotted path of the section called `name` under `section`: `pools.p`,
 /// or `pools[""]` when the name could not stand in a dotted path.
-pub(crate) fn section_path(section: &str, name: &str) -> String {
+pub fn section_path(section: &str, name: &str) -> String {
     if is_valid_name(name) {
         format!("{section}.{name}")
     } else {
@@ -35,7 +35,7 @@ fn is_valid_name(name: &str) -> bool {
 ///
 /// Names label logs and hook events and appear in the dotted paths of errors,
 /// where a `.` would make a path ambiguous.
-pub(crate) fn validate_name(section: &str, name: &str) -> Result<(), ConfigError> {
+pub fn validate_name(section: &str, name: &str) -> Result<(), ConfigError> {
     if is_valid_name(name) {
         return Ok(());
     }
@@ -61,7 +61,7 @@ pub(crate) fn validate_name(section: &str, name: &str) -> Result<(), ConfigError
 /// its IP address, or two hosts in front of one database; opening such a pair
 /// is not caught here (redb refuses to open one file twice, and two Postgres
 /// handles on one queue share its leases).
-pub(crate) fn physical_queue(backend: &BackendConfig) -> Option<(String, &'static str)> {
+pub fn physical_queue(backend: &BackendConfig) -> Option<(String, &'static str)> {
     match backend {
         BackendConfig::Redb(cfg) => Some((format!("redb\0{}", normalize_path(&cfg.path)), "path")),
         BackendConfig::Postgres(cfg) => Some((
