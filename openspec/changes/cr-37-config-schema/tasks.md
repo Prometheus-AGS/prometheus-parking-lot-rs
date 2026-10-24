@@ -2,6 +2,6 @@ Model and worker assignments for these tasks: `.kbd-orchestrator/phases/phase-co
 
 ## 1. Config schema carrying backend parameters and a real build_pools_from_scheduler_config
 
-- [ ] 1.1 Config types + validation + builder
-- [ ] 1.2 Doc-example deserialization tests
+- [x] 1.1 Config types + validation + builder
+- [x] 1.2 Doc-example deserialization tests
 - [ ] 1.3 Independent review at the merge gate (schema strictness)

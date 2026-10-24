@@ -2,6 +2,6 @@ Model and worker assignments for these tasks: `.kbd-orchestrator/phases/phase-co
 
 ## 1. Mobile (UniFFI) bindings and desktop (Tauri) integration
 
-- [ ] 1.1 UniFFI crate over the embedded backend; generated bindings
-- [ ] 1.2 Android/iOS check jobs; Tauri example with restart test
+- [x] 1.1 UniFFI crate over the embedded backend; generated bindings
+- [x] 1.2 Android/iOS check jobs; Tauri example with restart test
 - [ ] 1.3 Independent review at the merge gate (FFI safety (crate denies unsafe outside generated code))

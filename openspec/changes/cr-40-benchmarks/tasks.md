@@ -2,6 +2,6 @@ Model and worker assignments for these tasks: `.kbd-orchestrator/phases/phase-co
 
 ## 1. CI-reproducible benchmarks and published numbers
 
-- [ ] 1.1 Criterion suites (throughput, latency, utilization)
-- [ ] 1.2 Bench CI job and ARCHITECTURE.md numbers (tech-lead)
+- [x] 1.1 Criterion suites (throughput, latency, utilization)
+- [x] 1.2 Bench CI job and ARCHITECTURE.md numbers (tech-lead)
 - [ ] 1.3 Independent review at the merge gate (benchmark validity)
