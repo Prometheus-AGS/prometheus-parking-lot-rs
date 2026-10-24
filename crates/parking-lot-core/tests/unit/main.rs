@@ -6,4 +6,5 @@
 mod audit_test;
 mod error_test;
 mod mailbox_test;
+mod review_test;
 mod util_test;

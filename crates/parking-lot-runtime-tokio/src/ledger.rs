@@ -44,9 +44,11 @@ use crate::shutdown::ShutdownReport;
 /// Accepted, settled and cancelled task counts for one pool.
 #[derive(Debug, Default)]
 pub struct Ledger {
-    /// Accepted and not yet settled (durable pool: leased in this process,
-    /// plus the dispatcher itself while it runs).
+    /// Accepted and not yet settled (durable pool: leased in this process).
     in_flight: AtomicU64,
+    /// Pool machinery a shutdown also waits for but that is not a task (the
+    /// durable pool's dispatcher while it runs); never reported.
+    background: AtomicU64,
     /// Cancelled tasks handed to the sink whose answer is still pending.
     capturing: AtomicU64,
     /// Tasks that reached their own outcome (success, failure, expiry).
@@ -123,7 +125,9 @@ impl Ledger {
         self.poke();
     }
 
-    /// A cancelled durable task was handed back to its queue (nack, requeue).
+    /// A durable task was handed back to its queue (nack, requeue, or a lease
+    /// left to expire): cancelled at shutdown, too large for this process, or
+    /// its outcome could not be stored.
     pub fn requeued(&self) {
         self.requeued.fetch_add(1, Ordering::Relaxed);
         self.cancelled.fetch_add(1, Ordering::Relaxed);
@@ -139,6 +143,11 @@ impl Ledger {
 
     pub fn in_flight(&self) -> u64 {
         self.in_flight.load(Ordering::SeqCst)
+    }
+
+    /// Background work still running (see [`Background`]).
+    pub fn background(&self) -> u64 {
+        self.background.load(Ordering::SeqCst)
     }
 
     pub fn capturing(&self) -> u64 {
@@ -192,18 +201,61 @@ impl Ledger {
 
 /// One accepted task held by the durable pool; settles it when dropped
 /// (including by unwinding), so no path out of the pool can leave it counted.
-pub struct Held(Arc<Ledger>);
+///
+/// It is tallied when it settles, after its lease is resolved: as finished
+/// once [`finish`](Self::finish) marked it (its outcome is stored), and
+/// otherwise as requeued, because every other way out of the pool — a nack,
+/// or a lease left to expire — redelivers the task.
+pub struct Held {
+    ledger: Arc<Ledger>,
+    finished: bool,
+}
 
 impl Held {
     pub fn new(ledger: &Arc<Ledger>) -> Self {
         ledger.accept();
-        Self(Arc::clone(ledger))
+        Self {
+            ledger: Arc::clone(ledger),
+            finished: false,
+        }
+    }
+
+    /// The task reached its own outcome, which is stored, and its lease is
+    /// resolved: settle it as finished.
+    pub fn finish(mut self) {
+        self.finished = true;
     }
 }
 
 impl Drop for Held {
     fn drop(&mut self) {
-        self.0.settle(1);
+        // The tally first: a waiter that sees the settle sees it.
+        if self.finished {
+            self.ledger.finish(1);
+        } else {
+            self.ledger.requeued();
+        }
+        self.ledger.settle(1);
+    }
+}
+
+/// Counts pool machinery as background work until dropped (including by
+/// unwinding): a shutdown waits for it, but it is not a task, so it is never
+/// reported as `unsettled`.
+pub struct Background(Arc<Ledger>);
+
+impl Background {
+    pub fn new(ledger: &Arc<Ledger>) -> Self {
+        // SeqCst: the same store-then-load pairing as `in_flight`.
+        ledger.background.fetch_add(1, Ordering::SeqCst);
+        Self(Arc::clone(ledger))
+    }
+}
+
+impl Drop for Background {
+    fn drop(&mut self) {
+        self.0.background.fetch_sub(1, Ordering::SeqCst);
+        self.0.poke();
     }
 }
 

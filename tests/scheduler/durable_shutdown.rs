@@ -50,29 +50,45 @@ fn options() -> DurableOptions {
         .with_poll_interval(Duration::from_millis(50))
 }
 
-/// Phase one runs `long-*` for `long`, everything else at once; phase two
-/// (`long == ZERO`) runs everything at once. Counts the executions that
+/// Phase one holds `long-*` until the test releases them (never, under the
+/// policies that cancel), everything else runs at once; phase two
+/// (`gated == false`) runs everything at once. Counts the executions that
 /// returned.
+///
+/// The long tasks wait on an explicit release rather than a timer, so the
+/// start state (both long tasks running) cannot pass before the test sees
+/// it, however loaded the machine is.
 #[derive(Clone)]
 struct Executor {
-    long: Duration,
+    gated: bool,
+    release: Arc<tokio::sync::Semaphore>,
     returned: Arc<AtomicU32>,
 }
 
 impl Executor {
-    fn new(long: Duration) -> Self {
+    fn new(gated: bool) -> Self {
         Self {
-            long,
+            gated,
+            release: Arc::new(tokio::sync::Semaphore::new(0)),
             returned: Arc::new(AtomicU32::new(0)),
         }
+    }
+
+    /// Let the held long tasks return.
+    fn release_long_tasks(&self) {
+        self.release.add_permits(TASKS.len());
     }
 }
 
 #[async_trait]
 impl TaskExecutor<String, String> for Executor {
     async fn execute(&self, payload: String, _meta: TaskMetadata) -> Result<String, TaskError> {
-        if payload.starts_with("long") {
-            tokio::time::sleep(self.long).await;
+        if self.gated && payload.starts_with("long") {
+            self.release
+                .acquire()
+                .await
+                .expect("the release semaphore is never closed")
+                .forget();
         }
         self.returned.fetch_add(1, Ordering::SeqCst);
         Ok(format!("done:{payload}"))
@@ -114,7 +130,7 @@ struct PhaseOne {
 
 /// The first process: submit, shut down under `policy`, exit. Runs on its own
 /// thread and runtime so nothing of it survives into the restart.
-fn first_process<B: Backend>(backend: &Arc<B>, policy: ShutdownPolicy, long: Duration) -> PhaseOne {
+fn first_process<B: Backend>(backend: &Arc<B>, policy: ShutdownPolicy) -> PhaseOne {
     let backend = Arc::clone(backend);
     std::thread::spawn(move || {
         let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -124,7 +140,7 @@ fn first_process<B: Backend>(backend: &Arc<B>, policy: ShutdownPolicy, long: Dur
             .expect("first process runtime");
         let phase = runtime.block_on(async move {
             let (queue, mailbox) = backend.open().await;
-            let executor = Executor::new(long);
+            let executor = Executor::new(true);
             let pool = DurableResourcePool::start(
                 limits(3),
                 queue,
@@ -142,7 +158,7 @@ fn first_process<B: Backend>(backend: &Arc<B>, policy: ShutdownPolicy, long: Dur
             }
             // Both long tasks running and `big` leased, waiting for capacity.
             let pool_ref = &pool;
-            let settled = eventually(Duration::from_secs(20), || async move {
+            let settled = eventually(Duration::from_secs(120), || async move {
                 let depth = pool_ref.queue().depth().await.expect("depth");
                 (pool_ref.running_tasks() == 2 && depth.leased == 3).then_some(())
             })
@@ -155,10 +171,11 @@ fn first_process<B: Backend>(backend: &Arc<B>, policy: ShutdownPolicy, long: Dur
                     report.unsettled, 2,
                     "the long tasks outlive the drain: {report:?}"
                 );
-                // A second call waits for them.
+                // They finish now; a second call waits for them.
+                executor.release_long_tasks();
                 let rest = pool
                     .shutdown_with(ShutdownPolicy::Drain {
-                        deadline: Duration::from_secs(30),
+                        deadline: Duration::from_secs(120),
                     })
                     .await;
                 assert_eq!(rest.unsettled, 0, "{rest:?}");
@@ -183,7 +200,7 @@ fn first_process<B: Backend>(backend: &Arc<B>, policy: ShutdownPolicy, long: Dur
 /// the first one did not complete; exactly one result per task.
 async fn restart_and_check<B: Backend>(backend: &B, first: &PhaseOne) {
     let (queue, mailbox) = backend.open().await;
-    let executor = Executor::new(Duration::ZERO);
+    let executor = Executor::new(false);
     let pool = DurableResourcePool::start(
         limits(3),
         queue,
@@ -197,7 +214,7 @@ async fn restart_and_check<B: Backend>(backend: &B, first: &PhaseOne) {
     for name in TASKS {
         let key = key(name);
         let key_ref = &key;
-        let entry = eventually(LEASE + Duration::from_secs(30), || async move {
+        let entry = eventually(LEASE + Duration::from_secs(120), || async move {
             pool_ref.mailbox().consume(key_ref).await.expect("consume")
         })
         .await
@@ -205,7 +222,7 @@ async fn restart_and_check<B: Backend>(backend: &B, first: &PhaseOne) {
         assert_eq!(entry.status, TaskStatus::Completed, "{name}");
         assert_eq!(entry.payload, Some(format!("done:{name}")), "{name}");
     }
-    let drained = eventually(Duration::from_secs(10), || async move {
+    let drained = eventually(Duration::from_secs(60), || async move {
         let depth = pool_ref.queue().depth().await.expect("depth");
         (depth.live() == 0).then_some(depth)
     })
@@ -264,16 +281,11 @@ fn assert_first_report(policy: &ShutdownPolicy, first: &PhaseOne) {
 }
 
 async fn shut_down_and_restart<B: Backend>(backend: B, policy: ShutdownPolicy) {
-    let long = if policy.cancels_stragglers() {
-        Duration::from_secs(600)
-    } else {
-        Duration::from_millis(1_500)
-    };
     let backend = Arc::new(backend);
     let first = {
         let backend = Arc::clone(&backend);
         let policy = policy.clone();
-        tokio::task::spawn_blocking(move || first_process(&backend, policy, long))
+        tokio::task::spawn_blocking(move || first_process(&backend, policy))
             .await
             .expect("first process")
     };

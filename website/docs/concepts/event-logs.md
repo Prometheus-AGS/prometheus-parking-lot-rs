@@ -111,11 +111,15 @@ sequenceDiagram
   emits lifecycle events through its `HookBus` (cr-31): `Submitted`, then
   `Queued` if the task parks, `Started` if it runs, and exactly one terminal
   event (`Completed`, `Failed`, `Rejected`, `Cancelled`, `Expired` or
-  `Requeued`). Hooks run on a background delivery thread fed by a bounded
+  `Requeued`). For `DurableResourcePool` that is one terminal event per run:
+  a run that ends in `Requeued` is followed by the task's next run. Hooks run on a background delivery thread fed by a bounded
   queue, so a slow or panicking hook never stalls dispatch; when the queue is
   full, events are dropped and counted (`HookBus::dropped_events`). With no
   hook registered, emission is one atomic load and a branch. The WASM pool
-  emits the same events (cr-53), calling its hooks inline.
+  emits the same events (cr-53), calling its hooks inline: there a slow hook
+  stalls the pool, `Queued` is delivered under the dispatch lock (a hook must
+  not call back into the pool) and a panicking hook aborts the module. Tasks
+  removed by `prune_expired` emit no terminal event (issue #57).
 - The place a notifier plugs in exists: `StorageMailbox<S, N>` (cr-34) stores a
   result first and then hands it to a `Notifier` off the delivery path, with
   bounded retries. `NoopNotifier` sends nothing; `IggyNotifier` (below) is
@@ -125,8 +129,10 @@ sequenceDiagram
   `prometheus-parking-lot-iggy`), `IggyHook` publishes every lifecycle event to
   the `lifecycle` topic, partitioned by tenant (or by pool when no tenant is
   set), and `IggyNotifier` publishes `mailbox.ready` after a result is stored.
-  Message ids are UUIDv5 values derived from the idempotency key, so a retried
-  publish carries the same id. Both publish from a bounded background queue:
+  Message ids are UUIDv5 values: `mailbox.ready` derives from the idempotency
+  key (a result without one gets a distinct id), a lifecycle event gets its own,
+  so repeated task ids never collapse events; a retried publish carries the same
+  id. Both publish from a bounded background queue:
   `on_event` only enqueues, and when the server is slow or down the queue fills
   and further events are dropped and counted instead of delaying dispatch.
   Tested against a pinned `apache/iggy:0.9.0` server: a subscriber receives

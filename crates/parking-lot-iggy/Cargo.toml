@@ -4,6 +4,7 @@ description = "Apache Iggy lifecycle events and mailbox notifications for promet
 documentation = "https://docs.rs/prometheus-parking-lot-iggy"
 keywords = ["scheduler", "iggy", "events", "streaming", "ai"]
 categories = ["asynchronous", "network-programming"]
+readme = "README.md"
 include = ["/src/**", "/Cargo.toml", "/README.md", "/LICENSE*"]
 version.workspace = true
 edition.workspace = true

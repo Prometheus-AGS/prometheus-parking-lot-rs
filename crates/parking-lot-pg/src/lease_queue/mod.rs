@@ -77,6 +77,8 @@ type PgQuery = sqlx::query::Query<'static, sqlx::Postgres, sqlx::postgres::PgArg
 pub struct PgLeaseQueue<P> {
     pool: PgPool,
     queue_name: Arc<str>,
+    /// [`LeaseQueue::identity`]: `pg:<table>:<queue name>`.
+    identity: Arc<str>,
     max_depth: usize,
     max_attempts: Option<u32>,
     payload: PhantomData<fn() -> P>,
@@ -87,6 +89,7 @@ impl<P> Clone for PgLeaseQueue<P> {
         Self {
             pool: self.pool.clone(),
             queue_name: Arc::clone(&self.queue_name),
+            identity: Arc::clone(&self.identity),
             max_depth: self.max_depth,
             max_attempts: self.max_attempts,
             payload: PhantomData,
@@ -112,9 +115,11 @@ impl<P> PgLeaseQueue<P> {
     /// The schema must exist: call [`migrate`](Self::migrate) first.
     #[must_use]
     pub fn new(pool: PgPool, queue_name: impl Into<String>, max_depth: usize) -> Self {
+        let queue_name: Arc<str> = Arc::from(queue_name.into());
         Self {
             pool,
-            queue_name: Arc::from(queue_name.into()),
+            identity: Arc::from(format!("pg:{}:{queue_name}", self::sql::TABLE)),
+            queue_name,
             max_depth,
             max_attempts: None,
             payload: PhantomData,
@@ -387,6 +392,13 @@ where
 
     fn max_depth(&self) -> usize {
         self.max_depth
+    }
+
+    /// `pg:<table>:<queue name>`: entry ids come from the table's sequence.
+    /// Two databases with a queue of the same name have the same identity, so
+    /// do not deliver both into one mailbox without task idempotency keys.
+    fn identity(&self) -> &str {
+        &self.identity
     }
 }
 

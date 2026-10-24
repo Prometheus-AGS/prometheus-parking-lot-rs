@@ -57,6 +57,8 @@ enum Job {
     PanicWithBadPayload,
     /// Wait until two rendezvous jobs run at once, then return 0.
     Rendezvous,
+    /// Wait until the test opens the executor's gate, then return the number.
+    Gated(u64),
 }
 
 /// A panic payload whose destructor panics: the pool's executor containment
@@ -72,12 +74,14 @@ impl Drop for BadPayload {
 #[derive(Clone)]
 struct PanicExecutor {
     rendezvous: Arc<Barrier>,
+    gate: Arc<Notify>,
 }
 
 impl PanicExecutor {
     fn new() -> Self {
         Self {
             rendezvous: Arc::new(Barrier::new(2)),
+            gate: Arc::new(Notify::new()),
         }
     }
 
@@ -92,6 +96,10 @@ impl PanicExecutor {
             Job::Rendezvous => {
                 self.rendezvous.wait().await;
                 Ok(0)
+            }
+            Job::Gated(value) => {
+                self.gate.notified().await;
+                Ok(value)
             }
         }
     }
@@ -123,11 +131,13 @@ impl Spawn for TokioSpawner {
     }
 }
 
-/// A mailbox the test reads while the pool owns a clone of it.
+/// A mailbox the test reads while the pool owns a clone of it. Delivering
+/// for the key in `panic_on` panics (once).
 #[derive(Clone, Default)]
 struct SharedMailbox {
     inner: Arc<Mutex<InMemoryMailbox<u64>>>,
     delivered: Arc<Notify>,
+    panic_on: Arc<Mutex<Option<MailboxKey>>>,
 }
 
 impl Mailbox<u64> for SharedMailbox {
@@ -137,6 +147,11 @@ impl Mailbox<u64> for SharedMailbox {
         status: TaskStatus,
         payload: Option<u64>,
     ) -> Result<(), SchedulerError> {
+        let panics = {
+            let mut panic_on = self.panic_on.lock();
+            panic_on.as_ref() == Some(key) && panic_on.take().is_some()
+        };
+        assert!(!panics, "mailbox panicked delivering {key:?}");
         self.inner.lock().deliver(key, status, payload)?;
         self.delivered.notify_waiters();
         Ok(())
@@ -166,6 +181,10 @@ type Pool = ResourcePool<Job, u64, InMemoryQueue<Job>, SharedMailbox, PanicExecu
 
 /// A one-unit `ResourcePool`: one task runs at a time, the rest park.
 fn resource_pool(mailbox: &SharedMailbox) -> Pool {
+    resource_pool_with(mailbox, PanicExecutor::new())
+}
+
+fn resource_pool_with(mailbox: &SharedMailbox, executor: PanicExecutor) -> Pool {
     ResourcePool::new(
         PoolLimits {
             max_units: 1,
@@ -174,7 +193,7 @@ fn resource_pool(mailbox: &SharedMailbox) -> Pool {
         },
         InMemoryQueue::new(128),
         mailbox.clone(),
-        PanicExecutor::new(),
+        executor,
         TokioSpawner,
     )
 }
@@ -327,6 +346,38 @@ async fn panic_resource_pool_escaped_panic_wakes_parked_task() {
     assert_eq!(pool.queued_tasks(), 0);
     assert_eq!(pool.completed_tasks(), 1);
     assert_eq!(pool.failed_tasks(), 1);
+}
+
+/// A user `Mailbox` that panics while a completion delivers its outcome does
+/// not lose the task that completion woke: the woken task is started before
+/// the mailbox is called. (Not a `panic_` test: it does not depend on the
+/// executor containment, so the S-3 control does not apply to it.)
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn resource_pool_woken_task_survives_a_mailbox_that_panics() {
+    let mailbox = SharedMailbox::default();
+    *mailbox.panic_on.lock() = Some(key(1));
+    let executor = PanicExecutor::new();
+    let pool = resource_pool_with(&mailbox, executor.clone());
+
+    // 1 holds the only unit until the gate opens; 2 parks behind it.
+    assert_eq!(
+        pool.submit(task(1, Job::Gated(1))).await.expect("accepted"),
+        TaskStatus::Running
+    );
+    pool.submit(task(2, Job::Echo(2))).await.expect("accepted");
+    assert_eq!(pool.queued_tasks(), 1);
+    executor.gate.notify_one();
+
+    // 1's completion wakes 2, then panics in the mailbox: 2 must still run.
+    let (status, payload) = mailbox.take(&key(2), Instant::now() + WAIT).await;
+    assert_eq!(status, TaskStatus::Completed);
+    assert_eq!(payload, Some(2));
+    assert_eq!(pool.queued_tasks(), 0);
+    let idle = Instant::now() + WAIT;
+    while pool.active_units() != 0 {
+        assert!(Instant::now() < idle, "capacity leaked");
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
 }
 
 // ── native WorkerPool ───────────────────────────────────────────────────────

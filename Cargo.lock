@@ -2738,7 +2738,7 @@ dependencies = [
 
 [[package]]
 name = "prometheus-parking-lot-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2754,7 +2754,7 @@ dependencies = [
 
 [[package]]
 name = "prometheus-parking-lot-embedded"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "prometheus-parking-lot-core",
  "prometheus-parking-lot-embedded",
@@ -2767,7 +2767,7 @@ dependencies = [
 
 [[package]]
 name = "prometheus-parking-lot-ffi"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "prometheus-parking-lot-core",
  "prometheus-parking-lot-embedded",
@@ -2779,7 +2779,7 @@ dependencies = [
 
 [[package]]
 name = "prometheus-parking-lot-iggy"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "iggy",
  "prometheus-parking-lot-core",
@@ -2793,7 +2793,7 @@ dependencies = [
 
 [[package]]
 name = "prometheus-parking-lot-pg"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "prometheus-parking-lot-core",
  "serde",
@@ -2806,7 +2806,7 @@ dependencies = [
 
 [[package]]
 name = "prometheus-parking-lot-runtime-tokio"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "crossbeam-channel",
@@ -2825,7 +2825,7 @@ dependencies = [
 
 [[package]]
 name = "prometheus-parking-lot-wasm"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "futures-channel",
@@ -2840,7 +2840,7 @@ dependencies = [
 
 [[package]]
 name = "prometheus_parking_lot"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "criterion",

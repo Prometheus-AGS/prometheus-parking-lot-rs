@@ -20,6 +20,10 @@ pub trait TaskQueue<P> {
     fn dequeue(&mut self) -> Result<Option<ScheduledTask<P>>, SchedulerError>;
     /// Remove expired tasks and return count.
     ///
+    /// A task is expired once `now_ms` is past its `deadline_ms`
+    /// (`now_ms > deadline_ms`); at its deadline it is still live. This is
+    /// the rule the dispatcher applies (`Ticket::is_expired`).
+    ///
     /// # Errors
     ///
     /// Returns an error when the backend fails to remove expired tasks.

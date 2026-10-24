@@ -4,6 +4,7 @@ description = "Postgres lease queue and result mailbox backends for prometheus_p
 documentation = "https://docs.rs/prometheus-parking-lot-pg"
 keywords = ["scheduler", "queue", "postgres", "ai"]
 categories = ["asynchronous", "database"]
+readme = "README.md"
 include = ["/src/**", "/migrations/**", "/Cargo.toml", "/README.md", "/LICENSE*"]
 version.workspace = true
 edition.workspace = true

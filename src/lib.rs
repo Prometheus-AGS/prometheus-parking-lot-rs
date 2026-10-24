@@ -23,7 +23,9 @@
 //! - **Worker Thread Pool**: Dedicated OS threads for CPU/GPU-bound work (native) or async tasks (WASM)
 //! - **Persistent Queues**: Survive application restarts
 //! - **Mailbox System**: Store results for later retrieval when clients disconnect
-//! - **Multi-Environment**: Same code runs on desktop (Tauri), cloud, and web (WASM)
+//! - **Multi-Environment**: Same code runs on desktop (Tauri), cloud, and web (WASM; on
+//!   `wasm32-unknown-unknown` depend on this crate with `default-features = false`, because the
+//!   default `tokio-runtime` feature does not build for that target)
 //!
 //! ## `WorkerPool` - Thread Pool for CPU/GPU-Bound Work
 //!

@@ -52,7 +52,9 @@ use crate::contracts::task::ScheduledTask;
 ///
 /// Distinct from [`TaskMetadata::id`](crate::contracts::TaskMetadata), which a
 /// pool generates per process and which is not unique across restarts. A
-/// backend's ids are unique within that queue for as long as the entry exists.
+/// backend's ids are unique within that queue for as long as the entry exists;
+/// [`LeaseQueue::identity`] names the queue, so the pair is unique across
+/// queues.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct QueueEntryId(pub u64);
@@ -337,6 +339,34 @@ pub trait LeaseQueue<P: Send>: Send + Sync {
     /// Maximum number of live (ready, delayed or leased) entries `enqueue`
     /// accepts.
     fn max_depth(&self) -> usize;
+
+    /// A stable name for the queue this handle reads and writes, which
+    /// qualifies its [`QueueEntryId`]s.
+    ///
+    /// Entry ids are unique only within one queue, so a consumer that keys
+    /// anything on an entry id (a durable pool keys each result's idempotency
+    /// key as `"<identity>:entry:<entry id>"`) qualifies it with this name.
+    /// The identity must be:
+    ///
+    /// - **the same** for every handle on the same queue, in every process
+    ///   and across restarts, for as long as the queue exists, so every
+    ///   redelivery of an entry is recognised whoever consumes it;
+    /// - **different** for any two queues whose entry ids could repeat, so
+    ///   results of two queues that share one mailbox never collide.
+    ///
+    /// It does not depend on how a consumer names itself. The built-in
+    /// backends use `in-memory:<process nonce>:<instance>` (one identity per
+    /// `InMemoryLeaseQueue` value), `pg:<table>:<queue name>`,
+    /// `pgmq:<queue name>` and `redb:<store id>` (an id generated when the
+    /// database file is created and stored in it).
+    ///
+    /// **Limit:** a queue that is dropped and recreated under the same
+    /// identity (a Postgres table or pgmq queue recreated, so its id sequence
+    /// restarts) can hand out an entry id again; a mailbox that still
+    /// remembers the old entry's key would then treat the new entry's result
+    /// as a duplicate. Recreate the mailbox with the queue, or set
+    /// [`idempotency_key`](crate::contracts::TaskMetadata) on every task.
+    fn identity(&self) -> &str;
 }
 
 #[cfg(test)]

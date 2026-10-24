@@ -21,6 +21,7 @@ use tokio::sync::{mpsc, oneshot};
 use tokio::task::JoinHandle;
 
 use crate::options::IggyOptions;
+use crate::stream::partition_for;
 
 /// Longest partition key Iggy accepts, in bytes.
 const MAX_KEY_LEN: usize = 255;
@@ -33,9 +34,14 @@ pub struct Envelope {
     pub(crate) key: String,
     /// JSON payload.
     pub(crate) payload: Vec<u8>,
-    /// Explicit partition; when set it overrides the key hash (stream replay
-    /// needs a reader to know which partition holds a stream).
-    pub(crate) partition: Option<u32>,
+    /// Choose the partition by [`crate::stream::partition_for`] over the
+    /// topic's real partition count instead of the server's key hash (stream
+    /// replay needs a reader to know which partition holds a stream).
+    pub(crate) by_stream_hash: bool,
+    /// Skip this message when its id was published recently. Off for messages
+    /// whose id is not a stable function of their content (lifecycle events),
+    /// where a repeated id would silently drop a real event.
+    pub(crate) dedup: bool,
     /// Set by the worker when the message is abandoned; a message whose flag is
     /// already set is skipped, so a stream never publishes past a gap.
     pub(crate) poison: Option<Arc<AtomicBool>>,
@@ -47,9 +53,16 @@ impl Envelope {
             id,
             key,
             payload,
-            partition: None,
+            by_stream_hash: false,
+            dedup: true,
             poison: None,
         }
+    }
+
+    /// Never skip this message as a repeat.
+    pub(crate) const fn without_dedup(mut self) -> Self {
+        self.dedup = false;
+        self
     }
 }
 
@@ -220,6 +233,8 @@ impl Drop for Publisher {
 struct Connection {
     _client: IggyClient,
     producer: IggyProducer,
+    /// The topic's real partition count, read from the server.
+    partitions: u32,
 }
 
 struct Worker {
@@ -256,7 +271,7 @@ impl Worker {
             self.counters.failed.fetch_add(1, Ordering::Relaxed);
             return;
         }
-        if self.recent.contains(envelope.id) {
+        if envelope.dedup && self.recent.contains(envelope.id) {
             self.counters.deduplicated.fetch_add(1, Ordering::Relaxed);
             return;
         }
@@ -267,7 +282,9 @@ impl Worker {
             let error = match outcome {
                 Ok(Ok(())) => {
                     self.counters.published.fetch_add(1, Ordering::Relaxed);
-                    self.recent.insert(envelope.id);
+                    if envelope.dedup {
+                        self.recent.insert(envelope.id);
+                    }
                     return;
                 }
                 Ok(Err(error)) => error,
@@ -303,8 +320,8 @@ impl Worker {
             .payload(envelope.payload.clone().into())
             .build()
             .map_err(|e| e.to_string())?;
-        let partitioning = if let Some(partition) = envelope.partition {
-            Partitioning::partition_id(partition)
+        let partitioning = if envelope.by_stream_hash {
+            Partitioning::partition_id(partition_for(&envelope.key, connection.partitions))
         } else {
             let mut key = envelope.key.as_bytes();
             key = &key[..key.len().min(MAX_KEY_LEN)];
@@ -329,16 +346,40 @@ impl Worker {
             .create_stream_if_not_exists()
             .create_topic_if_not_exists(
                 self.options.partitions,
-                IggyExpiry::NeverExpire,
+                self.options
+                    .retention
+                    .map_or(IggyExpiry::NeverExpire, |keep| {
+                        IggyExpiry::ExpireDuration(keep.into())
+                    }),
                 MaxTopicSize::ServerDefault,
             )
             .build();
         producer.init().await.map_err(|e| e.to_string())?;
+        let partitions = topic_partitions(&client, &self.options.stream, &self.topic)
+            .await
+            .map_err(|e| e.to_string())?
+            .unwrap_or(self.options.partitions);
         Ok(Connection {
             _client: client,
             producer,
+            partitions,
         })
     }
+}
+
+/// The partition count the server reports for `topic`, `None` when the topic
+/// cannot be found.
+pub async fn topic_partitions(
+    client: &IggyClient,
+    stream: &str,
+    topic: &str,
+) -> Result<Option<u32>, iggy::prelude::IggyError> {
+    use iggy::prelude::{Identifier, TopicClient};
+
+    let stream = Identifier::from_str_value(stream)?;
+    let topic = Identifier::from_str_value(topic)?;
+    let details = client.get_topic(&stream, &topic).await?;
+    Ok(details.map(|t| t.partitions_count.max(1)))
 }
 
 /// A bounded window of recently published ids.

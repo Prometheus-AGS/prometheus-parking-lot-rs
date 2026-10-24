@@ -4,9 +4,9 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use prometheus_parking_lot_core::{HookBus, ResourceKind, SchedulerError};
+use prometheus_parking_lot_core::{HookBus, PoolLimits, ResourceKind, SchedulerError};
 
-/// Pool name used in errors and in the fallback result idempotency key.
+/// Pool name used in errors, logs and lifecycle events.
 pub(super) const DEFAULT_NAME: &str = "resource_pool";
 
 /// Default interval between two `lease` calls while the queue is empty.
@@ -35,6 +35,7 @@ pub struct DurableOptions {
     name: String,
     hooks: HookBus,
     resource_limits: BTreeMap<ResourceKind, u32>,
+    max_running: Option<u32>,
 }
 
 impl DurableOptions {
@@ -51,6 +52,7 @@ impl DurableOptions {
             name: DEFAULT_NAME.to_owned(),
             hooks: HookBus::new(),
             resource_limits: BTreeMap::new(),
+            max_running: None,
         }
     }
 
@@ -81,9 +83,14 @@ impl DurableOptions {
         self
     }
 
-    /// Name the pool (errors, logs and the fallback result idempotency key
-    /// `"<name>:entry:<queue entry id>"`). Give every pool that delivers into
-    /// one mailbox its own name.
+    /// Name the pool in errors, logs and lifecycle events.
+    ///
+    /// The name plays no part in exactly-one-result: a result delivered
+    /// without a task idempotency key is keyed by the queue's identity and
+    /// the entry (`"<queue identity>:entry:<entry id>"`, see
+    /// [`LeaseQueue::identity`](prometheus_parking_lot_core::LeaseQueue::identity)),
+    /// so any number of pools, named alike or not, can consume one queue, and
+    /// pools on different queues can share one mailbox.
     #[must_use]
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = name.into();
@@ -108,6 +115,29 @@ impl DurableOptions {
     pub fn with_resource_limit(mut self, kind: ResourceKind, limit: u32) -> Self {
         self.resource_limits.insert(kind, limit);
         self
+    }
+
+    /// Run at most `max` tasks at once, whatever their cost. Units bound the
+    /// tasks that cost something; this bound also holds for zero-cost tasks,
+    /// which take no unit. Defaults to the pool's `max_units` (at least 1), so
+    /// a zero-cost task counts like a one-unit task. Must be greater than
+    /// zero.
+    #[must_use]
+    pub const fn with_max_running(mut self, max: u32) -> Self {
+        self.max_running = Some(max);
+        self
+    }
+
+    /// The bound set with [`with_max_running`](Self::with_max_running), if
+    /// any.
+    #[must_use]
+    pub const fn max_running(&self) -> Option<u32> {
+        self.max_running
+    }
+
+    /// The running-task bound in effect for a pool with `limits`.
+    pub(super) fn max_running_for(&self, limits: &PoolLimits) -> u32 {
+        self.max_running.unwrap_or_else(|| limits.max_units.max(1))
     }
 
     /// The per-kind limits, in `ResourceKind` order.
@@ -171,6 +201,11 @@ impl DurableOptions {
                 "durable pool: the poll interval must be greater than zero",
             ));
         }
+        if self.max_running == Some(0) {
+            return Err(SchedulerError::invalid_config(
+                "durable pool: the running-task bound must be greater than zero",
+            ));
+        }
         if self.name.trim().is_empty() {
             return Err(SchedulerError::invalid_config(
                 "durable pool: the name must not be empty",
@@ -205,6 +240,12 @@ mod tests {
         assert!(
             DurableOptions::new(Duration::from_secs(3))
                 .with_name(" ")
+                .validate()
+                .is_err()
+        );
+        assert!(
+            DurableOptions::new(Duration::from_secs(3))
+                .with_max_running(0)
                 .validate()
                 .is_err()
         );

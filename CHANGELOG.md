@@ -13,6 +13,32 @@ entry names the OpenSpec change that made it.
 
 ### Changed (breaking)
 
+- **`LeaseQueue::identity` (0.3.0 gate review, C1).** `LeaseQueue` has a new
+  required method, `fn identity(&self) -> &str`: a stable name for the queue,
+  the same in every process and across restarts, that qualifies its entry ids.
+  The built-in backends return `in-memory:<process nonce>:<instance>`,
+  `pg:pl_lease_queue:<queue name>`, `pgmq:<queue name>` and `redb:<store id>`
+  (a random id generated when the file is first opened and stored in it).
+  Custom queues and queue wrappers must implement it (wrappers forward it).
+  The backend conformance suite checks it
+  (`identity_is_stable_and_distinct`).
+- **Durable result keys (C1).** A `DurableResourcePool` result delivered
+  without a task idempotency key is keyed `"<queue identity>:entry:<entry
+  id>"` instead of `"<pool name>:entry:<entry id>"`. `DurableOptions::with_name`
+  now names the pool in logs, errors and events only. Pre-release users:
+  drain durable queues before upgrading, or a task in flight across the
+  upgrade can deliver a second result under the new key.
+- **Durable lifecycle events (W2).** `DurableResourcePool` emits one terminal
+  event per run, not per task: a run that ends in `Requeued` is followed by
+  the task's next run. An enqueue that fails with an unknown outcome (a
+  backend error) no longer emits `Rejected`, because the task may have been
+  stored and may run; definite refusals (`QueueFull`, `CapacityExceeded`,
+  `DeadlineExpired`, `PoolShutdown`, `InvalidConfig`) still do.
+- **Durable oversize tasks (W4).** A leased task too large for this pool is
+  handed back (`nack`, requeued after one lease duration) instead of being
+  delivered as `Dropped` and dead-lettered, so a consumer with more capacity
+  can run it. It emits `Requeued`, not `Rejected`.
+
 - **Workspace split (cr-48).** The crate is now a workspace: the facade
   `prometheus_parking_lot` re-exports `prometheus-parking-lot-core`,
   `-runtime-tokio`, `-pg`, `-embedded` and `-wasm` under the paths 0.2 used
@@ -159,6 +185,24 @@ entry names the OpenSpec change that made it.
   `PoolShutdown` from such a pool, its lifecycle events and its cancellation
   log now carry that name instead of `resource_pool`. In the core crate,
   `Dispatcher::pool_name` and `Dispatcher::set_pool_name` are new.
+- **`RejectionReason::CapacityExceeded` names the dimension (cr-23).** It is
+  now `CapacityExceeded { kind: Option<ResourceKind> }`: the limited kind the
+  task exceeded, or `None` for the pool's total, the same dimension as
+  `SchedulerError::CapacityExceeded`. Every pool (`ResourcePool`, the native
+  and WASM `WorkerPool`s, `DurableResourcePool`) fills it in its `Rejected`
+  event. Match it with `CapacityExceeded { .. }`.
+- **Resource limits are set before the first submission (core).**
+  `Dispatcher::set_resource_limit` now returns `InvalidConfig` once anything
+  has been submitted (it used to check only for outstanding permits, so an
+  item already parked could end up over the new limit and block the queue
+  for good). `ResourcePool::with_resource_limit` and `with_name` panic after
+  the first `submit`, as documented, even once the pool is idle again: the
+  pool's state is shared from then on.
+- **A zero-permit semaphore is refused (core).** `Dispatcher::submit` returns
+  `SchedulerError::InvalidConfig` when its semaphore admits no permit
+  (`UnitSemaphore::with_max_permits(_, 0)`) instead of parking every item
+  forever. The pools already reject `worker_count == 0` in their
+  configuration.
 
 ### Added
 
@@ -171,6 +215,11 @@ entry names the OpenSpec change that made it.
   are counted (`lost()`) and logged, and `shutdown().await` drains the queue.
   `payload` is `TEXT` (the old, never-applied DDL said `JSONB`). Needs a Tokio
   runtime.
+- **Iggy topic retention (review W5).** `IggyOptions::with_retention` and
+  `"retention_secs"` in the `iggy` backend section set the expiry of topics the
+  crate creates. The default is unchanged (never expire), so operators must size
+  the server's disk or set it.
+
 - **`RedbLeaseQueue::with_max_attempts` and `max_attempts` in the `redb`
   backend section.** A task is delivered exactly that many times, then the next
   lease dead-letters it with the reason `max attempts (N) exhausted`, the same
@@ -280,11 +329,22 @@ entry names the OpenSpec change that made it.
   `"type": "iggy"` (`config::IggyBackendConfig`, example
   `examples/configs/iggy.json`); `LifecycleEvent::pool()` is new in core.
 
+- **Release hook for dropped permits (core).** `Dispatcher::install_release_hook`
+  and `has_release_hook`: a permit dropped other than through
+  `Dispatcher::complete` (a dropped `Grant`, `Dispatched` or `Admission`, or a
+  task future the spawner discarded) returns its units and then calls the
+  hook, which should schedule a `Dispatcher::poke`. `ResourcePool` and
+  `DurableResourcePool` install one that spawns the poke through their
+  spawner. `ParkedQueue::supports_skip_ahead` (default `false`) tells the
+  dispatcher a queue implements `fitting`/`take`; `PriorityQueue` and
+  `TaskQueueAdapter` return `true`.
 - **Lifecycle events (cr-31, scenario S-21).** `ResourcePool`, the native
   `WorkerPool` and `DurableResourcePool` emit `Submitted`, `Queued`,
   `Started` and exactly one terminal event per task (`Completed`, `Failed`,
   `Rejected`, `Cancelled`, `Expired`, or `Requeued` for a durable task handed
-  back to its queue), in that causal order for every observer. Register hooks
+  back to its queue), in that causal order for every observer. For
+  `DurableResourcePool` the guarantee is one terminal event per run: a run
+  ending in `Requeued` is followed by the task's next run. Register hooks
   with `ResourcePool::with_hook`/`WorkerPool::with_hook` (or on `hooks()`),
   `DurableOptions::with_hooks`, or
   `build_pools_from_scheduler_config_with_hooks`. Emission never blocks the
@@ -335,9 +395,10 @@ entry names the OpenSpec change that made it.
   leased task is heartbeated with `extend` (every third of the lease by
   default) until its lease is resolved, so a task that runs longer than the
   lease is not redelivered. The outcome is delivered to the mailbox with an
-  idempotency key (the task's own key, or `"<pool name>:entry:<queue entry
-  id>"`), and only then is the lease acked (success) or dead-lettered (executor
-  error, panic, timeout, expired deadline, cost above capacity). A process
+  idempotency key (the task's own key, or `"<queue identity>:entry:<queue
+  entry id>"`), and only then is the lease acked (success) or dead-lettered
+  (executor error, panic, timeout, expired deadline); a task too large for the
+  pool is requeued for another consumer. A process
   killed at any point leaves the task leased; it is redelivered after the lease
   expires and the first-write-wins mailbox keeps exactly one result. A lost
   lease does not cancel the running execution; its delivery is deduplicated.
@@ -541,6 +602,88 @@ entry names the OpenSpec change that made it.
 
 ### Fixed
 
+- **Iggy personal access token printed by `Debug` (review C3).** A connection
+  string `iggy://<token>@host:8090` (one credential, no colon) is now masked
+  whole in `IggyOptions` and `IggyBackendConfig` `Debug`. Before, only userinfo
+  with a colon was masked, so the token was printed in full.
+- **`?password=` in a Postgres URL printed by `Debug` (review W2).** The value
+  of any `password` query parameter is masked in `PostgresBackendConfig` and
+  `PgmqBackendConfig` `Debug`.
+- **Iggy message ids collided when task ids repeat (review W1).** Task ids are
+  caller-supplied (the README uses 0 for every task), so lifecycle ids built
+  from pool, kind, task id and millisecond collided, and the publisher's repeat
+  window dropped real events as "deduplicated". A lifecycle event now has its own
+  id and bypasses the window; a `mailbox.ready` without an idempotency key gets a
+  distinct id per notification. `TaskMetadata.id` is documented as caller-supplied.
+- **Iggy streams assumed the configured partition count (review W3).** A stream
+  topic that already existed with another count made writes fail and readers wait
+  forever. The sink and reader now read the topic's real partition count.
+- **An invalid Iggy `connection_string` loaded and then lost every event (review
+  W7).** It is now parsed with the Iggy client's parser during validation.
+- **Docs overclaimed the stream offset hint (review W4)**: a hint past the end
+  of a stream waits instead of reporting an error. `streaming-replay.md` and the
+  `stream` module say so.
+- **`QueueFull` no longer refuses work that can start now (cr-20).** With
+  `max_queue_depth` tasks parked, a submission that would start at once is
+  admitted instead of refused: one with a strictly higher priority than the
+  parked head that fits, or one that fits beside a blocked head while the
+  starvation guard still allows a skip (it counts as a skip). Priority order
+  and the `max_head_skips` bound are unchanged; a task that would have to
+  wait still gets `QueueFull`.
+- **A dropped grant no longer strands parked work.** A permit returned other
+  than through `Dispatcher::complete` freed its units but drained nothing, so
+  parked work it would admit waited for the next submission or completion,
+  possibly forever (for example after a spawner discarded a task future).
+  It now calls the dispatcher's release hook (see Added), which the tokio
+  pools use to poke; the native and WASM `WorkerPool`s return every permit
+  through `complete` or poke after a panic.
+- **A cost whose units overflow is rejected.** A `ResourceCost` whose
+  per-kind units sum past `u32::MAX` (its total saturates) was admitted by a
+  pool of `u32::MAX` units; it is now `CapacityExceeded` (`kind: None`).
+- **The drain cannot spin on a vanishing head.** If a `ParkedQueue` reported
+  an expired head and then could not pop it, the drain looped forever; it now
+  stops, as it already did for a head that fits.
+- **`BackgroundNotifier::with_policy` always applies.** It was silently
+  ignored once a dispatched notification still held the notifier's shared
+  state; the policy now applies to every notification dispatched after the
+  call.
+- **One deadline rule.** `InMemoryQueue::prune_expired` removed a task whose
+  deadline equalled `now`, while the dispatcher (`Ticket::is_expired`) and the
+  pools treat it as live until `now > deadline`. It now keeps it, and
+  `TaskQueue::prune_expired` and `TaskMetadata::deadline_ms` document the rule.
+- **Documentation.** The hook docs no longer promise isolation on `wasm32`:
+  there, hooks run inline on the scheduling path (`Queued` under the dispatch
+  lock, so a hook must not call back into the pool) and a panicking hook
+  aborts the module. The event-sequence docs now say that tasks removed by
+  `prune_expired` emit no terminal event (issue #57, 0.4.0). The
+  `loom_skip_ahead` model now asserts the starvation bound itself
+  (`skipped <= max_head_skips`) and that the guard engaged, and fails under
+  the S-20 negative control.
+- **Durable exactly-one-result no longer depends on pool names (C1).**
+  Differently named pools consuming one queue stored a second result when a
+  consumer died between delivery and ack, and pools on different queues
+  sharing one mailbox dropped each other's results as duplicates (entry ids
+  repeat across queues). Results are now keyed by the queue's identity.
+  Tested by `durable_differently_named_consumers_of_one_queue_store_one_result`,
+  `durable_pools_on_two_queues_share_one_mailbox_and_keep_both_results` and
+  the S-16 `pool_sigkill_*_between_delivery_and_ack` tests, whose restarted
+  pool is named differently.
+- **Durable `ShutdownReport` (W1).** A task is counted when its lease is
+  resolved: `completed` once its outcome is stored, `requeued` (and
+  `cancelled`) when it is handed back, including a task whose delivery kept
+  failing (it was reported `completed`). A task still delivering when the
+  shutdown began is counted when it lands (it was counted nowhere), and the
+  dispatcher no longer counts as an `unsettled` task.
+- **`ResourcePool` lost woken tasks on a panicking `Mailbox` or `AuditSink`
+  (W3).** A completion now starts the tasks it woke before it calls them.
+- **Durable pool had no bound for zero-cost tasks (W5).** New
+  `DurableOptions::with_max_running` (default: `max_units`) bounds the tasks
+  running at once.
+- **Durable cancellation (S1).** A running task cancelled at shutdown whose
+  executor panics while being dropped is handed back, not dead-lettered as
+  `Failed`.
+- The S-21 negative control also suppresses the durable `Requeued` event, so
+  the durable requeue tests are covered by it (W7).
 - **One undecodable task wedged the whole embedded queue.** `RedbLeaseQueue::lease`
   aborted its transaction on a stored task that did not decode as `P` (for
   example after an app update changed the payload type), leaving the entry at the
@@ -588,6 +731,14 @@ entry names the OpenSpec change that made it.
 - `QueueListener::wait` no longer claims to be cancel safe: sqlx does not
   promise that a cancelled receive keeps a notification. Callers already poll
   on `Wake::TimedOut`.
+- Release packaging: `cargo package --workspace` failed for
+  `prometheus-parking-lot-embedded` and the facade (a self dev-dependency
+  that carried a version); the six library crates now ship a README and the
+  MIT license file; workspace version is 0.3.0.
+- Building the facade for `wasm32-unknown-unknown` needs
+  `default-features = false`: the default `tokio-runtime` feature does not
+  build for that target. README, `docs/API.md` and the crate docs say so, and
+  CI checks it.
 
 ### Known limitations
 
@@ -596,6 +747,15 @@ entry names the OpenSpec change that made it.
 - Durable dispatch is at-least-once for the executor: a task can run again
   after a crash, a lost lease or a failed ack. Results are deduplicated by the
   mailbox; executors with external side effects must be idempotent.
+- A durable queue dropped and recreated under the same identity (a Postgres
+  table or pgmq queue whose id sequence restarts) can reuse entry ids; a
+  mailbox that remembers the old keys would then drop the new results as
+  duplicates. Recreate the mailbox with the queue, or set task idempotency
+  keys.
+- After a crash between storing a durable task's `Failed` result and
+  dead-lettering it, the redelivered run can emit `Completed` while the stored
+  result stays `Failed` (first write wins); events report the run, the
+  mailbox the task.
 - A durable pool lets at most one leased task wait for capacity; a task
   enqueued later at a higher priority waits behind it instead of overtaking it
   as it would in the in-memory pool.

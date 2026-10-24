@@ -51,6 +51,21 @@ pub fn message_id(scope: &str, key: &str) -> u128 {
     (u128::from(high.finish()) << 64) | u128::from(low.finish())
 }
 
+/// A value that differs between publisher instances, including across
+/// restarts, for ids of messages that have no stable key of their own.
+pub(crate) fn instance_nonce() -> u128 {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| d.as_nanos());
+    nanos
+        ^ (u128::from(std::process::id()) << 96)
+        ^ (u128::from(COUNTER.fetch_add(1, Ordering::Relaxed)) << 64)
+}
+
 /// The message id of a `mailbox.ready` notification: one per stored result.
 #[must_use]
 pub fn mailbox_ready_id(stable_key: &str) -> u128 {

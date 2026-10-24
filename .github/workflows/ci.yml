@@ -216,6 +216,15 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Check the core and wasm crates for wasm32-unknown-unknown
         run: cargo +${{ matrix.toolchain }} check --locked --target wasm32-unknown-unknown -p prometheus-parking-lot-core -p prometheus-parking-lot-wasm --all-targets
+      - name: Check the facade for wasm32-unknown-unknown (default features are native-only)
+        run: |
+          cargo +${{ matrix.toolchain }} check --locked --target wasm32-unknown-unknown -p prometheus_parking_lot --no-default-features
+          # The default features pull in tokio's multi-thread runtime (mio), which does not
+          # build for wasm32; the facade docs say to turn them off. Prove the claim.
+          if cargo +${{ matrix.toolchain }} check --locked --target wasm32-unknown-unknown -p prometheus_parking_lot >/dev/null 2>&1; then
+            echo "::error::the facade now builds for wasm32 with default features: update README.md, docs/API.md and src/lib.rs, then drop this assertion"
+            exit 1
+          fi
       - name: Core and wasm dependency graph (no tokio, sqlx, sea-orm, redb, reqwest)
         if: matrix.toolchain == env.PINNED_TOOLCHAIN
         run: .github/scripts/check-wasm-graph.sh

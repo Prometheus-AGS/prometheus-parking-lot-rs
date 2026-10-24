@@ -171,19 +171,26 @@ conformance suite (the core crate's `conformance` feature).
   unit-weighted semaphore as the in-memory pool. A heartbeat calls `extend`
   every third of the lease by default, so a long task is not mistaken for a
   dead one. The outcome is delivered to the mailbox with an idempotency key
-  (the task's own key, or `"<pool name>:entry:<queue entry id>"`), and **only
-  then** is the lease acked (success) or dead-lettered (executor error, panic,
-  timeout, expired deadline, cost above capacity). This is the outbox order
-  above: store the result, then let go of the work.
+  (the task's own key, or `"<queue identity>:entry:<queue entry id>"`, where
+  `LeaseQueue::identity` names the queue the same way in every process), and
+  **only then** is the lease acked (success) or dead-lettered (executor error,
+  panic, timeout, expired deadline). A task too large for this pool is handed
+  back (requeued after one lease duration) for a consumer that can run it.
+  This is the outbox order above: store the result, then let go of the work.
 - **What that guarantees.** A process killed at any point leaves the task
   leased; the lease expires and the queue redelivers it. Because the mailbox
   keeps the first write for a key, the client sees exactly one result.
   Execution is still at-least-once: the executor can run again after a crash,
   a lost lease or a failed ack, so executors with external side effects must
   be idempotent. Scenario S-16 (`-E "test(pool_sigkill_)"`) kills a pool
-  process with `SIGKILL` mid-execution and between execution and the mailbox
-  write, on Postgres 18 and redb, and requires exactly one result after a
-  restart.
+  process with `SIGKILL` mid-execution, between execution and the mailbox
+  write, and between the mailbox write and the ack, on Postgres 18 and redb,
+  and requires exactly one result after a restart by a pool with a different
+  name.
+- **Any number of consumers.** The result key depends on the queue, not on
+  the pool's name, so several pools (in one process or many, named alike or
+  not) can consume one queue, and pools on different queues can deliver into
+  one mailbox, with exactly one result per task.
 - **Configuration.** A pool whose `queue` and `mailbox` both name a `postgres`
   or `redb` backend is built as a durable pool by
   `build_pools_from_scheduler_config` (cr-37, cr-49) and returned as a
@@ -204,8 +211,15 @@ failed mailbox write is logged, not retried.
 - An idle durable pool notices work enqueued by another process, and expired
   leases, by polling (`DurableOptions::with_poll_interval`, 500 ms by default).
   It does not use the Postgres `QueueListener` yet.
-- A task that kills its process is redelivered on every restart; cap it with
-  the backend's attempt limit (for example `PgLeaseQueue::with_max_attempts`).
+- A task that kills its process is redelivered on every restart, and a task
+  too large for every consumer cycles between them; cap both with the
+  backend's attempt limit (for example `PgLeaseQueue::with_max_attempts`).
+- An entry id can repeat after a queue is dropped and recreated under the same
+  identity (a Postgres table or pgmq queue whose id sequence restarts). A
+  mailbox that still remembers the old entry's key then treats the new
+  entry's result as a duplicate. Recreate the mailbox with the queue, or set
+  an idempotency key on every task. A redb file gets a new identity when it is
+  recreated.
 
 ## Sources
 

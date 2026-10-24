@@ -96,6 +96,11 @@ struct Shared<P, R, E> {
     /// Pool configuration.
     config: WorkerPoolConfig,
     /// Admission, the parked queue and the semaphore.
+    ///
+    /// No release hook (`Dispatcher::install_release_hook`): `run` returns
+    /// every permit through `complete`. `spawn_local` never discards a task
+    /// future, and a panic aborts the module, so no permit is dropped any
+    /// other way.
     dispatcher: Dispatcher<WorkerTask<P>>,
     /// Result slots with oneshot notification.
     results: Results<TaskOutcome<R>>,

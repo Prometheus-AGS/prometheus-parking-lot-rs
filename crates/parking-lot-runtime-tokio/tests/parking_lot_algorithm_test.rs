@@ -566,3 +566,95 @@ async fn test_shutdown() {
     let results = executor.get_results().await;
     assert_eq!(results.len(), 1);
 }
+
+/// A spawned future, held without being run.
+type HeldFuture = std::pin::Pin<Box<dyn Future<Output = ()> + Send>>;
+
+/// Holds the first spawned future without running it (a spawner that
+/// stalls, then discards, a task), and spawns every later one on tokio.
+#[derive(Clone, Default)]
+struct StallingSpawner {
+    held: Arc<std::sync::Mutex<Option<HeldFuture>>>,
+    stalled: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl Spawn for StallingSpawner {
+    fn spawn<F>(&self, fut: F)
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        if self.stalled.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            tokio::spawn(fut);
+        } else {
+            *self.held.lock().expect("held") = Some(Box::pin(fut));
+        }
+    }
+}
+
+/// W3: a task future the spawner discards drops its permit outside
+/// `Dispatcher::complete`. The pool's release hook then schedules a poke, so
+/// the parked task the freed units admit still runs.
+#[tokio::test]
+async fn test_discarded_task_future_hands_its_units_to_parked_work() {
+    let limits = PoolLimits {
+        max_units: 10,
+        max_queue_depth: 100,
+        default_timeout: Duration::from_secs(60),
+    };
+    let executor = TestExecutor::new();
+    let spawner = StallingSpawner::default();
+    let pool = ResourcePool::new(
+        limits,
+        InMemoryQueue::new(100),
+        InMemoryMailbox::new(),
+        executor.clone(),
+        spawner.clone(),
+    );
+    let task = |id: u64, name: &str| ScheduledTask {
+        meta: TaskMetadata {
+            id,
+            priority: Priority::Normal,
+            cost: ResourceCost::new(ResourceKind::Cpu, 10),
+            created_at_ms: now_ms(),
+            idempotency_key: None,
+            deadline_ms: None,
+            mailbox: None,
+            sequence: 0,
+        },
+        payload: TestJob {
+            name: name.to_string(),
+            value: 1,
+        },
+    };
+
+    let first = pool.submit(task(1, "stalled")).await.expect("accepted");
+    assert!(matches!(first, TaskStatus::Running));
+    let second = pool.submit(task(2, "parked")).await.expect("accepted");
+    assert!(matches!(second, TaskStatus::Queued));
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    assert_eq!(executor.get_results().await, Vec::<String>::new());
+    assert_eq!(pool.active_units(), 10);
+
+    // The spawner discards the stalled task: its permit is dropped.
+    drop(spawner.held.lock().expect("held").take());
+
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        let results = executor.get_results().await;
+        if results.iter().any(|result| result.contains("parked")) {
+            break;
+        }
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "the parked task never ran after the discarded task freed its units"
+        );
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(
+        !executor
+            .get_results()
+            .await
+            .iter()
+            .any(|result| result.contains("stalled"))
+    );
+}

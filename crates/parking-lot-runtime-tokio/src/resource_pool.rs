@@ -277,8 +277,8 @@ where
     ///
     /// # Panics
     ///
-    /// When a task is running (it shares the pool's state): limits are part
-    /// of building the pool. Call it before the first `submit`.
+    /// After the first `submit` (the pool's state is then shared): limits
+    /// are part of building the pool. Call it before the first `submit`.
     #[must_use]
     pub fn with_resource_limit(mut self, kind: ResourceKind, limit: u32) -> Self {
         let set = Arc::get_mut(&mut self.inner)
@@ -453,6 +453,7 @@ where
             events.rejected(task_id, &error);
             return Err(error);
         }
+        inner.ensure_release_hook();
         let now_ms = inner.now_ms();
         let meta = task.meta.clone();
         let admission = inner
@@ -626,6 +627,40 @@ where
         Duration::from_secs(u64::from(u32::MAX))
     }
 
+    /// Install the dispatcher's release hook (once): a permit dropped other
+    /// than through `Dispatcher::complete` — a task future the spawner
+    /// discarded without running it — schedules a poke through the spawner,
+    /// so the units it frees reach parked work. Every other path returns its
+    /// permit through `complete`, or pokes after catching a panic.
+    ///
+    /// Installed at the first submission rather than in `new`: the hook holds
+    /// a `Weak` to this state, and the builder methods need the state
+    /// unshared.
+    fn ensure_release_hook(self: &Arc<Self>) {
+        if self.dispatcher.has_release_hook() {
+            return;
+        }
+        self.dispatcher.install_release_hook(|| {
+            let weak = Arc::downgrade(self);
+            move || {
+                if let Some(inner) = weak.upgrade() {
+                    inner.poke_later();
+                }
+            }
+        });
+    }
+
+    /// Spawn a drain of the parked queue and start what it admits (the
+    /// release hook's job; it must not drain on the dropping thread, which
+    /// may hold this pool's locks).
+    fn poke_later(self: &Arc<Self>) {
+        let inner = Arc::clone(self);
+        self.spawner.spawn(async move {
+            let woken = inner.dispatcher.poke(inner.now_ms());
+            inner.launch(woken, None);
+        });
+    }
+
     /// Start every task the dispatcher admitted and report every task it
     /// found expired at the head. `submitted` is the sequence of the task
     /// whose submission produced `dispatched`, which is audited as "start"
@@ -657,9 +692,8 @@ where
     /// so the freed units are handed to parked work with
     /// [`Dispatcher::poke`]. A task whose outcome was not recorded yet is
     /// reported as panicked; one whose completion had started is not reported
-    /// twice. If the panic struck after the completion took woken tasks off
-    /// the queue but before they were started, those tasks are lost with it;
-    /// that needs a panicking `Mailbox` or `AuditSink`.
+    /// twice. The completion starts the tasks it wakes before it calls the
+    /// `Mailbox` or `AuditSink`, so a panic there loses none of them.
     async fn supervise(self: Arc<Self>, task: ScheduledTask<P>, permit: Permit) {
         // Settles the task however `run` ends, unwinding included.
         let _settle = SettleOnDrop(&self.ledger);
@@ -762,10 +796,10 @@ where
     /// Release a finished task's capacity, deliver its outcome, audit it and
     /// start whatever queued work now fits.
     ///
-    /// The permit is returned (and the woken tasks taken off the queue) before
-    /// the outcome is delivered, so a caller that reads the outcome from the
-    /// mailbox already sees the units released. The woken tasks are spawned
-    /// after delivery, outside the dispatch lock.
+    /// The permit is returned, and the woken tasks taken off the queue and
+    /// started, before the outcome is delivered: a caller that reads the
+    /// outcome from the mailbox already sees the units released, and a panic
+    /// in the user's `Mailbox` or `AuditSink` cannot lose the woken tasks.
     fn finish(
         self: &Arc<Self>,
         task_id: TaskId,
@@ -774,6 +808,7 @@ where
         outcome: Result<T, TaskError>,
     ) {
         let woken = self.dispatcher.complete(permit, self.now_ms());
+        self.launch(woken, None);
         let counter = if outcome.is_ok() {
             &self.completed
         } else {
@@ -812,7 +847,6 @@ where
 
         let tenant = mailbox_key.map_or("unknown", |key| key.tenant.as_str());
         self.record_event(task_id, tenant, action);
-        self.launch(woken, None);
     }
 
     /// Record a queued task that reached the head after its deadline.

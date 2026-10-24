@@ -7,8 +7,10 @@
 //! idempotency key: it is what a client already holds, and what the
 //! `mailbox.ready` notification carries. Every message of one stream goes to
 //! one partition of the `stream.chunks` topic, chosen by a hash of the key
-//! ([`partition_for`]) and set explicitly, so a reader knows where to look and
-//! per-partition ordering is per-stream ordering.
+//! ([`partition_for`]) over the topic's **real** partition count (read from the
+//! server, so a topic created with a different count than the options say still
+//! works) and set explicitly, so a reader knows where to look and per-partition
+//! ordering is per-stream ordering.
 //!
 //! Each message has a **sequence number** `seq` that starts at 1 and rises by
 //! one per message; the last message is an end marker carrying the final
@@ -24,7 +26,12 @@
 //! - `seq <= last` is a duplicate (a retried publish, or a restarted executor
 //!   re-publishing) and is skipped;
 //! - `seq > last + 1` is a gap and is an error ([`StreamError::Gap`]), never
-//!   silently passed on, so even a wrong offset hint cannot lose a chunk.
+//!   silently passed on, so a wrong offset hint cannot silently lose a chunk
+//!   once later messages arrive.
+//!
+//! A hint that is **too high** is not detected by itself: if no message follows
+//! it (the stream already ended, say) `next` waits rather than failing. Take the
+//! hint from [`StreamItem::resume_point`] or omit it.
 //!
 //! A reader that kept `(seq, offset)` of the last message it saw asks for
 //! [`IggyStreamReader::resume`] and receives exactly the messages after it, in
@@ -44,7 +51,7 @@ use std::collections::VecDeque;
 use std::error::Error;
 use std::fmt;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::Duration;
 
 use iggy::prelude::{
@@ -55,7 +62,7 @@ use tokio::runtime::Handle;
 
 use crate::ids::message_id;
 use crate::options::IggyOptions;
-use crate::publisher::{Envelope, Publisher, PublisherStats};
+use crate::publisher::{Envelope, Publisher, PublisherStats, topic_partitions};
 
 /// Messages read per poll.
 const POLL_BATCH: u32 = 100;
@@ -138,7 +145,6 @@ enum WireBody {
 #[derive(Debug, Clone)]
 pub struct IggyStreamSink {
     publisher: Arc<Publisher>,
-    partitions: u32,
 }
 
 impl IggyStreamSink {
@@ -156,7 +162,6 @@ impl IggyStreamSink {
     pub fn start_on(handle: &Handle, options: &IggyOptions) -> Self {
         Self {
             publisher: Arc::new(Publisher::start(handle, options, &options.stream_topic)),
-            partitions: options.partitions.max(1),
         }
     }
 
@@ -173,7 +178,6 @@ impl IggyStreamSink {
     pub fn writer_from(&self, key: impl Into<String>, next_seq: u64) -> StreamWriter {
         let key = key.into();
         StreamWriter {
-            partition: partition_for(&key, self.partitions),
             publisher: Arc::clone(&self.publisher),
             key,
             next_seq: next_seq.max(1),
@@ -200,7 +204,6 @@ impl IggyStreamSink {
 pub struct StreamWriter {
     publisher: Arc<Publisher>,
     key: String,
-    partition: u32,
     next_seq: u64,
     poison: Arc<AtomicBool>,
     finished: bool,
@@ -262,7 +265,7 @@ impl StreamWriter {
             self.key.clone(),
             payload,
         );
-        envelope.partition = Some(self.partition);
+        envelope.by_stream_hash = true;
         envelope.poison = Some(Arc::clone(&self.poison));
         self.publisher
             .enqueue_wait(envelope)
@@ -335,7 +338,14 @@ pub struct IggyStreamReader {
     client: IggyClient,
     stream: Identifier,
     topic: Identifier,
-    partitions: u32,
+    stream_name: String,
+    topic_name: String,
+    /// Partition count from the options, used until the server reports the
+    /// topic's real one.
+    configured_partitions: u32,
+    /// The topic's real partition count once the server has reported it; 0
+    /// before.
+    partitions: AtomicU32,
     poll_interval: Duration,
 }
 
@@ -344,7 +354,7 @@ impl fmt::Debug for IggyStreamReader {
         f.debug_struct("IggyStreamReader")
             .field("stream", &self.stream)
             .field("topic", &self.topic)
-            .field("partitions", &self.partitions)
+            .field("partitions", &self.partitions.load(Ordering::Relaxed))
             .finish_non_exhaustive()
     }
 }
@@ -368,9 +378,29 @@ impl IggyStreamReader {
             client,
             stream: Identifier::from_str_value(&options.stream).map_err(backend)?,
             topic: Identifier::from_str_value(&options.stream_topic).map_err(backend)?,
-            partitions: options.partitions.max(1),
+            stream_name: options.stream.clone(),
+            topic_name: options.stream_topic.clone(),
+            configured_partitions: options.partitions.max(1),
+            partitions: AtomicU32::new(0),
             poll_interval: Duration::from_millis(50),
         })
+    }
+
+    /// The topic's partition count: what the server reports once the topic
+    /// exists (a topic created by someone else may differ from the options),
+    /// the configured count until then.
+    async fn partition_count(&self) -> u32 {
+        let known = self.partitions.load(Ordering::Relaxed);
+        if known != 0 {
+            return known;
+        }
+        match topic_partitions(&self.client, &self.stream_name, &self.topic_name).await {
+            Ok(Some(count)) => {
+                self.partitions.store(count, Ordering::Relaxed);
+                count
+            }
+            _ => self.configured_partitions,
+        }
     }
 
     /// Wait `interval` between polls while a live stream has nothing new.
@@ -401,7 +431,6 @@ impl IggyStreamReader {
 pub struct StreamCursor<'a> {
     reader: &'a IggyStreamReader,
     key: String,
-    partition: u32,
     next_offset: u64,
     last_seq: u64,
     ready: VecDeque<StreamItem>,
@@ -416,7 +445,6 @@ impl<'a> StreamCursor<'a> {
         Self {
             reader,
             key: key.to_owned(),
-            partition: partition_for(key, reader.partitions),
             next_offset,
             last_seq,
             ready: VecDeque::new(),
@@ -471,13 +499,14 @@ impl<'a> StreamCursor<'a> {
 
     /// Poll once; `true` when any message was read.
     async fn fill(&mut self) -> Result<bool, StreamError> {
+        let partition = partition_for(&self.key, self.reader.partition_count().await);
         let polled = match self
             .reader
             .client
             .poll_messages(
                 &self.reader.stream,
                 &self.reader.topic,
-                Some(self.partition),
+                Some(partition),
                 &Consumer::default(),
                 &PollingStrategy::offset(self.next_offset),
                 POLL_BATCH,

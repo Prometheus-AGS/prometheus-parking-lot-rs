@@ -4,9 +4,10 @@
 //!
 //! - `durable_sigkill`: scenario S-16. A child process runs a
 //!   `DurableResourcePool` on Postgres 18 (project image) or redb, accepts a
-//!   task and is killed with `SIGKILL` mid-execution, or between execution and
-//!   the mailbox write; a restarted pool completes the task and exactly one
-//!   result is consumable. Tests are named `pool_sigkill_*`, so
+//!   task and is killed with `SIGKILL` mid-execution, between execution and
+//!   the mailbox write, or between the mailbox write and the ack; a restarted
+//!   pool (named differently) completes the task and exactly one result is
+//!   consumable. Tests are named `pool_sigkill_*`, so
 //!   `-E "test(pool_sigkill_)"` selects them; the Postgres ones need Docker
 //!   and are `#[ignore]`d (run with `--run-ignored all`).
 //! - `durable_dispatch`: ack-after-delivery ordering, persist-before-accept and

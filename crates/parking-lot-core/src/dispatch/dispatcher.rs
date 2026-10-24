@@ -13,9 +13,20 @@
 //! lock*), which guards the parked queue and the sequence counter:
 //!
 //! - **submit**: stamp the sequence, then either start the item (queue empty
-//!   and it fits), reject it (queue at depth), or park it and run the drain.
-//!   The depth check and the enqueue are one critical section, so the depth
-//!   limit holds exactly (no TOCTOU) and a park cannot interleave with a drain.
+//!   and it fits), park it and run the drain (queue below depth), or, with
+//!   `max_queue_depth` items parked, start it only if it would start at once
+//!   anyway and reject it otherwise. The depth check and the enqueue are one
+//!   critical section, so the depth limit holds exactly (no TOCTOU) and a
+//!   park cannot interleave with a drain.
+//! - **submit at depth**: an item that must wait is rejected with
+//!   `QueueFull`, but one that the drain after a park would have started at
+//!   once is started without being parked: one that precedes the head (a
+//!   strictly higher priority) and fits, or one that may skip the blocked
+//!   head under the starvation guard (below) and is the first parked-or-new
+//!   item, in dispatch order, that fits. Both are the drain's own choices, so
+//!   priority order and the guard are unchanged; the skip is counted against
+//!   the head like any other. The check is conservative: when the head is
+//!   expired or would fit itself (a drain is pending), the item is rejected.
 //! - **drain**: while the head exists: an expired head is popped and reported;
 //!   a head that fits is popped and started; a head that does not fit stays
 //!   where it is, and the drain tries to *skip ahead* of it (below). The drain
@@ -26,6 +37,20 @@
 //!
 //! The dispatcher never runs anything: started items come back to the caller
 //! as [`Grant`]s (item plus [`Permit`]) to spawn outside the lock.
+//!
+//! ## Returning permits
+//!
+//! A [`Grant`]'s permit must come back through
+//! [`complete`](Dispatcher::complete), which drains. A permit dropped any
+//! other way (a dropped [`Grant`], [`Dispatched`] or [`Admission`], a task
+//! future a spawner discarded) returns its units but cannot drain itself: it
+//! calls the *release hook* instead, which the owner installs with
+//! [`install_release_hook`](Dispatcher::install_release_hook) and which must
+//! arrange a [`poke`](Dispatcher::poke) (the tokio pools spawn one). Without a
+//! hook, the owner must poke after such a drop, or the parked work the freed
+//! units admit waits for the next submission or completion. The hook is not
+//! called while the thread unwinds; an owner that catches a panic pokes
+//! afterwards (every pool does).
 //!
 //! ## Lifecycle events (cr-31)
 //!
@@ -78,9 +103,12 @@
 //!    parallel.
 //!
 //! *Proof.* (1) Every start happens under the dispatch lock, in the fast path
-//! of [`submit`](Dispatcher::submit) or in the drain. The fast path starts an
-//! item only when nothing is parked, and `H` is parked. In the drain, an item
-//! other than the head starts only as a skip, which requires the head's skip
+//! of [`submit`](Dispatcher::submit), in its at-depth path or in the drain.
+//! The fast path starts an item only when nothing is parked, and `H` is
+//! parked. The at-depth path starts the new item either because it precedes
+//! the head (it then *is* the head the drain would serve, and `H` is no
+//! longer the head) or as a skip; in the drain, an item other than the head
+//! starts only as a skip. A skip, in either place, requires the head's skip
 //! count to be below `N` and increments it. The count is keyed by `H`'s
 //! sequence and restarts only when the head's sequence differs, which would
 //! contradict `H` staying the head. So at most `N` items start in place of
@@ -93,7 +121,8 @@
 //! one permit, so `H` fits as soon as no permit is held: every dimension is
 //! then back to zero. Every completion returns its permit under the dispatch lock and then
 //! drains ([`complete`](Dispatcher::complete); a permit dropped any other way
-//! is followed by [`poke`](Dispatcher::poke) in the pools), and that drain
+//! calls the release hook, which pokes, or is followed by a
+//! [`poke`](Dispatcher::poke) in the pools), and that drain
 //! reads `H` as the head and starts it once it fits; so `H` starts no later
 //! than the drain after the last completion in `R` and `S`. For the
 //! wall-clock form: `H` does not fit (in any dimension) only while some
@@ -129,7 +158,9 @@
 //! ## No lost wakeup
 //!
 //! Claim: when `complete` returns, no parked head that fits the free capacity
-//! is left parked. A parked item becomes startable only when units are
+//! is left parked. (A permit released outside `complete` gives the same
+//! guarantee only through the drain its release hook or owner runs; see
+//! "Returning permits".) A parked item becomes startable only when units are
 //! returned (a `complete`) or when it reaches the head (a pop, or a park of a
 //! higher-priority item; both happen inside a drain-ending critical section).
 //! Both `complete` and the park branch of `submit` hold the dispatch lock while
@@ -212,6 +243,11 @@ const fn guard_engaged(skips: u32, max_head_skips: u32) -> bool {
 }
 
 /// An admitted item and the permit it runs under.
+///
+/// Return the permit with [`Dispatcher::complete`] when the item finishes.
+/// Dropping the grant (or its permit) frees the units without draining: the
+/// dispatcher's release hook runs instead, or, without one, the owner must
+/// call [`Dispatcher::poke`]. See the module docs, "Returning permits".
 #[derive(Debug)]
 pub struct Grant<T> {
     /// The item to start.
@@ -222,6 +258,9 @@ pub struct Grant<T> {
 }
 
 /// What a dispatcher operation took off the parked queue.
+///
+/// Dropping it drops its grants' permits: see [`Grant`] for what that
+/// obliges.
 #[derive(Debug)]
 #[must_use = "started items must be spawned and expired items reported"]
 pub struct Dispatched<T> {
@@ -250,6 +289,9 @@ impl<T> Dispatched<T> {
 }
 
 /// The result of an accepted submission.
+///
+/// Dropping it drops the grants in `dispatched`: see [`Grant`] for what that
+/// obliges.
 #[derive(Debug)]
 #[must_use = "started items must be spawned and expired items reported"]
 pub struct Admission<T> {
@@ -326,23 +368,29 @@ impl<T, Q> Dispatcher<T, Q> {
         }
     }
 
-    /// Limit dimension `kind` to `limit` units (cr-23) on a dispatcher with no
-    /// permit outstanding (every permit shares the semaphore, so exclusive
-    /// access to it is the check). Pools call it while they are being built,
-    /// before anything is submitted.
+    /// Limit dimension `kind` to `limit` units (cr-23) on a dispatcher that
+    /// has not taken a submission yet. Pools call it while they are being
+    /// built.
+    ///
+    /// Before the first submission no permit is outstanding (every permit
+    /// shares the semaphore, so exclusive access to it is checked too) and
+    /// nothing is parked: a parked item over a new limit could never start,
+    /// and at the head it would block the items behind it.
     ///
     /// # Errors
     ///
-    /// [`SchedulerError::InvalidConfig`] when a permit is outstanding;
-    /// nothing changes then.
+    /// [`SchedulerError::InvalidConfig`] once an item has been submitted (or
+    /// a permit is outstanding); nothing changes then.
     pub fn set_resource_limit(
         &mut self,
         kind: ResourceKind,
         limit: u32,
     ) -> Result<(), SchedulerError> {
-        let Some(semaphore) = Arc::get_mut(&mut self.semaphore) else {
+        let submitted = self.state.lock().last_sequence > 0;
+        let semaphore = Arc::get_mut(&mut self.semaphore).filter(|_| !submitted);
+        let Some(semaphore) = semaphore else {
             return Err(SchedulerError::invalid_config(format!(
-                "pool '{}': resource limits can only be set while no task holds capacity",
+                "pool '{}': resource limits can only be set before the first submission",
                 self.pool
             )));
         };
@@ -442,6 +490,35 @@ impl<T, Q> Dispatcher<T, Q> {
     pub fn running(&self) -> u32 {
         self.semaphore.permits_outstanding()
     }
+
+    /// Install the *release hook* that `make` builds, unless one is
+    /// installed (`make` is then not called). Returns whether this call
+    /// installed it.
+    ///
+    /// The hook runs after a permit of this dispatcher is dropped other than
+    /// through [`complete`](Self::complete): a dropped [`Grant`],
+    /// [`Dispatched`] or [`Admission`], or a task whose future was discarded.
+    /// Its job is to make a [`poke`](Self::poke) happen, so the parked work
+    /// the freed units admit is started (see the module docs, "Returning
+    /// permits").
+    ///
+    /// It runs on the dropping thread, outside the dispatch lock, possibly
+    /// while that thread holds the owner's own locks: it must not block, and
+    /// should *schedule* the poke (spawn it) rather than poke inline. It is
+    /// not called while the thread unwinds, and a panic inside it is
+    /// contained and logged.
+    pub fn install_release_hook<F>(&self, make: impl FnOnce() -> F) -> bool
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        self.semaphore.install_release_hook(make)
+    }
+
+    /// Whether a release hook is installed.
+    #[must_use]
+    pub fn has_release_hook(&self) -> bool {
+        self.semaphore.has_release_hook()
+    }
 }
 
 impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
@@ -494,7 +571,10 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
     ///   kind (it could never start; see
     ///   [`check_capacity`](Self::check_capacity));
     /// - [`SchedulerError::QueueFull`] when it must wait and `max_queue_depth`
-    ///   items are already parked;
+    ///   items are already parked. An item that would start at once is
+    ///   admitted even then (see the module docs, "submit at depth");
+    /// - [`SchedulerError::InvalidConfig`] when the semaphore admits no
+    ///   permit at all (`max_permits == 0`): nothing could ever start;
     /// - the parked queue's error when it cannot store the item.
     ///
     /// On error the item is dropped and nothing else changes (its sequence
@@ -520,6 +600,12 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
         on_park: impl FnOnce(usize),
     ) -> Result<Admission<T>, SchedulerError> {
         let demand = item.ticket().demand;
+        if self.semaphore.max_permits() == 0 {
+            return Err(SchedulerError::invalid_config(format!(
+                "pool '{}' admits no task: its semaphore allows 0 permits",
+                self.pool
+            )));
+        }
         self.check_capacity(&demand)?;
 
         let mut state = self.state.lock();
@@ -543,11 +629,19 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
 
         let depth = state.queue.len();
         if depth >= self.max_queue_depth {
-            return Err(SchedulerError::queue_full(
-                self.pool.clone(),
-                depth,
-                self.max_queue_depth,
-            ));
+            let Some(dispatched) = self.start_at_depth(&mut state, item, now_ms) else {
+                return Err(SchedulerError::queue_full(
+                    self.pool.clone(),
+                    depth,
+                    self.max_queue_depth,
+                ));
+            };
+            drop(state);
+            return Ok(Admission {
+                sequence,
+                started: true,
+                dispatched,
+            });
         }
 
         #[cfg(parking_lot_negative_control = "s-2")]
@@ -593,7 +687,9 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
     /// for why that rules out a lost wakeup.
     pub fn complete(&self, permit: Permit, now_ms: u128) -> Dispatched<T> {
         let mut state = self.state.lock();
-        drop(permit);
+        // Quietly: this drain is the wakeup, so the release hook is not
+        // needed (and a hook that poked inline would deadlock here).
+        permit.release_quietly();
         let dispatched = self.drain_locked(&mut state, now_ms);
         drop(state);
         dispatched
@@ -641,17 +737,21 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
                 }
             };
             if ticket.is_expired(now_ms) {
-                if let Some(item) = state.queue.pop_head() {
-                    dispatched.expired.push(item);
+                // A queue that reports a head it then cannot pop would make
+                // `continue` spin; stop as the start path does.
+                match state.queue.pop_head() {
+                    Some(item) => dispatched.expired.push(item),
+                    None => break,
                 }
                 continue;
             }
             if let Some(permit) = UnitSemaphore::try_acquire_vector(&self.semaphore, &ticket.demand)
             {
-                match state.queue.pop_head() {
-                    Some(item) => dispatched.started.push(Grant { item, permit }),
-                    None => break,
-                }
+                let Some(item) = state.queue.pop_head() else {
+                    permit.release_quietly();
+                    break;
+                };
+                dispatched.started.push(Grant { item, permit });
                 continue;
             }
             if !self.skip_ahead_locked(state, &ticket, now_ms, &mut dispatched) {
@@ -677,14 +777,7 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
         if state.max_head_skips == 0 {
             return false;
         }
-        let mut blocked = match state.blocked {
-            Some(blocked) if blocked.sequence == head.sequence => blocked,
-            _ => BlockedHead {
-                sequence: head.sequence,
-                skips: 0,
-                reserved: false,
-            },
-        };
+        let mut blocked = Self::blocked_head(state, head);
         if guard_engaged(blocked.skips, state.max_head_skips) {
             if !blocked.reserved {
                 blocked.reserved = true;
@@ -716,9 +809,9 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
         else {
             return false;
         };
-        // Dropping `permit` on the `None` path returns its units under the
-        // dispatch lock.
         let Some(item) = state.queue.take(&candidate) else {
+            // Returned under the dispatch lock; this drain is still running.
+            permit.release_quietly();
             return false;
         };
         if candidate != *head {
@@ -730,6 +823,97 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
         }
         dispatched.started.push(Grant { item, permit });
         true
+    }
+
+    /// The skip record of `head`: the current one if it is for `head`,
+    /// otherwise a fresh one (a different item became the head).
+    const fn blocked_head(state: &State<Q>, head: &Ticket) -> BlockedHead {
+        match state.blocked {
+            Some(blocked) if blocked.sequence == head.sequence => blocked,
+            _ => BlockedHead {
+                sequence: head.sequence,
+                skips: 0,
+                reserved: false,
+            },
+        }
+    }
+
+    /// Submission at depth (`max_queue_depth` items parked): start `item`
+    /// now, without parking it, if the drain after a park would have started
+    /// it at once; otherwise drop it and return `None` (the caller reports
+    /// `QueueFull`). Callers hold the dispatch lock.
+    ///
+    /// The drain would start the new item at once in exactly two cases, and
+    /// this checks the same conditions the drain does:
+    ///
+    /// - it precedes the head (strictly higher priority, as it is the newest)
+    ///   and fits: it would be the head, and a head that fits starts;
+    /// - it follows a head that does not fit, skip-ahead is on and the
+    ///   queue supports it, the starvation guard has not engaged for that
+    ///   head, the item fits, and no parked item ahead of it fits: it would
+    ///   be the skip candidate. The start is counted as a skip of the head.
+    ///
+    /// It is conservative where the drain would first change the queue: an
+    /// expired head, or a head that fits (a drain is pending), gets `None`.
+    /// After a start, the drain runs as it would have after a park, and its
+    /// grants are returned with the item's.
+    fn start_at_depth(&self, state: &mut State<Q>, item: T, now_ms: u128) -> Option<Dispatched<T>> {
+        let ticket = item.ticket();
+        if ticket.is_expired(now_ms) {
+            return None;
+        }
+        let head = state.queue.head().ok().flatten()?;
+        if head.is_expired(now_ms) {
+            return None;
+        }
+        let permit = if ticket.runs_before(&head) {
+            UnitSemaphore::try_acquire_vector(&self.semaphore, &ticket.demand)?
+        } else {
+            self.claim_skip_at_depth(state, &ticket, &head, now_ms)?
+        };
+        let mut dispatched = Dispatched {
+            started: vec![Grant { item, permit }],
+            expired: Vec::new(),
+        };
+        let after = self.drain_locked(state, now_ms);
+        dispatched.started.extend(after.started);
+        dispatched.expired.extend(after.expired);
+        Some(dispatched)
+    }
+
+    /// The skip branch of [`start_at_depth`](Self::start_at_depth): claim
+    /// `ticket`'s demand as a skip of `head` if the drain would, and count
+    /// the skip. Callers hold the dispatch lock.
+    fn claim_skip_at_depth(
+        &self,
+        state: &mut State<Q>,
+        ticket: &Ticket,
+        head: &Ticket,
+        now_ms: u128,
+    ) -> Option<Permit> {
+        if state.max_head_skips == 0 || !state.queue.supports_skip_ahead() {
+            return None;
+        }
+        let mut blocked = Self::blocked_head(state, head);
+        if guard_engaged(blocked.skips, state.max_head_skips) {
+            return None;
+        }
+        let free = self.semaphore.available()?;
+        if head.demand.fits_in(&free) || !ticket.can_skip_ahead(&free, now_ms) {
+            return None;
+        }
+        // A parked item ahead of the new one that fits would be the drain's
+        // candidate instead.
+        match state.queue.fitting(&free, now_ms) {
+            Ok(None) => {}
+            Ok(Some(parked)) if ticket.runs_before(&parked) => {}
+            Ok(Some(_)) | Err(_) => return None,
+        }
+        let permit = UnitSemaphore::try_acquire_vector(&self.semaphore, &ticket.demand)?;
+        blocked.skips = blocked.skips.saturating_add(1);
+        state.blocked = Some(blocked);
+        state.stats.skipped += 1;
+        Some(permit)
     }
 }
 
@@ -1074,7 +1258,7 @@ mod tests {
     }
 
     #[test]
-    fn resource_limits_are_set_only_while_no_permit_is_out() {
+    fn resource_limits_are_set_only_before_the_first_submission() {
         let mut dispatcher = Dispatcher::in_memory("test", UnitSemaphore::new(4), 8);
         dispatcher
             .set_resource_limit(ResourceKind::GpuVram, 2)

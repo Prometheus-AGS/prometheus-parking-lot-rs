@@ -1,6 +1,6 @@
 # prometheus_parking_lot
 
-Resource-aware parking-lot scheduler crate: Rust 1.91.1, MIT, published.
+Resource-aware parking-lot scheduler crate: toolchain 1.99.1 (MSRV 1.95), MIT. 0.3.0 is the first publication and is not yet released; no crate from this workspace is on crates.io.
 `CLAUDE.md` is a symlink to this file; edit prose here, outside the markers.
 
 Before changing code, read `docs/agent-context.md` (layout, CI commands, hard

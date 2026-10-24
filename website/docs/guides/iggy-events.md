@@ -11,7 +11,8 @@ an audit trail, or another service that starts when a task completes.
 
 **What you get:** two publishers on Apache Iggy. `IggyHook` publishes every
 lifecycle event (`submitted`, `queued`, `started`, then exactly one terminal
-event) to the `lifecycle` topic. `IggyNotifier` publishes a `mailbox.ready`
+event; per run for a durable pool, where `requeued` ends a run that another
+follows) to the `lifecycle` topic. `IggyNotifier` publishes a `mailbox.ready`
 pointer to the `mailbox.ready` topic after each result is stored. Neither runs
 on the dispatch path: a slow or absent server costs bounded buffering and
 counted drops, never scheduling latency.
@@ -50,6 +51,19 @@ reads the whole string from `IGGY_URL`); the rest are the defaults shown in
   "dedup_window": 4096
 }
 ```
+
+The connection string is parsed when the configuration loads: one the Iggy
+client rejects fails validation at `backends.<name>.connection_string` instead
+of silently losing every event. A single credential with no colon
+(`iggy://<token>@host:8090`) is a personal access token; `Debug` hides it.
+
+**Retention.** Topics are created without an expiry, so the server keeps every
+message until its own size limits remove it. Size the server's disk, or set
+`"retention_secs"` (for example `604800` for a week; absent keeps messages) so
+the server expires old messages. It applies when this crate creates the topic;
+an existing topic keeps the expiry it has. A stream topic's `partitions` value
+likewise applies only to a topic this crate creates: an existing topic keeps its
+real partition count, and writers and readers use that.
 
 No pool runs on an `"iggy"` backend and the builder opens nothing for it: you
 build the hook and the notifier from `IggyBackendConfig::options()`.
@@ -134,11 +148,23 @@ tells the client where to look, and the client reads the result from the
 mailbox ([Disconnected clients](./disconnected-clients.md)). Messages are
 partitioned by tenant.
 
-Every message id is a UUIDv5 of the task's idempotency key (or of its address
-and task id when it has none), so a retried publish carries the same id.
-Iggy 0.9 de-duplicates retried requests per client, not by message id: the
-publisher skips repeats it remembers (`dedup_window`), and a consumer that must
-be exactly-once across publisher restarts de-duplicates on the id.
+Every message id is a UUIDv5, and task ids are caller-supplied, so they can
+repeat (the README example gives every task id 0). The ids are therefore built
+so that distinct events never share one:
+
+- A `mailbox.ready` id is derived from the idempotency key. A result without
+  one gets a distinct id per notification, so two results with the same task id
+  are both published; set an idempotency key to have repeats recognized.
+- A lifecycle event gets its own id per event (the hook instance and the
+  event's sequence number). The publisher's repeat-skipping window does not
+  apply to lifecycle events.
+
+A publisher retry resends the same message with the same id. The Iggy 0.9
+server (the client crate is 0.11) de-duplicates retried requests per client,
+not by message id, so a send that reached the server but timed out is stored
+twice. The publisher skips ids it remembers (`dedup_window`) for
+`mailbox.ready` and stream chunks, and a consumer that must be exactly-once, or
+that compares counts, de-duplicates on the message id.
 
 ## What this does not do
 
