@@ -5,7 +5,7 @@ Phase: phase-0-4-operational-assurance. Assignment source: .kbd-orchestrator/pha
 ## 1. Assemble and evaluate one candidate boundary packet
 
 - [x] 1.1 Implement the candidate-bound boundary runner and receipt/approval verifier; verify candidate packet fixture/manifest coverage by static inspection
-- [ ] 1.2 Assemble the completed candidate and record the final integration, review and publication dispositions; verify artifact links and contract/documentation handoff
+- [x] 1.2 Assemble the completed candidate and record the final integration, review and publication dispositions; verify artifact links and contract/documentation handoff
 
 Production fixtures and documentation are part of this coherent change. Final real verification is owned by oa-18 task 2, after all production edits; no per-edit Cargo/test loops. All OA scenarios and exact acceptance oracle are in design.md and the phase contract. Never check off either task by hand; begin/end through timeout-bounded kbd-apply with stdin closed.
 

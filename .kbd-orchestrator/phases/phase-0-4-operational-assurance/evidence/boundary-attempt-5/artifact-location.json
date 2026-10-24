@@ -1,0 +1,94 @@
+{
+  "candidate": "180a2c612030648902567ccce0823bc0a369658c",
+  "contract_digest": "e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257",
+  "retained_root": "/Users/gqadonis/.local/state/prometheus/operational-assurance/180a2c612030648902567ccce0823bc0a369658c",
+  "validation_input": "/Users/gqadonis/.local/state/prometheus/operational-assurance/180a2c612030648902567ccce0823bc0a369658c/export",
+  "packet": "/Users/gqadonis/.local/state/prometheus/operational-assurance/180a2c612030648902567ccce0823bc0a369658c/packet/packet.json",
+  "packet_status": "BLOCKED",
+  "publication": "NOT_EXERCISED",
+  "local_profiles": {
+    "baseline": {
+      "driver_exit": 2,
+      "PASS": 40,
+      "FAIL": 0,
+      "BLOCKED": 2,
+      "native_passed": 460,
+      "native_skipped": 119
+    },
+    "macos": {
+      "driver_exit": 0,
+      "PASS": 5
+    },
+    "ios": {
+      "driver_exit": 0,
+      "PASS": 4
+    }
+  },
+  "local_controls": {
+    "driver_exit": 0,
+    "PASS": 27,
+    "full_manifest_cases": 52,
+    "scope": "9 Loom,12 native,6 redb; not full OA12 certification",
+    "all_producer_receipts_verified": true
+  },
+  "old_recursion_control": {
+    "classification": "PASS",
+    "compile_exit": 0,
+    "discovery_exit": 0,
+    "designated_runtime_failure_exit": 101,
+    "ordinary_companion_exit": 0
+  },
+  "inventories": {
+    "local-controls-retained-files.json": {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/180a2c612030648902567ccce0823bc0a369658c/local-controls-retained-files.json",
+      "sha256": "7f6db9216dbe2e71e5e45098cf8f2b877e7e27c2f68d5a0f413b6775fd446047"
+    },
+    "stack-control-retained-files.json": {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/180a2c612030648902567ccce0823bc0a369658c/stack-control-retained-files.json",
+      "sha256": "a1fabbee6775613d7be3ed05f4c87469ea687c04e10531bd47081969523abc86"
+    },
+    "profiles-retained-files.json": {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/180a2c612030648902567ccce0823bc0a369658c/profiles-retained-files.json",
+      "sha256": "5a526a3fe1d6418fb7c4073eacfd822bf74533d0c9844c99fbfe87b54c74028f"
+    },
+    "export-retained-files.json": {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/180a2c612030648902567ccce0823bc0a369658c/export-retained-files.json",
+      "sha256": "9235297a61d6b22d481b4068295e29dace21a522de5c8d30b9ab4cbda0b0d4fa"
+    },
+    "packet-retained-files.json": {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/180a2c612030648902567ccce0823bc0a369658c/packet-retained-files.json",
+      "sha256": "3d90b17ad9751c5de8c78216fa58c117a9f0b2e152fad2cd43901730817ef65d"
+    },
+    "drivers/files-sha256.json": {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/180a2c612030648902567ccce0823bc0a369658c/drivers/files-sha256.json",
+      "sha256": "e45cf54cde7e5e30d97f75c884f6de714488c171a7ef15c37402e59d321f633f"
+    },
+    "pre-commit-scans-retained-files.json": {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/180a2c612030648902567ccce0823bc0a369658c/pre-commit-scans-retained-files.json",
+      "sha256": "b703c8e94865e20c73af2afced68bc2e3cd8c45b998504ddd6485f478094044b"
+    },
+    "closeout-retained-files.json": {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/180a2c612030648902567ccce0823bc0a369658c/closeout-retained-files.json",
+      "sha256": "31da33c3ca50db40c7a4d0d5af7a56254f0ac5acc70080a3521222d44ad63e22"
+    }
+  },
+  "changed_file_count": 664,
+  "changed_files_sha256": "db498515b0611c1bf7dfb3806a74d126195fdb93d41b7d134af7478a99400f07",
+  "limits": [
+    "Raw profiles include scratch preparation workspaces. Use exported job folders as packet-verifier input.",
+    "Only source candidate named here was executed. Subsequent documentation/runtime-record commits are not relabelled as tested candidates.",
+    "No authenticated remote provenance, release certification, signed release tag or publication is established by local records."
+  ],
+  "implementation_records": {
+    "revision": 1121,
+    "changes_complete": 18,
+    "tasks_complete": 36,
+    "reconciliation_exit": 0,
+    "clean": true,
+    "drifted": 0,
+    "errors": [],
+    "phase_stage": "execute",
+    "phase_stage_status": "in_progress",
+    "end_task_exit": 0
+  }
+}
