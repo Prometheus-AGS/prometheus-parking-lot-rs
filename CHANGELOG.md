@@ -13,7 +13,7 @@ entry names the OpenSpec change that made it.
 
 ### Changed (breaking)
 
-- **`LeaseQueue::identity` (0.3.0 gate review, C1).** `LeaseQueue` has a new
+- **`LeaseQueue::identity` (0.3.0 gate review).** `LeaseQueue` has a new
   required method, `fn identity(&self) -> &str`: a stable name for the queue,
   the same in every process and across restarts, that qualifies its entry ids.
   The built-in backends return `in-memory:<process nonce>:<instance>`,
@@ -22,19 +22,19 @@ entry names the OpenSpec change that made it.
   Custom queues and queue wrappers must implement it (wrappers forward it).
   The backend conformance suite checks it
   (`identity_is_stable_and_distinct`).
-- **Durable result keys (C1).** A `DurableResourcePool` result delivered
+- **Durable result keys.** A `DurableResourcePool` result delivered
   without a task idempotency key is keyed `"<queue identity>:entry:<entry
   id>"` instead of `"<pool name>:entry:<entry id>"`. `DurableOptions::with_name`
   now names the pool in logs, errors and events only. Pre-release users:
   drain durable queues before upgrading, or a task in flight across the
   upgrade can deliver a second result under the new key.
-- **Durable lifecycle events (W2).** `DurableResourcePool` emits one terminal
+- **Durable lifecycle events.** `DurableResourcePool` emits one terminal
   event per run, not per task: a run that ends in `Requeued` is followed by
   the task's next run. An enqueue that fails with an unknown outcome (a
   backend error) no longer emits `Rejected`, because the task may have been
   stored and may run; definite refusals (`QueueFull`, `CapacityExceeded`,
   `DeadlineExpired`, `PoolShutdown`, `InvalidConfig`) still do.
-- **Durable oversize tasks (W4).** A leased task too large for this pool is
+- **Durable oversize tasks.** A leased task too large for this pool is
   handed back (`nack`, requeued after one lease duration) instead of being
   delivered as `Dropped` and dead-lettered, so a consumer with more capacity
   can run it. It emits `Requeued`, not `Rejected`.
@@ -251,7 +251,7 @@ entry names the OpenSpec change that made it.
   byte, loses only itself) are counted (`lost()`) and logged, and `shutdown().await` drains the queue.
   `payload` is `TEXT` (the old, never-applied DDL said `JSONB`). Needs a Tokio
   runtime.
-- **Iggy topic retention (review W5).** `IggyOptions::with_retention` and
+- **Iggy topic retention.** `IggyOptions::with_retention` and
   `"retention_secs"` in the `iggy` backend section set the expiry of topics the
   crate creates. The default is unchanged (never expire), so operators must size
   the server's disk or set it.
@@ -454,8 +454,11 @@ entry names the OpenSpec change that made it.
   opens every backend (Postgres: connect, optional migration of the queue and
   mailbox schemas, `PgLeaseQueue`, `PgResultMailbox` and an optional
   `QueueListener`; redb: `EmbeddedStore`, `RedbLeaseQueue`,
-  `RedbResultMailbox`) and builds every pool with an in-memory queue and a
-  readable `SharedInMemoryMailbox`. One example per backend is in
+  `RedbResultMailbox`) and builds every pool. A pool whose `queue` and
+  `mailbox` are `"in_memory"` becomes a `ResourcePool` with a readable
+  `SharedInMemoryMailbox`; a pool whose `queue` and `mailbox` both name a
+  `postgres` or `redb` backend becomes a crash-durable `DurableResourcePool`
+  on it (cr-49). One example per backend is in
   `examples/configs/`, and the test suite loads and builds each of them, plus
   every JSON config block in the README and docs.
 
@@ -638,25 +641,25 @@ entry names the OpenSpec change that made it.
 
 ### Fixed
 
-- **Iggy personal access token printed by `Debug` (review C3).** A connection
+- **Iggy personal access token printed by `Debug`.** A connection
   string `iggy://<token>@host:8090` (one credential, no colon) is now masked
   whole in `IggyOptions` and `IggyBackendConfig` `Debug`. Before, only userinfo
   with a colon was masked, so the token was printed in full.
-- **`?password=` in a Postgres URL printed by `Debug` (review W2).** The value
+- **`?password=` in a Postgres URL printed by `Debug`.** The value
   of any `password` query parameter is masked in `PostgresBackendConfig` and
   `PgmqBackendConfig` `Debug`.
-- **Iggy message ids collided when task ids repeat (review W1).** Task ids are
+- **Iggy message ids collided when task ids repeat.** Task ids are
   caller-supplied (the README uses 0 for every task), so lifecycle ids built
   from pool, kind, task id and millisecond collided, and the publisher's repeat
   window dropped real events as "deduplicated". A lifecycle event now has its own
   id and bypasses the window; a `mailbox.ready` without an idempotency key gets a
   distinct id per notification. `TaskMetadata.id` is documented as caller-supplied.
-- **Iggy streams assumed the configured partition count (review W3).** A stream
+- **Iggy streams assumed the configured partition count.** A stream
   topic that already existed with another count made writes fail and readers wait
   forever. The sink and reader now read the topic's real partition count.
-- **An invalid Iggy `connection_string` loaded and then lost every event (review
-  W7).** It is now parsed with the Iggy client's parser during validation.
-- **Docs overclaimed the stream offset hint (review W4)**: a hint past the end
+- **An invalid Iggy `connection_string` loaded and then lost every event.**
+  It is now parsed with the Iggy client's parser during validation.
+- **Docs overclaimed the stream offset hint**: a hint past the end
   of a stream waits instead of reporting an error. `streaming-replay.md` and the
   `stream` module say so.
 - **`QueueFull` no longer refuses work that can start now (cr-20).** With
@@ -695,7 +698,7 @@ entry names the OpenSpec change that made it.
   `loom_skip_ahead` model now asserts the starvation bound itself
   (`skipped <= max_head_skips`) and that the guard engaged, and fails under
   the S-20 negative control.
-- **Durable exactly-one-result no longer depends on pool names (C1).**
+- **Durable exactly-one-result no longer depends on pool names.**
   Differently named pools consuming one queue stored a second result when a
   consumer died between delivery and ack, and pools on different queues
   sharing one mailbox dropped each other's results as duplicates (entry ids
@@ -704,22 +707,22 @@ entry names the OpenSpec change that made it.
   `durable_pools_on_two_queues_share_one_mailbox_and_keep_both_results` and
   the S-16 `pool_sigkill_*_between_delivery_and_ack` tests, whose restarted
   pool is named differently.
-- **Durable `ShutdownReport` (W1).** A task is counted when its lease is
+- **Durable `ShutdownReport`.** A task is counted when its lease is
   resolved: `completed` once its outcome is stored, `requeued` (and
   `cancelled`) when it is handed back, including a task whose delivery kept
   failing (it was reported `completed`). A task still delivering when the
   shutdown began is counted when it lands (it was counted nowhere), and the
   dispatcher no longer counts as an `unsettled` task.
-- **`ResourcePool` lost woken tasks on a panicking `Mailbox` or `AuditSink`
-  (W3).** A completion now starts the tasks it woke before it calls them.
-- **Durable pool had no bound for zero-cost tasks (W5).** New
+- **`ResourcePool` lost woken tasks on a panicking `Mailbox` or `AuditSink`.**
+  A completion now starts the tasks it woke before it calls them.
+- **Durable pool had no bound for zero-cost tasks.** New
   `DurableOptions::with_max_running` (default: `max_units`) bounds the tasks
   running at once.
-- **Durable cancellation (S1).** A running task cancelled at shutdown whose
+- **Durable cancellation.** A running task cancelled at shutdown whose
   executor panics while being dropped is handed back, not dead-lettered as
   `Failed`.
 - The S-21 negative control also suppresses the durable `Requeued` event, so
-  the durable requeue tests are covered by it (W7).
+  the durable requeue tests are covered by it.
 - **One undecodable task wedged the whole embedded queue.** `RedbLeaseQueue::lease`
   aborted its transaction on a stored task that did not decode as `P` (for
   example after an app update changed the payload type), leaving the entry at the
@@ -737,7 +740,7 @@ entry names the OpenSpec change that made it.
   the constructor returned, so every spawn went to a dead runtime.
   `TokioSpawner` now also implements `Debug`.
 
-- The WASM pool ignored `max_units` (audit C1); it now enforces capacity,
+- The WASM pool ignored `max_units`; it now enforces capacity,
   priority then FIFO order and the queue depth (cr-38).
 - **`PgmqLeaseQueue`: a nacked token could still be used (cr-30).** After
   `nack(Requeue { delay > 0 })` the old lease token passed the fence guard again
@@ -768,13 +771,35 @@ entry names the OpenSpec change that made it.
   promise that a cancelled receive keeps a notification. Callers already poll
   on `Wake::TimedOut`.
 - Release packaging: `cargo package --workspace` failed for
-  `prometheus-parking-lot-embedded` and the facade (a self dev-dependency
-  that carried a version); the six library crates now ship a README and the
+  `prometheus-parking-lot-embedded` (a self dev-dependency that carried a
+  version), and so for the facade, which depends on it; the six library crates now ship a README and the
   MIT license file; workspace version is 0.3.0.
 - Building the facade for `wasm32-unknown-unknown` needs
   `default-features = false`: the default `tokio-runtime` feature does not
   build for that target. README, `docs/API.md` and the crate docs say so, and
   CI checks it.
+- **Credentials holding `?`, `#`, `/`, `@` or `:` were printed by `Debug`.** The
+  redaction of Postgres, pgmq and Iggy connection strings split at the first
+  `?` or `/` before it found the userinfo, so `iggy://app:pa?ss@iggy:8090`
+  printed its password. The userinfo now ends at the last `@`, found before
+  any query string is read.
+- **Validating an `iggy+quic://` connection string built a client.** It did a
+  blocking name lookup, failed outside a tokio runtime and bound a UDP socket
+  inside one. `validate_connection_string` now parses with the Iggy
+  connection-string grammar for the string's transport and builds nothing.
+- **A configuration could name one queue twice, or use an empty name.** Two
+  `postgres` or two `pgmq` sections with the same database and `queue_name`,
+  or two `redb` sections with the same `path`, are rejected (the error names
+  both sections); the comparison is lexical and cannot see symlinks or a host
+  name versus its IP address. A pool or backend name must be 1 to 64
+  characters of ASCII letters, digits, `-` and `_`; an empty pool name used to
+  pass validation and fail after the backends were opened.
+- Docs: the message-id description for Iggy now matches the code (keyed
+  `mailbox.ready` ids and stream chunk ids are derived from the key; keyless
+  `mailbox.ready` and lifecycle ids use a per-instance nonce and sequence), the
+  Iggy 0.9 de-duplication note says "server", the `listen` setting says the
+  durable pool still polls (#54), and `docs/API.md` lists `pgmq` and the
+  per-field feature gates of `BuiltScheduler`.
 
 ### Known limitations
 

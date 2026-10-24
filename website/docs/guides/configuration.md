@@ -48,6 +48,10 @@ The schema is strict: an unknown or misspelled field fails to load, and the
 error names it. A value that fails validation is reported with its dotted path,
 for example `pools.inference.resource_limits.gpu_vram`.
 
+Pool and backend names are 1 to 64 characters of ASCII letters, digits, `-` and
+`_`: they label logs and events and appear in those dotted paths, and a bad one
+is reported as `pools["a b"]` before any backend is opened.
+
 What the builder makes of a pool:
 
 - both `"in_memory"`: a `ResourcePool` with an in-memory queue and a
@@ -96,6 +100,14 @@ for `redb`, `iggy` for `iggy`).
 | `iggy` | `iggy` | no | nothing: build `IggyHook` and `IggyNotifier` from `IggyBackendConfig::options()` |
 
 Each `postgres` or `redb` backend drives at most one pool.
+
+Two sections of one type that open the same queue are rejected, because a second
+handle on a queue would bypass that rule: two `redb` sections with the same
+`path`, or two `postgres` (or two `pgmq`) sections with the same database and
+`queue_name`. The error names both sections. The comparison is lexical: it
+treats `./a/../q.redb` and `q.redb`, or `postgresql://u@HOST/db` and
+`postgres://v@host:5432/db`, as the same, and it cannot see a symlink, a
+relative versus an absolute path, or a host name versus its IP address.
 
 ### `postgres`
 

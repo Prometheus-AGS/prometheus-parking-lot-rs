@@ -23,8 +23,14 @@ event.
   the caller never waits on the network.
 - `TokioHandleSpawner`, `TokioSleeper`, `RetryPolicy`.
 
-Message ids are deterministic UUIDv5 values, so a retried publish carries the
-same id.
+Every message carries a 128-bit UUIDv5 id, and a publisher retry resends the
+same message with the same id. Only a `mailbox.ready` notification for a result
+with an idempotency key, and a stream chunk, have an id derived from their key
+(the same in every process and after a restart). A keyless `mailbox.ready` and
+every lifecycle event get an id from a per-instance nonce and a sequence
+number: unique, not reproducible across processes, because task ids are
+caller-supplied and can repeat. Lifecycle events bypass the publisher's
+repeat-skipping window.
 
 ## Features
 

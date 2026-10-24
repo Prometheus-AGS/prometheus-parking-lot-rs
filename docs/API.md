@@ -60,10 +60,10 @@ returning a `ShutdownReport` (cr-29).
 | `PoolConfig { max_units, max_queue_depth, default_timeout_secs, queue, mailbox, max_head_skips, resource_limits }`, `StorageConfig` (`"in_memory"` or `{ "backend": name }`) | `config::*` | always |
 | `BackendConfig` (`"type": "postgres"` / `"redb"` / `"pgmq"` / `"iggy"`), `PostgresBackendConfig`, `RedbBackendConfig`, `PgmqBackendConfig`, `IggyBackendConfig` (`options()` with `iggy`; topics `lifecycle_topic`, `mailbox_topic`, `stream_topic`) | `config::*` | always (validation requires `postgres` / `embedded` / `iggy`) |
 | `ConfigError` (`Parse` names an unknown or missing field; `Invalid { field, reason }` with a dotted path) | `config::ConfigError` | always |
-| `build_pools_from_scheduler_config(cfg, executor_factory, spawner)` → `BuiltScheduler { pools, durable_pools, postgres, redb }` | `builders::*` | `tokio-runtime` |
-| `ConfiguredDurablePool` (`Postgres` / `Redb` variants; `submit`, `consume`, `shutdown`) | `builders::*` | `postgres` or `embedded` |
+| `build_pools_from_scheduler_config(cfg, executor_factory, spawner)` → `BuiltScheduler { pools, durable_pools, postgres, pgmq, redb }`. Per-field features: `pools` always (within `tokio-runtime`); `durable_pools` needs `postgres` or `embedded`; `postgres` and `pgmq` need `postgres`; `redb` needs `embedded` | `builders::*` | `tokio-runtime` |
+| `ConfiguredDurablePool` (`Postgres` / `Redb` variants; `submit`, `consume`, `shutdown`) | `builders::*` | `tokio-runtime` and (`postgres` or `embedded`); the `Postgres` variant needs `postgres`, the `Redb` variant `embedded` |
 | `ConfiguredPool { pool, mailbox }`, `SharedInMemoryMailbox` (`take`) | `builders::*` | `tokio-runtime` |
-| `PostgresBackend { queue, mailbox, listener, lease_for }`, `RedbBackend { store, queue, mailbox, lease_for }` | `builders::*` | `postgres`, `embedded` |
+| `PostgresBackend { queue, mailbox, listener, lease_for }`, `PgmqBackend`, `RedbBackend { store, queue, mailbox, lease_for }` | `builders::*` | `tokio-runtime` with `postgres` (`PostgresBackend`, `PgmqBackend`) or `embedded` (`RedbBackend`) |
 | `build_pools(cfg, queue_factory, mailbox_factory, executor_factory, spawner)` | `builders::build_pools` | `tokio-runtime` |
 
 A pool whose `queue` and `mailbox` are `"in_memory"` becomes a `ResourcePool`
@@ -156,7 +156,7 @@ queue stays in Postgres or redb.
 | `IggyOptions::new(connection_string)` | Stream `parking-lot`, topics `lifecycle` and `mailbox.ready`, 4 partitions, a 1024-event queue, a 2 s attempt timeout, `RetryPolicy::default()`, a 4096-id dedup window. `Debug` hides the password. |
 | `IggyHook::start(&options)` | A `Hook`: register it on a pool's `HookBus`. Publishes every `LifecycleEvent` to `lifecycle`, partitioned by `options.tenant`, else by pool. |
 | `IggyNotifier::start(&options)` | A `Notifier<T>`: wrap in `BackgroundNotifier::new(notifier, TokioHandleSpawner::current(), TokioSleeper)` and pass to `StorageMailbox::new(storage, ..)`. Publishes `mailbox.ready` (mailbox key, task id, status, `result_ref`) after the result is stored, partitioned by tenant. |
-| `ids::message_id`, `ids::mailbox_ready_id` | UUIDv5 message ids (as `u128`) from the idempotency key, or from the mailbox address and task id when there is none. |
+| `ids::message_id`, `ids::mailbox_ready_id` | UUIDv5 message ids (as `u128`) derived from a stable key: the idempotency key of a `mailbox.ready` notification, or a stream key and sequence number for a chunk. A keyless `mailbox.ready` and every lifecycle event get an id from a per-instance nonce and a sequence number instead: unique, not reproducible across processes. |
 | `Publisher`, `PublisherStats` (`hook.stats()`, `notifier.stats()`) | `enqueued`, `published`, `dropped` (queue full), `deduplicated`, `retried`, `failed`. `flush(timeout)` waits for the queue to drain. |
 | `IggyStreamSink::start(&options)` | Publishes task output streams to `stream.chunks` (cr-33). `writer(key)` (key = the idempotency key) gives a `StreamWriter`: `send(text)` returns the chunk's sequence number (from 1), `finish(StreamOutcome)` writes the end marker. `writer_from(key, next_seq)` continues after an executor restart. All messages of a stream go to one partition (`partition_for(key, partitions)`). |
 | `IggyStreamReader::connect(&options)` | `open(key)` or `resume(key, ResumePoint { after_seq, offset })` returns a `StreamCursor`; `next().await` yields `StreamItem::Chunk` / `StreamItem::End` in order, waiting for live chunks, then `None`. `item.resume_point()` is what a client stores. |
@@ -173,9 +173,10 @@ poisoned stream never gets an end marker.
 Publishing is off the dispatch path: `Hook::on_event` only serializes and does
 a non-blocking enqueue. While the server is slow or down the queue (default
 1024) fills and further events are dropped and counted; each message gets
-`RetryPolicy` attempts with a per-attempt timeout. Iggy 0.9 deduplicates
-retried requests per client, not by message id, so the publisher skips an id it
-published recently and a consumer that must be exactly-once across publisher
+`RetryPolicy` attempts with a per-attempt timeout. The Iggy server (0.9) deduplicates
+retried requests per client, not by message id, so the publisher skips a
+`mailbox.ready` or stream-chunk id it published recently (lifecycle events
+bypass that window) and a consumer that must be exactly-once across publisher
 restarts de-duplicates on the message id. Use an IPv4 literal such as
 `127.0.0.1` in the connection string when `localhost` resolves to `::1`.
 

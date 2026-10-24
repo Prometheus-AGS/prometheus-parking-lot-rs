@@ -869,3 +869,263 @@ fn config_iggy_retention_reaches_the_options() {
     let zero = json.replace("3600", "0");
     assert_eq!(invalid_field(&zero), "backends.ev.retention_secs");
 }
+
+/// Credentials that hold URL-reserved characters are still redacted from
+/// `Debug` by every backend section that prints a URL, and the error for a
+/// connection string that does not parse never repeats the secret. Iggy reads
+/// credentials as everything before the string's only `@`, so `?`, `#`, `/`
+/// and `:` are valid inside a password or token.
+#[cfg(all(feature = "postgres", feature = "iggy"))]
+#[test]
+fn config_debug_and_errors_hide_credentials_holding_reserved_characters() {
+    for reserved in ["?", "#", "/", ":", "@"] {
+        let secret = format!("se{reserved}cr3t");
+        let pg_url = format!("postgres://app:{secret}@db:5432/app");
+        let iggy_password = format!("iggy://app:{secret}@iggy:8090");
+        let iggy_token = format!("iggy://pat{reserved}cr3t@iggy:8090");
+        let json = format!(
+            r#"{{ "backends": {{
+                "db": {{ "type": "postgres", "url": "{pg_url}", "queue_name": "q",
+                         "max_depth": 10, "lease_secs": 30 }},
+                "mq": {{ "type": "pgmq", "url": "{pg_url}", "queue_name": "q",
+                         "max_depth": 10, "lease_secs": 30 }},
+                "ev1": {{ "type": "iggy", "connection_string": "{iggy_password}" }},
+                "ev2": {{ "type": "iggy", "connection_string": "{iggy_token}" }} }},
+                "pools": {{ "p": {{ {POOL} }} }} }}"#
+        );
+        // `@` inside iggy credentials is rejected by the Iggy parser, so that
+        // case cannot load; the rest load and must print without the secret.
+        if reserved == "@" {
+            let err = SchedulerConfig::from_json_str(&json).expect_err("`@` splits the userinfo");
+            assert!(!err.to_string().contains("cr3t"), "{err}");
+            let parsed: SchedulerConfig = serde_json::from_str(&json).expect("parses");
+            let shown = format!("{parsed:?}");
+            assert!(!shown.contains("cr3t"), "{reserved}: {shown}");
+            continue;
+        }
+        let parsed: SchedulerConfig = serde_json::from_str(&json).expect("parses");
+        let shown = format!("{parsed:?}");
+        assert!(!shown.contains("cr3t"), "{reserved}: {shown}");
+        // Valid for Iggy, so the section loads.
+        if reserved != ":" {
+            SchedulerConfig::from_json_str(&json).expect("iggy accepts the credentials");
+        }
+    }
+}
+
+/// The error for a connection string Iggy rejects names the field and never
+/// repeats the credentials, whatever is wrong with the string.
+#[cfg(feature = "iggy")]
+#[test]
+fn config_iggy_rejection_never_echoes_the_secret() {
+    for bad in [
+        "iggy://app:cr3t@iggy",
+        "iggy://app:cr3t@iggy:notaport",
+        "iggy+quic://app:cr3t@iggy",
+        "iggy://app:cr3t@iggy:8090?bogus=cr3t",
+        "iggy+pigeon://app:cr3t@iggy:8090",
+        "iggy://cr3t@iggy",
+    ] {
+        let json = format!(
+            r#"{{ "backends": {{ "ev": {{ "type": "iggy", "connection_string": "{bad}" }} }},
+                "pools": {{ "p": {{ {POOL} }} }} }}"#
+        );
+        let err = SchedulerConfig::from_json_str(&json).expect_err(bad);
+        assert_eq!(err.field(), Some("backends.ev.connection_string"), "{bad}");
+        assert!(!err.to_string().contains("cr3t"), "{bad} -> {err}");
+    }
+}
+
+/// QUIC, TCP and HTTP connection strings validate with no tokio runtime on
+/// the thread (this is a plain `#[test]`): validation parses, it builds no
+/// client, resolves no name and binds no socket.
+#[cfg(feature = "iggy")]
+#[test]
+fn config_iggy_connection_strings_validate_without_a_runtime() {
+    for good in [
+        "iggy+quic://app:s3cret@iggy.invalid:8080",
+        "iggy+tcp://app:s3cret@iggy.invalid:8090",
+        "iggy+http://app:s3cret@iggy.invalid:3000",
+    ] {
+        let json = format!(
+            r#"{{ "backends": {{ "ev": {{ "type": "iggy", "connection_string": "{good}" }} }},
+                "pools": {{ "p": {{ {POOL} }} }} }}"#
+        );
+        SchedulerConfig::from_json_str(&json).unwrap_or_else(|e| panic!("{good}: {e}"));
+    }
+}
+
+// ── names ────────────────────────────────────────────────────────────────────
+
+/// Pool and backend names label logs, hook events and the dotted paths of
+/// errors, and a durable pool refuses an empty one only after its backends
+/// are open. Validation rejects a bad name first, naming where it is.
+#[test]
+fn config_pool_and_backend_names_are_validated() {
+    let cfg_with_pool = |name: &str| SchedulerConfig {
+        backends: BTreeMap::new(),
+        pools: BTreeMap::from([(name.to_owned(), pool(4))]),
+    };
+    for bad in [
+        "",
+        "a b",
+        "a.b",
+        "pool/1",
+        "tab\t",
+        "naïve",
+        &"x".repeat(65),
+    ] {
+        let err = cfg_with_pool(bad).validate().expect_err(bad);
+        assert_eq!(
+            err.field().map(str::to_owned),
+            Some(format!("pools[{bad:?}]")),
+            "{bad:?}: {err}"
+        );
+        assert!(err.to_string().contains("name"), "{bad:?}: {err}");
+    }
+    for good in ["inference", "llm_inference", "gpu-1", "A", &"x".repeat(64)] {
+        cfg_with_pool(good)
+            .validate()
+            .unwrap_or_else(|e| panic!("{good}: {e}"));
+    }
+
+    // The same rule for a backend name, checked before any backend is built.
+    for bad in ["", "a b", "a.b"] {
+        let mut cfg = with_redb_backends(&["local"]);
+        let section = cfg.backends.remove("local").expect("section");
+        cfg.backends.insert(bad.to_owned(), section);
+        let err = cfg.validate().expect_err(bad);
+        assert_eq!(
+            err.field().map(str::to_owned),
+            Some(format!("backends[{bad:?}]")),
+            "{bad:?}: {err}"
+        );
+    }
+}
+
+/// Through JSON: the empty pool name fails the load, so no backend is opened.
+#[test]
+fn config_empty_pool_name_fails_the_load() {
+    let json = format!(r#"{{ "pools": {{ "": {{ {POOL} }} }} }}"#);
+    assert_eq!(invalid_field(&json), r#"pools[""]"#);
+}
+
+// ── two sections, one physical queue ─────────────────────────────────────────
+
+/// Redb sections `names`, each at the path given with it.
+#[cfg(feature = "embedded")]
+fn redb_paths(paths: &[(&str, &str)]) -> SchedulerConfig {
+    let mut cfg = one_pool(pool(4));
+    for (name, path) in paths {
+        cfg.backends.insert(
+            (*name).to_owned(),
+            BackendConfig::Redb(RedbBackendConfig {
+                path: PathBuf::from(path),
+                max_depth: 10,
+                lease_secs: 30,
+                max_attempts: None,
+            }),
+        );
+    }
+    cfg
+}
+
+/// Two redb sections on one file would open one store twice and bypass the
+/// one-pool-per-backend rule; the error names both sections.
+#[cfg(feature = "embedded")]
+#[test]
+fn config_two_redb_sections_on_one_path_are_rejected() {
+    for second in [
+        "./data/q.redb",
+        "data/q.redb",
+        "data/./q.redb",
+        "data//q.redb",
+        "data/sub/../q.redb",
+    ] {
+        let cfg = redb_paths(&[("a", "data/q.redb"), ("b", second)]);
+        let err = cfg.validate().expect_err(second);
+        assert_eq!(err.field(), Some("backends.b.path"), "{second}: {err}");
+        let message = err.to_string();
+        assert!(
+            message.contains("`a`") && message.contains("`b`"),
+            "names both sections: {message}"
+        );
+    }
+    redb_paths(&[("a", "data/a.redb"), ("b", "data/b.redb")])
+        .validate()
+        .expect("different files");
+    redb_paths(&[("a", "data/q.redb"), ("b", "other/q.redb")])
+        .validate()
+        .expect("same file name, different directory");
+}
+
+#[cfg(feature = "postgres")]
+fn pg_section(kind: &str, url: &str, queue: &str) -> String {
+    format!(
+        r#"{{ "type": "{kind}", "url": "{url}", "queue_name": "{queue}",
+            "max_depth": 10, "lease_secs": 30 }}"#
+    )
+}
+
+#[cfg(feature = "postgres")]
+fn pg_config(kind: &str, sections: &[(&str, &str, &str)]) -> Result<SchedulerConfig, ConfigError> {
+    let backends: Vec<String> = sections
+        .iter()
+        .map(|(name, url, queue)| format!(r#""{name}": {}"#, pg_section(kind, url, queue)))
+        .collect();
+    SchedulerConfig::from_json_str(&format!(
+        r#"{{ "backends": {{ {} }}, "pools": {{ "p": {{ {POOL} }} }} }}"#,
+        backends.join(", ")
+    ))
+}
+
+/// Two `postgres` or `pgmq` sections naming one queue in one database are one
+/// queue, however the URL is spelled; the error names both sections and never
+/// repeats the URL.
+#[cfg(feature = "postgres")]
+#[test]
+fn config_two_pg_sections_on_one_queue_are_rejected() {
+    const URL: &str = "postgres://app:s3cret@db.example:5432/app";
+    for kind in ["postgres", "pgmq"] {
+        for second in [
+            URL,
+            "postgresql://app:s3cret@db.example:5432/app",
+            "postgres://app:s3cret@DB.EXAMPLE/app",
+            "postgres://app:s3cret@db.example:5432/app/",
+            // A database is one database whichever role opens it.
+            "postgres://other:x@db.example:5432/app",
+        ] {
+            let err = pg_config(kind, &[("a", URL, "jobs"), ("b", second, "jobs")])
+                .expect_err(&format!("{kind} {second}"));
+            assert_eq!(
+                err.field(),
+                Some("backends.b.queue_name"),
+                "{second}: {err}"
+            );
+            let message = err.to_string();
+            assert!(
+                message.contains("`a`") && message.contains("`b`"),
+                "names both sections: {message}"
+            );
+            assert!(!message.contains("s3cret"), "{message}");
+        }
+        // Different queue, database, host or port: different queues.
+        for (second_url, second_queue) in [
+            (URL, "other"),
+            ("postgres://app:s3cret@db.example:5432/other", "jobs"),
+            ("postgres://app:s3cret@db2.example:5432/app", "jobs"),
+            ("postgres://app:s3cret@db.example:6543/app", "jobs"),
+        ] {
+            pg_config(kind, &[("a", URL, "jobs"), ("b", second_url, second_queue)])
+                .unwrap_or_else(|e| panic!("{kind} {second_url} {second_queue}: {e}"));
+        }
+    }
+    // A `postgres` and a `pgmq` section of the same name are not one queue:
+    // pgmq keeps its messages in its own tables.
+    let json = format!(
+        r#"{{ "backends": {{ "a": {}, "b": {} }}, "pools": {{ "p": {{ {POOL} }} }} }}"#,
+        pg_section("postgres", URL, "jobs"),
+        pg_section("pgmq", URL, "jobs")
+    );
+    SchedulerConfig::from_json_str(&json).expect("different queue kinds");
+}

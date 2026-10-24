@@ -2782,6 +2782,7 @@ name = "prometheus-parking-lot-iggy"
 version = "0.3.0"
 dependencies = [
  "iggy",
+ "iggy_common",
  "prometheus-parking-lot-core",
  "serde",
  "serde_json",

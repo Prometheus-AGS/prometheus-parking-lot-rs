@@ -1,5 +1,5 @@
 //! Scenario S-11 (cr-32): lifecycle events and `mailbox.ready` notifications
-//! reach a pinned Apache Iggy server with deterministic ids, and a server that
+//! reach a pinned Apache Iggy server with stable ids where a key exists, and a server that
 //! stops answering never slows the dispatch path.
 //!
 //! Every test starts an `apache/iggy` container, so each is `#[ignore]`d and
