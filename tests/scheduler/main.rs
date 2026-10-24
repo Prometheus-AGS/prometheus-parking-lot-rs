@@ -14,6 +14,18 @@
 //!   the outcome-to-lease mapping, on the in-memory reference backends.
 //! - `durable_lease`: a task running for three lease durations is never
 //!   leased by a second dispatcher (redb).
+//! - `durable_oversize`: a task too large for the consumers that lease it is
+//!   handed back up to the oversize attempt limit, then settled `Dropped`
+//!   with a `Rejected` event; a consumer that fits it still runs it first.
+//! - `durable_panic_race`: an executor panic that races a cancelling
+//!   shutdown fails the task instead of handing it back.
+//! - `durable_not_stored`: Postgres and pgmq enqueue failures before any
+//!   write (`NotStored`) emit `Rejected` (Docker, `#[ignore]`d).
+//!
+//! Pool construction:
+//!
+//! - `pool_builders`: `ResourcePool::with_name` and `with_resource_limit`
+//!   work before the first `submit` and panic after it, even when idle.
 //!
 //! Shutdown (cr-29):
 //!
@@ -43,8 +55,13 @@ mod support;
 mod durable_dispatch;
 #[cfg(feature = "embedded")]
 mod durable_lease;
+#[cfg(feature = "postgres")]
+mod durable_not_stored;
+mod durable_oversize;
+mod durable_panic_race;
 #[cfg(any(feature = "postgres", feature = "embedded"))]
 mod durable_shutdown;
 #[cfg(any(feature = "postgres", feature = "embedded"))]
 mod durable_sigkill;
+mod pool_builders;
 mod skip_ahead;

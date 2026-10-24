@@ -20,23 +20,40 @@
 //! 3. [`Started`](LifecycleEvent::Started) when the executor is about to run
 //!    it;
 //! 4. exactly one terminal event ([`LifecycleEvent::is_terminal`]):
-//!    `Completed`, `Failed`, `Rejected` (refused at submission, or by a
-//!    durable pool when its cost can never fit), `Cancelled` (shutdown),
+//!    `Completed`, `Failed`, `Rejected` (refused at submission; or, by a
+//!    durable pool, a leased task too large for every consumer that leased
+//!    it, once its attempts reach the pool's oversize attempt limit: it is
+//!    then settled as `Dropped` and dead-lettered), `Cancelled` (shutdown),
 //!    `Expired` (deadline passed before it started) or `Requeued` (a durable
-//!    pool handed it back to its queue; another run follows, in this or a
-//!    later process).
+//!    pool handed it back to its queue, including a task too large for that
+//!    pool below the limit; another run follows, in this or a later process).
 //!
 //! `Queued` and `Started` are optional (a task rejected at submission has
 //! neither; one cancelled while parked has no `Started`). A durable pool's
 //! task redelivered from its queue starts at `Queued`/`Started`: its
 //! `Submitted` was emitted by the process that accepted it.
 //!
-//! One exception to "exactly one terminal event": a parked task removed by
-//! `ResourcePool::prune_expired` (`Dispatcher::prune_expired`) emits *no*
-//! terminal event, because the `TaskQueue` contract does not return the ids
-//! of the tasks it prunes. Changing that contract is tracked for 0.4.0 in
-//! issue #57. A parked task whose deadline passes and that the drain finds
-//! at the head is reported as `Expired` as usual.
+//! Exceptions to "exactly one terminal event":
+//!
+//! - A parked task removed by `ResourcePool::prune_expired`
+//!   (`Dispatcher::prune_expired`) emits *no* terminal event, because the
+//!   `TaskQueue` contract does not return the ids of the tasks it prunes.
+//!   Changing that contract is tracked for 0.4.0 in issue #57. A parked task
+//!   whose deadline passes and that the drain finds at the head is reported
+//!   as `Expired` as usual.
+//! - A durable pool's `submit` whose enqueue fails with an *unknown* outcome
+//!   (`SchedulerError::Backend`, for example a connection lost during the
+//!   commit) emits `Submitted` and no terminal event: the task may have been
+//!   stored and may run, here or in another process, and that run emits its
+//!   own events. An enqueue that certainly stored nothing
+//!   (`SchedulerError::NotStored`, a full queue) is `Rejected`.
+//! - A durable pool's task can run more than once (a redelivery after a
+//!   crash or an expired lease, a hand-back), so for it the rule holds *per
+//!   run*, not per task: each run ends in exactly one terminal event, every
+//!   run but the last ends in `Requeued`, and only `Requeued` is followed by
+//!   further events (the next run's). Runs in other processes emit on their
+//!   own buses, so one bus can see a task's `Submitted` without its final
+//!   terminal event, or a run without its `Submitted`.
 //!
 //! ## Delivery and zero cost when empty
 //!
@@ -110,6 +127,12 @@ pub enum RejectionReason {
     },
     /// A custom reason provided by a policy implementation.
     Custom(String),
+    /// The durable queue's backend failed before it stored anything
+    /// (`SchedulerError::NotStored`: the task could not be serialised, no
+    /// connection or transaction could be opened, a statement failed before
+    /// the commit). Holds the error's text. Nothing was accepted, so
+    /// resubmitting cannot duplicate the task.
+    NotStored(String),
 }
 
 /// Reason a running task was cancelled before completion.
@@ -248,8 +271,9 @@ pub enum LifecycleEvent {
     },
 
     /// A durable pool handed a task back to its queue without an outcome
-    /// (shutdown, a delivery that kept failing, or a panic outside the
-    /// executor): it runs again on a later lease. Terminal for this run.
+    /// (shutdown, a cost too large for this pool that another consumer may
+    /// fit, a delivery that kept failing, or a panic outside the executor):
+    /// it runs again on a later lease. Terminal for this run.
     Requeued {
         /// Internal task ID.
         task_id: u64,

@@ -12,6 +12,11 @@ pub(super) const DEFAULT_NAME: &str = "resource_pool";
 /// Default interval between two `lease` calls while the queue is empty.
 const DEFAULT_POLL: Duration = Duration::from_millis(500);
 
+/// Default [`DurableOptions::oversize_attempt_limit`]: a task too large for
+/// the pools that lease it is offered four times (one lease duration apart)
+/// before the fifth lease settles it as dropped.
+const DEFAULT_OVERSIZE_ATTEMPT_LIMIT: u32 = 5;
+
 /// How a [`DurableResourcePool`](super::DurableResourcePool) leases, heartbeats
 /// and polls.
 ///
@@ -36,6 +41,7 @@ pub struct DurableOptions {
     hooks: HookBus,
     resource_limits: BTreeMap<ResourceKind, u32>,
     max_running: Option<u32>,
+    oversize_attempt_limit: u32,
 }
 
 impl DurableOptions {
@@ -53,6 +59,7 @@ impl DurableOptions {
             hooks: HookBus::new(),
             resource_limits: BTreeMap::new(),
             max_running: None,
+            oversize_attempt_limit: DEFAULT_OVERSIZE_ATTEMPT_LIMIT,
         }
     }
 
@@ -110,7 +117,9 @@ impl DurableOptions {
     /// Limit the units of dimension `kind` held by running tasks to `limit`
     /// (cr-23): a task starts only when its cost fits `max_units` and every
     /// limited kind at once, and a task over any limit is rejected at
-    /// submission (or settled as dropped when it is leased).
+    /// submission. A leased task over a limit (enqueued by a larger pool, or
+    /// directly) is handed back for another consumer, up to the
+    /// [oversize attempt limit](Self::with_oversize_attempt_limit).
     #[must_use]
     pub fn with_resource_limit(mut self, kind: ResourceKind, limit: u32) -> Self {
         self.resource_limits.insert(kind, limit);
@@ -126,6 +135,42 @@ impl DurableOptions {
     pub const fn with_max_running(mut self, max: u32) -> Self {
         self.max_running = Some(max);
         self
+    }
+
+    /// Bound how long a task too large for this pool keeps being handed back.
+    ///
+    /// A leased task whose cost exceeds this pool's `max_units` or a per-kind
+    /// limit cannot run here, but another consumer of the same queue may fit
+    /// it (mixed pool sizes, limits lowered during a rolling deploy), so the
+    /// pool hands it back with `nack(Requeue)` delayed by one lease duration.
+    /// When the task's attempt count (the queue's
+    /// [`LeasedTask::attempt`](prometheus_parking_lot_core::LeasedTask), 1 on
+    /// the first lease) has reached `limit`, the pool instead settles it: it
+    /// delivers `TaskStatus::Dropped` to the task's mailbox key (if any),
+    /// emits `Rejected` with `RejectionReason::CapacityExceeded`, and
+    /// dead-letters the entry. A consumer that can run the task runs it at
+    /// any attempt; the limit only applies to consumers that cannot.
+    ///
+    /// The attempt count includes every earlier lease of the entry (crash
+    /// redeliveries and shutdown hand-backs too), so a task with that history
+    /// reaches the limit after fewer oversize hand-backs. `1` drops such a
+    /// task on its first lease. With a backend attempt limit (for example
+    /// `PgLeaseQueue::with_max_attempts`), keep this at or below it, or the
+    /// backend dead-letters the task first, without a mailbox delivery.
+    /// Default: 5 (four hand-backs, one lease duration apart). Must be
+    /// greater than zero.
+    #[must_use]
+    pub const fn with_oversize_attempt_limit(mut self, limit: u32) -> Self {
+        self.oversize_attempt_limit = limit;
+        self
+    }
+
+    /// The attempt at which a task too large for this pool is settled as
+    /// dropped instead of handed back; see
+    /// [`with_oversize_attempt_limit`](Self::with_oversize_attempt_limit).
+    #[must_use]
+    pub const fn oversize_attempt_limit(&self) -> u32 {
+        self.oversize_attempt_limit
     }
 
     /// The bound set with [`with_max_running`](Self::with_max_running), if
@@ -201,6 +246,11 @@ impl DurableOptions {
                 "durable pool: the poll interval must be greater than zero",
             ));
         }
+        if self.oversize_attempt_limit == 0 {
+            return Err(SchedulerError::invalid_config(
+                "durable pool: the oversize attempt limit must be greater than zero",
+            ));
+        }
         if self.max_running == Some(0) {
             return Err(SchedulerError::invalid_config(
                 "durable pool: the running-task bound must be greater than zero",
@@ -246,6 +296,16 @@ mod tests {
         assert!(
             DurableOptions::new(Duration::from_secs(3))
                 .with_max_running(0)
+                .validate()
+                .is_err()
+        );
+        assert_eq!(
+            options.oversize_attempt_limit(),
+            DEFAULT_OVERSIZE_ATTEMPT_LIMIT
+        );
+        assert!(
+            DurableOptions::new(Duration::from_secs(3))
+                .with_oversize_attempt_limit(0)
                 .validate()
                 .is_err()
         );
