@@ -1395,7 +1395,7 @@
   "source_sha256": {
     ".github/scripts/check-wasm-graph.sh": "346147af0925cff1a5afcf4844fae6c8f514939b54ef3db7d79c25d8b426992a",
     ".github/wasm-browser-assurance.json": "c0914d1180577d6664a3e9e57ccf1cdda664fd4e8ff4ab1736b7b29a798b9379",
-    ".github/workflows/ci.yml": "2e4d7d08616368d89805464572dd8e724927bfeeb029968bedf649d46b3ce7d9",
+    ".github/workflows/ci.yml": "46f93e6c0552445480e50cf7708c795aa785dc873abf3ce23dd8e92ac6b8fb45",
     "Cargo.lock": "7a84a14ee557b99a95ea93a4a9e78ed6e3032920115edda63badfb85b52c3371",
     "Cargo.toml": "f628f145f4d317210688fff2a94aff0de1415f7cebe479a146b359c7c525e38b",
     "crates/parking-lot-core/Cargo.toml": "47a7961c72d26cf1813e06149e2447377fc225e695d4c0cce47a5e8af88d0fe0",

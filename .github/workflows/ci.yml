@@ -369,10 +369,34 @@ jobs:
           push: false
           cache-from: type=gha,scope=parking-lot-pg-${{ matrix.pg }}
           cache-to: type=gha,mode=max,scope=parking-lot-pg-${{ matrix.pg }},ignore-error=true
+      - name: Provision physical-upgrade images on the default hosted runner
+        if: matrix.adapter == 'upgrade' && runner.environment == 'github-hosted' && vars.PG_UPGRADE_RUNNER == '' && vars.PG_UPGRADE_PG17_IMAGE_ID == '' && vars.PG_UPGRADE_PG18_IMAGE_ID == '' && vars.PG_UPGRADE_IMAGE_ID == ''
+        run: |
+          set -euo pipefail
+          # The default Docker driver can resolve the ID-derived local FROM
+          # aliases; a separate docker-container builder cannot see these images.
+          docker build --builder default -f docker/postgres17/Dockerfile -t parking-lot-pg:17 docker
+          docker build --builder default -f docker/postgres18/Dockerfile -t parking-lot-pg:18 docker
+          pg17_id=$(docker image inspect parking-lot-pg:17 --format '{{.Id}}')
+          pg18_id=$(docker image inspect parking-lot-pg:18 --format '{{.Id}}')
+          pg17_alias="oa14-local/pg17:${pg17_id#sha256:}"
+          pg18_alias="oa14-local/pg18:${pg18_id#sha256:}"
+          docker tag "$pg17_id" "$pg17_alias"
+          docker tag "$pg18_id" "$pg18_alias"
+          upgrade_tag="oa14-local/upgrade:${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker build --builder default -f docker/postgres18/upgrade/Dockerfile \
+            --build-arg "PG17_IMAGE=$pg17_alias" \
+            --build-arg "PG18_IMAGE=$pg18_alias" \
+            --build-arg "PG17_SOURCE_ID=$pg17_id" \
+            --build-arg "PG18_SOURCE_ID=$pg18_id" \
+            -t "$upgrade_tag" docker
+          upgrade_id=$(docker image inspect "$upgrade_tag" --format '{{.Id}}')
+          printf 'OA12_PG17_IMAGE=%s\nOA12_PG18_IMAGE=%s\nOA12_UPGRADE_IMAGE=%s\n' \
+            "$pg17_id" "$pg18_id" "$upgrade_id" >> "$GITHUB_ENV"
       # Every Cargo process is awaited by one runner. Baseline and mutant use
       # different target directories/RUSTFLAGS; compile/discovery failures and
       # timeouts never count as a designated assertion. Browser/upgrade tools
-      # must be provisioned before validation (hosted browser setup above, or
+      # must be provisioned before validation (hosted setup above, or
       # explicit preconfigured environments); missing inputs fail with BLOCKED.
       - name: Compile, discover and exercise the production defect oracle
         run: python3 .github/scripts/tests/negative-controls.py run --case '${{ matrix.id }}' --output '${{ runner.temp }}/oa12-${{ matrix.id }}'

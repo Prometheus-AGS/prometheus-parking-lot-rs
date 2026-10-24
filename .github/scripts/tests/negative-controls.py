@@ -545,7 +545,7 @@ def main() -> int:
         if args.operation == "matrix":
             inventory(manifest)
             print(json.dumps({"include": [{key: case.get(key, "") for key in ("id", "adapter", "pg")}
-                                          for case in manifest["cases"]]}, separators=(",", ":")))
+                                          for case in sorted(manifest["cases"], key=lambda case: case["adapter"] != "upgrade")]}, separators=(",", ":")))
         elif args.operation == "run":
             run_case(args, manifest)
         else:
