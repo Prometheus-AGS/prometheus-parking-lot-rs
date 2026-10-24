@@ -1,0 +1,25 @@
+commit a3e517fe95dc31311f5c781bed490bdfdbc1372b rustc rustc 1.99.1 (58cf8f9c3 2026-10-13) date 2026-10-24T08:25:57Z
+01-fmt rc=0 0s :: cargo fmt --all -- --check
+02-clippy rc=0 14s :: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+03-clippy-wasm32 rc=0 4s :: cargo clippy --locked --target wasm32-unknown-unknown -p prometheus-parking-lot-core -p prometheus-parking-lot-wasm --all-targets --all-features -- -D warnings
+04-nextest rc=0 88s :: cargo nextest run --workspace --all-features --locked --no-tests=fail
+05-docker-pg18 rc=0 105s :: PARKING_LOT_PG_MAJOR=18 cargo nextest run --workspace --all-features --locked --run-ignored all --no-fail-fast --no-tests=fail
+06-docker-pg17 rc=0 88s :: PARKING_LOT_PG_MAJOR=17 cargo nextest run --workspace --all-features --locked --run-ignored all --no-fail-fast --no-tests=fail -E "package(prometheus-parking-lot-pg) | test(config_postgres_) | test(config_pgmq_) | test(pool_sigkill_) | test(shutdown_durable_pg_)"
+07-msrv rc=0 104s :: cargo +1.95 check --workspace --all-targets --all-features --locked
+08-loom rc=0 7s :: RUSTFLAGS="--cfg parking_lot_loom" LOOM_MAX_PREEMPTIONS=3 CARGO_TARGET_DIR=$PWD/target-gate-loom cargo test -p prometheus-parking-lot-core --test loom_capacity --test loom_wakeup --test loom_vector --test loom_skip_ahead --test loom_at_depth --locked
+09-doctest rc=0 7s :: cargo test --doc --workspace --all-features --locked
+10-rustdoc rc=0 15s :: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --all-features --locked
+11-deny rc=0 2s :: cargo deny --workspace --all-features --locked check
+12-package rc=0 25s :: cargo package --workspace --locked --exclude prometheus-parking-lot-ffi
+13-gitleaks rc=1 9s :: gitleaks detect --redact --no-banner --log-opts="--all"
+STOP at 13-gitleaks (rc=1)
+-- resumed from 13 after gate-script correction (amendment 2026-10-23 (1))
+commit a3e517fe95dc31311f5c781bed490bdfdbc1372b rustc rustc 1.99.1 (58cf8f9c3 2026-10-13) date 2026-10-24T08:35:32Z
+13-supply-chain rc=0 3s :: bash .github/scripts/supply-chain.sh tracked-credentials && bash .github/scripts/supply-chain.sh secrets-diff bbd2b96^..HEAD && bash .github/scripts/supply-chain.sh package-allowlist
+14-core-graph rc=0 1s :: bash .github/scripts/check-wasm-graph.sh && ! cargo tree -p prometheus-parking-lot-core -e normal --locked | grep -E " (tokio|sqlx|sea-orm|iggy|redb|reqwest) v" && ! cargo tree -p prometheus-parking-lot-core --target wasm32-unknown-unknown -e normal --locked | grep -E " tokio v"
+15-wasm-node rc=0 9s :: PATH=/private/tmp/claude-501/-Volumes-T7-Projects-prometheus-prometheus-parking-lot/d281c3f1-466c-41cb-b006-ce00f1aa43b6/scratchpad/wbg/bin:$PATH cargo test --locked --target wasm32-unknown-unknown -p prometheus-parking-lot-wasm
+16-android rc=0 27s :: cargo ndk -t arm64-v8a check -p prometheus-parking-lot-ffi --locked
+17-ios-sim rc=0 5s :: cargo check -p prometheus-parking-lot-ffi --target aarch64-apple-ios-sim --locked
+18-examples-build rc=0 1s :: cargo build --examples --workspace --all-features --locked && /usr/bin/python3 .github/scripts/check-doc-snippets.py && /usr/bin/python3 .github/scripts/check-orphan-tests.py
+19-site rc=0 164s :: npm --prefix website ci && npm --prefix website run build && npm --prefix website run verify
+ALL PASS

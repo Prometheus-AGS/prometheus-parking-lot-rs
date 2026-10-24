@@ -2,16 +2,16 @@
   "schemaVersion": "2",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 380,
-  "derivedRevision": 380,
+  "sourceRevision": 621,
+  "derivedRevision": 621,
   "frontier": {
-    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 380
+    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 621
   },
   "conflictCount": 0,
   "phase": "phase-correctness-and-durability",
   "phaseId": "phase-correctness-and-durability",
   "parentPhase": null,
-  "last_updated": "2026-10-22T20:47:09.078073Z",
+  "last_updated": "2026-10-23T20:52:28.727865Z",
   "last_updated_by": "kbd-runtime",
   "changes_total": 37,
   "changes_completed": 6,
@@ -208,9 +208,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 4,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Register unit/integration suites as test targets in their crates",
+      "tasks_done": 3,
+      "last_task_completed": "Add the orphan-test check script to CI",
+      "next_task_pending": "Independent review at the merge gate (no test silently dropped)",
       "blockers": []
     },
     {
@@ -219,9 +219,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Archive invalid docs (PLAN-/SPEC-/TASKS-*, primitives docs, stale reports) to docs/archive/ with an index of reasons",
+      "tasks_done": 2,
+      "last_task_completed": "Rewrite README.md against the real API and wire it as a doctest on the facade (tech-lead applies the lib.rs attribute)",
+      "next_task_pending": "Independent review at the merge gate (no stale API claims remain)",
       "blockers": []
     },
     {
@@ -230,9 +230,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "catch_unwind + RAII permits on every execution path; worker respawn; counters",
+      "tasks_done": 2,
+      "last_task_completed": "Panic tests for ResourcePool and the native WorkerPool, with a negative control under --cfg parking_lot_negative_control (catch_unwind skipped)",
+      "next_task_pending": "Independent review at the merge gate (unwind safety, permit release on all paths)",
       "blockers": []
     },
     {
@@ -241,9 +241,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 4,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "One-day spike: redb vs rustqueue; record the decision in docs/adr",
+      "tasks_done": 3,
+      "last_task_completed": "Conformance suite + crash-point fault-injection tests; negative control under --cfg parking_lot_negative_control skips the redb commit and must lose a task",
+      "next_task_pending": "Independent review at the merge gate (durability under crash)",
       "blockers": []
     },
     {
@@ -252,9 +252,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Replace condvar slots with oneshot/Notify slots; blocking API via blocking_recv; TTL sweeper",
+      "tasks_done": 2,
+      "last_task_completed": "Load test for blocking-thread usage and TTL tests",
+      "next_task_pending": "Independent review at the merge gate (no blocking in async context)",
       "blockers": []
     },
     {
@@ -263,9 +263,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 4,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Lease/ack/nack/extend SQL and migrations; LISTEN/NOTIFY wake-up; reaper; backoff",
+      "tasks_done": 3,
+      "last_task_completed": "Conformance suite + SIGKILL redelivery + concurrent dispatcher tests on the PG18 image; negative controls under --cfg parking_lot_negative_control (lease never expires; SKIP LOCKED omitted)",
+      "next_task_pending": "Independent review at the merge gate (SQL correctness, isolation level, lease races)",
       "blockers": []
     },
     {
@@ -274,9 +274,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Port the wasm pool onto the dispatcher in parking-lot-wasm (spawn_local + JS timers, capacity admission, budgets); getrandom config; document panic=abort limit",
+      "tasks_done": 2,
+      "last_task_completed": "CI wasm check, core dependency-graph check, and wasm-bindgen-test smoke/capacity/budget job",
+      "next_task_pending": "Independent review at the merge gate (no tokio runtime on wasm)",
       "blockers": []
     },
     {
@@ -285,9 +285,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Mailbox SQL (DELETE ... RETURNING, TTL, ON CONFLICT) and migration",
+      "tasks_done": 2,
+      "last_task_completed": "Async implementation + conformance tests on PG18; consume-once race test with two transactions coordinated by a barrier; remove sea-orm/sqlx 0.8 from parking-lot-pg via tech-lead Cargo handoff",
+      "next_task_pending": "Independent review at the merge gate (consume-once race, TTL)",
       "blockers": []
     },
     {
@@ -296,9 +296,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Config types + validation + builder",
+      "tasks_done": 2,
+      "last_task_completed": "Doc-example deserialization tests",
+      "next_task_pending": "Independent review at the merge gate (schema strictness)",
       "blockers": []
     },
     {
@@ -307,9 +307,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "SQL implementation over pgmq functions with visibility-timeout leases and per-priority queues; add the pgmq config section and example test (tech-lead config handoff)",
+      "tasks_done": 2,
+      "last_task_completed": "Conformance suite against the PG18 image with pgmq",
+      "next_task_pending": "Independent review at the merge gate (lease mapping to visibility timeout)",
       "blockers": []
     },
     {
@@ -318,9 +318,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "StorageMailbox<S, N> behaviour in crates/parking-lot-core/src/mailbox/ with off-path bounded notification",
+      "tasks_done": 2,
+      "last_task_completed": "Failure-injection tests in prometheus-parking-lot-core with in-memory storage and a failing notifier",
+      "next_task_pending": "Independent review at the merge gate (ordering of store vs notify)",
       "blockers": []
     },
     {
@@ -329,9 +329,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "UniFFI crate over the embedded backend; generated bindings",
+      "tasks_done": 2,
+      "last_task_completed": "Android/iOS check jobs; Tauri example with restart test",
+      "next_task_pending": "Independent review at the merge gate (FFI safety (crate denies unsafe outside generated code))",
       "blockers": []
     },
     {
@@ -340,9 +340,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 4,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Dispatcher sources from TaskQueue::lease when durable; persist-before-accept on submit; ack after mailbox write; lease heartbeat",
+      "tasks_done": 3,
+      "last_task_completed": "Child-process SIGKILL tests for ResourcePool on PG18 and redb, ack-ordering test, long-task lease test, negative control",
+      "next_task_pending": "Independent review at the merge gate (durability ordering: persist, lease, deliver, ack)",
       "blockers": []
     },
     {
@@ -351,9 +351,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "CI matrix job (handoff to platform-engineer) and per-table autovacuum migration",
+      "tasks_done": 2,
+      "last_task_completed": "PG18 runbook",
+      "next_task_pending": "Independent review at the merge gate (matrix coverage)",
       "blockers": []
     },
     {
@@ -362,9 +362,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 4,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Wire ShutdownPolicy + cancellation channel into ResourcePool and WorkerPool; fix received-task drop",
+      "tasks_done": 3,
+      "last_task_completed": "Shutdown and restart tests on PG18 and redb; negative control under --cfg parking_lot_negative_control drops a received task and must be detected",
+      "next_task_pending": "Independent review at the merge gate (no silent loss on any shutdown path)",
       "blockers": []
     },
     {
@@ -373,9 +373,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Emit events from the dispatcher and pools; builder registration (tech-lead handoff); hooks.rs API adjustments via events-engineer handoff",
+      "tasks_done": 2,
+      "last_task_completed": "Ordering tests and overhead benchmark",
+      "next_task_pending": "Independent review at the merge gate (event completeness, overhead)",
       "blockers": []
     },
     {
@@ -384,9 +384,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Skip-ahead policy with starvation guard (config field via tech-lead handoff); emit lifecycle events for skipped/promoted dispatch",
+      "tasks_done": 2,
+      "last_task_completed": "Starvation and utilization tests/benchmarks; event-ordering test still passes",
+      "next_task_pending": "Independent review at the merge gate (starvation bound proof)",
       "blockers": []
     },
     {
@@ -395,9 +395,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "IggyHook + IggyNotifier with bounded publisher and UUIDv5 IDs; iggy config section + example test (tech-lead config handoff)",
+      "tasks_done": 2,
+      "last_task_completed": "Integration tests against a pinned Iggy 0.11-compatible server container: same idempotency key published twice yields one message ID; a paused server does not raise dispatch latency beyond the bound",
+      "next_task_pending": "Independent review at the merge gate (backpressure, ID determinism)",
       "blockers": []
     },
     {
@@ -406,9 +406,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Vector-aware semaphore/dispatcher admission; multi-dimension limits via tech-lead config handoff; lifecycle events per dimension",
+      "tasks_done": 2,
+      "last_task_completed": "Extend loom/proptest invariants and negative controls to vectors",
+      "next_task_pending": "Independent review at the merge gate (invariant per dimension)",
       "blockers": []
     },
     {
@@ -417,9 +417,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "IggyStreamSink and resume API",
+      "tasks_done": 2,
+      "last_task_completed": "Disconnect/reconnect test",
+      "next_task_pending": "Independent review at the merge gate (gap/duplicate proof)",
       "blockers": []
     },
     {
@@ -428,9 +428,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Prune dependencies (handoff Cargo.toml edits to tech-lead)",
+      "tasks_done": 2,
+      "last_task_completed": "cargo-semver-checks + udeps CI jobs",
+      "next_task_pending": "Independent review at the merge gate (no needed dependency removed)",
       "blockers": []
     },
     {
@@ -439,9 +439,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Criterion suites (throughput, latency, utilization)",
+      "tasks_done": 2,
+      "last_task_completed": "Bench CI job and ARCHITECTURE.md numbers (tech-lead)",
+      "next_task_pending": "Independent review at the merge gate (benchmark validity)",
       "blockers": []
     },
     {
@@ -450,9 +450,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 4,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Write scenario guides backed by examples/ sources; every JSON/TOML config shown is added to the config example test (tech-lead reviews API usage)",
+      "tasks_done": 3,
+      "last_task_completed": "Hand platform-engineer the docs-example CI job",
+      "next_task_pending": "Independent review at the merge gate (examples compile and match the API)",
       "blockers": []
     },
     {
@@ -461,9 +461,9 @@
       "status": "PENDING",
       "implementation_status": "PENDING",
       "tasks_total": 3,
-      "tasks_done": 0,
-      "last_task_completed": null,
-      "next_task_pending": "Adapt the WASM pool to vector admission, skip-ahead and lifecycle events",
+      "tasks_done": 2,
+      "last_task_completed": "Shared admission/event cases under wasm-bindgen-test",
+      "next_task_pending": "Independent review at the merge gate (parity with native pools)",
       "blockers": []
     },
     {

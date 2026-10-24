@@ -2,6 +2,6 @@ Model and worker assignments for these tasks: `.kbd-orchestrator/phases/phase-co
 
 ## 1. Dependency prune and semver checks
 
-- [ ] 1.1 Prune dependencies (handoff Cargo.toml edits to tech-lead)
-- [ ] 1.2 cargo-semver-checks + udeps CI jobs
+- [x] 1.1 Prune dependencies (handoff Cargo.toml edits to tech-lead)
+- [x] 1.2 cargo-semver-checks + udeps CI jobs
 - [ ] 1.3 Independent review at the merge gate (no needed dependency removed)

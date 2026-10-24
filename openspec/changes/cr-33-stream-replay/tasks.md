@@ -2,6 +2,6 @@ Model and worker assignments for these tasks: `.kbd-orchestrator/phases/phase-co
 
 ## 1. (Stretch) Streaming-token replay for reconnecting clients
 
-- [ ] 1.1 IggyStreamSink and resume API
-- [ ] 1.2 Disconnect/reconnect test
+- [x] 1.1 IggyStreamSink and resume API
+- [x] 1.2 Disconnect/reconnect test
 - [ ] 1.3 Independent review at the merge gate (gap/duplicate proof)

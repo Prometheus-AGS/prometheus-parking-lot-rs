@@ -2,13 +2,13 @@
   "schemaVersion": "1",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 380,
-  "derivedRevision": 380,
+  "sourceRevision": 621,
+  "derivedRevision": 621,
   "frontier": {
-    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 380
+    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 621
   },
   "conflictCount": 0,
-  "updatedAt": "2026-10-22T20:47:09.078073Z",
+  "updatedAt": "2026-10-23T20:52:28.727865Z",
   "cursor": [
     "phase-correctness-and-durability",
     "execute",
@@ -286,7 +286,7 @@
             "id": "cr-35-test-targets",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 3,
               "total": 4
             }
           },
@@ -295,7 +295,7 @@
             "id": "cr-16-docs-truth",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -304,7 +304,7 @@
             "id": "cr-21-panic-containment",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -313,7 +313,7 @@
             "id": "cr-28-embedded-redb-queue",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 3,
               "total": 4
             }
           },
@@ -322,7 +322,7 @@
             "id": "cr-22-result-slots",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -331,7 +331,7 @@
             "id": "cr-26-pg-lease-queue",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 3,
               "total": 4
             }
           },
@@ -340,7 +340,7 @@
             "id": "cr-38-wasm-target",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -349,7 +349,7 @@
             "id": "cr-27-pg-mailbox",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -358,7 +358,7 @@
             "id": "cr-37-config-schema",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -367,7 +367,7 @@
             "id": "cr-30-pgmq-sql-backend",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -376,7 +376,7 @@
             "id": "cr-34-mailbox-composition",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -385,7 +385,7 @@
             "id": "cr-44-mobile-desktop-bindings",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -394,7 +394,7 @@
             "id": "cr-49-durable-dispatch",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 3,
               "total": 4
             }
           },
@@ -403,7 +403,7 @@
             "id": "cr-36-pg-matrix",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -412,7 +412,7 @@
             "id": "cr-29-shutdown-cancellation",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 3,
               "total": 4
             }
           },
@@ -421,7 +421,7 @@
             "id": "cr-31-hook-emission",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -430,7 +430,7 @@
             "id": "cr-20-skip-ahead",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -439,7 +439,7 @@
             "id": "cr-32-iggy-events",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -448,7 +448,7 @@
             "id": "cr-23-multi-resource",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -457,7 +457,7 @@
             "id": "cr-33-stream-replay",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -466,7 +466,7 @@
             "id": "cr-39-dependency-hygiene",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -475,7 +475,7 @@
             "id": "cr-40-benchmarks",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },
@@ -484,7 +484,7 @@
             "id": "cr-47-docs-guides",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 3,
               "total": 4
             }
           },
@@ -493,7 +493,7 @@
             "id": "cr-53-wasm-parity",
             "status": "PENDING",
             "progress": {
-              "done": 0,
+              "done": 2,
               "total": 3
             }
           },

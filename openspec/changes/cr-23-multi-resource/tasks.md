@@ -2,6 +2,6 @@ Model and worker assignments for these tasks: `.kbd-orchestrator/phases/phase-co
 
 ## 1. Multi-resource cost vectors (e.g. VRAM + worker slots)
 
-- [ ] 1.1 Vector-aware semaphore/dispatcher admission; multi-dimension limits via tech-lead config handoff; lifecycle events per dimension
-- [ ] 1.2 Extend loom/proptest invariants and negative controls to vectors
+- [x] 1.1 Vector-aware semaphore/dispatcher admission; multi-dimension limits via tech-lead config handoff; lifecycle events per dimension
+- [x] 1.2 Extend loom/proptest invariants and negative controls to vectors
 - [ ] 1.3 Independent review at the merge gate (invariant per dimension)

@@ -2,10 +2,10 @@
   "schemaVersion": "5",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 380,
-  "derivedRevision": 380,
+  "sourceRevision": 621,
+  "derivedRevision": 621,
   "frontier": {
-    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 380
+    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 621
   },
   "conflictCount": 0,
   "projectId": "f6c384db-6ee1-4f1b-9bab-0e1602ec2615",
@@ -31,9 +31,9 @@
   "implementationCompleted": 20,
   "implementationTotal": 51,
   "planRevision": 1,
-  "revision": 380,
+  "revision": 621,
   "exactNextCommand": "/kbd-assess phase-correctness-and-durability",
   "nextChange": "cr-15-containment",
   "nextTask": "1",
-  "updatedAt": "2026-10-22T20:47:09.078073Z"
+  "updatedAt": "2026-10-23T20:52:28.727865Z"
 }
