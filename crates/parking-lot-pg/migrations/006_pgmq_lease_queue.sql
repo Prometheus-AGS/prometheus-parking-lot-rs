@@ -88,6 +88,24 @@ BEGIN
 END
 $$;
 
+-- Is the entry delayed by a nack right now? The fence guard of every statement
+-- keyed by a lease token (src/pgmq/sql.rs, `held`) calls this in the WHERE
+-- clause of its `FOR UPDATE` row lock. It is plpgsql and VOLATILE on purpose:
+-- when a statement waits for the row lock and then re-checks the new row
+-- version (READ COMMITTED's EvalPlanQual), a plain subquery on this table would
+-- still read the statement's old snapshot and miss a nack that committed
+-- meanwhile, but every query a volatile plpgsql function runs takes a fresh
+-- snapshot. Do not rewrite it as LANGUAGE sql or mark it STABLE: the planner
+-- would inline or cache it and the re-check would go blind again.
+CREATE OR REPLACE FUNCTION pl_pgmq_is_delayed(queue text, entry bigint) RETURNS boolean
+    LANGUAGE plpgsql VOLATILE AS $$
+BEGIN
+    RETURN EXISTS (SELECT 1 FROM pl_pgmq_aux
+                    WHERE queue_name = queue AND entry_id = entry
+                      AND delayed_until > clock_timestamp());
+END;
+$$;
+
 -- pgmq's own tables. pgmq.create() builds pgmq.q_<name> (and pgmq.a_<name>, the
 -- archive, which PgmqLeaseQueue never writes to: it deletes). The q_ tables take
 -- the same churn as pl_lease_queue (send, read bumps vt and read_ct, delete), so

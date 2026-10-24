@@ -39,7 +39,8 @@
 //! | the executor returned a value | `Completed` with the value | ack |
 //! | executor error, panic, budget exceeded | `Failed(error)` | dead-letter |
 //! | deadline passed before the task started | `Expired` | dead-letter |
-//! | cost exceeds this pool's capacity (another consumer may fit it) | nothing | nack (requeue after one lease duration) |
+//! | cost exceeds this pool's capacity, attempt below the oversize limit (another consumer may fit it) | nothing | nack (requeue after one lease duration) |
+//! | cost exceeds this pool's capacity at the oversize attempt limit | `Dropped(reason)` | dead-letter |
 //! | delivery still failing after retries | nothing | nack (requeue) |
 //! | pool shut down before the task started | nothing | nack (requeue) |
 //! | cancelled by `shutdown_with` while running | nothing | nack (requeue) |
@@ -47,10 +48,23 @@
 //!
 //! Failures are final, as in the in-memory pool (no automatic retry); they are
 //! dead-lettered rather than acked so operators keep a record of them in the
-//! queue. A task that kills its process is redelivered on every restart, and a
-//! task too large for every consumer of the queue cycles between them; cap
-//! both with the backend's own attempt limit (for example
-//! `PgLeaseQueue::with_max_attempts`).
+//! queue. A task that kills its process is redelivered on every restart; cap
+//! that with the backend's own attempt limit (for example
+//! `PgLeaseQueue::with_max_attempts`), which dead-letters it without a
+//! mailbox delivery.
+//!
+//! A task too large for this pool (it arrived through
+//! [`LeaseQueue::enqueue`] directly, or from a larger pool's `submit`) is
+//! handed back, one lease duration later, for a consumer that can fit it. The
+//! hand-back is bounded by
+//! [`DurableOptions::with_oversize_attempt_limit`] (default 5): a pool that
+//! leases the task at that attempt or later, and cannot run it, settles it
+//! instead — `Dropped` in the mailbox, a `Rejected` event
+//! (`CapacityExceeded`) and a dead letter — so a client waiting on the task's
+//! mailbox key gets a terminal status within about `limit - 1` lease
+//! durations. A consumer that can run the task runs it at any attempt. With
+//! a backend attempt limit, keep the oversize limit at or below it, or the
+//! backend dead-letters the task first, without a mailbox delivery.
 //!
 //! `max_units` bounds the units of running tasks; a zero-cost task takes no
 //! unit, so the number of running tasks is bounded separately by
@@ -120,18 +134,21 @@
 //!
 //! - `Submitted` first in `submit`. `Rejected` when `submit` refuses the task
 //!   for certain (shutdown, expired deadline, a cost over this pool's
-//!   capacity, a full queue): nothing is stored. When the enqueue fails with
-//!   an unknown outcome (a backend error), no terminal event is emitted: the
-//!   task may have been stored and run, and that run emits its own events.
+//!   capacity, a full queue, a backend failure before anything was written,
+//!   [`SchedulerError::NotStored`]): nothing is stored. When the enqueue
+//!   fails with an unknown outcome ([`SchedulerError::Backend`]), no terminal
+//!   event is emitted: the task may have been stored and run, and that run
+//!   emits its own events.
 //! - Per run of a leased task: `Queued` when it waits for capacity (under the
 //!   dispatch lock), `Started` just before the executor runs, then the run's
 //!   terminal event, emitted when the lease is about to be resolved:
 //!   `Completed` or `Failed` once the outcome is stored in the mailbox (or at
 //!   once without a mailbox key), `Expired` for a deadline that passed before
-//!   it started, and `Requeued` whenever the task goes back to the queue
-//!   (shutdown, a cost too large for this pool, a delivery that keeps
-//!   failing, or a panic outside the executor, which leaves the lease to
-//!   expire).
+//!   it started, `Rejected` (`CapacityExceeded`) for a task too large for
+//!   this pool at the oversize attempt limit, and `Requeued` whenever the
+//!   task goes back to the queue (shutdown, a cost too large for this pool
+//!   below that limit, a delivery that keeps failing, or a panic outside the
+//!   executor, which leaves the lease to expire).
 //!
 //! A run redelivered from the queue starts at `Queued`/`Started`; its
 //! `Submitted` came from the process that accepted it. A redelivered run
@@ -193,6 +210,7 @@ const fn refused_for_sure(error: &SchedulerError) -> bool {
     matches!(
         error,
         SchedulerError::QueueFull { .. }
+            | SchedulerError::NotStored { .. }
             | SchedulerError::CapacityExceeded { .. }
             | SchedulerError::DeadlineExpired { .. }
             | SchedulerError::PoolShutdown { .. }
@@ -287,6 +305,9 @@ enum Terminal {
     Ran(Option<Instant>),
     /// Its deadline passed before it started.
     Expired,
+    /// It is too large for this pool and reached the oversize attempt limit:
+    /// `Rejected` with the capacity error.
+    TooLarge(SchedulerError),
 }
 
 /// How a settled task's lease is resolved.
@@ -392,10 +413,12 @@ where
     ///   pool's total units or a per-kind limit
     ///   ([`DurableOptions::with_resource_limit`]), so it could never start;
     /// - the queue's error: [`SchedulerError::QueueFull`] at its maximum
-    ///   depth, [`SchedulerError::Backend`] when it cannot store the task. If
-    ///   the error leaves the outcome unknown (a connection lost mid-commit),
-    ///   retry with an idempotency key set; the retry resolves to the stored
-    ///   entry. Such an error emits no `Rejected` event (the task may run).
+    ///   depth, [`SchedulerError::NotStored`] when it failed before writing
+    ///   anything (both emit `Rejected`), [`SchedulerError::Backend`] when
+    ///   the outcome is unknown (a connection lost mid-commit). After a
+    ///   `Backend` error, retry with an idempotency key set; the retry
+    ///   resolves to the stored entry. Such an error emits no `Rejected`
+    ///   event (the task may run).
     pub async fn submit(&self, task: ScheduledTask<P>) -> Result<TaskStatus, SchedulerError> {
         let inner = &self.inner;
         let events = inner.events();
@@ -679,6 +702,12 @@ where
             .dispatcher
             .check_capacity(&UnitVector::from_cost(&item.task.meta.cost))
         {
+            // Every consumer that leased it so far was too small: stop
+            // cycling it and give its client a terminal outcome.
+            if item.attempt >= self.options.oversize_attempt_limit() {
+                self.settle_too_large(item, error);
+                return;
+            }
             // Too large for this process, not necessarily for every consumer
             // of the queue (mixed capacities, or limits lowered during a
             // rolling deploy): give it back, delayed so this process does not
@@ -784,10 +813,20 @@ where
 
         let executor = &self.executor;
         let cancel = &self.cancel;
+        // Set when the cancel branch wins, before `select!` drops the
+        // executor future: a panic caught afterwards came from that drop
+        // (the task was cancelled), while a panic with the flag clear is the
+        // executor's own, even if the token fired meanwhile. Relaxed: written
+        // and read by this one task.
+        let cancel_won = AtomicBool::new(false);
+        let won = &cancel_won;
         let contained = contain(async move {
             tokio::select! {
                 biased;
-                () = cancel.cancelled() => None,
+                () = async {
+                    cancel.cancelled().await;
+                    won.store(true, Ordering::Relaxed);
+                } => None,
                 ran = tokio::time::timeout(budget, executor.execute(payload, meta)) => Some(ran),
             }
         })
@@ -807,7 +846,7 @@ where
             }
             // A panic while the cancelled executor future was dropped: the
             // task was cancelled, not failed, so it is handed back too.
-            Err(panicked) if self.cancel.is_cancelled() => {
+            Err(panicked) if cancel_won.load(Ordering::Relaxed) => {
                 tracing::warn!(
                     task_id,
                     %panicked,
@@ -909,6 +948,47 @@ where
         });
     }
 
+    /// Settle a leased task too large for this pool that reached the
+    /// oversize attempt limit: deliver `Dropped`, emit `Rejected` and
+    /// dead-letter it. Every consumer that leased it so far (at least
+    /// `limit - 1` hand-backs, one lease duration apart) was too small.
+    fn settle_too_large(self: &Arc<Self>, item: LeasedItem<P>, error: SchedulerError) {
+        let LeasedItem {
+            task,
+            token,
+            heartbeat,
+            held,
+            attempt,
+        } = item;
+        let limit = self.options.oversize_attempt_limit();
+        let reason = format!(
+            "{error}; still too large for the consumer that leased it at attempt {attempt} \
+             (oversize attempt limit {limit})"
+        );
+        self.failed.fetch_add(1, Ordering::Relaxed);
+        tracing::warn!(
+            task_id = task.meta.id,
+            %error,
+            attempt,
+            limit,
+            "leased task is too large for every consumer that leased it; dropping it"
+        );
+        let settlement = Settlement {
+            task_id: task.meta.id,
+            mailbox: task.meta.mailbox.clone(),
+            idempotency_key: self.idempotency_key(&task.meta, token),
+            status: TaskStatus::Dropped(reason.clone()),
+            payload: None,
+            resolution: Resolution::DeadLetter(reason),
+            attempt,
+            terminal: Terminal::TooLarge(error),
+        };
+        let inner = Arc::clone(self);
+        self.spawner.spawn(async move {
+            inner.settle(settlement, token, heartbeat, held, None).await;
+        });
+    }
+
     /// Deliver, then resolve the lease. The ordering is the durability
     /// guarantee: the lease is acked (or dead-lettered) only after the
     /// mailbox has stored the outcome, so a crash between the two re-runs the
@@ -992,6 +1072,7 @@ where
         let events = self.events();
         match (terminal, status) {
             (Terminal::Expired, _) => events.expired(task_id),
+            (Terminal::TooLarge(error), _) => events.rejected(task_id, error),
             (Terminal::Ran(_), TaskStatus::Failed(error)) => events.failed(task_id, error),
             (Terminal::Ran(started), _) => events.completed(task_id, *started),
         }

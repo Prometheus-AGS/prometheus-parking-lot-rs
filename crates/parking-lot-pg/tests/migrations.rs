@@ -13,6 +13,12 @@
 //!   row, which is what a busy producer looks like); each re-run finishes in
 //!   bounded time. Before the guards, `CREATE INDEX IF NOT EXISTS` waited for a
 //!   `SHARE` lock and `DROP TRIGGER` for `ACCESS EXCLUSIVE`.
+//! - `migration_rerun_takes_no_table_lock`: another session holds
+//!   `SHARE UPDATE EXCLUSIVE` (what a manual VACUUM, ANALYZE, `CREATE INDEX
+//!   CONCURRENTLY` or `pg_repack` holds), and then `ACCESS EXCLUSIVE`, the
+//!   strongest mode, on every queue table; a re-run still finishes in bounded
+//!   time. An unguarded `COMMENT ON` takes `SHARE UPDATE EXCLUSIVE` and failed
+//!   this test.
 //! - `migration_lock_wait_is_bounded_by_lock_timeout`: a migration that does need
 //!   a lock (an index was dropped) fails within the `lock_timeout` instead of
 //!   waiting for the blocking transaction.
@@ -74,6 +80,49 @@ async fn migration_rerun_does_not_block_behind_open_writers() -> TestResult<()> 
         panic!("a migration re-run blocked behind an open transaction for {waited:?} ({elapsed})")
     });
     result?;
+    Ok(())
+}
+
+/// Hold `mode` on every table a re-run could touch, then re-run everything.
+async fn rerun_while_locked(
+    pg: &PgContainer,
+    pgmq: &PgmqLeaseQueue<String>,
+    mode: &str,
+) -> TestResult<()> {
+    let mut holder = PgConnection::connect(&pg.url).await?;
+    sqlx::query("BEGIN").execute(&mut holder).await?;
+    let mut tables = vec![
+        "pl_lease_queue".to_owned(),
+        "pl_result_mailbox".to_owned(),
+        "pl_result_mailbox_keys".to_owned(),
+        "pl_pgmq_aux".to_owned(),
+        "pl_audit_events".to_owned(),
+    ];
+    tables.extend(["p0", "p1", "p2", "p3", "dead"].map(|lane| format!("pgmq.q_pl_held_{lane}")));
+    for table in &tables {
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "LOCK TABLE {table} IN {mode} MODE"
+        )))
+        .execute(&mut holder)
+        .await?;
+    }
+    let started = Instant::now();
+    let rerun = tokio::time::timeout(BOUND, migrate_everything(&pg.pool, pgmq)).await;
+    let waited = started.elapsed();
+    holder.close().await?;
+    rerun.unwrap_or_else(|elapsed| {
+        panic!("a re-run blocked behind {mode} for {waited:?} ({elapsed})")
+    })
+}
+
+#[tokio::test]
+#[ignore = "needs Docker: starts a parking-lot-pg container"]
+async fn migration_rerun_takes_no_table_lock() -> TestResult<()> {
+    let pg = PgContainer::start(pg_major()).await?;
+    let pgmq = PgmqLeaseQueue::<String>::new(pg.pool.clone(), "held", 10)?;
+    migrate_everything(&pg.pool, &pgmq).await?;
+    rerun_while_locked(&pg, &pgmq, "SHARE UPDATE EXCLUSIVE").await?;
+    rerun_while_locked(&pg, &pgmq, "ACCESS EXCLUSIVE").await?;
     Ok(())
 }
 

@@ -137,9 +137,10 @@ sequenceDiagram
   and further events are dropped and counted instead of delaying dispatch.
   Tested against a pinned `apache/iggy:0.9.0` server: a subscriber receives
   `mailbox.ready` for each completed task and replays from an earlier offset.
-  Iggy 0.9 deduplicates retried requests per client rather than by message id,
-  so the publisher also skips ids it published recently and consumers
-  de-duplicate on the id across restarts.
+  The Iggy server (0.9) deduplicates retried requests per client rather than
+  by message id, so the publisher also skips `mailbox.ready` and stream-chunk
+  ids it published recently and consumers de-duplicate on the id across
+  restarts.
 
 - `cr-33-stream-replay`: `IggyStreamSink` publishes a task's streamed
   output (for example LLM tokens) as numbered chunks plus an end marker to the

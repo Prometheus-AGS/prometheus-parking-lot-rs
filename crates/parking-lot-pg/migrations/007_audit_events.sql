@@ -41,4 +41,14 @@ BEGIN
 END
 $$;
 
-COMMENT ON TABLE pl_audit_events IS 'Audit log written by PostgresAuditSink';
+-- COMMENT ON takes SHARE UPDATE EXCLUSIVE, which conflicts with manual VACUUM
+-- and ANALYZE, anti-wraparound autovacuum, CREATE INDEX CONCURRENTLY and
+-- pg_repack, so a re-run under lock_timeout could fail start-up. Each comment is
+-- set only when the catalog text differs (obj_description takes no table lock).
+DO $$
+BEGIN
+    IF obj_description('pl_audit_events'::regclass, 'pg_class') IS DISTINCT FROM 'Audit log written by PostgresAuditSink' THEN
+        COMMENT ON TABLE pl_audit_events IS 'Audit log written by PostgresAuditSink';
+    END IF;
+END
+$$;

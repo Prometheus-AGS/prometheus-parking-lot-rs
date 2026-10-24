@@ -206,6 +206,27 @@ pub enum SchedulerError {
         source: Box<dyn std::error::Error + Send + Sync + 'static>,
     },
 
+    /// A backend failed *before it stored anything*: the operation certainly
+    /// had no effect. A queue's `enqueue` returns it for failures it hits
+    /// before any write could land (the task cannot be serialised, no
+    /// connection or transaction could be opened, a statement failed inside
+    /// a transaction that was never committed), as opposed to
+    /// [`SchedulerError::Backend`], whose outcome the caller cannot know
+    /// (for example a connection lost during the commit).
+    ///
+    /// A pool reports such a submission as refused (a `Rejected` lifecycle
+    /// event): nothing was accepted, so resubmitting cannot duplicate work.
+    /// Not classed as retryable: whether a retry succeeds depends on the
+    /// cause (a payload that cannot be serialised never will).
+    #[error("backend error in '{context}', nothing stored: {source}")]
+    NotStored {
+        /// Short description of which operation or backend produced the error.
+        context: String,
+        /// The underlying cause.
+        #[source]
+        source: Box<dyn std::error::Error + Send + Sync + 'static>,
+    },
+
     /// An operation timed out.
     #[error("operation timed out{}", task_id.map(|id| format!(" (task {id})")).unwrap_or_default())]
     Timeout {
@@ -288,6 +309,18 @@ impl SchedulerError {
         source: impl std::error::Error + Send + Sync + 'static,
     ) -> Self {
         Self::Backend {
+            context: context.into(),
+            source: Box::new(source),
+        }
+    }
+
+    /// Constructor for [`SchedulerError::NotStored`]: a backend failure
+    /// raised before anything was written.
+    pub fn not_stored(
+        context: impl Into<String>,
+        source: impl std::error::Error + Send + Sync + 'static,
+    ) -> Self {
+        Self::NotStored {
             context: context.into(),
             source: Box::new(source),
         }
@@ -389,6 +422,18 @@ mod tests {
         // source chain accessible
         let src = std::error::Error::source(&e);
         assert!(src.is_some());
+    }
+
+    #[test]
+    fn not_stored_preserves_source_and_is_not_retryable() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::ConnectionRefused, "refused");
+        let e = SchedulerError::not_stored("pg lease queue: enqueue begin", io_err);
+        assert_eq!(
+            e.to_string(),
+            "backend error in 'pg lease queue: enqueue begin', nothing stored: refused"
+        );
+        assert!(std::error::Error::source(&e).is_some());
+        assert!(!e.is_retryable());
     }
 
     #[test]

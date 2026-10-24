@@ -9,6 +9,7 @@
 
 pub mod backend;
 pub mod error;
+mod identity;
 pub mod pool;
 
 pub use backend::{

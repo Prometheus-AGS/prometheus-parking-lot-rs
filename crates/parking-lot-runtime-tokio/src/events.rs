@@ -159,6 +159,7 @@ fn rejection_reason(error: &SchedulerError) -> RejectionReason {
         SchedulerError::CapacityExceeded { kind, .. } => {
             RejectionReason::CapacityExceeded { kind: *kind }
         }
+        SchedulerError::NotStored { .. } => RejectionReason::NotStored(error.to_string()),
         other => RejectionReason::Custom(other.to_string()),
     }
 }

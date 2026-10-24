@@ -339,19 +339,23 @@ where
     /// once. Dropping the future rolls the transaction back.
     async fn enqueue(&self, task: ScheduledTask<P>) -> Result<Enqueued, SchedulerError> {
         let message = serde_json::json!({
-            "meta": serde_json::to_value(&task.meta).map_err(backend("serialize task metadata"))?,
-            "payload": serde_json::to_value(&task.payload).map_err(backend("serialize task payload"))?,
+            "meta": serde_json::to_value(&task.meta).map_err(not_stored("serialize task metadata"))?,
+            "payload": serde_json::to_value(&task.payload).map_err(not_stored("serialize task payload"))?,
         });
         let lane = sql::lane_of(priority_level(task.meta.priority));
         let key = task.meta.idempotency_key;
         let queue = &*self.queue_name;
 
-        let mut tx = self.pool.begin().await.map_err(backend("enqueue begin"))?;
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(not_stored("enqueue begin"))?;
         sqlx::query(ENQUEUE_LOCK)
             .bind(queue)
             .execute(&mut *tx)
             .await
-            .map_err(backend("enqueue lock"))?;
+            .map_err(not_stored("enqueue lock"))?;
 
         if let Some(key) = &key {
             let existing: Option<i64> = sqlx::query_scalar(ENQUEUE_EXISTING)
@@ -359,7 +363,7 @@ where
                 .bind(key)
                 .fetch_optional(&mut *tx)
                 .await
-                .map_err(backend("enqueue idempotency check"))?;
+                .map_err(not_stored("enqueue idempotency check"))?;
             if let Some(entry) = existing {
                 return Ok(Enqueued::Duplicate(entry_id(entry)?));
             }
@@ -370,7 +374,7 @@ where
             .bind(limit)
             .fetch_one(&mut *tx)
             .await
-            .map_err(backend("enqueue depth check"))?;
+            .map_err(not_stored("enqueue depth check"))?;
         let live = usize::try_from(live).unwrap_or(usize::MAX);
         if live >= self.max_depth {
             return Err(SchedulerError::queue_full(queue, live, self.max_depth));
@@ -381,7 +385,7 @@ where
             .bind(message)
             .fetch_one(&mut *tx)
             .await
-            .map_err(backend("enqueue send"))?;
+            .map_err(not_stored("enqueue send"))?;
         let entry = entry_of(msg_id, lane);
         if let Some(key) = &key {
             sqlx::query(ENQUEUE_KEY)
@@ -390,13 +394,13 @@ where
                 .bind(key)
                 .execute(&mut *tx)
                 .await
-                .map_err(backend("enqueue key"))?;
+                .map_err(not_stored("enqueue key"))?;
         }
         sqlx::query(ENQUEUE_NOTIFY)
             .bind(queue)
             .execute(&mut *tx)
             .await
-            .map_err(backend("enqueue notify"))?;
+            .map_err(not_stored("enqueue notify"))?;
         tx.commit().await.map_err(backend("enqueue commit"))?;
         Ok(Enqueued::Accepted(entry_id(entry)?))
     }
@@ -406,6 +410,10 @@ where
     /// dispatchers never receive the same message). A message past
     /// `max_attempts`, or one that cannot be decoded, is dead-lettered and
     /// does not count toward `max`.
+    ///
+    /// If reading a lower lane fails after higher lanes already leased tasks,
+    /// those tasks are returned and the error is logged; the error is returned
+    /// only when nothing was leased.
     async fn lease(
         &self,
         max: usize,
@@ -414,50 +422,20 @@ where
         ensure_duration(lease_for, "lease duration")?;
         let vt = lease_seconds(lease_for);
         let mut leased = Vec::new();
-        for lane in (0..LANES).rev() {
-            while leased.len() < max {
-                let want = i32::try_from(max - leased.len()).unwrap_or(i32::MAX);
-                let rows = sqlx::query(LEASE_READ)
-                    .bind(&*self.lanes[lane])
-                    .bind(vt)
-                    .bind(want)
-                    .fetch_all(&self.pool)
-                    .await
-                    .map_err(backend("lease"))?;
-                if rows.is_empty() {
-                    break;
-                }
-                for row in &rows {
-                    let msg_id: i64 = row.try_get("msg_id").map_err(backend("decode msg_id"))?;
-                    let read_ct: i32 = row.try_get("read_ct").map_err(backend("decode read_ct"))?;
-                    let attempts = u32::try_from(read_ct).map_err(|_| {
-                        SchedulerError::internal(format!("negative read_ct {read_ct}"))
-                    })?;
-                    if let Some(limit) = self.max_attempts_i64()
-                        && i64::from(read_ct) > limit
-                    {
-                        let reason = format!("max attempts ({limit}) exceeded");
-                        self.dead_letter_or_log(lane, msg_id, read_ct, reason).await;
-                        continue;
-                    }
-                    match decode_task::<P>(row) {
-                        Ok(task) => {
-                            let token = LeaseToken::new(
-                                entry_id(entry_of(msg_id, lane))?,
-                                u64::from(attempts),
-                            );
-                            leased.push(LeasedTask::new(task, token, attempts));
-                        }
-                        Err(reason) => {
-                            // Not retryable: redelivery would fail the same way.
-                            let reason = format!("undecodable task: {reason}");
-                            self.dead_letter_or_log(lane, msg_id, read_ct, reason).await;
-                        }
-                    }
-                }
+        match self.lease_lanes(max, vt, &mut leased).await {
+            Ok(()) => Ok(leased),
+            // Messages already read are invisible to everyone else until their
+            // leases run out: returning the error would strand them for a whole
+            // lease. Hand them over; the failing lane is read again next call.
+            Err(error) if !leased.is_empty() => {
+                tracing::error!(
+                    %error, queue = &*self.queue_name, leased = leased.len(),
+                    "lease failed on a lower lane; returning the tasks already leased"
+                );
+                Ok(leased)
             }
+            Err(error) => Err(error),
         }
-        Ok(leased)
     }
 
     async fn ack(&self, token: LeaseToken) -> Result<(), SchedulerError> {
@@ -520,6 +498,65 @@ where
     /// deliver both into one mailbox without task idempotency keys.
     fn identity(&self) -> &str {
         &self.identity
+    }
+}
+
+impl<P> PgmqLeaseQueue<P>
+where
+    P: DeserializeOwned,
+{
+    /// Read the lanes from the highest down into `leased` until it holds `max`
+    /// tasks. `leased` keeps what was read even when a later read fails.
+    async fn lease_lanes(
+        &self,
+        max: usize,
+        vt: i32,
+        leased: &mut Vec<LeasedTask<P>>,
+    ) -> Result<(), SchedulerError> {
+        for lane in (0..LANES).rev() {
+            while leased.len() < max {
+                let want = i32::try_from(max - leased.len()).unwrap_or(i32::MAX);
+                let rows = sqlx::query(LEASE_READ)
+                    .bind(&*self.lanes[lane])
+                    .bind(vt)
+                    .bind(want)
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(backend("lease"))?;
+                if rows.is_empty() {
+                    break;
+                }
+                for row in &rows {
+                    let msg_id: i64 = row.try_get("msg_id").map_err(backend("decode msg_id"))?;
+                    let read_ct: i32 = row.try_get("read_ct").map_err(backend("decode read_ct"))?;
+                    let attempts = u32::try_from(read_ct).map_err(|_| {
+                        SchedulerError::internal(format!("negative read_ct {read_ct}"))
+                    })?;
+                    if let Some(limit) = self.max_attempts_i64()
+                        && i64::from(read_ct) > limit
+                    {
+                        let reason = format!("max attempts ({limit}) exceeded");
+                        self.dead_letter_or_log(lane, msg_id, read_ct, reason).await;
+                        continue;
+                    }
+                    match decode_task::<P>(row) {
+                        Ok(task) => {
+                            let token = LeaseToken::new(
+                                entry_id(entry_of(msg_id, lane))?,
+                                u64::from(attempts),
+                            );
+                            leased.push(LeasedTask::new(task, token, attempts));
+                        }
+                        Err(reason) => {
+                            // Not retryable: redelivery would fail the same way.
+                            let reason = format!("undecodable task: {reason}");
+                            self.dead_letter_or_log(lane, msg_id, read_ct, reason).await;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -590,6 +627,15 @@ where
     E: std::error::Error + Send + Sync + 'static,
 {
     move |source| SchedulerError::backend(format!("pgmq lease queue: {operation}"), source)
+}
+
+/// A failure before the enqueue's commit: the transaction is rolled back, so
+/// nothing was stored and the pool can report the task as refused.
+fn not_stored<E>(operation: &'static str) -> impl FnOnce(E) -> SchedulerError
+where
+    E: std::error::Error + Send + Sync + 'static,
+{
+    move |source| SchedulerError::not_stored(format!("pgmq lease queue: {operation}"), source)
 }
 
 /// Decode the stored message; the error is a human-readable reason.

@@ -153,7 +153,13 @@ pub struct PostgresBackendConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_attempts: Option<u32>,
     /// Open a `LISTEN` connection for this queue's wake-up notifications
-    /// (`QueueListener`), so consumers wake on enqueue instead of polling.
+    /// (`QueueListener`), returned in the built backend for consumers of your
+    /// own, which can then wake on enqueue instead of polling.
+    ///
+    /// The `DurableResourcePool` this backend drives does **not** use the
+    /// listener: it still polls an empty queue (every 500 ms), so a task
+    /// submitted by another process to an idle pool can wait that long to
+    /// start (issue #54).
     #[serde(default)]
     pub listen: bool,
     /// Create the queue and mailbox tables, indexes and triggers when missing
@@ -557,36 +563,45 @@ fn redact_iggy_credentials(url: &str) -> String {
     redact_url(url, true)
 }
 
+/// The userinfo is everything between `://` and the *last* `@`, found before
+/// any query string is considered. Iggy reads its credentials as everything
+/// before the connection string's only `@`, so `?`, `#`, `/` and `:` can sit
+/// inside a password or token; splitting at the first `?` or `/` first would
+/// stop inside the secret and print it.
+///
+/// The cost is that an `@` in a query value (`?email=a@b`) makes the
+/// redacted text drop the host: it is the safe side of an ambiguity that no
+/// parser can settle without knowing the secret.
 fn redact_url(url: &str, bare_userinfo_is_secret: bool) -> String {
-    let (base, query) = match url.split_once('?') {
-        Some((base, query)) => (base, Some(query)),
-        None => (url, None),
-    };
-    let mut out = match base.split_once("://") {
+    let masked = match url.split_once("://") {
         Some((scheme, rest)) => match rest.rsplit_once('@') {
             Some((userinfo, host)) => match userinfo.split_once(':') {
                 Some((user, _)) => format!("{scheme}://{user}:***@{host}"),
                 None if bare_userinfo_is_secret => format!("{scheme}://***@{host}"),
-                None => base.to_owned(),
+                None => url.to_owned(),
             },
-            None => base.to_owned(),
+            None => url.to_owned(),
         },
-        None => base.to_owned(),
+        None => url.to_owned(),
     };
-    if let Some(query) = query {
-        let masked: Vec<String> = query
-            .split('&')
-            .map(|pair| match pair.split_once('=') {
-                Some((key, _)) if key.to_ascii_lowercase().contains("password") => {
-                    format!("{key}=***")
-                }
-                _ => pair.to_owned(),
-            })
-            .collect();
-        out.push('?');
-        out.push_str(&masked.join("&"));
-    }
-    out
+    mask_password_parameters(&masked)
+}
+
+/// Replace the value of every `password` query parameter with `***`.
+fn mask_password_parameters(url: &str) -> String {
+    let Some((base, query)) = url.split_once('?') else {
+        return url.to_owned();
+    };
+    let masked: Vec<String> = query
+        .split('&')
+        .map(|pair| match pair.split_once('=') {
+            Some((key, _)) if key.to_ascii_lowercase().contains("password") => {
+                format!("{key}=***")
+            }
+            _ => pair.to_owned(),
+        })
+        .collect();
+    format!("{base}?{}", masked.join("&"))
 }
 
 #[cfg(test)]
@@ -608,6 +623,51 @@ mod tests {
             redact_password("postgres://app@db/app?sslmode=require&password=q&x=1"),
             "postgres://app@db/app?sslmode=require&password=***&x=1"
         );
+    }
+
+    /// Characters that end a URL component when unescaped. Iggy reads its
+    /// credentials as everything before the string's only `@`, so these are
+    /// valid inside a password or token, and a redactor that stops at the first
+    /// one prints the secret.
+    const RESERVED: [&str; 5] = ["?", "#", "/", "@", ":"];
+
+    #[test]
+    fn redacts_a_password_holding_reserved_characters() {
+        for reserved in RESERVED {
+            let password = format!("se{reserved}cr3t");
+            for url in [
+                format!("postgres://app:{password}@db:5432/app"),
+                format!("postgres://app:{password}@db:5432/app?sslmode=require"),
+                format!("postgres://app:{password}@db:5432/app?password=q-cr3t&x=1"),
+            ] {
+                let shown = redact_password(&url);
+                assert!(!shown.contains("cr3t"), "{url} -> {shown}");
+                assert!(shown.starts_with("postgres://app:***@"), "{url} -> {shown}");
+            }
+            let iggy = format!("iggy://app:{password}@iggy:8090");
+            let shown = super::redact_iggy_credentials(&iggy);
+            assert!(!shown.contains("cr3t"), "{iggy} -> {shown}");
+            assert_eq!(
+                super::redact_iggy_credentials(&format!("{iggy}?tls=true")),
+                "iggy://app:***@iggy:8090?tls=true"
+            );
+        }
+    }
+
+    #[test]
+    fn redacts_a_token_holding_reserved_characters() {
+        for reserved in RESERVED {
+            let url = format!("iggy://pat{reserved}cr3t@iggy:8090");
+            let shown = super::redact_iggy_credentials(&url);
+            assert!(!shown.contains("cr3t"), "{url} -> {shown}");
+            assert!(shown.ends_with("@iggy:8090"), "{url} -> {shown}");
+        }
+    }
+
+    #[test]
+    fn redacts_a_query_password_even_when_an_at_sign_follows() {
+        let shown = redact_password("postgres://db/app?password=cr3t@x&sslmode=require");
+        assert!(!shown.contains("cr3t"), "{shown}");
     }
 
     #[test]

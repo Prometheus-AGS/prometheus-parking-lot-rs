@@ -20,10 +20,21 @@
 //! `pgmq.read` that re-claims an expired message also locks the row, and
 //! whichever statement gets the lock second re-evaluates `read_ct` and `vt`
 //! against the new row version. The loser is a `LeaseLost`, never a double
-//! claim. (The delay mark of a nacked token is read from the statement's
-//! snapshot, so it does not cover two statements racing on the very same
-//! token, such as an `ack` and a `nack` issued concurrently by one caller;
-//! a token is meant to be resolved once.)
+//! claim.
+//!
+//! The delay mark of a nacked token lives in another table, so the lock on the
+//! message row alone does not cover it. A statement that waited for the row
+//! lock re-checks the new row version with its *old* snapshot, which cannot see
+//! a nack that committed while it waited. That matters because dropping a Rust
+//! future does not cancel its SQL statement: a heartbeat `extend` can still be
+//! queued behind a `nack(Requeue { delay > 0 })` and would otherwise pass,
+//! set `vt = now + lease`, and make the nacked token valid again once the delay
+//! has elapsed. The guard therefore calls `pl_pgmq_is_delayed` (migration 006),
+//! a volatile plpgsql function whose queries take a fresh snapshot each time,
+//! from the same `WHERE` clause that locks the row: the re-check after the wait
+//! runs it again and sees the nack. This fences any two statements racing on
+//! one token (`extend` vs `nack`, `ack` vs `nack`, ...); the loser is a
+//! `LeaseLost`.
 //!
 //! # Lease predicate
 //!
@@ -141,15 +152,15 @@ fn dynamic(sql: String) -> SqlStr {
 /// guard's point of view the message then looks leased again, to the token
 /// that was just nacked. The nack records the end of the delay in
 /// `pl_pgmq_aux.delayed_until` in the same statement, and a row with a delay
-/// still running is never held. Once the delay has elapsed `vt` has too, and
+/// still running is never held. The delay is read through
+/// `pl_pgmq_is_delayed`, not a subquery, so that a statement which waited for
+/// the row lock re-reads it with a fresh snapshot (see the module docs). Once the delay has elapsed `vt` has too, and
 /// the next delivery changes `read_ct`, so the old token stays dead for good.
 fn held(table: &str) -> String {
     format!(
         "held AS (SELECT msg_id, read_ct, message FROM pgmq.\"{table}\"
                   WHERE msg_id = $2 AND read_ct = $3 AND vt > clock_timestamp()
-                    AND NOT EXISTS (SELECT 1 FROM pl_pgmq_aux d
-                                     WHERE d.queue_name = $4 AND d.entry_id = $5
-                                       AND d.delayed_until > clock_timestamp())
+                    AND NOT pl_pgmq_is_delayed($4, $5)
                   FOR UPDATE)"
     )
 }

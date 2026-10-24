@@ -181,19 +181,45 @@ fn redact(connection_string: &str) -> String {
 }
 
 /// Check that the Iggy client can parse `connection_string`, without
-/// connecting.
+/// connecting and without building a client.
 ///
 /// A string the client rejects makes every publish fail, which the off-path
 /// publisher reports only as counted failures; configuration loading calls this
 /// so the mistake is found at startup.
 ///
+/// This runs the same grammar the client does (`iggy_common::ConnectionString`
+/// for the string's transport) and stops there. Building the client would do
+/// more than parse: a `iggy+quic://` client resolves its address and binds a
+/// UDP socket, which needs a tokio runtime and has side effects a validator
+/// must not have.
+///
 /// # Errors
 ///
-/// The client's reason, which never includes the credentials.
+/// The parser's reason, which never includes the credentials.
 pub fn validate_connection_string(connection_string: &str) -> Result<(), String> {
-    iggy::prelude::IggyClient::from_connection_string(connection_string)
-        .map(drop)
-        .map_err(|error| error.to_string())
+    use iggy_common::{
+        ConnectionString, ConnectionStringUtils, HttpConnectionStringOptions,
+        QuicConnectionStringOptions, TcpConnectionStringOptions, TransportProtocol,
+        WebSocketConnectionStringOptions,
+    };
+
+    let protocol = ConnectionStringUtils::parse_protocol(connection_string)
+        .map_err(|error| error.to_string())?;
+    match protocol {
+        TransportProtocol::Tcp => {
+            ConnectionString::<TcpConnectionStringOptions>::new(connection_string).map(drop)
+        }
+        TransportProtocol::Quic => {
+            ConnectionString::<QuicConnectionStringOptions>::new(connection_string).map(drop)
+        }
+        TransportProtocol::Http => {
+            ConnectionString::<HttpConnectionStringOptions>::new(connection_string).map(drop)
+        }
+        TransportProtocol::WebSocket => {
+            ConnectionString::<WebSocketConnectionStringOptions>::new(connection_string).map(drop)
+        }
+    }
+    .map_err(|error| error.to_string())
 }
 
 #[cfg(test)]
@@ -206,6 +232,64 @@ mod tests {
         assert!(validate_connection_string("iggy://pat-token@127.0.0.1:8090").is_ok());
         for bad in ["", "not-a-url", "iggy://127.0.0.1:8090", "iggy://a:b@host"] {
             assert!(validate_connection_string(bad).is_err(), "{bad}");
+        }
+    }
+
+    /// Parsing builds no transport client, so it needs no runtime and binds no
+    /// socket: these are plain `#[test]`s, with no tokio runtime on the thread.
+    #[test]
+    fn every_transport_is_parsed_without_a_runtime() {
+        for good in [
+            "iggy://app:s3cret@127.0.0.1:8090",
+            "iggy+tcp://app:s3cret@127.0.0.1:8090?tls=true",
+            "iggy+quic://app:s3cret@iggy.invalid:8080",
+            "iggy+quic://pat-token@iggy.invalid:8080?validate_certificate=false",
+            "iggy+http://app:s3cret@iggy.invalid:3000",
+            "iggy+ws://app:s3cret@iggy.invalid:8092",
+        ] {
+            assert_eq!(validate_connection_string(good), Ok(()), "{good}");
+        }
+        for bad in [
+            "iggy+quic://app:s3cret@iggy.invalid",
+            "iggy+quic://app:s3cret@iggy.invalid:8080?bogus=1",
+            "iggy+http://app:s3cret@iggy.invalid:port",
+            "iggy+carrier-pigeon://app:s3cret@iggy.invalid:1",
+            "iggy+ws://app:@iggy.invalid:1",
+        ] {
+            assert!(validate_connection_string(bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn rejection_reasons_never_echo_the_secret() {
+        for bad in [
+            "iggy://app:se?cr3t@iggy",
+            "iggy://app:se#cr3t@iggy:notaport",
+            "iggy+quic://app:se/cr3t@iggy",
+            "iggy://pat-cr3t@iggy",
+            "iggy+tcp://app:se:cr3t@iggy:8090",
+            "iggy://app:se@cr3t@iggy:8090",
+            "iggy://app:cr3t@iggy:8090?bogus=cr3t",
+            "iggy://app:cr3t@iggy:8090?tls=cr3t=x",
+        ] {
+            let reason = validate_connection_string(bad).expect_err(bad);
+            assert!(!reason.contains("cr3t"), "{bad} -> {reason}");
+        }
+    }
+
+    /// Credentials are read as everything before the only `@`, so `?`, `#`
+    /// and `/` are valid inside them; redaction must cover them all.
+    #[test]
+    fn debug_hides_credentials_holding_reserved_characters() {
+        for reserved in ["?", "#", "/", "@", ":"] {
+            for url in [
+                format!("iggy://app:se{reserved}cr3t@iggy:8090"),
+                format!("iggy://pat{reserved}cr3t@iggy:8090"),
+                format!("iggy+quic://app:se{reserved}cr3t@iggy:8090?validate_certificate=false"),
+            ] {
+                let shown = format!("{:?}", IggyOptions::new(url.clone()));
+                assert!(!shown.contains("cr3t"), "{url} -> {shown}");
+            }
         }
     }
 

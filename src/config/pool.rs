@@ -28,6 +28,7 @@ use serde::{Deserialize, Serialize};
 
 use super::backend::BackendConfig;
 use super::error::ConfigError;
+use super::identity;
 
 /// Where a pool keeps its parked tasks or its results.
 ///
@@ -182,15 +183,32 @@ impl PoolConfig {
 impl SchedulerConfig {
     /// Validate every backend and pool, and require at least one pool.
     ///
+    /// Names come first: a pool or backend name is 1 to 64 characters of ASCII
+    /// letters, digits, `-` and `_` (the error path of a bad name is
+    /// `pools["a b"]`). Then each backend, then that no two backends of one
+    /// type open the same queue (the same redb `path`, or the same Postgres
+    /// database and `queue_name`), then each pool. The queue comparison is
+    /// lexical: it unifies `./a/../q.redb` with `q.redb` and
+    /// `postgresql://U@HOST/db` with `postgres://V@host:5432/db`, but cannot
+    /// see a symlink, a relative versus an absolute path, or a host name
+    /// versus its IP address.
+    ///
     /// # Errors
     ///
     /// [`ConfigError::Invalid`] naming the first invalid field by its dotted
     /// path, e.g. `pools.inference.max_units` or `backends.db.lease_secs`.
     /// Backends, then pools, are checked in name order.
     pub fn validate(&self) -> Result<(), ConfigError> {
+        for name in self.backends.keys() {
+            identity::validate_name("backends", name)?;
+        }
+        for name in self.pools.keys() {
+            identity::validate_name("pools", name)?;
+        }
         for (name, backend) in &self.backends {
             backend.validate(&format!("backends.{name}"))?;
         }
+        self.validate_distinct_queues()?;
         if self.pools.is_empty() {
             return Err(ConfigError::invalid(
                 "pools",
@@ -210,6 +228,30 @@ impl SchedulerConfig {
                     format!(
                         "backend `{backend}` already drives pool `{other}`; each durable \
                          backend drives at most one pool"
+                    ),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Reject two backend sections of one type that open the same physical
+    /// queue (the same redb file, or the same Postgres database and queue
+    /// name): they would be two handles on one queue, which bypasses the rule
+    /// that a durable backend drives at most one pool. Backends are compared in
+    /// name order; the error is on the later section and names both.
+    fn validate_distinct_queues(&self) -> Result<(), ConfigError> {
+        let mut opened: BTreeMap<String, &str> = BTreeMap::new();
+        for (name, backend) in &self.backends {
+            let Some((key, field)) = identity::physical_queue(backend) else {
+                continue;
+            };
+            if let Some(first) = opened.insert(key, name) {
+                return Err(ConfigError::invalid(
+                    format!("backends.{name}.{field}"),
+                    format!(
+                        "backends `{first}` and `{name}` are both `{}` sections that open the                          same queue; use one section (a second handle on it would bypass the                          one-pool-per-backend rule)",
+                        backend.kind()
                     ),
                 ));
             }
