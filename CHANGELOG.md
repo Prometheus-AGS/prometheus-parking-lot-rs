@@ -38,26 +38,26 @@ entry names the OpenSpec change that made it.
   handed back (`nack`, requeued after one lease duration) instead of being
   delivered as `Dropped` and dead-lettered, so a consumer with more capacity
   can run it. It emits `Requeued`, not `Rejected`.
-- **Durable oversize bound (re-review W1).** The hand-back above is bounded by
+- **Durable oversize bound.** The hand-back above is bounded by
   `DurableOptions::with_oversize_attempt_limit` (default 5). A pool that
   leases such a task at that attempt or later delivers `TaskStatus::Dropped`
   to its mailbox key, emits `Rejected` (`CapacityExceeded`) and dead-letters
   it, so the client gets a terminal outcome instead of the task cycling
   forever. A consumer that fits the task still runs it at any attempt.
-- **Pre-write enqueue failures are refusals (re-review S3).** New
+- **Pre-write enqueue failures are refusals.** New
   `SchedulerError::NotStored` (constructor `SchedulerError::not_stored`) for a
   backend failure that certainly stored nothing, and
-  `RejectionReason::NotStored`. The Postgres and pgmq queues return it from
-  `enqueue` for failures before the commit (serialisation, `begin`, the
+  `RejectionReason::NotStored`. The Postgres, pgmq and redb queues return it
+  from `enqueue` for failures before the commit (serialisation, `begin`, the
   statements of the uncommitted transaction); `DurableResourcePool::submit`
   emits `Rejected` for it. `SchedulerError::Backend` from `enqueue` still
   means "outcome unknown" and still emits no terminal event.
-- **Executor panic racing shutdown (re-review S1).** A durable task whose
+- **Executor panic racing shutdown.** A durable task whose
   executor panics while `shutdown_with` fires its cancel token now fails
   (`Failed`, delivered and dead-lettered) instead of being handed back; only
   a panic raised while dropping the executor future after the cancel branch
   won is treated as a cancellation.
-- **`ResourcePool::with_name` docs (re-review S4).** Its `# Panics` section
+- **`ResourcePool::with_name` docs.** Its `# Panics` section
   now says what it does: it panics after the first `submit`, even once the
   pool is idle again, like `with_resource_limit`.
 

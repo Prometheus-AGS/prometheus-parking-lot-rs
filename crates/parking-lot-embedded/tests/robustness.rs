@@ -252,3 +252,40 @@ async fn undecodable_mailbox_entry_is_deleted_and_reported_once() {
         "the bad entry is gone and no longer blocks the key"
     );
 }
+
+/// A payload that cannot be serialized.
+struct Unserializable;
+
+impl Serialize for Unserializable {
+    fn serialize<S: serde::Serializer>(&self, _serializer: S) -> Result<S::Ok, S::Error> {
+        Err(serde::ser::Error::custom("this payload cannot be serialized"))
+    }
+}
+
+impl<'de> Deserialize<'de> for Unserializable {
+    fn deserialize<D: serde::Deserializer<'de>>(_deserializer: D) -> Result<Self, D::Error> {
+        Err(serde::de::Error::custom("never stored"))
+    }
+}
+
+/// An enqueue that fails before anything is written reports `NotStored`, not
+/// an unknown-outcome `Backend` error, and leaves the queue empty.
+#[tokio::test]
+async fn enqueue_failure_before_any_write_is_not_stored() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store = EmbeddedStore::open(dir.path().join("not-stored.redb")).expect("open");
+    let queue = store.lease_queue::<Unserializable>(10);
+    let err = queue
+        .enqueue(task(Unserializable, "bad", Priority::Normal))
+        .await
+        .expect_err("an unserializable payload is refused");
+    assert!(
+        matches!(err, SchedulerError::NotStored { .. }),
+        "expected NotStored, got {err:?}"
+    );
+    let depth = queue.depth().await.expect("depth");
+    assert_eq!(
+        (depth.ready, depth.delayed, depth.leased, depth.dead_lettered),
+        (0, 0, 0, 0)
+    );
+}

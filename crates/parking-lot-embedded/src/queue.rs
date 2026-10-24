@@ -452,6 +452,18 @@ impl<P> RedbLeaseQueue<P> {
     }
 }
 
+/// A storage failure raised before the enqueue commits stored nothing: report
+/// it as [`SchedulerError::NotStored`] so callers can tell it from an unknown
+/// outcome. Other errors (`QueueFull`, …) pass through unchanged.
+fn not_stored(error: SchedulerError) -> SchedulerError {
+    match error {
+        SchedulerError::Backend { context, source } => {
+            SchedulerError::NotStored { context, source }
+        }
+        other => other,
+    }
+}
+
 fn enqueue_tx(
     db: &redb::Database,
     max_depth: usize,
@@ -461,9 +473,29 @@ fn enqueue_tx(
 ) -> Result<Enqueued, SchedulerError> {
     let txn = db
         .begin_write()
-        .map_err(backend("embedded::queue::enqueue::begin"))?;
+        .map_err(backend("embedded::queue::enqueue::begin"))
+        .map_err(not_stored)?;
+    // Everything up to `commit` writes only into the uncommitted transaction;
+    // an error drops it and nothing is stored.
+    let staged = stage_enqueue(&txn, max_depth, task_json, priority, key).map_err(not_stored)?;
+    match staged {
+        Enqueued::Accepted(id) => {
+            commit(txn, "enqueue")?;
+            Ok(Enqueued::Accepted(id))
+        }
+        duplicate @ Enqueued::Duplicate(_) => Ok(duplicate),
+    }
+}
+
+fn stage_enqueue(
+    txn: &redb::WriteTransaction,
+    max_depth: usize,
+    task_json: &[u8],
+    priority: Priority,
+    key: Option<&str>,
+) -> Result<Enqueued, SchedulerError> {
     let accepted = {
-        let mut t = Tables::open(&txn)?;
+        let mut t = Tables::open(txn)?;
         if let Some(key) = key
             && let Some(existing) = t
                 .idem
@@ -495,7 +527,6 @@ fn enqueue_tx(
         }
         id
     };
-    commit(txn, "enqueue")?;
     Ok(Enqueued::Accepted(QueueEntryId(accepted)))
 }
 
@@ -676,8 +707,9 @@ where
     ) -> impl Future<Output = Result<Enqueued, SchedulerError>> + Send {
         let max_depth = self.max_depth;
         self.store.blocking(move |db, _| {
-            let task_json =
-                serde_json::to_vec(&task).map_err(backend("embedded::queue::encode"))?;
+            let task_json = serde_json::to_vec(&task)
+                .map_err(backend("embedded::queue::encode"))
+                .map_err(not_stored)?;
             enqueue_tx(
                 db,
                 max_depth,
