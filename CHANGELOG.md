@@ -1,9 +1,124 @@
 # Changelog
 
+## [0.4.0] - 2026-10-24
+
+### prometheus-parking-lot-core
+
+- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)
+
+### prometheus-parking-lot-runtime-tokio
+
+- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)
+
+### prometheus-parking-lot-pg
+
+- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)
+
+### prometheus-parking-lot-embedded
+
+- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)
+
+### prometheus-parking-lot-iggy
+
+- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)
+
+### prometheus-parking-lot-wasm
+
+- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)
+
+### prometheus_parking_lot
+
+- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)
+
 All notable changes to `prometheus_parking_lot` are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Fixed
+
+- **Durable stored outcome (oa-07, #78).** A duplicate returns its original full
+  status/error even after result consumption. After a Failed delivery and
+  process crash, a locally successful retry emits the original Failed and
+  dead-letters rather than emitting Completed and acking. Delivery still
+  precedes lease resolution and only the original result is consumable.
+  Generic Queued/Running metadata remains supported; the durable consumer warns
+  and requeues rather than fabricating terminal truth. A permanent nonterminal
+  fence can retry indefinitely pending explicit remediation. Real PG17/18 and
+  redb crash/restart/consumed-result fixtures are authored; execution remains
+  NOT_EXERCISED.
+
+- **Per-task explicit expiry (oa-10, #57).** `ResourcePool::prune_expired`
+  retains its public removal count and now reports each removed task through
+  the normal expiry path: `Expired` terminal event, one configured mailbox
+  delivery attempt of `TaskStatus::Expired`, per-task audit and once-only
+  ledger settlement. Removed work cannot execute, and live survivors keep
+  their order. Equality at a deadline remains live. Aggregate accounting and
+  the batch-only audit are replaced by per-task handling; callback/storage
+  failure limits remain unchanged. Final-boundary execution is unverified.
+
+- **Address-scoped result idempotency (oa-06, #80).** Results now deduplicate
+  by the complete mailbox address plus caller key within the storage namespace.
+  Different tenants, users or sessions can independently reuse one caller key;
+  same-address retries retain the first result through consume/reopen until
+  its original TTL, and no-TTL fences remain permanent. The memory reference,
+  Postgres and redb implementations share these semantics. Final-boundary
+  execution remains unverified.
+
+- **Pre-filled ResourcePool admission (oa-09, #82).** A stored head exceeding
+  the current total or per-kind capacity is removed once without execution,
+  emits `Rejected(CapacityExceeded)`, and gets one configured mailbox delivery
+  attempt of `TaskStatus::Dropped(capacity_error.to_string())` with no result
+  payload. Valid followers proceed; valid heads waiting for temporarily held
+  units remain parked. Pre-filled depth now enters shutdown accounting at
+  construction and is first drained after builder configuration on submission
+  or shutdown, so rejection, head expiry and completion settle counted work.
+  FIFO retains the stored-ticket policy; no cross-epoch global sequence
+  recovery or persistent dead-letter store is added.
+- **Discarded ResourcePool spawns (oa-08, #81).** An accepted run whose
+  spawner drops its future before first poll now emits `Failed` and attempts
+  one configured mailbox delivery of `TaskStatus::Failed(TaskError::Cancelled)`
+  with reason `spawner discarded resource pool task before its first poll`
+  and no result payload. Its permit is returned and shutdown accounting is
+  settled; the executor is never called. This finished failure does not invoke
+  the async cancellation sink or increment `ShutdownReport::cancelled`.
+  Retained futures, unavailable execution runtimes and failed mailbox storage
+  retain their existing progress/delivery limits; this adds no crash durability.
+
+### Changed (breaking)
+
+- **Pruned-task ownership (oa-10).** Synchronous `TaskQueue<P>::prune_expired`
+  now returns `Result<Vec<ScheduledTask<P>>, SchedulerError>`; core
+  `ParkedQueue<T>::prune_expired` returns `Result<Vec<T>, SchedulerError>`.
+  Custom implementations must return every removed task with original
+  metadata/payload, without requiring Clone, and leave tasks queued on error.
+  Adapter pruning performs the fallible backend step before changing its
+  front. Direct dispatcher consumers retain the count plus full removed
+  items in `Dispatched.expired` for terminal reporting outside the lock.
+- **Duplicate metadata (oa-07).** `DeliveryOutcome::Duplicate` becomes
+  `Duplicate { status: TaskStatus }`; the enum loses Copy/Hash. Custom mailbox
+  implementations must retain original status atomically with the fence beyond
+  consume, and never substitute retry status or extend original TTL. Stored
+  remains a unit variant; existing mailbox method signatures are unchanged.
+- **Persistent result-mailbox upgrade (oa-06/oa-07).** Final 0.4 uses PG
+  protocol 3 and redb schema 3. Both old 0.3 and intermediate schema-2 writers
+  are rejected. Core `LegacyIdempotencyOwner` and `LegacyDeliveryStatus`
+  provide independent owner/status evidence through explicit metadata APIs.
+  Direct 0.3 -> 3 and intermediate 2 -> 3 conversion refuse atomically if
+  original active metadata cannot be proved; no owner, status or TTL is
+  invented. Results/identity/order and immutable provenance are preserved;
+  evidence replay cannot resurrect expired fences. Ordinary embedded open
+  refuses 1/2. Rollback requires an untouched pre-upgrade backup with new
+  writers stopped. See ADRs 0006/0007; implementation is not live-upgrade
+  authorization or execution evidence.
+- **Core dispatcher result (oa-09).** `Dispatched<T>` adds
+  `rejected: Vec<(T, SchedulerError)>`; callers must report every returned
+  rejection outside the dispatch lock. Struct literals/destructuring must
+  account for the field, and rejection-only batches are nonempty.
+- **ResourcePool constructor bound (oa-09).** `ResourcePool::new` now requires
+  `Q: TaskQueue<P>` to count already queued work before observing it.
 
 ## [0.3.0] - 2026-10-24
 

@@ -1,0 +1,77 @@
+{
+  "owner": "/root/oa04_postgres",
+  "sourceManifest": "docker/postgres18/upgrade/handoffs/oa14-task1.json",
+  "sourceManifestSha256": "7864e5eca31ec429901532b60ec8674070dd3b9d2f8b0221b1fb94b885735f41",
+  "files": [
+    {
+      "path": "docker/postgres18/upgrade/Dockerfile",
+      "sha256": "378622954eb23bcd70454baff98856b8d2eaeda231c098b403fd1a326c4c36c8"
+    },
+    {
+      "path": "docker/postgres18/upgrade/preflight.sh",
+      "sha256": "edec00c6df3de6d8c01134efc380d5b8fc842f8f04b7ada89209eb84210bfd64"
+    },
+    {
+      "path": "docker/postgres18/upgrade/cluster-rehearsal.sh",
+      "sha256": "2e43cb480fad71cae498b899e26fd4ea69b26bebc8e824c68a2d57bab7f1177d"
+    },
+    {
+      "path": "docker/postgres18/upgrade/rehearse.py",
+      "sha256": "89fd043bc24ea9b0291782b168df6babad5f50ce9fb24c012485264f982dd7cd"
+    },
+    {
+      "path": "scripts/rehearse-postgres-upgrade.sh",
+      "sha256": "aa5484755f7ab9377ada73b91b0028fbcc639c26615606c687378ab007b64232"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/support/mod.rs",
+      "sha256": "f0076a64bf20109e1c62539a399b0ab0fa2ebaf668a9c0c5d36973d9cf92dd2c"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/mailbox_migration.rs",
+      "sha256": "385b6025af958addbe77867e18df92cc406b6d8facb392843263d137b3e28de9"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/mailbox_status.rs",
+      "sha256": "a7a6b565cffb9cb118ee99fbeb626ec0ea79b7fc4d73da7595579e32053b54a7"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/pg_image_smoke.rs",
+      "sha256": "8eedd6fa7a5cbf6951c732df3b3936dc8cafd5f5b76355d5553df3d69f659d9d"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/postgres_upgrade.rs",
+      "sha256": "f391f8c917a7fd68f75733bd7ece3111d6b489b771bd60b9654e1cfc7acafb31"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa14/004_lease_queue_0_3.sql",
+      "sha256": "206b3e316b3e091dbc2c166ced30e4be71a3edaad726fbf35623a0ce7c8a2719"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa14/005_mailbox_populated_0_3.sql",
+      "sha256": "84d351cb2f340c91ba4e4d863ffea6477c5cc53ad77a1ace1958cbbd9402f1a7"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa14/006_pgmq_lease_queue_0_3.sql",
+      "sha256": "5330d7f95e22410178d0631d77269338fd276bb40fe5413959e4cad797588702"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa14/populated_queues.sql",
+      "sha256": "1afa6e0facc8a851283544e194213f4abb54c8d1c71d8c02746101b67c8f85e1"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa14/metadata.json",
+      "sha256": "aa8368269db463bccb4ee111bbeb773d26f03d849bd36675cac077f5d5e7a958"
+    },
+    {
+      "path": "docker/postgres18/upgrade/handoffs/ci-postgres-upgrade-exclusion.patch",
+      "sha256": "89632523b755d89b688bad2e4d6831c0152dab6b7c47592d8469b64dddace422"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa14/manifest.json",
+      "sha256": "e3dd4df8ed4844b2ff8c4c17b09598e80607b0f8b633fb5e8afb8cd2b6f1ebb4"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED",
+  "ci": "Exact proposed patch only; platform owner applies separate shared CI integration"
+}

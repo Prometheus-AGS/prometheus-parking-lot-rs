@@ -1,0 +1,8 @@
+{
+  "operator": "",
+  "machine_id": "",
+  "no_active_agents": false,
+  "no_concurrent_builds": false,
+  "no_other_benchmarks": false,
+  "no_host_tuning": false
+}

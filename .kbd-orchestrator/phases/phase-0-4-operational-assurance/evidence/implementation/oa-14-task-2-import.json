@@ -1,0 +1,20 @@
+{
+  "owner": "/root/oa04_postgres",
+  "files": [
+    {
+      "path": "docker/postgres18/upgrade/handoffs/postgres18-runbook.patch",
+      "sha256": "38137255ebc7c3fa281e9d62a044cd5f06a30cd56323fbd21a79a194d57f1635"
+    },
+    {
+      "path": "docker/postgres18/upgrade/handoffs/postgres18.runbook.proposed.md",
+      "sha256": "72857cf274c946f604211cfee2a1d93ff536bd1770fb78b6059fb7cc9bb97e4e"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-14.md",
+      "sha256": "8fa7d60b0cb9e850d18327fe1ef0ac84bdeb5a3d5b4f700fb0a3fe9b32881a61"
+    }
+  ],
+  "sourceManifest": "docker/postgres18/upgrade/handoffs/oa14-task2.json",
+  "appliedPublicDocsPatch": "docker/postgres18/upgrade/handoffs/postgres18-runbook.patch",
+  "runtimeEvidence": "NOT_EXERCISED"
+}

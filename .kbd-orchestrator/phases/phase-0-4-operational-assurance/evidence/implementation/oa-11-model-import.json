@@ -1,0 +1,34 @@
+{
+  "owner": "/root/oa04_scheduler",
+  "files": [
+    {
+      "path": "crates/parking-lot-core/src/semaphore/mod.rs",
+      "sha256": "a0a0b965e3937c4a8f93b2ffc4145faf77cdccd02e66c68ad5b426e476864537"
+    },
+    {
+      "path": "crates/parking-lot-core/tests/loom_kind_release.rs",
+      "sha256": "6e081f68b69d1829abd3470566982e5c0ea0c3cea465675bd931403d838b048c"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/src/ledger.rs",
+      "sha256": "dde628e2afa5dcd67ebf1263ce201a50b520413c59016499fa77961929ade7d9"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/loom_ledger.rs",
+      "sha256": "1ce540848d5575a8baa2fb14e464e6fd721c350cdf83ff5a7e22381c96ceee9f"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-11-ci.patch",
+      "sha256": "9d0c571ca43f0d2619821df7185e3ea66f598d9c9f84fd0aad462cc5a51f9476"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED",
+  "ciOwnerApplication": {
+    "owner": "/root/oa04_platform",
+    "file": ".github/workflows/ci.yml",
+    "sha256": "677281eefc80dd074df613cccbfb91f4a7e9fd3a378540b54cfef7ac8e508bfc",
+    "command": "git apply exact oa-11-ci.patch",
+    "exit": 0,
+    "runtimeEvidence": "NOT_EXERCISED"
+  }
+}

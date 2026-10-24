@@ -183,13 +183,16 @@ pub trait ParkedQueue<T> {
         false
     }
 
-    /// Remove every parked item whose deadline passed at `now_ms`; return how
-    /// many were removed.
+    /// Remove every parked item whose deadline passed at `now_ms` and return
+    /// each removed item exactly once with its original metadata/payload.
+    /// Equality at the deadline is live; items without deadlines stay parked.
+    /// Survivor ordering is unchanged. Removed-item order is unspecified and
+    /// no payload cloning is required. The caller owns terminal reporting.
     ///
     /// # Errors
     ///
-    /// The backend's error when pruning fails.
-    fn prune_expired(&mut self, now_ms: u128) -> Result<usize, SchedulerError>;
+    /// The backend's error when pruning fails; nothing is removed on error.
+    fn prune_expired(&mut self, now_ms: u128) -> Result<Vec<T>, SchedulerError>;
 }
 
 /// Map key: dispatch order (higher priority, then lower sequence) first, then
@@ -325,17 +328,20 @@ impl<T: Parkable> ParkedQueue<T> for PriorityQueue<T> {
         self.remove(&key)
     }
 
-    fn prune_expired(&mut self, now_ms: u128) -> Result<usize, SchedulerError> {
+    fn prune_expired(&mut self, now_ms: u128) -> Result<Vec<T>, SchedulerError> {
         let expired: Vec<Key> = self
             .entries
             .iter()
             .filter(|(_, entry)| entry.ticket.is_expired(now_ms))
             .map(|(key, _)| *key)
             .collect();
-        for key in &expired {
-            let _ = self.remove(key);
+        let mut removed = Vec::with_capacity(expired.len());
+        for key in expired {
+            if let Some(item) = self.remove(&key) {
+                removed.push(item);
+            }
         }
-        Ok(expired.len())
+        Ok(removed)
     }
 }
 
@@ -367,8 +373,10 @@ pub const ADAPTER_LOOKAHEAD: usize = 64;
 ///   invariant: that task follows everything already in the front) and checks
 ///   it, until one fits or the front holds [`ADAPTER_LOOKAHEAD`] tasks.
 ///
-/// A task leaves the adapter only through `pop_head` or `take`, after the
-/// dispatcher admitted it, so no task is ever pushed back into the backend.
+/// A task leaves the adapter through `pop_head`, `take` or `prune_expired`,
+/// after the dispatcher admitted, expired or rejected it. Pruning returns the
+/// full removed tasks, so no task is ever pushed back into the backend or
+/// discarded without its terminal-reporting metadata.
 ///
 /// Tasks in the front are held in memory, exactly like a task the 0.2 pool
 /// had dequeued and not yet started; durable leasing of the head is cr-49.
@@ -443,9 +451,12 @@ impl<P, Q: TaskQueue<P>> ParkedQueue<ScheduledTask<P>> for TaskQueueAdapter<P, Q
         true
     }
 
-    fn prune_expired(&mut self, now_ms: u128) -> Result<usize, SchedulerError> {
-        let from_front = self.front.prune_expired(now_ms)?;
-        Ok(from_front + self.backend.prune_expired(now_ms)?)
+    fn prune_expired(&mut self, now_ms: u128) -> Result<Vec<ScheduledTask<P>>, SchedulerError> {
+        // The backend can fail; the in-memory front cannot. Finish fallible
+        // pruning before mutating the front so Err never loses buffered work.
+        let mut removed = self.backend.prune_expired(now_ms)?;
+        removed.extend(self.front.prune_expired(now_ms)?);
+        Ok(removed)
     }
 }
 
@@ -610,7 +621,14 @@ mod tests {
         later.meta.deadline_ms = Some(10);
         queue.push(later).expect("push");
         assert!(queue.head().expect("head").is_some());
-        assert_eq!(queue.prune_expired(11).expect("prune"), 2);
+        let mut removed: Vec<_> = queue
+            .prune_expired(11)
+            .expect("prune")
+            .into_iter()
+            .map(|task| task.meta.id)
+            .collect();
+        removed.sort_unstable();
+        assert_eq!(removed, vec![1, 3]);
         assert_eq!(drain(&mut queue), vec![2]);
     }
 }

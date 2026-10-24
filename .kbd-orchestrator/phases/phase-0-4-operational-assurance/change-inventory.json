@@ -1,0 +1,590 @@
+[
+  {
+    "n": 1,
+    "id": "oa-01-containment-controls",
+    "issues": [
+      88
+    ],
+    "title": "Prepare and enforce post-purge containment controls",
+    "role": "platform-engineer",
+    "paths": ".github/scripts/supply-chain.sh; .github/pre-purge-roots.txt; docs security runbook",
+    "deps": [],
+    "size": "M",
+    "scenario": "OA-01",
+    "entry": "bash .github/scripts/supply-chain.sh tracked-credentials; post-purge secrets-history/path-history/pre-purge in an approved fresh mirror",
+    "oracle": "After separately approved purge, history/path scans are blocking and clean, roots are nonempty, and a scratch branch with an old root is rejected; a clean candidate passes. Operator cache-removal evidence is recorded without credential values.",
+    "negative": "A scratch clone/ref deliberately retaining one recorded pre-purge root must fail the pre-purge check; an intentionally tracked credential path must fail.",
+    "design": "Implement truthful pre-purge versus post-purge state and prepare a backup/ref-map/reclone/support runbook. Operator executes the approved rewrite; the driver does not force-push. Rotation and KBD signer replacement are explicitly deferred by the 2026-10-24 operator reply and do not block implementation.",
+    "safety": "No history rewrite, remote ref deletion, Support submission, credential change or enrollment operation without scoped authorization.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement prepare and enforce post-purge containment controls with the specified regression fixtures; verify OA-01 fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+        "kind": "implementation"
+      }
+    ]
+  },
+  {
+    "n": 2,
+    "id": "oa-02-release-versioning",
+    "issues": [
+      86
+    ],
+    "title": "Choose and automate seven-crate versioning",
+    "role": "tech-lead",
+    "paths": "Cargo.toml; crates/*/Cargo.toml; release-plz/git-cliff configuration; docs/adr; CHANGELOG.md",
+    "deps": [],
+    "size": "M",
+    "scenario": "OA-02",
+    "entry": "Proposed release-tool dry run against a scratch copy of the seven-crate workspace, invoked by the boundary runner",
+    "oracle": "The adopted ADR chooses lockstep 0.4.0 (proposal) or an operator-amended policy; a dry run yields consistent internal dependency versions and changelog entries for exactly seven publishable crates, excluding FFI; a second run is unchanged.",
+    "negative": "Inject a mismatched internal dependency/version in the scratch copy; the release-preparation check must fail.",
+    "design": "Recommend lockstep to match the existing uniform 0.3.0 release. Validate official release-plz/git-cliff capabilities and versions before introducing dependencies; freeze exact tool versions and executable dry-run argv in the boundary manifest during implementation.",
+    "safety": "No registry publishing in a dry run. New tooling/version choices verified from primary sources before installation.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement choose and automate seven-crate versioning with the specified regression fixtures; verify OA-02 fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+        "kind": "implementation"
+      }
+    ]
+  },
+  {
+    "n": 3,
+    "id": "oa-03-signed-release-tags",
+    "issues": [
+      87
+    ],
+    "title": "Verify operator-signed release tags",
+    "role": "platform-engineer",
+    "paths": ".github/workflows planned release workflow; .github/scripts signing verifier; docs/PUBLISHING.md",
+    "deps": [
+      "oa-02-release-versioning"
+    ],
+    "size": "S",
+    "scenario": "OA-03",
+    "entry": "git verify-tag <candidate-tag> using the operator-selected SSH/GPG trust configuration",
+    "oracle": "A scratch annotated tag signed by an operator-authorized identity verifies at the frozen candidate; an unsigned, wrong-identity or wrong-commit tag is rejected. Real v0.4.0 tag creation remains an approved publication step.",
+    "negative": "Unsigned tag and a signed tag pointing at a different commit each fail candidate authorization.",
+    "design": "Do not generate, import or copy private signing keys. Operator selects existing release authority; workflow verifies an explicit identity and exact commit, not merely presence of a signature.",
+    "safety": "Release signing setup is a separate scoped account/key action; no private key bytes in repo, workflow output or receipts.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement verify operator-signed release tags with the specified regression fixtures; verify OA-03 fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+        "kind": "implementation"
+      }
+    ]
+  },
+  {
+    "n": 4,
+    "id": "oa-04-trusted-publishing",
+    "issues": [
+      85
+    ],
+    "title": "Gate trusted publishing on candidate evidence and approval",
+    "role": "platform-engineer",
+    "paths": ".github/workflows planned release workflow; docs/PUBLISHING.md; seven crates.io publisher settings (operator)",
+    "deps": [
+      "oa-01-containment-controls",
+      "oa-02-release-versioning",
+      "oa-03-signed-release-tags"
+    ],
+    "size": "M",
+    "scenario": "OA-04",
+    "entry": "Proposed approval-environment GitHub release workflow dispatch for the frozen candidate, initially a non-publishing rehearsal",
+    "oracle": "Unapproved or stale boundary receipts, incorrect tag identities and missing environment approval prevent publication; approved candidate rehearsal resolves exactly seven crates and uses OIDC with minimum permissions and no long-lived token fallback. Actual publish/install evidence is required only after separate publication approval.",
+    "negative": "Dispatch a scratch/rehearsal candidate with a stale receipt or unapproved environment; no cargo publish invocation may occur.",
+    "design": "Split preparation, evidence validation and approval-gated publication; require candidate SHA, contract digest and tag identity to agree. Owner GQAdonis/operator coordinates repository and crates.io permissions; availability is unverified until an attributable account receipt exists.",
+    "safety": "No credentials, account settings or third-party resources changed during planning. Publication is not authorized by plan adoption.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement gate trusted publishing on candidate evidence and approval with the specified regression fixtures; verify OA-04 fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+        "kind": "implementation"
+      }
+    ]
+  },
+  {
+    "n": 5,
+    "id": "oa-05-template-secret-scan",
+    "issues": [
+      89
+    ],
+    "title": "Make template scans precise without hiding real secrets",
+    "role": "platform-engineer",
+    "paths": ".gitleaks.toml; docs/coding-standards/README.md; .e2b-template/SETUP.md",
+    "deps": [],
+    "size": "S",
+    "scenario": "OA-05",
+    "entry": "gitleaks detect --no-git --redact, plus repository staged/diff scans",
+    "oracle": "The two known non-secret template examples no longer fail the full-tree scan; a synthetic nonfunctional secret-pattern canary outside narrowly scoped exceptions still fails. Scan metadata contains no unredacted secret.",
+    "negative": "Synthetic canary outside the exact example paths/rules must be detected; a broad path or rule disable is rejected.",
+    "design": "Prefer removing ambiguous placeholder material or narrowly fingerprinted example exceptions with rationale. Do not blanket-allowlist template folders or weaken default rules.",
+    "safety": "Synthetic nonfunctional test values only; never insert a real key to test a detector.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement make template scans precise without hiding real secrets with the specified regression fixtures; verify OA-05 fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+        "kind": "implementation"
+      }
+    ]
+  },
+  {
+    "n": 6,
+    "id": "oa-06-tenant-idempotency",
+    "issues": [
+      80
+    ],
+    "title": "Scope result idempotency to tenant/mailbox key",
+    "role": "tech-lead",
+    "paths": "crates/parking-lot-core/src/contracts (ResultMailbox and conformance); crates/parking-lot-pg/src/mailbox and migrations; crates/parking-lot-embedded/src/mailbox.rs; docs/API.md",
+    "deps": [],
+    "size": "L",
+    "scenario": "OA-06",
+    "entry": "ResultMailbox::deliver/consume through PG17, PG18 and redb, including populated 0.3.0 stores",
+    "oracle": "Two tenants reusing the same caller key independently retrieve their own first result; a duplicate within one tenant remains first-write-wins after consume/restart/TTL rules. Migration preserves existing results and dedup meaning under the recorded upgrade policy.",
+    "negative": "The old mailbox-global-key behavior must fail the cross-tenant case; a duplicate within one tenant must not produce a second stored result.",
+    "design": "Tech-lead owns the public contract and conformance change; postgres-engineer and events-engineer implement the two backends after that contract. Preserve old database/store fixtures and require explicit safe migration.",
+    "safety": "No production store mutation; migration fixtures are isolated copies with manifests and rollback/read-compatibility policy.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement scope result idempotency to tenant/mailbox key with the specified regression fixtures; verify OA-06 fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+        "kind": "implementation"
+      }
+    ]
+  },
+  {
+    "n": 7,
+    "id": "oa-07-stored-terminal-outcome",
+    "issues": [
+      78
+    ],
+    "title": "Emit durable terminal events from the stored result",
+    "role": "tech-lead",
+    "paths": "crates/parking-lot-core/src/contracts; PG/redb mailbox implementations; crates/parking-lot-runtime-tokio/src/durable_pool/mod.rs",
+    "deps": [
+      "oa-06-tenant-idempotency"
+    ],
+    "size": "L",
+    "scenario": "OA-07",
+    "entry": "DurableResourcePool deliver-before-resolve path on real PG/redb, killed after Failed delivery and before dead-letter/ack",
+    "oracle": "After restart and redelivery, stored status and terminal event agree on Failed, exactly one result is consumable, and delivery still precedes lease resolution. The status remains knowable after consume while the idempotency record is retained.",
+    "negative": "Old bool-only delivery handling that emits local Completed after a stored Failed must fail the event/result consistency oracle.",
+    "design": "Extend DeliveryOutcome duplicate metadata to retain authoritative terminal status in idempotency records, including consumed-result cases. Update all ResultMailbox implementers/conformance and migrate retained metadata; do not fetch destructive consume just to learn status.",
+    "safety": "Contract/migration changes depend on oa-06; no acknowledged task may lose its durable outcome.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement emit durable terminal events from the stored result with the specified regression fixtures; verify OA-07 fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+        "kind": "implementation"
+      }
+    ]
+  },
+  {
+    "n": 8,
+    "id": "oa-08-discarded-spawn",
+    "issues": [
+      81
+    ],
+    "title": "Settle accepted work when a spawner discards its future",
+    "role": "scheduler-engineer",
+    "paths": "crates/parking-lot-runtime-tokio/src/resource_pool.rs; shutdown ledger; runtime integration tests",
+    "deps": [],
+    "size": "M",
+    "scenario": "OA-08",
+    "entry": "ResourcePool::submit/launch with a legal Spawn implementation that discards supervise without polling, followed by shutdown_with",
+    "oracle": "Discarding an unpolled supervise future produces one documented Failed/Cancelled terminal outcome and mailbox result where configured, releases units and settles the ledger; shutdown does not wait out its deadline for the discarded task. A normal spawner still completes once.",
+    "negative": "Constructing the settlement guard only inside the unpolled async body must fail the task-outcome/ledger oracle.",
+    "design": "Establish ownership/settlement before handing the future to Spawn. Preserve panic containment and avoid duplicate terminal reporting. Do not claim durable execution for an in-memory ResourcePool.",
+    "safety": "No new dependency from core to an async runtime; preserve capacity and shutdown ordering.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement settle accepted work when a spawner discards its future with the specified regression fixtures; verify OA-08 fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+        "kind": "implementation"
+      }
+    ]
+  },
+  {
+    "n": 9,
+    "id": "oa-09-backend-admission",
+    "issues": [
+      82
+    ],
+    "title": "Reject impossible pre-populated adapter work",
+    "role": "scheduler-engineer",
+    "paths": "TaskQueueAdapter and dispatcher first-observation path; core/runtime admission tests",
+    "deps": [],
+    "size": "M",
+    "scenario": "OA-09",
+    "entry": "TaskQueueAdapter backend prefilled before ResourcePool startup with total-oversized and per-kind-oversized tasks",
+    "oracle": "An impossible head task is rejected/dead-lettered with a reason once first observed, valid following work runs, and active vector/kind cost never exceeds limits. Pre-populated valid work remains FIFO within the applicable policy.",
+    "negative": "Skip first-observation capacity validation; the invalid head blocks valid followers and the oracle fails.",
+    "design": "Use the existing Dispatcher::check_capacity contract on first observation; persist or emit a terminal reason appropriate to the adapter, without silently dropping entries or looping forever.",
+    "safety": "Keep one dispatcher owner; distinguish impossible total/kind cost from temporary lack of free capacity.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement reject impossible pre-populated adapter work with the specified regression fixtures; verify OA-09 fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+        "kind": "implementation"
+      }
+    ]
+  },
+  {
+    "n": 10,
+    "id": "oa-10-expiry-events",
+    "issues": [
+      57
+    ],
+    "title": "Emit terminal events for explicitly pruned work",
+    "role": "tech-lead",
+    "paths": "crates/parking-lot-core/src/contracts/queue.rs; dispatcher and all TaskQueue implementers; ResourcePool pruning; lifecycle tests",
+    "deps": [],
+    "size": "M",
+    "scenario": "OA-10",
+    "entry": "ResourcePool::prune_expired on parked tasks through real TaskQueue implementations and recording hooks",
+    "oracle": "Each pruned task emits exactly one Expired terminal event, releases/settles its accepted-work accounting, and cannot execute; non-expired work still runs. The public return behavior is documented and all backends implement the changed metadata contract.",
+    "negative": "Count-only pruning or suppressing Expired events must fail the per-task lifecycle sequence oracle.",
+    "design": "Return pruned task metadata through the contract; implement across queue adapters, retain the public count if compatible, and update conformance and changelog.",
+    "safety": "Do not emit terminal events while holding dispatcher locks; preserve existing event causality and panic boundaries.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement emit terminal events for explicitly pruned work with the specified regression fixtures; verify OA-10 fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+        "kind": "implementation"
+      }
+    ]
+  },
+  {
+    "n": 11,
+    "id": "oa-11-concurrency-models",
+    "issues": [
+      64
+    ],
+    "title": "Model ledger races and kind-limited release",
+    "role": "scheduler-engineer",
+    "paths": "crates/parking-lot-core/tests/loom_*; runtime shutdown ledger model and cfg wiring; .github/workflows/ci.yml",
+    "deps": [
+      "oa-08-discarded-spawn",
+      "oa-09-backend-admission",
+      "oa-10-expiry-events"
+    ],
+    "size": "M",
+    "scenario": "OA-11",
+    "entry": "Loom model runs under --cfg parking_lot_loom with LOOM_MAX_PREEMPTIONS=3 and isolated target directories",
+    "oracle": "Ledger submit/shutdown and kind-limited permit release explore the bounded schedules without violation; each corresponding broken-order/release negative control compiles then triggers the intended model assertion.",
+    "negative": "Remove the named happens-before edge or kind-release synchronization in an isolated cfg build and require the model to fail for that reason.",
+    "design": "Model the production state machine with explicit mapping to source ordering; no runtime dependency in core normal graph. Bound exploration and retain seed/preemption/compiler receipts.",
+    "safety": "A model is supporting evidence; real runtime/backends and shutdown/crash paths remain required.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement model ledger races and kind-limited release with the specified regression fixtures; verify OA-11 fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+        "kind": "implementation"
+      }
+    ]
+  },
+  {
+    "n": 12,
+    "id": "oa-12-negative-control-ci",
+    "issues": [
+      79
+    ],
+    "title": "Run every scenario negative control in CI",
+    "role": "platform-engineer",
+    "paths": ".github/workflows/ci.yml; proposed negative-control manifest/runner; existing scenario suites",
+    "deps": [
+      "oa-06-tenant-idempotency",
+      "oa-07-stored-terminal-outcome",
+      "oa-08-discarded-spawn",
+      "oa-09-backend-admission",
+      "oa-10-expiry-events",
+      "oa-11-concurrency-models"
+    ],
+    "size": "M",
+    "scenario": "OA-12",
+    "entry": "CI matrix of every existing parking_lot_negative_control cfg plus each new OA regression control, compiled separately before test invocation",
+    "oracle": "All listed controls compile, discover the expected nonzero tests and fail only at their designated oracle; normal builds pass. Omitted controls, compile failures, timeouts and missing tests fail the CI job rather than count as successful negative controls.",
+    "negative": "Remove one matrix row or let one defective control pass; the completeness/expected-failure verifier must fail.",
+    "design": "Create a checked manifest from actual cfg sites and expected assertion/test identities. Existing controls include S-1\u2013S-9 where defined, S-11,S-16\u2013S-21,S-33; use enumerated source inventory rather than assuming every integer exists. Independent targets avoid RUSTFLAGS cache collisions.",
+    "safety": "No CI green result from arbitrary nonzero exit; retain diagnostic classifier and all raw output.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement run every scenario negative control in ci with the specified regression fixtures; verify OA-12 fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+        "kind": "implementation"
+      }
+    ]
+  },
+  {
+    "n": 13,
+    "id": "oa-13-browser-assurance",
+    "issues": [
+      65
+    ],
+    "title": "Exercise WASM admission and events in a browser",
+    "role": "platform-engineer",
+    "paths": "crates/parking-lot-wasm/tests/wasm_pool.rs; wasm_events.rs; .github/workflows/ci.yml",
+    "deps": [
+      "oa-10-expiry-events"
+    ],
+    "size": "M",
+    "scenario": "OA-13",
+    "entry": "wasm-bindgen-test runner in pinned headless Chromium, exercising real browser event loop/timers",
+    "oracle": "Smoke, vector capacity, execution-budget, event-order and applicable expiry scenarios execute and pass in a real headless browser with nonzero test discovery; existing Node path also passes.",
+    "negative": "A broken capacity/event-budget control fails in the browser; Node-only execution cannot satisfy the browser receipt.",
+    "design": "Resolve browser/driver and wasm-bindgen runner versions against Cargo.lock and official docs before implementation; preserve no-tokio core graph. Browser installation is an environment prerequisite, not a planning side effect.",
+    "safety": "Do not change UI design; this is platform verification, not a UI redesign.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement exercise wasm admission and events in a browser with the specified regression fixtures; verify OA-13 fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+        "kind": "implementation"
+      }
+    ]
+  },
+  {
+    "n": 14,
+    "id": "oa-14-postgres-upgrade",
+    "issues": [
+      66
+    ],
+    "title": "Rehearse a populated PostgreSQL 17\u219218 upgrade",
+    "role": "postgres-engineer",
+    "paths": "docker images; docs/runbooks/postgres18.md; proposed disposable upgrade rehearsal script and PG suites",
+    "deps": [
+      "oa-06-tenant-idempotency",
+      "oa-07-stored-terminal-outcome"
+    ],
+    "size": "M",
+    "scenario": "OA-14",
+    "entry": "Project PG17 image populated with queue/mailbox/pgmq fixtures, pg_upgrade into project PG18 image, then real integration suites",
+    "oracle": "Queued payloads, mailbox results, tenant dedup records and pgmq state survive the checksum-compatible upgrade; lease/mailbox/pgmq suites pass on upgraded PG18. Source fixture remains recoverable; version/checksum mismatch is detected before destructive work.",
+    "negative": "Wrong checksum/version fixture must be rejected before upgrade; removing a seeded result must fail post-upgrade data verification.",
+    "design": "Use image digests and disposable volumes; populate a real 0.3.0 store, perform the 0.4 schema migration in its documented order relative to pg_upgrade, verify invariants and correct the runbook.",
+    "safety": "Never use operator data directories or non-test Docker volumes; record cleanup handles and backup checks.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement rehearse a populated postgresql 17\u219218 upgrade with the specified regression fixtures; verify OA-14 fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+        "kind": "implementation"
+      }
+    ]
+  },
+  {
+    "n": 15,
+    "id": "oa-15-desktop-assurance",
+    "issues": [
+      67
+    ],
+    "title": "Build and launch the Tauri embedded example",
+    "role": "platform-engineer",
+    "paths": "bindings/tauri-desktop; .github/workflows/platform.yml; desktop launch/restart evidence runbook",
+    "deps": [
+      "oa-06-tenant-idempotency"
+    ],
+    "size": "M",
+    "scenario": "OA-15",
+    "entry": "Real Tauri application launch on macOS and Linux/Windows shell builds, plus app submit/restart/retrieve operation",
+    "oracle": "Tauri shell builds on macOS/Linux/Windows. At least macOS actual GUI launch submits work, restarts the app and retrieves the persisted result; platform-specific manual checks are attributable and may not be replaced by queue-service unit tests.",
+    "negative": "Delete only the test app's store before restart; retrieval oracle fails. A build-only or queue-service-only run cannot satisfy GUI evidence.",
+    "design": "Keep the incumbent UI unchanged. Exact supported desktop launch matrix is frozen in the contract: builds on all three OS, actual GUI restart operation on macOS; if Linux/Windows runtime support is claimed, require corresponding launch evidence before that claim.",
+    "safety": "No unattended GUI input to unrelated apps; no production user directories; no new paid runner or host package installation without approval.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement build and launch the tauri embedded example with the specified regression fixtures; verify OA-15 fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+        "kind": "implementation"
+      }
+    ]
+  },
+  {
+    "n": 16,
+    "id": "oa-16-iggy-poisoning",
+    "issues": [
+      68
+    ],
+    "title": "Prove no stream publication beyond an abandoned chunk",
+    "role": "events-engineer",
+    "paths": "crates/parking-lot-iggy/tests/iggy_stream.rs; stream writer; pinned Iggy test support",
+    "deps": [],
+    "size": "M",
+    "scenario": "OA-16",
+    "entry": "IggyStreamSink/StreamWriter against a pinned real Iggy server with failure at one chosen chunk",
+    "oracle": "Exhausting the publish budget poisons the writer, later publishes return Poisoned, and a reader observes no sequence beyond the hole; reconnect semantics for valid prefixes remain correct.",
+    "negative": "Disable writer poisoning or allow a later sequence to publish; the real-server reader oracle fails.",
+    "design": "Introduce deterministic fault scheduling at the actual publisher/server boundary without replacing the real sink/reader with mocks. Preserve the documented consumer-dedup requirement; #62 is not solved here.",
+    "safety": "Use per-run stream/topic names and delete only owned test resources.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement prove no stream publication beyond an abandoned chunk with the specified regression fixtures; verify OA-16 fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+        "kind": "implementation"
+      }
+    ]
+  },
+  {
+    "n": 17,
+    "id": "oa-17-backend-benchmarks",
+    "issues": [
+      71
+    ],
+    "title": "Measure PG throughput, contention and memory",
+    "role": "scheduler-engineer",
+    "paths": "benches/; benches/README.md; docs/ARCHITECTURE.md section 7; disposable PG fixtures",
+    "deps": [
+      "oa-06-tenant-idempotency",
+      "oa-07-stored-terminal-outcome",
+      "oa-08-discarded-spawn",
+      "oa-09-backend-admission",
+      "oa-10-expiry-events"
+    ],
+    "size": "M",
+    "scenario": "OA-17",
+    "entry": "Docker-backed Postgres queue/mailbox/durable-pool benchmarks plus multi-thread contention and peak-memory measurement",
+    "oracle": "Quiet-machine baseline and candidate run the identical fixed workload with >=5 samples; report throughput, p50/p95/p99 latency, contention parameters and peak RSS, raw samples and environment. No performance gain or broad regression-budget claim is made from task counts or incomparable hosts; any observed regression is reported explicitly for the operator's release decision.",
+    "negative": "Drop a raw sample or change workload/machine identity; report validation fails. A deliberately slowed workload validates regression classification.",
+    "design": "Freeze hardware/OS/CPU/thread counts, toolchain, features and image digests; no speedup claim if confidence intervals overlap noise. This issue requires reproducible measurement, not an invented numerical performance target. No release benchmark during implementation.",
+    "safety": "One build/benchmark writer, no active agents/builds on the benchmark host; no privileged host tuning without approval.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement measure pg throughput, contention and memory with the specified regression fixtures; verify OA-17 fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+        "kind": "implementation"
+      }
+    ]
+  },
+  {
+    "n": 18,
+    "id": "oa-18-release-boundary",
+    "issues": [],
+    "title": "Assemble and evaluate one candidate boundary packet",
+    "role": "tech-lead",
+    "paths": ".github/scripts proposed operational-assurance boundary runner; .github/workflows; phase evidence and release report",
+    "deps": [
+      "oa-01-containment-controls",
+      "oa-02-release-versioning",
+      "oa-03-signed-release-tags",
+      "oa-04-trusted-publishing",
+      "oa-05-template-secret-scan",
+      "oa-06-tenant-idempotency",
+      "oa-07-stored-terminal-outcome",
+      "oa-08-discarded-spawn",
+      "oa-09-backend-admission",
+      "oa-10-expiry-events",
+      "oa-11-concurrency-models",
+      "oa-12-negative-control-ci",
+      "oa-13-browser-assurance",
+      "oa-14-postgres-upgrade",
+      "oa-15-desktop-assurance",
+      "oa-16-iggy-poisoning",
+      "oa-17-backend-benchmarks"
+    ],
+    "size": "L",
+    "scenario": null,
+    "entry": "Proposed bash .github/scripts/operational-assurance-gate.sh --candidate <full-sha> --contract <path> --out <owned-evidence-dir>",
+    "oracle": "One receipt set binds all 17 scenarios, current candidate SHA/contract digest, required OS/backend jobs, raw logs and approvals; no omitted, stale, blocked or not-exercised required scenario is reported PASS. Code completion, certification and publication are reported separately.",
+    "negative": "Alter the candidate SHA, omit a required OS receipt, or replace a required scenario with a skip; boundary verification rejects release readiness.",
+    "design": "Implement this proposed runner and freeze exact per-scenario argv/tool versions before it can run. It coordinates fresh collaborators after all production changes are complete; independent cumulative review has one correction/confirmation cycle. No actual publish or history rewrite inside unattended validation.",
+    "safety": "Complete phase implementation may be recorded while external publication/containment authorization remains pending; this never certifies a release.",
+    "tasks": [
+      {
+        "id": "1",
+        "title": "1.1 Implement the candidate-bound boundary runner and receipt/approval verifier; verify candidate packet fixture/manifest coverage by static inspection",
+        "kind": "implementation"
+      },
+      {
+        "id": "2",
+        "title": "1.2 Assemble the completed candidate and record the final integration, review and publication dispositions; verify artifact links and contract/documentation handoff",
+        "kind": "evidence-boundary"
+      }
+    ]
+  }
+]

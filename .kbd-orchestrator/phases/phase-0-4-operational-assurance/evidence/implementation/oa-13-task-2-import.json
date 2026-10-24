@@ -1,0 +1,7 @@
+{
+  "owner": "/root/oa04_platform",
+  "file": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-13.md",
+  "sha256": "07092252696fd3eb57bfeb598ce458a577c9b954afea019a4a0abf6fa8e252a0",
+  "readmePatchApplied": ".github/scripts/proposals/oa-13-wasm-readme.patch",
+  "runtimeEvidence": "NOT_EXERCISED"
+}

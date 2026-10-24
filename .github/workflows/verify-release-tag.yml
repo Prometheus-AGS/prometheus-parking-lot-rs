@@ -1,0 +1,72 @@
+name: Verify release tag identity
+
+# Read-only reusable gate; no tag creation, key provisioning or publishing.
+# G-03 requires operator-approved environment policy and public trust material.
+on:
+  workflow_call:
+    inputs:
+      candidate:
+        description: Full frozen candidate commit ID
+        type: string
+        required: true
+      tag:
+        description: Exact existing annotated tag name
+        type: string
+        required: true
+      runner:
+        description: Existing approved runner label; OpenPGP needs a provisioned public verification home
+        type: string
+        default: ubuntu-latest
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ${{ inputs.runner }}
+    environment: release-signature-verification
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Verification code comes from the default branch, never the tag.
+          # Operator protection of that branch/environment is still required.
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify exact annotated tag, commit and authorized signer
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_CANDIDATE: ${{ inputs.candidate }}
+          RELEASE_FORMAT: ${{ vars.RELEASE_SIGNATURE_FORMAT }}
+          RELEASE_SSH_IDENTITY: ${{ vars.RELEASE_SSH_IDENTITY }}
+          RELEASE_SSH_FINGERPRINT: ${{ vars.RELEASE_SSH_FINGERPRINT }}
+          RELEASE_SSH_ALLOWED_SIGNERS: ${{ vars.RELEASE_SSH_ALLOWED_SIGNERS }}
+          RELEASE_SSH_REVOCATIONS_FILE: ${{ vars.RELEASE_SSH_REVOCATIONS_FILE }}
+          RELEASE_GPG_FINGERPRINT: ${{ vars.RELEASE_GPG_FINGERPRINT }}
+          RELEASE_GPG_HOME: ${{ vars.RELEASE_GPG_HOME }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          args=(--tag "$RELEASE_TAG" --candidate "$RELEASE_CANDIDATE" --format "$RELEASE_FORMAT")
+          case "$RELEASE_FORMAT" in
+            ssh)
+              test -n "$RELEASE_SSH_ALLOWED_SIGNERS" || { echo 'Missing operator-approved public SSH trust'; exit 1; }
+              # This variable is public allowed-signers content, never a private key.
+              case "$RELEASE_SSH_ALLOWED_SIGNERS" in *'PRIVATE KEY'*) echo 'Private material is forbidden'; exit 1 ;; esac
+              trust_file="$RUNNER_TEMP/release-allowed-signers"
+              printf '%s\n' "$RELEASE_SSH_ALLOWED_SIGNERS" > "$trust_file"
+              args+=(--identity "$RELEASE_SSH_IDENTITY" --fingerprint "$RELEASE_SSH_FINGERPRINT" --allowed-signers "$trust_file")
+              if test -n "$RELEASE_SSH_REVOCATIONS_FILE"; then
+                args+=(--revocations "$RELEASE_SSH_REVOCATIONS_FILE")
+              fi
+              ;;
+            openpgp)
+              # No import/provisioning step. The operator supplies an existing
+              # runner-local verification home containing approved public keys.
+              args+=(--fingerprint "$RELEASE_GPG_FINGERPRINT" --gnupg-home "$RELEASE_GPG_HOME")
+              ;;
+            *) echo 'Missing/unsupported operator signature format'; exit 1 ;;
+          esac
+          python3 .github/scripts/verify-release-tag.py "${args[@]}"

@@ -53,6 +53,7 @@ pub mod mailbox;
 #[cfg(test)]
 mod negative;
 pub mod queue;
+pub mod task_queue;
 
 /// Builds isolated [`LeaseQueue`] backends and moves their clock.
 ///
@@ -237,7 +238,11 @@ macro_rules! result_mailbox_conformance {
                 per_key_delivery_order,
                 keys_are_isolated,
                 first_write_wins,
+                idempotency_is_scoped_to_mailbox_key,
+                idempotency_expiry_is_scoped_to_mailbox_key,
                 idempotency_survives_consume,
+                duplicate_returns_original_status,
+                duplicate_status_expires_with_original_fence,
                 deliveries_without_key_all_stored,
                 ttl_hides_and_evicts,
             ],
@@ -268,6 +273,9 @@ mod run_all {
 
     #[test]
     fn run_all_passes_for_in_memory_backends() {
+        super::task_queue::prune_returns_all_removed_tasks(
+            &mut crate::contracts::InMemoryQueue::new(8),
+        );
         futures::executor::block_on(async {
             queue::run_all(&InMemoryQueueHarness::new()).await;
             mailbox::run_all(&InMemoryMailboxHarness::new()).await;

@@ -1,0 +1,20 @@
+{
+  "candidate": "729cc42549defb5fcf69b432485224cb89da74bc",
+  "status": "FAIL",
+  "baseline_counts": {
+    "PASS": 28,
+    "FAIL": 9,
+    "BLOCKED": 5
+  },
+  "baseline_exit": 2,
+  "artifact_directory": "/Users/gqadonis/.local/state/prometheus/operational-assurance/729cc42549defb5fcf69b432485224cb89da74bc/boundary-attempt-1",
+  "inventory_path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/729cc42549defb5fcf69b432485224cb89da74bc/boundary-attempt-1/retained-files.json",
+  "inventory_digest": "4d9d900e72b49a72dd6d039a63a96c1689598f18f12318139ef4611d0fa82ef1",
+  "retained_files": 176,
+  "relocation": "All raw bytes preserved and verified. 62 SHA256 values and six Git revision ranges triggered generic-api-key when beside receipt labels. No scanner policy changed. Raw evidence is an external durable artifact; this source pointer preserves its identity.",
+  "repair_compiler_check": {
+    "exit": 0,
+    "log": "/Users/gqadonis/.local/state/prometheus/operational-assurance/729cc42549defb5fcf69b432485224cb89da74bc/boundary-attempt-1/compiler-rechecks/oa04-observed-repair7-clippy.log",
+    "sha256": "8298e61547236f434410d44780083607d1834fcdb74ae148b5b72bf92b447cf8"
+  }
+}

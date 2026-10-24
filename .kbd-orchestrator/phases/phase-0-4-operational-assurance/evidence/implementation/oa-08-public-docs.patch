@@ -1,0 +1,57 @@
+--- a/docs/API.md
++++ b/docs/API.md
+@@ -31,6 +31,31 @@
+ `with_cancellation_config`, `submit`, `prune_expired`, `active_units`,
+ `running_tasks`, `queued_tasks`, `shutdown` (refuse new work only),
+ `shutdown_with(policy)` (async; returns a `ShutdownReport`, cr-29).
++
++`Spawn` may legally drop a supplied future without polling it. For an accepted
++`ResourcePool` run discarded this way (oa-08), the executor is never called:
++the pool emits one `Failed` lifecycle event with no `Started`, and attempts one
++mailbox delivery for a configured key, with no result payload and status
++`TaskStatus::Failed(TaskError::Cancelled { reason })`. The reason is exactly
++`spawner discarded resource pool task before its first poll`.
++
++The pool returns the permit and launches admitted parked work before mailbox
++or audit callbacks, increments `failed_tasks`, and settles shutdown accounting
++when the discard action exits. A discard during shutdown counts in
++`ShutdownReport::completed` (which includes finished failures); one settled
++before shutdown began is outside that report's interval. It does not increment
++`cancelled`, emit the shutdown `Cancelled` event, invoke the asynchronous
++`CancellationSink`, or requeue the payload. First-polled runs retain the normal
++executor panic, timeout and shutdown cancellation behavior.
++
++Discard settlement is synchronous and does not supply an unavailable runtime.
++A spawner that retains a future without polling or dropping it can still hold
++its work unsettled. Collaborators must return for settlement to finish. The
++discard path contains mailbox/audit callback unwinding and settles the ledger,
++but does not guarantee a stored result when the mailbox errors or panics before
++storage. Panicking clocks/queues can interrupt completion, blocking callbacks
++can delay it, process aborts do not run drop guards, and hook delivery retains
++the bus's bounded-queue semantics. `ResourcePool` remains an in-memory pool.
+ 
+ `DurableResourcePool` (crash-durable mode on a `LeaseQueue` and a
+ `ResultMailbox`, cr-49; top-level `DurableResourcePool`, `DurableOptions`):
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,6 +4,20 @@
+ 
+ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
++
++## [Unreleased]
++
++### Fixed
++
++- **Discarded ResourcePool spawns (oa-08, #81).** An accepted run whose
++  spawner drops its future before first poll now emits `Failed` and attempts
++  one configured mailbox delivery of `TaskStatus::Failed(TaskError::Cancelled)`
++  with reason `spawner discarded resource pool task before its first poll`
++  and no result payload. Its permit is returned and shutdown accounting is
++  settled; the executor is never called. This finished failure does not invoke
++  the async cancellation sink or increment `ShutdownReport::cancelled`.
++  Retained futures, unavailable execution runtimes and failed mailbox storage
++  retain their existing progress/delivery limits; this adds no crash durability.
+ 
+ ## [0.3.0] - 2026-10-24
+ 

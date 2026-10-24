@@ -1,0 +1,17 @@
+{
+  "status": "NOT_EXERCISED",
+  "scope": "OA18 cumulative correction cycle 1: OA08 discarded-run bounded stack",
+  "files": [
+    {
+      "path": "crates/parking-lot-runtime-tokio/src/resource_pool.rs",
+      "central_base_sha256": "84c441bd0d2030d747cb10fce5ab2eaf385864aa015160413702df1cc292791c",
+      "authored_sha256": "4ef1c88a2e3c60ee48d165f578837266a1f59b88ddaa419bf32f7ed28690aaec"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs",
+      "central_base_sha256": "345cba56167ab7d82637ea77e6a81f01c79658ca9c81c7bebbca6b5f6afb1ba1",
+      "authored_sha256": "1dd5f8cfbde2d1ac3ba982bf0e3231e7e677324cfdb7a46a25e7ca55a44bb850"
+    }
+  ],
+  "patch_sha256": "7587716a32f6e77393c03a7f27bfafb5349b88691ce8a7eada00e60043eb55a4"
+}

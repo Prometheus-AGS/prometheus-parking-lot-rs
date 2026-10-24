@@ -1,0 +1,143 @@
+{
+  "scenario": "OA-07",
+  "execution": "NOT_EXERCISED; implementation only, final verification by OA-18 task 2",
+  "contract": "docs/adr/0007-authoritative-duplicate-status.md",
+  "source_protocols": {
+    "1": "independently frozen OA06 005 schema plus populated0.3 and Failed overlay",
+    "2": "independently frozen 008 schema plus explicit old-layout population and Failed/scoped Running overlay; never created by the new migration"
+  },
+  "files": {
+    "008_scoped_result_mailbox_v2.sql": {
+      "sha256": "f583b5e14927df5a0f09974b2d1656d4bab374d5982e315ecde853298fd971aa"
+    },
+    "populated_v2.sql": {
+      "sha256": "6fe271c5ff8c956e8739dc6dde068ea868f24eab0e5fe0a2d559f6517f3b6421"
+    },
+    "failed_generation_0_3.sql": {
+      "sha256": "e21ee9fd180c623112515be2e462512bf226b8e6886179a3ad43a980be3d10f0"
+    },
+    "failed_generation_v2.sql": {
+      "sha256": "fe1c28d1f672b19ed2dd27985a17a728c4d6eabce318ab7103a98c49293ce177"
+    },
+    "ambiguous_status_0_3.sql": {
+      "sha256": "2272ad1e46195ad844ec87ed4ebc8cf349e30621f5971067390bdef734bc2826"
+    },
+    "untouched_backup_0_3.sql": {
+      "sha256": "84d351cb2f340c91ba4e4d863ffea6477c5cc53ad77a1ace1958cbbd9402f1a7"
+    },
+    "untouched_backup_v2.sql": {
+      "sha256": "84b866946af7549f5a4a6e17779c3e7cd2b7afc1b94d2f5657f559b1d6b43921"
+    },
+    "authoritative_metadata.json": {
+      "sha256": "9f499bad0a6172608299fb5c2b7a20eded3b91745401566aeb5aa18d97548f52"
+    }
+  },
+  "preserved_oa06_assets": [
+    "../oa06/005_result_mailbox_0_3.sql",
+    "../oa06/populated_0_3.sql",
+    "../oa06/untouched_backup_0_3.sql",
+    "../oa06/manifest.json"
+  ],
+  "native_precision": "PostgreSQL timestamptz microseconds; never round for generation equality or migration copy",
+  "entry": "PgResultMailbox::migrate_with_idempotency_metadata(pool,owners,statuses); direct1\u21923 and intermediate2\u21923 each under one transaction",
+  "policy": [
+    "Every active fence resolves full address and original full TaskStatus before commit",
+    "Retained status proof matches namespace, full address, caller and exact original expiry",
+    "Ambiguous authority selects a coherent retained owner/status pair; zero-candidate consumed records require explicit independent owner/status evidence",
+    "Unknown/expired/wrong-address/duplicate/contradictory assignments refuse without logical mutation",
+    "New protocol3 active fences retain status through consume; duplicates never read/destructively consume results",
+    "Immutable conversion metadata validates replay after expiry/consume without rebuilding or extending fences",
+    "Keep old1 and old2 names occupied with database mutation guards; never allow statusless old-writer fences",
+    "Queued and Running remain valid generic mailbox statuses"
+  ],
+  "backup_and_rollback": "Stop all old readers/writers; preserve these digest-bound untouched SQL backups and restore only to isolated databases. Refusal keeps source logical rows/schema/identity unchanged. To roll back success, stop new writers and restore untouched pre-upgrade backup; do not downgrade converted stores. Reconcile subsequent writes separately. No production upgrade authorized.",
+  "environment_required": [
+    "real parking-lot-pg:17",
+    "real parking-lot-pg:18",
+    "freeze actual image digests, source fixture digests and tool versions in boundary receipt"
+  ],
+  "regressions": [
+    {
+      "binary": "mailbox_status",
+      "test": "mailbox_status_direct_and_v2_refuse_atomically_then_preserve_failed_provenance",
+      "oracles": [
+        "OA-07:atomic-refusal",
+        "OA-07:stored-status",
+        "OA-07:consumed-status",
+        "OA-07:address-status"
+      ],
+      "covers": "Both actual old layouts: owner/status refusal, duplicate/unknown/expired/wrong-address/contradictory evidence, status cannot replace ownership, exact results/native expiry/sequence preservation, consumed Failed after reconnect, equal caller at different full addresses, backup-only source consume"
+    },
+    {
+      "binary": "mailbox_status",
+      "test": "mailbox_status_migration_requires_coherent_owner_status_pair",
+      "oracles": [
+        "OA-07:coherent-proof"
+      ],
+      "covers": "Multiple matching owners/statuses; selecting one owner cannot borrow status proved only at another owner; among-candidate status choice succeeds"
+    },
+    {
+      "binary": "mailbox_status",
+      "test": "mailbox_duplicate_status_matches_concurrent_winner_after_consume",
+      "oracles": [
+        "OA-07:concurrent-status"
+      ],
+      "covers": "16 distinct Failed writers plus concurrent real consume/eviction, one store, all15 duplicates return winner status, one result only"
+    },
+    {
+      "binary": "mailbox_status",
+      "test": "mailbox_status_provenance_replay_does_not_resurrect_expired_fence",
+      "oracles": [
+        "OA-07:consumed-status",
+        "OA-07:proof-replay"
+      ],
+      "covers": "Native original consumed TTL, immutable proof replay after eviction, new generation Running status, conflicting proof replay rejection"
+    },
+    {
+      "binary": "mailbox_status",
+      "test": "mailbox_status_protocol_rejects_v1_and_v2_mutations",
+      "covers": "Frozen old startup, actual v1/v2 SQL insert/upsert/consume/expiry/update/truncate, protocol3 marker, immutable proof guards"
+    },
+    {
+      "binary": "mailbox_status",
+      "test": "mailbox_undecodable_duplicate_status_is_error_without_consuming_result",
+      "covers": "Real corrupt metadata returns error without hiding error behind retry status; original result still consumable once"
+    },
+    {
+      "binary": "mailbox",
+      "test": "mailbox_conformance::duplicate_returns_original_status",
+      "covers": "Every supported TaskStatus and full TaskError, before/after consume"
+    },
+    {
+      "binary": "mailbox",
+      "test": "mailbox_conformance::duplicate_status_expires_with_original_fence",
+      "covers": "Original status lifetime and new generation after expiry"
+    },
+    {
+      "binary": "mailbox_migration",
+      "test": "all existing OA06 scenarios adapted to protocol3 and explicit known Completed evidence",
+      "covers": "Original owner/scoping/backups/atomic refusal/oldwriter semantics preserved without changing OA06 frozen assets"
+    },
+    {
+      "binary": "migrations",
+      "test": "existing migration lock scenarios",
+      "covers": "Protocol3 reopens do not block behind active traffic or table locks"
+    },
+    {
+      "binary": "queue_autovacuum",
+      "test": "autovacuum_settings_are_applied_to_every_queue_table",
+      "covers": "Both protocol3 churn tables retain fixed thresholds"
+    }
+  ],
+  "negative_control": {
+    "cfg": "parking_lot_negative_control=\"oa-07\"",
+    "source": "crates/parking-lot-pg/src/mailbox/mod.rs::duplicate_outcome",
+    "mechanism": "After real row-locked duplicate metadata retrieval and decoding, return local retry status instead of original stored status; backend storage/transactions remain active",
+    "binary": "mailbox_status",
+    "test": "mailbox_status_direct_and_v2_refuse_atomically_then_preserve_failed_provenance",
+    "required_failure": "OA-07:stored-status",
+    "compile_failure_timeout_or_empty_discovery_accepted": false,
+    "runtime_event_control": "Owned separately by scheduler, distinct cfg; do not combine faults"
+  },
+  "deferred": "No Cargo, Docker, fmt, analyzers, validators, scans, review or tests executed. Scheduler owns actual Failed process-kill durable-pool event fixture. Task2 documentation/KBD/commit external mutations not performed."
+}

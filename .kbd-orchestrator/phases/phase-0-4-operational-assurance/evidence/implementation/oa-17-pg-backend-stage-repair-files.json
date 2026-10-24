@@ -1,0 +1,21 @@
+{
+  "owner": "/root/oa04_release",
+  "scenario": "OA-17",
+  "runtimeEvidence": "NOT_EXERCISED",
+  "review_followup_required": true,
+  "files": [
+    {
+      "path": "benches/pg_backend.rs",
+      "base_sha256": "44ec626e294a3b16a971dedf80ddab124a1022d55ec86580a687de99ea470c91",
+      "sha256": "c535d9b380b04ae6c9f426aa8306ff92ee31c03784461f62e75d8832562e6b32"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-17-pg-backend-stage-repair.patch",
+      "sha256": "6084347aa5cbcb6e41415d926867c3b2340a3259fd043dc5817c6e7a1d37c0b4"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-17-pg-backend-stage-repair.md",
+      "sha256": "45c135ff9f5f4bbcdfdd97cbe5174d86514e5ef80b8dffe2f0036c79de3a5241"
+    }
+  ]
+}

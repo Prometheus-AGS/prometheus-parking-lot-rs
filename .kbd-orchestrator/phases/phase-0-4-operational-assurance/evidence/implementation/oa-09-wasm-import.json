@@ -1,0 +1,8 @@
+{
+  "owner": "/root/oa04_platform",
+  "task": "oa-09-backend-admission/1",
+  "file": "crates/parking-lot-wasm/src/pool.rs",
+  "sha256": "99b1e13ab9d50bfb62b79e06ad969631555907ad7fdd2fd1e5d749d67ddc04c9",
+  "scope": "exact techlead-approved Dispatched.rejected consumer handoff",
+  "verification": "NOT_EXERCISED; shared interface integration pending"
+}

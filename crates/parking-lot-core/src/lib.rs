@@ -26,12 +26,12 @@ pub mod semaphore;
 pub use contracts::conformance;
 pub use contracts::{
     AppResult, Clock, DeadLetter, Delivery, DeliveryOutcome, Enqueued, InMemoryLeaseQueue,
-    InMemoryQueue, InMemoryResultMailbox, LeaseQueue, LeaseToken, LeasedTask, Mailbox,
-    MailboxEntry, MailboxKey, NackAction, NoopNotifier, Notifier, PoolLimits, PoolStats, Priority,
-    QueueDepth, QueueEntryId, ResourceCost, ResourceKind, ResultMailbox, ScheduledTask,
-    SchedulerError, Spawn, StorageMailbox, SubmissionSequence, SystemClock, TaskError,
-    TaskExecutor, TaskId, TaskMetadata, TaskPayload, TaskQueue, TaskStatus, TestClock,
-    WorkerExecutor, now_ms,
+    InMemoryQueue, InMemoryResultMailbox, LeaseQueue, LeaseToken, LeasedTask, LegacyDeliveryStatus,
+    LegacyIdempotencyOwner, Mailbox, MailboxEntry, MailboxKey, NackAction, NoopNotifier, Notifier,
+    PoolLimits, PoolStats, Priority, QueueDepth, QueueEntryId, ResourceCost, ResourceKind,
+    ResultMailbox, ScheduledTask, SchedulerError, Spawn, StorageMailbox, SubmissionSequence,
+    SystemClock, TaskError, TaskExecutor, TaskId, TaskMetadata, TaskPayload, TaskQueue, TaskStatus,
+    TestClock, WorkerExecutor, now_ms,
 };
 pub use hooks::audit::{AuditEvent, AuditSink, InMemoryAuditSink, build_audit_event};
 pub use hooks::{

@@ -1,0 +1,22 @@
+{
+  "owner": "/root/oa04_release",
+  "scenario": "OA-09",
+  "repair_batch": "final-core-facade-1",
+  "review_correction_cycle": 1,
+  "runtimeEvidence": "NOT_EXERCISED",
+  "files": [
+    {
+      "path": "src/builders/pool_builder.rs",
+      "base_sha256": "52ba860b98d20e62b796a09ce7c8b93615ec319c90d9cffd4a022a4b73902e46",
+      "sha256": "68568beda883378bd8f86af4d9d09e48e27b33d317edb44c421812059f9cd04b"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-09-pool-builder-bound-repair1.patch",
+      "sha256": "d14f4925a8e14e22e7468a4407f0fe26666a3b7b77e1f0f09b08878fb5315036"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-09-pool-builder-bound-repair1.md",
+      "sha256": "8d61486606854846174545bf41084060539157a215a1d4e2eae99587f42c674a"
+    }
+  ]
+}

@@ -89,6 +89,12 @@ impl Events<'_> {
     }
 
     fn failed(&self, task_id: TaskId, error: &TaskError) {
+        // OA-13 browser control: cancellation still settles the real result,
+        // but dropping its terminal event must break the event-order oracle.
+        #[cfg(parking_lot_negative_control = "oa-13-budget-event")]
+        if matches!(error, TaskError::Timeout { .. }) {
+            return;
+        }
         self.bus.emit_with(|| LifecycleEvent::Failed {
             task_id,
             pool: self.pool.to_owned(),

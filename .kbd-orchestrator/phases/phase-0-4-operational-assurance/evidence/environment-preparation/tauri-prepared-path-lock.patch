@@ -1,0 +1,29 @@
+--- a/bindings/tauri-desktop/Cargo.lock
++++ b/bindings/tauri-desktop/Cargo.lock
+@@ -2452,7 +2452,7 @@
+ 
+ [[package]]
+ name = "prometheus-parking-lot-core"
+-version = "0.3.0"
++version = "0.4.0"
+ dependencies = [
+  "anyhow",
+  "async-trait",
+@@ -2466,7 +2466,7 @@
+ 
+ [[package]]
+ name = "prometheus-parking-lot-embedded"
+-version = "0.3.0"
++version = "0.4.0"
+ dependencies = [
+  "prometheus-parking-lot-core",
+  "redb",
+@@ -2477,7 +2477,7 @@
+ 
+ [[package]]
+ name = "prometheus-parking-lot-ffi"
+-version = "0.3.0"
++version = "0.4.0"
+ dependencies = [
+  "prometheus-parking-lot-core",
+  "prometheus-parking-lot-embedded",

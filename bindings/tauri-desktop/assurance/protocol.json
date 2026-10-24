@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "execution": "NOT_EXERCISED",
+  "rust_toolchain": "1.99.1",
+  "locked_versions": {
+    "tauri": "2.12.5",
+    "tauri-build": "2.7.4",
+    "wry": "0.57.1",
+    "webkit2gtk": "2.0.2",
+    "webview2-com": "0.39.1"
+  },
+  "build_cases": {
+    "Darwin": "OA15-BUILD-MACOS",
+    "Linux": "OA15-BUILD-LINUX",
+    "Windows": "OA15-BUILD-WINDOWS"
+  },
+  "gui_cases": {
+    "positive": "OA15-GUI-RESTART-PERSISTENCE",
+    "delete-store-control": "OA15-GUI-STORE-DELETION-CONTROL"
+  },
+  "required_gui_os": "Darwin",
+  "root_environment": "PARKING_LOT_DESKTOP_ASSURANCE_ROOT",
+  "owner_marker": "oa15-desktop-assurance-v1",
+  "root_prefix": "parking-lot-oa15-",
+  "store_relative_path": "store/parking-lot.redb",
+  "trace_columns": ["timestamp_ms", "session", "pid", "kind", "window", "task_id", "data_utf8_hex"],
+  "negative_classifier": "OA15_PERSISTED_RESULT_MISSING_AFTER_RESTART",
+  "linux_pkg_config": ["webkit2gtk-4.1", "gtk+-3.0", "openssl"],
+  "manual_steps": [
+    "Prepare a fresh isolated positive fixture from the actual macOS shell build receipt; use its printed non-secret synthetic input only.",
+    "Launch the real application through the fixture wrapper. In its visible main window replace the existing textarea with that exact input, click Add to queue and Process next; do not Collect results. Capture the visible processed state and quit the entire application (Cmd+Q on macOS).",
+    "Wait for the wrapper to record actual process exit. Launch the same binary with the same root again. Click Collect results; visually verify the same task ID and exact uppercase input, then click Collect results again and verify no second delivery. Capture the visible result and quit fully.",
+    "For an independent delete-store-control fixture repeat the first GUI session. After actual process exit, run only its guarded delete-store command. Restart the app, click Collect results, capture its empty result state and quit. The persistence retrieval oracle must fail with the exact classifier.",
+    "Attach both captures per case with the capture subcommand. A human records attributable macOS GUI observations, actual timestamps/app identity and process termination in the generated observation document. Backend traces and classifier output alone cannot certify GUI operation.",
+    "Retain all three native OS build receipts plus positive/negative macOS traces, raw logs, screenshots and attributable operator observation for independent OA-18 review. Linux/Windows runtime support is not claimed without corresponding actual launches."
+  ],
+  "sources": [
+    "https://v2.tauri.app/start/prerequisites/",
+    "https://v2.tauri.app/develop/calling-rust/",
+    "https://docs.rs/tauri/2.12.5/tauri/struct.Builder.html",
+    "https://raw.githubusercontent.com/tauri-apps/tauri/tauri-v2.12.5/crates/tauri/src/webview/mod.rs",
+    "https://raw.githubusercontent.com/tauri-apps/tauri/tauri-v2.12.5/crates/tauri-codegen/src/context.rs",
+    "https://raw.githubusercontent.com/tauri-apps/tauri/tauri-v2.12.5/crates/tauri/src/lib.rs",
+    "https://raw.githubusercontent.com/tauri-apps/tauri/tauri-v2.12.5/crates/tauri-utils/src/config.rs",
+    "https://v2.tauri.app/develop/tests/webdriver/",
+    "https://doc.rust-lang.org/cargo/commands/cargo-build.html",
+    "https://doc.rust-lang.org/cargo/reference/external-tools.html",
+    "https://raw.githubusercontent.com/tauri-apps/tauri/tauri-build-v2.7.4/crates/tauri-build/src/lib.rs",
+    "https://devblogs.microsoft.com/oldnewthing/20101022-00/?p=12473%2F",
+    "https://chromium.googlesource.com/chromium/src/+/refs/heads/main/tools/resources/ico_tools.py"
+  ],
+  "source_facts": {
+    "ipc": "A Tauri command can receive the actual invoking WebviewWindow and managed State; no frontend invoke or layout change is needed.",
+    "page_load": "Builder.on_page_load supplies Webview and PageLoadPayload with actual URL and Finished event; the fixture records it, but this alone is not visual evidence.",
+    "assets": "Pinned context code embeds frontendDist when devUrl is absent; this example has no devUrl, so native debug cargo build contains the incumbent assets.",
+    "isolation": "Context.config_mut and WindowConfig.incognito select nonpersistent webview storage only for explicit isolated fixtures; normal UI/config is preserved.",
+    "macos": "Native tauri-driver has no WKWebView driver; supported newer embedded WebDriver integrations require extra plugins. None is installed or added here; an attributable manual GUI protocol is used.",
+    "windows": "MSVC C++ build tools and the Windows SDK are build prerequisites; actual runtime additionally requires WebView2. tauri-build2.7.4 explicitly requires an ICO resource; icon.ico wraps the unchanged existing PNG bytes. No settings or runtime installed here.",
+    "linux": "Preinstalled WebKitGTK4.1, GTK3, OpenSSL development packages and native compiler/linker are required; no apt or host installation is performed."
+  },
+  "source_limitations": "Microsoft ICO article search excerpt was available but full article returned HTTP403; the actual little-endian ICO header/directory and PNG payload format were read in Chromium's primary ico_tools.py source. No icon renderer or Windows resource compiler executed.",
+  "limits": "All builds and GUI actions are deferred to the complete phase boundary. Build-only/queue-service-only/trace-only evidence cannot prove GUI. Native computer APIs are disabled in this session. No test root or store has been created or deleted by authoring this protocol."
+}

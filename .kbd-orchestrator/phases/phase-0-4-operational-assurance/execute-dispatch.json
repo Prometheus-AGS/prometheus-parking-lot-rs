@@ -1,0 +1,85 @@
+{
+  "dispatchedAt": "2026-10-24T12:09:35.174039+00:00",
+  "backend": "openspec",
+  "harness": "Codex native",
+  "workspace": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs",
+  "branch": "codex/operational-assurance",
+  "phase": "phase-0-4-operational-assurance",
+  "contractDigest": "e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257",
+  "assignedChanges": [
+    "oa-01-containment-controls",
+    "oa-02-release-versioning",
+    "oa-03-signed-release-tags",
+    "oa-04-trusted-publishing",
+    "oa-05-template-secret-scan",
+    "oa-06-tenant-idempotency",
+    "oa-07-stored-terminal-outcome",
+    "oa-08-discarded-spawn",
+    "oa-09-backend-admission",
+    "oa-10-expiry-events",
+    "oa-11-concurrency-models",
+    "oa-12-negative-control-ci",
+    "oa-13-browser-assurance",
+    "oa-14-postgres-upgrade",
+    "oa-15-desktop-assurance",
+    "oa-16-iggy-poisoning",
+    "oa-17-backend-benchmarks",
+    "oa-18-release-boundary"
+  ],
+  "pendingWork": "17/18 predecessor implementation changes complete. Active oa-18/1 candidate-bound runner/workflow/manifest source, begun1114 after OA12 closure1111 and READY exit0. oa-18/2 final cumulative review/integration not begun. All production verification NOT_EXERCISED.",
+  "credentialRotation": "deferred; non-blocking",
+  "verification": "deferred until complete production set",
+  "workers": [
+    {
+      "task": "oa-12-negative-control-ci/2",
+      "agent": "/root/oa04_platform",
+      "role": "platform-engineer",
+      "model": "gpt-6.1-sol",
+      "reasoning": "high",
+      "route": "native collaboration.spawn_agent fork_turns=none",
+      "workspace": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs",
+      "status": "OA12 implementation closed1111; idle; actual control matrix/aggregate remain NOT_EXERCISED"
+    },
+    {
+      "task": "oa-18-release-boundary/1",
+      "agent": "/root/oa04_release",
+      "role": "tech-lead",
+      "model": "gpt-6.1-sol",
+      "reasoning": "high",
+      "route": "native collaboration.spawn_agent fork_turns=none",
+      "workspace": "/Users/gqadonis/.codex/worktrees/oa04-release/prometheus-parking-lot-rs",
+      "status": "begun1114; native techlead resumed after dependency source/context mirror; final runner/workflow/manifest source active"
+    },
+    {
+      "task": "oa-17-backend-benchmarks/2",
+      "agent": "/root/oa04_scheduler",
+      "role": "scheduler-engineer",
+      "model": "gpt-6.1-sol",
+      "reasoning": "high",
+      "route": "native fresh context",
+      "workspace": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs",
+      "status": "OA17 closed1101 and exact OA12 test-only patch imported; idle, no checks run"
+    },
+    {
+      "task": "oa-07-stored-terminal-outcome/1",
+      "agent": "/root/oa04_events",
+      "role": "events-engineer",
+      "model": "gpt-6.1-sol",
+      "reasoning": "high",
+      "route": "native fresh context",
+      "workspace": "/Users/gqadonis/.codex/worktrees/oa04-events/prometheus-parking-lot-rs",
+      "status": "redb/status consumer package delivered and imported; runtime verification pending"
+    },
+    {
+      "task": "oa-14-postgres-upgrade/2",
+      "agent": "/root/oa04_postgres",
+      "role": "postgres-engineer",
+      "model": "gpt-6.1-sol",
+      "reasoning": "high",
+      "route": "native fresh context",
+      "workspace": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs",
+      "status": "OA14 implementation closed1104; idle; real pg_upgrade/schema3/PG17/18 execution pending"
+    }
+  ],
+  "updatedAt": "2026-10-24T14:00:25.545766+00:00"
+}

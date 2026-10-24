@@ -14,6 +14,7 @@ use parking_lot::Mutex;
 use crate::contracts::clock::{Clock, SystemClock};
 use crate::contracts::error::SchedulerError;
 use crate::contracts::result_mailbox::{Delivery, DeliveryOutcome, MailboxEntry, ResultMailbox};
+use crate::contracts::task::TaskStatus;
 use crate::contracts::types::MailboxKey;
 
 /// A stored entry and its expiry ([`Clock::monotonic`] reading).
@@ -28,12 +29,19 @@ fn is_expired(expires_at: Option<Duration>, now: Duration) -> bool {
     expires_at.is_some_and(|at| at <= now)
 }
 
+/// Metadata outliving consume, under the same original key lifetime.
+#[derive(Debug)]
+struct Remembered {
+    status: TaskStatus,
+    expires_at: Option<Duration>,
+}
+
 #[derive(Debug)]
 struct State<T> {
     by_key: HashMap<MailboxKey, VecDeque<Stored<T>>>,
-    /// Remembered idempotency keys and when they may be forgotten (the expiry
-    /// of the entry they arrived with; `None`: never).
-    idempotency_keys: HashMap<String, Option<Duration>>,
+    /// Remembered (complete mailbox address, caller key) pairs and when they
+    /// may be forgotten (the original entry's expiry; `None`: never).
+    idempotency_keys: HashMap<(MailboxKey, String), Remembered>,
 }
 
 impl<T> State<T> {
@@ -41,14 +49,23 @@ impl<T> State<T> {
     fn deliver(&mut self, delivery: Delivery<T>, now: Duration, now_ms: u128) -> DeliveryOutcome {
         let expires_at = delivery.ttl.map(|ttl| now.saturating_add(ttl));
         if let Some(idem) = &delivery.idempotency_key {
-            let remembered = self
+            let identity = (delivery.key.clone(), idem.clone());
+            if let Some(remembered) = self
                 .idempotency_keys
-                .get(idem)
-                .is_some_and(|&forget_at| !is_expired(forget_at, now));
-            if remembered {
-                return DeliveryOutcome::Duplicate;
+                .get(&identity)
+                .filter(|remembered| !is_expired(remembered.expires_at, now))
+            {
+                return DeliveryOutcome::Duplicate {
+                    status: remembered.status.clone(),
+                };
             }
-            self.idempotency_keys.insert(idem.clone(), expires_at);
+            self.idempotency_keys.insert(
+                identity,
+                Remembered {
+                    status: delivery.status.clone(),
+                    expires_at,
+                },
+            );
         }
         let key = delivery.key.clone();
         let entry = MailboxEntry::from_delivery(delivery, now_ms);
@@ -89,7 +106,7 @@ impl<T> State<T> {
             !queue.is_empty()
         });
         self.idempotency_keys
-            .retain(|_, &mut forget_at| !is_expired(forget_at, now));
+            .retain(|_, remembered| !is_expired(remembered.expires_at, now));
         evicted
     }
 }

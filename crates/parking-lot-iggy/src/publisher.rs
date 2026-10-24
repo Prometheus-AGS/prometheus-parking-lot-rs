@@ -299,6 +299,9 @@ impl Worker {
                 attempt += 1;
             } else {
                 self.counters.failed.fetch_add(1, Ordering::Relaxed);
+                // OA-16 negative control: queued later chunks remain publishable
+                // after a real-server rejection. The reader must detect the gap.
+                #[cfg(not(parking_lot_negative_control = "oa-16"))]
                 if let Some(flag) = &envelope.poison {
                     flag.store(true, Ordering::Release);
                 }

@@ -1,0 +1,25 @@
+{
+  "reviewer": "/root/oa04_final_security_review",
+  "role": "security-reviewer",
+  "verdict": "important correction required; no critical issue identified",
+  "findings": [
+    {
+      "id": "R2-05",
+      "severity": "Important",
+      "file": ".github/scripts/supply-chain.sh",
+      "line": 94,
+      "code": "if gitleaks git --no-banner --redact --log-opts=\"--all HEAD --full-history\" . ; then",
+      "failure": "Diff/history production invocations omit --config; inherited GITLEAKS_CONFIG/GITLEAKS_CONFIG_TOML can override repo rules, letting historical secrets escape a candidate-bound release-containment scan. Fixtures unset variables and miss this real path.",
+      "fix": "Explicit repository config for both scans; ambient conflicting-config detection control.",
+      "primary_source": "https://raw.githubusercontent.com/gitleaks/gitleaks/v8.30.1/cmd/root.go"
+    }
+  ],
+  "limits": "Static review only. No tests/builds/Cargo/deletion/account or secret reads. Live approval/OIDC and public trust unverified. Rotation and replacement remain operator-deferred/nonblocking.",
+  "review_cycle": 1,
+  "base": "92da0d3d28f7896ddc67062fa49ba40ea48d74a3",
+  "candidate": "uncommitted source artifact; later corrected full candidate must be confirmed",
+  "model": "gpt-6.1-sol",
+  "reasoning": "high",
+  "isolation": "fresh native context; same model family; no generation history",
+  "report_kind": "parent-preserved structured record of native final report; not a remote authority approval"
+}

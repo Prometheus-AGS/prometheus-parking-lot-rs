@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "execution": "NOT_EXERCISED",
+  "rust_toolchain": "1.99.1",
+  "node_major": 24,
+  "wasm_bindgen": "0.2.129",
+  "wasm_bindgen_test": "0.3.79",
+  "browser": {
+    "product": "Chrome for Testing (Chromium)",
+    "version": "156.0.8078.47",
+    "platform": "linux64",
+    "revision": "1706539",
+    "chrome_url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/linux64/chrome-linux64.zip",
+    "chromedriver_url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.47/linux64/chromedriver-linux64.zip",
+    "source": "https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json",
+    "source_timestamp": "2026-10-24T11:15:50.339Z",
+    "provisioning": "Normal CI explicitly downloads this exact pin into RUNNER_TEMP on default GitHub-hosted Linux runners before validation. Explicit runner/path configurations and certification require preprovisioned executables; validators never install."
+  },
+  "negative_control": {
+    "cfg": "oa-13-budget-event",
+    "target": "wasm_events",
+    "test": "lifecycle_events_completed_failed_and_timed_out",
+    "diagnostic": "OA-13 execution-budget terminal event missing",
+    "defect": "Production WASM event emitter omits Failed for TaskError::Timeout; actual timeout result still settles"
+  },
+  "tests": {
+    "wasm_pool": [
+      "smoke_submit_and_retrieve",
+      "vector_capacity_respects_total_and_kind_limits",
+      "resource_limits_admit_by_every_dimension",
+      "capacity_is_never_exceeded",
+      "oversized_task_is_rejected",
+      "priority_then_fifo_order",
+      "budget_cancels_a_wedged_executor",
+      "budget_follows_the_task_deadline",
+      "long_budget_does_not_fire_at_once",
+      "a_deadline_that_passed_while_parked_expires_the_task",
+      "retrieve_times_out_and_discards_the_slot",
+      "queue_depth_is_bounded_and_shutdown_fails_parked_tasks",
+      "skip_ahead_is_bounded_by_the_starvation_guard",
+      "skip_ahead_off_is_strict_head_of_line",
+      "a_full_dimension_does_not_block_another"
+    ],
+    "wasm_events": [
+      "lifecycle_events_completed_failed_and_timed_out",
+      "lifecycle_events_hold_under_a_mixed_load",
+      "lifecycle_events_rejected_at_submit",
+      "lifecycle_events_expired_while_parked",
+      "lifecycle_events_cancelled_at_shutdown",
+      "lifecycle_events_cost_nothing_without_a_hook"
+    ]
+  },
+  "sources": [
+    "https://wasm-bindgen.github.io/wasm-bindgen/wasm-bindgen-test/browsers.html",
+    "https://raw.githubusercontent.com/wasm-bindgen/wasm-bindgen/0.2.129/crates/cli/src/wasm_bindgen_test_runner.rs",
+    "https://raw.githubusercontent.com/wasm-bindgen/wasm-bindgen/0.2.129/crates/cli/src/wasm_bindgen_test_runner/headless.rs",
+    "https://raw.githubusercontent.com/wasm-bindgen/wasm-bindgen/0.2.129/crates/test/src/rt/mod.rs",
+    "https://raw.githubusercontent.com/wasm-bindgen/wasm-bindgen/0.2.129/crates/test-macro/src/lib.rs",
+    "https://raw.githubusercontent.com/wasm-bindgen/wasm-bindgen/0.2.129/crates/js-sys/src/lib.rs",
+    "https://developer.chrome.com/docs/chromedriver/capabilities"
+  ],
+  "source_facts": {
+    "browser_mode": "WASM_BINDGEN_USE_BROWSER=1; Node remains default when no explicit test mode is selected",
+    "headless": "NO_HEADLESS must be absent; runner adds headless Chrome capabilities",
+    "driver": "CHROMEDRIVER selects a local executable; other driver and remote overrides are cleared",
+    "capabilities": "WASM_BINDGEN_TEST_WEBDRIVER_JSON selects goog:chromeOptions.binary",
+    "discovery": "Runner --list prints each exported test; zero tests otherwise returns success, so exact nonzero discovery must be checked",
+    "output": "Per-test failure is FAIL; final summary is test result: FAILED, not a native libtest FAILED per-test token",
+    "serial": "Pinned wasm-bindgen-test runtime uses concurrency 1; unsupported --test-threads is not passed"
+  },
+  "limitations": "No browser/driver installed or launched; no tests, Cargo, syntax check or review run. Only the pinned Linux x86_64 local headless Chrome path is supported for browser evidence. Workers, Firefox, Safari, Edge, remote WebDriver and native-only discovery cannot substitute. Browser durability/page-loss and panic containment are not offered by this in-memory WASM pool."
+}

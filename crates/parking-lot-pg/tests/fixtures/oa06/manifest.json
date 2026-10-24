@@ -1,0 +1,135 @@
+{
+  "scenario": "OA-06",
+  "execution": "NOT_EXERCISED; source implementation only, final execution owned by OA-18 task 2",
+  "source_schema": "0.3.0 result mailbox migration 005, independently frozen before backend edits",
+  "source_revision": "92da0d3d28f7896ddc67062fa49ba40ea48d74a3",
+  "namespace": "legacy",
+  "native_expiry_precision": "PostgreSQL timestamptz microseconds; SQL equality IS NOT DISTINCT FROM",
+  "files": {
+    "005_result_mailbox_0_3.sql": {
+      "sha256": "bc5900ca7024444f36b8ac5f6746e8fc9af4d7e87bae84ba4895eba068279a05"
+    },
+    "populated_0_3.sql": {
+      "sha256": "16b8706a04ff5b339b513452ff6b6994f66b50d34b38351741410c66c0eecfec"
+    },
+    "untouched_backup_0_3.sql": {
+      "sha256": "9861a3281d5b763655be2ba2c2cb435b73914e51222a1327d888967522655bc7"
+    },
+    "legacy_keyed_delivery.sql": {
+      "sha256": "5ee0eca59018719d0005426717d1c38a7744f17669d27f4ef838c88be9f7fd5b"
+    },
+    "ambiguous_generation_0_3.sql": {
+      "sha256": "5e6da07d580a19cb5b230cf17ccce2e20ab9fe07948fca5cdad6b08e49a10d91"
+    }
+  },
+  "fixture_cases": [
+    "retained keyed result",
+    "unkeyed result",
+    "consumed finite-TTL fence",
+    "consumed permanent fence",
+    "expired ownerless fence retained as provenance",
+    "expired result and reused key with a different owner and exact native expiry",
+    "sequence high water mark 100 despite only ids 1..4 retained",
+    "ambiguous exact-expiry generation: two retained candidate addresses; unrelated assignment refuses atomically, in-candidate authority resolves"
+  ],
+  "authoritative_owners": [
+    {
+      "mailbox_name": "legacy",
+      "idempotency_key": "consumed-finite",
+      "key": {
+        "tenant": "tenant-a",
+        "user_id": "user",
+        "session_id": null
+      }
+    },
+    {
+      "mailbox_name": "legacy",
+      "idempotency_key": "consumed-permanent",
+      "key": {
+        "tenant": "tenant-a",
+        "user_id": "user",
+        "session_id": null
+      }
+    }
+  ],
+  "migration_order": [
+    "stop all legacy readers and writers",
+    "freeze fixture files and untouched backup with these digests",
+    "restore the untouched backup to an isolated database copy",
+    "call migrate_with_idempotency_owners with authoritative assignments inside its locked atomic transaction",
+    "assert native rows, TTL, high water mark and immutable provenance",
+    "reject legacy startup plus actual old mutation SQL",
+    "use new API only; never downgrade converted data"
+  ],
+  "rollback": "Stop all new writers. Restore untouched_backup_0_3.sql to a fresh isolated database. Old source SQL is exercised only there. Subsequent new writes are not in this backup and require separate reconciliation. No live production upgrade authorized.",
+  "environment_required": [
+    "real parking-lot-pg:17",
+    "real parking-lot-pg:18",
+    "record actual image digests/tool versions in final receipt"
+  ],
+  "regressions": [
+    {
+      "binary": "mailbox_migration",
+      "test": "mailbox_legacy_refusal_is_atomic_and_backup_readable",
+      "oracle": "missing, duplicate, unknown, expired, conflicting assignment refuses with unchanged logical source/sequence/objects; backup remains source-readable"
+    },
+    {
+      "binary": "mailbox_migration",
+      "test": "mailbox_legacy_ambiguous_generation_requires_retained_candidate",
+      "oracle": "missing ambiguous assignment and out-of-candidate address refuse with unchanged logical state; in-candidate assignment succeeds preserving both results and exact expiry",
+      "required_failure_identity": "OA-06:retained-candidate oracle"
+    },
+    {
+      "binary": "mailbox_migration",
+      "test": "mailbox_legacy_mapping_preserves_results_fences_and_native_expiry",
+      "oracle": "correct authoritative mapping preserves exact results/order/native timestamps, scoped suppression, consumed fences, generation owner and sequence; retry does not extend TTL; legacy provenance immutable"
+    },
+    {
+      "binary": "mailbox_migration",
+      "test": "mailbox_legacy_sql_writers_are_rejected_after_conversion",
+      "oracle": "frozen 005 startup cannot reopen writes; actual frozen keyed delivery, plain delivery, consume, update, TTL CTE and truncate rejected"
+    },
+    {
+      "binary": "mailbox_migration",
+      "test": "mailbox_scoped_fences_survive_reconnect_and_expire_independently",
+      "oracle": "cross-tenant same caller key independent; consumed fence persists through reconnect and expires at original instant only"
+    },
+    {
+      "binary": "mailbox",
+      "test": "mailbox_conformance::idempotency_is_scoped_to_mailbox_key",
+      "oracle": "complete MailboxKey scope including tenant/user/session and None versus empty"
+    },
+    {
+      "binary": "mailbox",
+      "test": "mailbox_conformance::idempotency_expiry_is_scoped_to_mailbox_key",
+      "oracle": "TTL eviction never releases another address fence"
+    },
+    {
+      "binary": "mailbox",
+      "test": "existing mailbox conformance, race, TTL, concurrent migration cases",
+      "oracle": "existing production behaviors retained on new tables"
+    },
+    {
+      "binary": "migrations",
+      "test": "existing migration lock scenarios",
+      "oracle": "converted rerun does not lock live v2 tables"
+    },
+    {
+      "binary": "queue_autovacuum",
+      "test": "autovacuum_settings_are_applied_to_every_queue_table",
+      "oracle": "both v2 churn tables retain fixed vacuum/analyze thresholds"
+    }
+  ],
+  "negative_control": {
+    "cfg": "parking_lot_negative_control=\"oa-06\"",
+    "source": "crates/parking-lot-pg/src/mailbox/mod.rs::idempotency_scope",
+    "mechanism": "empty address for the v2 fence claim only, retaining the real result address; restores mailbox-global-key suppression",
+    "binary": "mailbox_migration",
+    "test": "mailbox_scoped_fences_survive_reconnect_and_expire_independently",
+    "required_failure": "OA-06:address-scope oracle",
+    "compiler_failure_accepted": false
+  },
+  "deferred_verification": "No Cargo, Docker, fmt, compiler, analyzer, scan, review or test run during implementation. Boundary owner must execute both PG majors, shared conformance and new regression cases; no source-only PASS.",
+  "owner_resolution_policy": "With multiple retained exact-generation rows, authoritative assignment must select one of their canonical complete MailboxKey addresses. With zero retained candidates, authoritative consumed-owner mapping remains allowed. Unique retained owner still rejects contradictions.",
+  "ambiguous_fixture_application": "Apply ambiguous_generation_0_3.sql only to a disposable populated_0_3 copy; the original populated source and untouched backup bytes remain unchanged."
+}

@@ -1,0 +1,132 @@
+--- a/crates/parking-lot-runtime-tokio/src/resource_pool.rs
++++ b/crates/parking-lot-runtime-tokio/src/resource_pool.rs
+@@ -96,11 +96,7 @@
+ //! result payload. The executor is never called for that run.
+ //!
+ //! The completion path returns its permit through the dispatcher and launches
+-//! admitted parked work before calling the mailbox or audit sink. Discarded
+-//! successors enter a pool-owned worklist: one synchronous drainer settles
+-//! them iteratively, so an inline discarding spawner cannot recurse through a
+-//! parked backlog. The worklist lock is released before dispatch or callbacks.
+-//! It counts
++//! admitted parked work before calling the mailbox or audit sink. It counts
+ //! the run in [`failed_tasks`](ResourcePool::failed_tasks) and as a finished
+ //! outcome in the shutdown ledger, then settles it when the discard action
+ //! ends. A shutdown already waiting counts it in [`ShutdownReport::completed`];
+@@ -165,7 +161,6 @@
+ //! returns every removed task through the dispatcher and uses the same
+ //! per-task expiry reporting and mailbox delivery as an expired queue head.
+ 
+-use std::collections::VecDeque;
+ use std::marker::PhantomData;
+ use std::sync::Arc;
+ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+@@ -213,13 +208,6 @@
+             discarded(run);
+         }
+     }
+-}
+-
+-/// Runs discarded before their first poll. One caller drains outside this
+-/// lock; recursive or concurrent drops only transfer ownership into `pending`.
+-struct DiscardedRuns<P> {
+-    pending: VecDeque<(ScheduledTask<P>, Permit)>,
+-    draining: bool,
+ }
+ 
+ /// The error a cancelled task's mailbox receives.
+@@ -254,7 +242,6 @@
+     /// Owns the semaphore (units held by running tasks) and the parked queue.
+     dispatcher: Dispatcher<ScheduledTask<P>, TaskQueueAdapter<P, Q>>,
+     mailbox: Mutex<M>,
+-    discarded: Mutex<DiscardedRuns<P>>,
+     executor: E,
+     spawner: S,
+     audit: Mutex<Option<Box<dyn AuditSink>>>,
+@@ -316,10 +303,6 @@
+                 limits,
+                 dispatcher,
+                 mailbox: Mutex::new(mailbox),
+-                discarded: Mutex::new(DiscardedRuns {
+-                    pending: VecDeque::new(),
+-                    draining: false,
+-                }),
+                 executor,
+                 spawner,
+                 audit: Mutex::new(None),
+@@ -842,7 +825,22 @@
+         let pending = UnpolledRun {
+             run: Some((task, permit)),
+             discarded: Some(move |(task, permit): (ScheduledTask<P>, Permit)| {
+-                inner.discard(task, permit);
++                let _settle = SettleOnDrop(&inner.ledger);
++                let discarded = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
++                    let error = TaskError::Cancelled {
++                        reason: "spawner discarded resource pool task before its first poll".into(),
++                    };
++                    inner.events().failed(task.meta.id, &error);
++                    // complete returns the permit and launches admitted work
++                    // before mailbox/audit callbacks, just as for a run.
++                    inner.finish(task.meta.id, permit, task.meta.mailbox.as_ref(), Err(error));
++                    drop(task);
++                }));
++                if let Err(panicked) = discarded {
++                    // Drop must not unwind into Spawn, even if a callback's
++                    // panic payload would itself panic when dropped.
++                    std::mem::forget(panicked);
++                }
+             }),
+         };
+         async move {
+@@ -879,51 +877,6 @@
+                 }
+                 let woken = self.dispatcher.poke(self.now_ms());
+                 self.launch(woken, None);
+-            }
+-        }
+-    }
+-
+-    /// Settle discarded runs without recursively dropping their successors.
+-    /// The mutex publishes each owned task/permit to the sole drainer. Its
+-    /// empty check and release of drainer ownership share that same lock, so
+-    /// a concurrent enqueue either joins this drain or becomes the next one.
+-    fn discard(self: &Arc<Self>, task: ScheduledTask<P>, permit: Permit) {
+-        {
+-            let mut discarded = self.discarded.lock();
+-            discarded.pending.push_back((task, permit));
+-            if discarded.draining {
+-                return;
+-            }
+-            discarded.draining = true;
+-        }
+-        loop {
+-            let next = {
+-                let mut discarded = self.discarded.lock();
+-                let next = discarded.pending.pop_front();
+-                if next.is_none() {
+-                    discarded.draining = false;
+-                }
+-                next
+-            };
+-            let Some((task, permit)) = next else {
+-                return;
+-            };
+-            let _settle = SettleOnDrop(&self.ledger);
+-            let settled = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+-                let error = TaskError::Cancelled {
+-                    reason: "spawner discarded resource pool task before its first poll".into(),
+-                };
+-                self.events().failed(task.meta.id, &error);
+-                // finish returns capacity and hands off every successor before
+-                // callbacks. An inline discard only enqueues that successor;
+-                // this loop settles it after the current task, at fixed depth.
+-                self.finish(task.meta.id, permit, task.meta.mailbox.as_ref(), Err(error));
+-                drop(task);
+-            }));
+-            if let Err(panicked) = settled {
+-                // A callback (or its panic payload destructor) must not unwind
+-                // through Spawn or abandon the remaining owned worklist.
+-                std::mem::forget(panicked);
+             }
+         }
+     }

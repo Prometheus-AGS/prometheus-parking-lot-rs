@@ -1,0 +1,15 @@
+{
+  "audit_trail": {
+    "agent_did": null,
+    "executed_at": "2026-10-24T12:06:19.448208Z",
+    "hook_log": [],
+    "passes": 0,
+    "skill_id": "sycophancy.correction",
+    "strictness": "standard",
+    "version": "1.0.0"
+  },
+  "classifications": [],
+  "correction_mandatory": false,
+  "delta_summary": "No changes needed: score below clean threshold and no sycophancy patterns were detected.",
+  "sycophancy_score": 0.0
+}

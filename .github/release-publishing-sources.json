@@ -1,0 +1,41 @@
+{
+  "checked_date": "2026-10-24",
+  "execution": "NOT_EXERCISED",
+  "oidc_action": {
+    "repository": "rust-lang/crates-io-auth-action",
+    "tag": "v1.0.6",
+    "commit": "3268eb413133e2960fa4ae0e963ca76380c54cd9",
+    "evidence": "git ls-remote returned this full refs/tags/v1.0.6 ID; official action.yml read at that commit",
+    "source": "https://github.com/rust-lang/crates-io-auth-action/blob/3268eb413133e2960fa4ae0e963ca76380c54cd9/action.yml",
+    "output": "token",
+    "runtime": "node24",
+    "permissions": "id-token: write; temporary output only; action post step handles its temporary credential"
+  },
+  "github_rest": {
+    "origin": "https://api.github.com",
+    "version": "2026-03-10",
+    "paths": [
+      "GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}",
+      "GET /repos/{owner}/{repo}/actions/artifacts/{artifact_id}/zip",
+      "GET /repos/{owner}/{repo}/actions/runs/{run_id}",
+      "GET /repos/{owner}/{repo}/actions/runs/{run_id}/approvals",
+      "GET /repos/{owner}/{repo}/contents/{workflow_path}?ref={candidate}"
+    ],
+    "sources": [
+      "https://docs.github.com/en/rest/actions/artifacts",
+      "https://docs.github.com/en/rest/actions/workflow-runs",
+      "https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json"
+    ],
+    "limitation": "Review history schema has environments/state/user/comment but no approval timestamp or run-attempt binding; only first-attempt runs with unambiguous approved history are accepted. API/schema reads do not establish actual account/environment approval."
+  },
+  "cargo_publish": "https://doc.rust-lang.org/cargo/commands/cargo-publish.html",
+  "trusted_publishing": "https://crates.io/docs/trusted-publishing",
+  "github_oidc": "https://docs.github.com/en/actions/reference/security/oidc",
+  "workflow_context": {
+    "source": "https://docs.github.com/en/actions/reference/workflows-and-actions/contexts",
+    "github.workflow_sha": "Commit SHA for the workflow file; used for the separate trusted-tooling checkout",
+    "github.workflow_ref": "Repository/workflow path and source ref; checked independently on publication"
+  },
+  "upload_artifact": "https://github.com/actions/upload-artifact",
+  "settings": "No workflow dispatched, publisher/environment/account setting changed, token retired or publication attempted"
+}

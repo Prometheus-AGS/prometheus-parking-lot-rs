@@ -1,0 +1,24 @@
+{
+  "reviewer": "/root/oa04_final_runtime_review",
+  "role": "rust-reviewer",
+  "verdict": "correction required",
+  "findings": [
+    {
+      "id": "R2-03",
+      "severity": "HIGH",
+      "file": "crates/parking-lot-runtime-tokio/src/resource_pool.rs",
+      "line": 836,
+      "code": "inner.finish(task.meta.id, permit, task.meta.mailbox.as_ref(), Err(error));",
+      "failure": "finish complete+launch synchronously admits the next parked task; an inline-discard Spawn drops supervise, recursively calling finish once per queued task. Large accepted backlog can overflow the stack and abort before outcomes settle.",
+      "fix": "Pool-owned iterative completion worklist; child-process substantial-backlog public-API regression proves outcome count, capacity and no unsettled work."
+    }
+  ],
+  "limits": "Full relevant call graph/cfg/edition inspected. No runtime reproduction, tests, Cargo, builds or modifications. Threshold unmeasured.",
+  "review_cycle": 1,
+  "base": "92da0d3d28f7896ddc67062fa49ba40ea48d74a3",
+  "candidate": "uncommitted source artifact; later corrected full candidate must be confirmed",
+  "model": "gpt-6.1-sol",
+  "reasoning": "high",
+  "isolation": "fresh native context; same model family; no generation history",
+  "report_kind": "parent-preserved structured record of native final report; not a remote authority approval"
+}

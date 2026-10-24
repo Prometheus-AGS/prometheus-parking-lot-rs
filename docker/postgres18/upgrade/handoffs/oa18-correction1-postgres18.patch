@@ -1,0 +1,41 @@
+--- a/docs/runbooks/postgres18.md
++++ b/docs/runbooks/postgres18.md
+@@ -347,8 +347,18 @@
+ 
+ Required local tools are Docker with a usable daemon, Python 3, Git, the pinned
+ Rust toolchain and the exact preinstalled nextest. The runner acquires no tools.
+-The final owner must freeze a full committed candidate SHA and adopted-contract
+-SHA256. Working and committed bytes of the declared source set, fixtures and
++The final owner must freeze a full committed candidate SHA and the normalized
++adopted `identity.contractDigest` for `--contract-sha256`. This is not the raw
++JSON file SHA256. Match OA18's existing normalization: remove only
++`identity.contractDigest` and `identity.planRevision`, emit sorted compact
++UTF-8 JSON (`ensure_ascii=False`) with a trailing LF, then SHA256. The runner
++recomputes that digest and requires equality with both the declared adopted
++digest and caller argument. It validates contract kind/version, project/run/
++phase identity and plan revision1 before Docker. The receipt's
++`contract_sha256` is null until validation, then holds the normalized identity;
++`requested_contract_sha256` retains caller input, `contract_identity` records
++the validated adoption, and `contract_raw_sha256` separately identifies raw
++file bytes. OA12's delegate and classifier use the normalized value unchanged. Working and committed bytes of the declared source set, fixtures and
+ fixture manifest must match. Refresh `candidate_sources` and handoff hashes
+ after final permitted formatting/source corrections **before** that freeze.
+ The task1/task2 hashes are source handoff identities, not final certification.
+@@ -384,7 +394,7 @@
+ bash scripts/rehearse-postgres-upgrade.sh \
+   --out <NEW_ABSOLUTE_OUTPUT_DIRECTORY> --run-id <UNIQUE_SAFE_RUN_ID> \
+   --candidate <FULL_40_HEX_CANDIDATE> \
+-  --contract-sha256 <ADOPTED_CONTRACT_64_HEX_SHA256> \
++  --contract-sha256 <NORMALIZED_ADOPTED_CONTRACT_64_HEX_SHA256> \
+   --pg17-image sha256:<64_HEX_LOCAL_PG17_ID> \
+   --pg18-image sha256:<64_HEX_LOCAL_PG18_ID> \
+   --upgrade-image sha256:<64_HEX_LOCAL_DUAL_BINARY_ID> --control none
+@@ -482,7 +492,7 @@
+ bash scripts/rehearse-postgres-upgrade.sh \
+   --out <NEW_ABSOLUTE_NEGATIVE_OUTPUT_DIRECTORY> --run-id <UNIQUE_NEGATIVE_RUN_ID> \
+   --candidate <FULL_40_HEX_CANDIDATE> \
+-  --contract-sha256 <ADOPTED_CONTRACT_64_HEX_SHA256> \
++  --contract-sha256 <NORMALIZED_ADOPTED_CONTRACT_64_HEX_SHA256> \
+   --pg17-image sha256:<64_HEX_LOCAL_PG17_ID> \
+   --pg18-image sha256:<64_HEX_LOCAL_PG18_ID> \
+   --upgrade-image sha256:<64_HEX_LOCAL_DUAL_BINARY_ID> --control missing-result

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "repository": "Prometheus-AGS/prometheus-parking-lot-rs",
+  "branch": "main",
+  "version": "0.4.0",
+  "boundary_workflow_sha256": "",
+  "release_workflow_sha256": "",
+  "contract_digest": "e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257",
+  "max_age_seconds": 86400,
+  "boundary_environment": {
+    "name": "release-certification",
+    "id": 0,
+    "reviewer_ids": []
+  },
+  "publish_environment": {
+    "name": "release-crates-io",
+    "id": 0,
+    "reviewer_ids": []
+  },
+  "signature": {
+    "format": "ssh",
+    "identity": "",
+    "fingerprint": "",
+    "allowed_signers_file": "",
+    "revocations_file": null,
+    "public_trust_sha256": ""
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "reviewer": "/root/oa04_final_contract_review",
+  "role": "code-reviewer",
+  "verdict": "corrections required",
+  "findings": [
+    {
+      "id": "R2-01",
+      "severity": "HIGH",
+      "file": ".github/operational-assurance.json",
+      "line": 603,
+      "code": "\"--candidate\", \"{candidate}\", \"--base\", \"{base}\", \"--version\", \"0.4.0\"",
+      "failure": "OA02 requires target0.4 greater than the frozen candidate version; compact preparation validation requires that same final workspace already be0.4. No candidate satisfies both.",
+      "fix": "Explicit validated pre-bump ancestor; reproduce and compare prepared outputs with final candidate."
+    },
+    {
+      "id": "R2-02",
+      "severity": "HIGH",
+      "file": ".github/operational-assurance.json",
+      "line": 2538,
+      "code": "\"id\": \"desktop-linux\", \"profile\": \"baseline\"",
+      "failure": "Native baseline accepts macOS/Windows desktop receipt as Linux; child validation does not bind expected case/OS.",
+      "fix": "Linux profile plus expected case/OS validation."
+    }
+  ],
+  "limits": "Static review only; no builds, tests, Cargo or remote/account operations. Force-add ignored release scripts is a parent assembly check.",
+  "review_cycle": 1,
+  "base": "92da0d3d28f7896ddc67062fa49ba40ea48d74a3",
+  "candidate": "uncommitted source artifact; later corrected full candidate must be confirmed",
+  "model": "gpt-6.1-sol",
+  "reasoning": "high",
+  "isolation": "fresh native context; same model family; no generation history",
+  "report_kind": "parent-preserved structured record of native final report; not a remote authority approval"
+}

@@ -151,10 +151,16 @@
 //!   executor, which leaves the lease to expire).
 //!
 //! A run redelivered from the queue starts at `Queued`/`Started`; its
-//! `Submitted` came from the process that accepted it. A redelivered run
-//! reports its own outcome: after a crash between storing a `Failed` result
-//! and dead-lettering it, the next run can emit `Completed` while the stored
-//! result stays `Failed` (first write wins).
+//! `Submitted` came from the process that accepted it. A redelivered run uses
+//! the mailbox's authoritative duplicate status for both its terminal event
+//! and lease resolution, even after the first result was consumed. A local
+//! success cannot ack or emit `Completed` over an original stored `Failed`.
+//! Stored `Dropped` reasons emit `Rejected` with that original custom reason,
+//! without inventing a historical capacity error. A duplicate carrying
+//! `Queued` or `Running` is diagnosed and handed back with `Requeued`, without
+//! ack/dead-letter or a fabricated terminal result. A permanent nonterminal
+//! idempotency fence can therefore require separate data remediation;
+//! duplicate delivery does not overwrite or extend it.
 //!
 //! # Ordering difference from the in-memory pool
 //!
@@ -185,9 +191,9 @@ use std::time::{Duration, Instant};
 use prometheus_parking_lot_core::dispatch::{Dispatched, Dispatcher, Grant, Parkable, Ticket};
 use prometheus_parking_lot_core::semaphore::{Permit, UnitSemaphore, UnitVector};
 use prometheus_parking_lot_core::{
-    Delivery, LeaseQueue, LeaseToken, LeasedTask, MailboxKey, NackAction, PoolLimits,
-    ResultMailbox, ScheduledTask, SchedulerError, Spawn, TaskError, TaskExecutor, TaskId,
-    TaskMetadata, TaskPayload, TaskStatus, now_ms,
+    Delivery, DeliveryOutcome, LeaseQueue, LeaseToken, LeasedTask, MailboxKey, NackAction,
+    PoolLimits, ResultMailbox, ScheduledTask, SchedulerError, Spawn, TaskError, TaskExecutor,
+    TaskId, TaskMetadata, TaskPayload, TaskStatus, now_ms,
 };
 use tokio::sync::{Notify, oneshot};
 use tokio_util::sync::CancellationToken;
@@ -300,14 +306,17 @@ struct Settlement<T> {
 
 /// The terminal lifecycle event of a settled task.
 enum Terminal {
-    /// It ran: `Completed`, or `Failed` for a `TaskStatus::Failed` status.
-    /// Holds when it started, for the event's duration.
-    Ran(Option<Instant>),
+    /// A successful outcome; a local run can provide its start time.
+    Completed(Option<Instant>),
+    /// The original complete error, including on duplicate delivery.
+    Failed(TaskError),
     /// Its deadline passed before it started.
     Expired,
     /// It is too large for this pool and reached the oversize attempt limit:
     /// `Rejected` with the capacity error.
     TooLarge(SchedulerError),
+    /// An authoritative stored drop reason has no historical typed error.
+    Dropped(String),
 }
 
 /// How a settled task's lease is resolved.
@@ -745,7 +754,26 @@ where
 
     /// Start every admitted task and settle every task found expired.
     fn launch(self: &Arc<Self>, dispatched: Dispatched<LeasedItem<P>>) {
-        let Dispatched { started, expired } = dispatched;
+        let Dispatched {
+            started,
+            expired,
+            rejected,
+        } = dispatched;
+        // Admission already checks every leased item. Preserve the durable
+        // oversize policy if a parked entry is nevertheless rejected.
+        for (item, error) in rejected {
+            if item.attempt >= self.options.oversize_attempt_limit() {
+                self.settle_too_large(item, error);
+            } else {
+                let delay = self.options.lease_duration();
+                let inner = Arc::clone(self);
+                self.spawner.spawn(async move {
+                    inner
+                        .hand_back_with(item, NackAction::requeue_after(delay))
+                        .await;
+                });
+            }
+        }
         for item in expired {
             self.settle_expired(item);
         }
@@ -868,23 +896,8 @@ where
         // storage IO and do not hold capacity.
         self.release(permit);
 
-        let (status, payload, resolution) = match outcome {
-            Ok(value) => {
-                // Relaxed: statistics only.
-                self.completed.fetch_add(1, Ordering::Relaxed);
-                (TaskStatus::Completed, Some(value), Resolution::Ack)
-            }
-            Err(error) => {
-                self.failed.fetch_add(1, Ordering::Relaxed);
-                tracing::warn!(task_id, %error, "durable task failed");
-                let reason = error.to_string();
-                (
-                    TaskStatus::Failed(error),
-                    None,
-                    Resolution::DeadLetter(reason),
-                )
-            }
-        };
+        let (status, payload, resolution, terminal) =
+            self.execution_outcome(task_id, outcome, started);
         let settlement = Settlement {
             task_id,
             mailbox,
@@ -893,10 +906,44 @@ where
             payload,
             resolution,
             attempt,
-            terminal: Terminal::Ran(started),
+            terminal,
         };
         self.settle(settlement, token, heartbeat, held, Some(reported))
             .await;
+    }
+
+    /// Convert the local executor outcome after returning its capacity.
+    /// These statistics describe execution; settle still selects authoritative
+    /// duplicate status before emitting a terminal event or resolving a lease.
+    fn execution_outcome(
+        &self,
+        task_id: TaskId,
+        outcome: Result<T, TaskError>,
+        started: Option<Instant>,
+    ) -> (TaskStatus, Option<T>, Resolution, Terminal) {
+        match outcome {
+            Ok(value) => {
+                // Relaxed: statistics only.
+                self.completed.fetch_add(1, Ordering::Relaxed);
+                (
+                    TaskStatus::Completed,
+                    Some(value),
+                    Resolution::Ack,
+                    Terminal::Completed(started),
+                )
+            }
+            Err(error) => {
+                self.failed.fetch_add(1, Ordering::Relaxed);
+                tracing::warn!(task_id, %error, "durable task failed");
+                let reason = error.to_string();
+                (
+                    TaskStatus::Failed(error.clone()),
+                    None,
+                    Resolution::DeadLetter(reason),
+                    Terminal::Failed(error),
+                )
+            }
+        }
     }
 
     /// The release hook's job: spawn a drain and start what it admits, then
@@ -1028,13 +1075,13 @@ where
         #[cfg(parking_lot_negative_control = "s-16")]
         self.resolve(task_id, token, &resolution).await;
 
-        let status = if let Some(key) = mailbox {
-            let mut delivery =
-                Delivery::new(key, task_id, status, payload).with_idempotency_key(idempotency_key);
+        let delivered = if let Some(key) = mailbox {
+            let mut delivery = Delivery::new(key, task_id, status, payload)
+                .with_idempotency_key(idempotency_key.clone());
             if let Some(ttl) = self.options.result_ttl() {
                 delivery = delivery.with_ttl(ttl);
             }
-            if !self.deliver(task_id, &delivery).await {
+            let Some(outcome) = self.deliver(task_id, &delivery).await else {
                 // Never ack an undelivered outcome: hand the task back so a
                 // later attempt delivers it. If the nack fails too, the lease
                 // expires once the heartbeat stops.
@@ -1048,14 +1095,68 @@ where
                 // Settled as requeued: the task runs again.
                 drop(held);
                 return;
-            }
-            delivery.status
+            };
+            outcome
         } else {
-            status
+            // With no mailbox address there is no earlier result to override
+            // the local event/resolution; preserve the incumbent behavior.
+            DeliveryOutcome::Stored
+        };
+
+        let (terminal, resolution) = match delivered {
+            DeliveryOutcome::Stored => (terminal, resolution),
+            DeliveryOutcome::Duplicate { status } => {
+                // OA-07's runtime control reproduces bool-only handling while
+                // leaving the real mailbox/crash/restart collaborators intact.
+                #[cfg(parking_lot_negative_control = "oa-07-event")]
+                {
+                    let _ = status;
+                    (terminal, resolution)
+                }
+                #[cfg(not(parking_lot_negative_control = "oa-07-event"))]
+                match status {
+                    TaskStatus::Completed => {
+                        let started = match terminal {
+                            Terminal::Completed(started) => started,
+                            _ => None,
+                        };
+                        (Terminal::Completed(started), Resolution::Ack)
+                    }
+                    TaskStatus::Failed(error) => {
+                        let reason = error.to_string();
+                        (Terminal::Failed(error), Resolution::DeadLetter(reason))
+                    }
+                    TaskStatus::Expired => (
+                        Terminal::Expired,
+                        Resolution::DeadLetter(
+                            "deadline passed before the task started".to_owned(),
+                        ),
+                    ),
+                    TaskStatus::Dropped(reason) => (
+                        Terminal::Dropped(reason.clone()),
+                        Resolution::DeadLetter(reason),
+                    ),
+                    other => {
+                        // Delivery supports nonterminal current statuses too.
+                        // They cannot justify terminal emission or lease
+                        // destruction, even when this retry locally succeeded.
+                        tracing::warn!(
+                            task_id,
+                            ?other,
+                            "duplicate mailbox status is not terminal; handing the task back"
+                        );
+                        report();
+                        self.requeue(task_id, &idempotency_key, attempt, token, heartbeat)
+                            .await;
+                        drop(held);
+                        return;
+                    }
+                }
+            }
         };
 
         report();
-        self.emit_terminal(task_id, &terminal, &status);
+        self.emit_terminal(task_id, &terminal);
 
         // Stop extending before resolving, so no heartbeat races the ack. The
         // last extension left at least `lease - heartbeat interval` of lease.
@@ -1068,25 +1169,31 @@ where
     }
 
     /// Emit a settled run's terminal event.
-    fn emit_terminal(&self, task_id: TaskId, terminal: &Terminal, status: &TaskStatus) {
+    fn emit_terminal(&self, task_id: TaskId, terminal: &Terminal) {
         let events = self.events();
-        match (terminal, status) {
-            (Terminal::Expired, _) => events.expired(task_id),
-            (Terminal::TooLarge(error), _) => events.rejected(task_id, error),
-            (Terminal::Ran(_), TaskStatus::Failed(error)) => events.failed(task_id, error),
-            (Terminal::Ran(started), _) => events.completed(task_id, *started),
+        match terminal {
+            Terminal::Completed(started) => events.completed(task_id, *started),
+            Terminal::Failed(error) => events.failed(task_id, error),
+            Terminal::Expired => events.expired(task_id),
+            Terminal::TooLarge(error) => events.rejected(task_id, error),
+            Terminal::Dropped(reason) => prometheus_parking_lot_core::hooks::emit_rejected(
+                events.bus,
+                task_id,
+                events.pool,
+                prometheus_parking_lot_core::hooks::RejectionReason::Custom(reason.clone()),
+            ),
         }
     }
 
-    /// Store the delivery, retrying with backoff. True once it is stored (or
-    /// was already stored by an earlier attempt of the same task).
-    async fn deliver(&self, task_id: TaskId, delivery: &Delivery<T>) -> bool {
+    /// Store the delivery, retrying with backoff. Preserve authoritative
+    /// duplicate metadata; None means every delivery attempt failed.
+    async fn deliver(&self, task_id: TaskId, delivery: &Delivery<T>) -> Option<DeliveryOutcome> {
         let mut backoff = FIRST_BACKOFF;
         for attempt in 1..=ATTEMPTS {
             match self.mailbox.deliver(delivery.clone()).await {
                 Ok(outcome) => {
                     tracing::debug!(task_id, ?outcome, "outcome delivered");
-                    return true;
+                    return Some(outcome);
                 }
                 Err(error) if attempt < ATTEMPTS => {
                     tracing::warn!(task_id, attempt, %error, "delivery failed; retrying");
@@ -1098,7 +1205,7 @@ where
                 }
             }
         }
-        false
+        None
     }
 
     /// Ack or dead-letter the lease, retrying a backend failure. A lost lease

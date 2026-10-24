@@ -1,0 +1,400 @@
+--- a/.github/scripts/operational-assurance.py
++++ b/.github/scripts/operational-assurance.py
+@@ -38,7 +38,7 @@
+ INPUT_KEYS = {"base", "release_date", "release_plz", "git_cliff", "trust_policy", "rehearsal_artifact_id",
+               "fresh_mirror", "pg17_image", "pg18_image", "upgrade_image", "chrome", "chromedriver",
+               "android_ndk", "baseline_root", "quiet_attestation", "gui_positive", "gui_control",
+-              "authority_config", "rust_toolchain", "tag", "preparation_plan"}
++              "authority_config", "rust_toolchain", "tag", "preparation_plan", "preparation_source"}
+ CONTRACT = ROOT / ".kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json"
+ SUBSTITUTION = re.compile(r"\{([a-z_][a-z_0-9]*)\}")
+ TOOLS = {
+@@ -85,6 +85,14 @@
+     values = {r["status"] for r in records}
+     return next((s for s in ("FAIL", "BLOCKED", "NOT_EXERCISED") if s in values),
+                 "PASS" if records else "NOT_EXERCISED")
++
++
++def validate_child_receipt(data: dict, row: dict, candidate: str, binding: str) -> None:
++    require(data.get("status") == "PASS" and data.get("candidate") == candidate
++            and data.get("contract_digest") == binding,
++            "specialized receipt is missing/stale/non-PASS")
++    require(all(data.get(key) == value for key, value in row.get("receipt_identity", {}).items()),
++            "OA-18:child-receipt-identity: required OS/build case differs")
+ 
+ 
+ def definition() -> dict:
+@@ -339,6 +347,21 @@
+         else:
+             images[image] = {"status": "BLOCKED", "reason": "existing functional Docker unavailable; no pull/build"}
+     fixture_inputs = {}
++    if args.profile == "baseline":
++        try:
++            plan_path = Path(inputs["preparation_plan"]).resolve()
++            plan_bytes = plan_path.read_bytes()
++            plan = json.loads(plan_bytes)
++            require(plan.get("candidate") == inputs["preparation_source"]
++                    and plan.get("base") == inputs["base"]
++                    and plan.get("date") == inputs["release_date"], "OA-18:preparation-input-binding")
++            require(plan["candidate"] != args.candidate, "OA-18:preparation-source-must-precede-final")
++            validate_preparation(ROOT, plan, args.candidate, "0.4.0")
++            fixture_inputs["preparation_plan"] = {"status": "PASS", "path": str(plan_path),
++                "sha256": sha256(plan_bytes), "source": plan["candidate"], "final_candidate": args.candidate}
++            (output / "original-release-plan.json").write_bytes(plan_bytes)
++        except (ReleaseError, OSError, ValueError, KeyError) as error:
++            fixture_inputs["preparation_plan"] = {"status": "BLOCKED", "reason": str(error)}
+     if inputs.get("fresh_mirror"):
+         try:
+             mirror = Path(inputs["fresh_mirror"]).resolve()
+@@ -446,6 +469,11 @@
+                         for dep in row.get("depends", [])), "required earlier command did not PASS")
+             if row.get("authority"):
+                 require(manifest["authority"][row["authority"]]["status"] == "PASS", "independent authority absent")
++            if row["id"] == "oa02":
++                preparation = manifest["fixture_inputs"]["preparation_plan"]
++                require(preparation["status"] == "PASS", "bound original OA02 plan/ancestor unavailable")
++                require(digest(Path(preparation["path"])) == preparation["sha256"],
++                        "OA-18:changed-preparation-plan")
+             if row["id"] == "containment-real":
+                 require(manifest["fixture_inputs"].get("fresh_mirror", {}).get("status") == "PASS",
+                         "actual approved fresh-mirror identity unavailable")
+@@ -486,9 +514,7 @@
+                 if row.get("receipt"):
+                     child = Path(row["receipt"])
+                     data = json.loads(child.read_bytes())
+-                    require(data.get("status") == "PASS" and data.get("candidate") == args.candidate
+-                            and data.get("contract_digest") == manifest["contract_digest"],
+-                            "specialized receipt is missing/stale/non-PASS")
++                    validate_child_receipt(data, row, args.candidate, manifest["contract_digest"])
+                     record.update(child_receipt=str(child.relative_to(output)), child_sha256=digest(child))
+             clean(args.candidate)
+             require(sources() == manifest["source_sha256"], "OA-18:changed-source")
+@@ -580,12 +606,21 @@
+                 require(digest(folder / listing[stream]) == listing[stream + "_sha256"], "OA-18:changed-discovery")
+             count = discovery_count((folder / listing["stdout"]).read_text(), row)
+             require(count > 0 and record["selected_tests_before_run"] == count, "OA-18:zero-discovery")
++        if record["id"] == "oa02":
++            preparation = frozen["fixture_inputs"]["preparation_plan"]
++            original = folder / "original-release-plan.json"
++            require(preparation["status"] == "PASS" and digest(original) == preparation["sha256"],
++                    "OA-18:changed-preparation-plan")
++            validate_preparation(ROOT, json.loads(original.read_bytes()), candidate, "0.4.0")
+         output = text(folder, command)
+         require(not row.get("contains") or row["contains"] in output, "OA-18:missing-oracle")
+         require(not row.get("tests") or discovered(output, row["tests"]) > 0, "OA-18:zero-discovery")
+-        if record.get("child_receipt"):
++        checked_row = next(r for r in model["commands"] if r["id"] == record["id"])
++        if checked_row.get("receipt"):
++            require(bool(record.get("child_receipt")), "OA-18:omitted-child-receipt")
+             path = safe(folder, record["child_receipt"])
+             require(digest(path) == record["child_sha256"], "OA-18:changed-child-receipt")
++            validate_child_receipt(json.loads(path.read_bytes()), checked_row, candidate, binding)
+     require(receipt["status"] == state(records), "OA-18:false-job-pass")
+     return receipt
+ 
+@@ -762,6 +797,11 @@
+                 "compact artifact blocked: independently authenticated G02/G03/G04 authority missing")
+         require(signed is not None and trust is not None, "actual signed candidate verification missing")
+         plan_bytes = args.preparation_plan.read_bytes()
++        baseline_freeze = json.loads((source / "baseline" / "checked-manifest.json").read_bytes())
++        preparation = baseline_freeze["fixture_inputs"]["preparation_plan"]
++        require(preparation["status"] == "PASS" and preparation["sha256"] == sha256(plan_bytes)
++                and digest(source / "baseline" / "original-release-plan.json") == sha256(plan_bytes),
++                "OA-18:changed-preparation-plan: collector must retain the baseline's exact original plan")
+         validate_preparation(ROOT, json.loads(plan_bytes), args.candidate, "0.4.0")
+         require(args.purpose == "rehearsal" or packet["status"] == "PASS", "required full packet is not PASS")
+         checked = {p: digest(source / p / "checked-manifest.json") for p in profiles}
+--- a/.github/operational-assurance.json
++++ b/.github/operational-assurance.json
+@@ -601,7 +601,7 @@
+         "--source",
+         "{workspace}",
+         "--candidate",
+-        "{candidate}",
++        "{preparation_source}",
+         "--base",
+         "{base}",
+         "--version",
+@@ -613,7 +613,11 @@
+         "--git-cliff",
+         "{git_cliff}",
+         "--output",
+-        "{out}/oa02"
++        "{out}/oa02",
++        "--final-candidate",
++        "{candidate}",
++        "--preparation-plan",
++        "{preparation_plan}"
+       ],
+       "scenarios": [
+         "OA-02"
+@@ -2531,11 +2535,15 @@
+         "cargo"
+       ],
+       "timeout": 3600,
+-      "receipt": "{out}/desktop/build-receipt.json"
++      "receipt": "{out}/desktop/build-receipt.json",
++      "receipt_identity": {
++        "os": "Darwin",
++        "case_id": "OA15-BUILD-MACOS"
++      }
+     },
+     {
+       "id": "desktop-linux",
+-      "profile": "baseline",
++      "profile": "linux",
+       "argv": [
+         "python3",
+         "bindings/tauri-desktop/assurance/desktop-assurance.py",
+@@ -2550,7 +2558,11 @@
+         "cargo"
+       ],
+       "timeout": 3600,
+-      "receipt": "{out}/desktop/build-receipt.json"
++      "receipt": "{out}/desktop/build-receipt.json",
++      "receipt_identity": {
++        "os": "Linux",
++        "case_id": "OA15-BUILD-LINUX"
++      }
+     },
+     {
+       "id": "desktop-windows",
+@@ -2569,7 +2581,11 @@
+         "cargo"
+       ],
+       "timeout": 3600,
+-      "receipt": "{out}/desktop/build-receipt.json"
++      "receipt": "{out}/desktop/build-receipt.json",
++      "receipt_identity": {
++        "os": "Windows",
++        "case_id": "OA15-BUILD-WINDOWS"
++      }
+     },
+     {
+       "id": "desktop-fmt",
+--- a/.github/scripts/OPERATIONAL_ASSURANCE.md
++++ b/.github/scripts/OPERATIONAL_ASSURANCE.md
+@@ -64,7 +64,7 @@
+ | Keys | Meaning / existing owner entry |
+ | --- | --- |
+ | `rust_toolchain` | Explicit existing selector or absolute installed-toolchain path, verified as actual rustc/cargo 1.99.1 with executable SHA256. It can explicitly select existing stable bytes, never silently a different compiler. |
+-| `base`, `release_date`, `release_plz`, `git_cliff` | Real full changelog base, ISO date and existing exact OA02 executable paths (0.3.173 / 2.14.2). Scratch preparation runs twice with mismatch controls. |
++| `base`, `release_date`, `release_plz`, `git_cliff`, `preparation_source`, `preparation_plan` | Baseline OA02 uses a full pre-bump ancestor SHA, original plan path, full changelog base, ISO date and existing exact OA02 executable paths (0.3.173 / 2.14.2). The final candidate remains the job identity. Scratch ancestor preparation runs twice and must reproduce the original plan’s metadata/tool identities and the final candidate’s exact prepared files. |
+ | `chrome`, `chromedriver` | Existing pinned Linux x86_64 Chromium/driver 156.0.8078.47 paths, plus lock-matched wasm runner 0.2.129 and Node24 on PATH. |
+ | `pg17_image`, `pg18_image`, `upgrade_image` | Actual pre-existing immutable local IDs for the OA14 dual-binary rehearsal used by OA12's upgrade adapter. Ordinary PG17/18 baseline excludes binary(postgres_upgrade). No pull/build is implicit. |
+ | `fresh_mirror` | Separately approved post-purge full worktree clone for actual release-containment scans; G02 authority is independently required. No purge/fetch/rewrite is performed here. |
+@@ -73,7 +73,30 @@
+ | `gui_positive`, `gui_control` | Existing owned actual macOS GUI roots from OA15 prepare/launch/capture workflow, with closed real process traces and manual captures. Classifier does not automate a fake GUI. |
+ | `baseline_root`, `quiet_attestation` | Isolated 0.3 baseline checkout; optional externally supplied truthful quiet attestation. The dedicated same-run workflow normally derives its own attestation from actual host/process observations after builds. Only external/manual attestation needs an independent digest binding. |
+ | `authority_config` | Existing independent report/raw-evidence binding described below. This file is not trusted merely because a caller points at it. |
+-| `tag`, `preparation_plan` | Collector only: real operator-signed candidate tag and exact original OA02 plan bytes from its pre-bump source, matching the final prepared candidate through validate_preparation. |
++| `tag`, `preparation_plan` | Collector uses the real operator-signed final candidate tag and the same exact original OA02 plan bytes, matching the final prepared candidate through validate_preparation. No regenerated plan is substituted. |
++
++OA02 has two distinct commits. `preparation_source` is the original plan’s
++pre-bump `candidate`, available as an ancestor in the final checkout’s Git object
++store. `--candidate` on the outer gate always names the clean final prepared
++commit. The checked OA02 argv passes `--candidate {preparation_source}` to the
++incumbent preparation fixture and separately passes `--final-candidate {candidate}`
++and `--preparation-plan {preparation_plan}`. The plan’s base/date must match the
++frozen inputs. The shared validator checks its seven-package policy, ancestry
++and every metadata hash against the final checkout before preparation runs.
++Missing inputs block OA02 alone, allowing the other available checks to proceed.
++
++The original plan bytes are frozen and retained as `original-release-plan.json`;
++the fixture retains them again with separate real-tool logs and the newly
++reproduced plan. Absolute source/tool/scratch argv paths differ between the two
++invocations and remain truthful invocation provenance. They are never rewritten
++to force byte equality. Portable plan fields, actual tool identity hashes/version
++outputs and every prepared metadata byte must agree with the original plan and
++final checkout. The reproduced plan itself must remain byte-identical on its
++second run at the same output path. The compact artifact still copies only the
++original plan, with its exact digest; the collector must use the same original
++plan digest retained by the baseline freeze. Neither the reproduction nor a rebuilt plan
++can replace it. Actual altered-plan controls reject metadata mismatch through
++both the comparison and incumbent final-candidate validator.
+ 
+ The checked-in inputs example is an empty **profile map** for the workflow's
+ proposed `OA18_INPUTS_JSON` protected-environment variable; local `--inputs`
+@@ -152,7 +175,11 @@
+ 
+ Place exported folders under exact profile names. `verify_job` binds the exact
+ required command set, candidate/contract/definition/source/manifest, raw file
+-map, commands/exits/logs, nonzero tests and child receipt bytes. Full packet
++map, commands/exits/logs, nonzero tests and child receipt bytes. Native desktop
++build receipts additionally require the exact OS and OA15-BUILD-LINUX/MACOS/WINDOWS
++case identity at both execution and collector validation. Linux runs only in the
++Linux profile; Mac and Windows retain their own required profiles. A PASS build
++from another OS or another case cannot satisfy the missing native leg. Full packet
+ preserves every required slot and all four dispositions. Local source/data
+ alone never establishes remote provenance; no compact artifact is created.
+ Original per-profile records preserve independent baseline results even when
+--- a/.github/scripts/tests/boundary-packet.py
++++ b/.github/scripts/tests/boundary-packet.py
+@@ -4,6 +4,7 @@
+ 
+ import copy
+ import importlib.util
++import json
+ from pathlib import Path
+ import sys
+ import unittest
+@@ -85,6 +86,35 @@
+         self.assertEqual(boundary.discovered("Summary 0 tests run", "nextest"), 0)
+         self.assertEqual(boundary.discovered("test result: ok. 12 passed; 0 failed", "libtest"), 12)
+ 
++    def test_desktop_receipts_require_each_exact_os_and_build_case(self):
++        cases = {"Linux": "OA15-BUILD-LINUX", "Darwin": "OA15-BUILD-MACOS",
++                 "Windows": "OA15-BUILD-WINDOWS"}
++        for system, case in cases.items():
++            row = {"receipt_identity": {"os": system, "case_id": case}}
++            receipt = {"status": "PASS", "candidate": self.candidate,
++                       "contract_digest": self.binding, "os": system, "case_id": case}
++            boundary.validate_child_receipt(receipt, row, self.candidate, self.binding)
++            for wrong_system, wrong_case in cases.items():
++                if wrong_system == system:
++                    continue
++                for replacement in ({"os": wrong_system}, {"case_id": wrong_case},
++                                    {"os": wrong_system, "case_id": wrong_case}):
++                    with self.subTest(required=system, replacement=replacement):
++                        with self.assertRaisesRegex(boundary.ReleaseError, "OA-18:child-receipt-identity"):
++                            boundary.validate_child_receipt({**receipt, **replacement}, row,
++                                                            self.candidate, self.binding)
++
++    def test_desktop_definition_keeps_three_distinct_native_profiles(self):
++        model = json.loads(boundary.DEFINITION.read_bytes())
++        expected = {"desktop-linux": ("linux", "Linux", "OA15-BUILD-LINUX"),
++                    "desktop-macos": ("macos", "Darwin", "OA15-BUILD-MACOS"),
++                    "desktop-windows": ("windows", "Windows", "OA15-BUILD-WINDOWS")}
++        for name, (profile, system, case) in expected.items():
++            row = next(row for row in model["commands"] if row["id"] == name)
++            self.assertEqual(row["profile"], profile)
++            self.assertEqual(model["profiles"][profile], system)
++            self.assertEqual(row["receipt_identity"], {"os": system, "case_id": case})
++
+     def test_caller_flag_has_no_external_authority(self):
+         result = boundary.authority("review", {"approved": "true"}, self.candidate, self.binding)
+         self.assertEqual(result["status"], "BLOCKED")
+--- a/scripts/release/test-preparation.py
++++ b/scripts/release/test-preparation.py
+@@ -9,6 +9,7 @@
+ from __future__ import annotations
+ 
+ import argparse
++import copy
+ import hashlib
+ import json
+ from pathlib import Path
+@@ -18,6 +19,10 @@
+ import tempfile
+ import tomllib
+ 
++
++sys.dont_write_bytecode = True
++sys.path.insert(0, str(Path(__file__).resolve().parents[2] / ".github/scripts"))
++from release_evidence import ReleaseError, git, validate_preparation  # noqa: E402
+ 
+ SCRIPT = Path(__file__).with_name("prepare.py")
+ EXPECTED = [
+@@ -55,18 +60,51 @@
+     path.write_text(content.replace(old, new, 1), encoding="utf-8")
+ 
+ 
++def compare_final_preparation(final: Path, original: dict, reproduced: dict, workspace: Path) -> None:
++    # Absolute source/tool/scratch argv paths are invocation provenance, not
++    # portable outputs. Never rewrite the original plan to hide their difference.
++    fields = ("schema_version", "policy", "candidate", "base", "version", "date", "publish",
++              "packages", "excluded", "files_sha256")
++    if any(original.get(key) != reproduced.get(key) for key in fields):
++        raise AssertionError("OA-02:final-preparation-mismatch: reproduced plan differs")
++    original_tools = {name: {k: v for k, v in tool.items() if k != "path"}
++                      for name, tool in original["tools"].items()}
++    reproduced_tools = {name: {k: v for k, v in tool.items() if k != "path"}
++                        for name, tool in reproduced["tools"].items()}
++    if original_tools != reproduced_tools:
++        raise AssertionError("OA-02:final-preparation-mismatch: tool identities differ")
++    for name, expected in original["files_sha256"].items():
++        if sha(final / name) != expected or sha(workspace / name) != expected:
++            raise AssertionError("OA-02:final-preparation-mismatch: prepared/final bytes differ: " + name)
++
++
+ def main() -> int:
+     parser = argparse.ArgumentParser(description=__doc__)
+     for name in ("source", "output", "release-plz", "git-cliff"):
+         parser.add_argument(f"--{name}", type=Path, required=True)
+     for name in ("candidate", "base", "version", "date"):
+         parser.add_argument(f"--{name}", required=True)
++    parser.add_argument("--final-candidate", help="final prepared commit; --candidate remains the pre-bump source")
++    parser.add_argument("--preparation-plan", type=Path, help="exact original plan, never reconstructed")
+     args = parser.parse_args()
++    if bool(args.final_candidate) != bool(args.preparation_plan):
++        parser.error("--final-candidate and --preparation-plan must be supplied together")
+     evidence = args.output.resolve()
+     evidence.mkdir(parents=True, exist_ok=False)
+     source = args.source.resolve()
+     source_files = [source / "Cargo.toml", source / "Cargo.lock", source / "CHANGELOG.md"]
+     original = {str(p): sha(p) for p in source_files}
++    bound_bytes = args.preparation_plan.read_bytes() if args.preparation_plan else None
++    bound_plan = json.loads(bound_bytes) if bound_bytes is not None else None
++    if bound_plan is not None:
++        if (bound_plan.get("candidate"), bound_plan.get("base"), bound_plan.get("date"), bound_plan.get("version")) != (
++                args.candidate, args.base, args.date, args.version):
++            raise AssertionError("OA-02:final-preparation-mismatch: original plan/input binding differs")
++        if args.candidate == args.final_candidate or git(source, "rev-parse", "HEAD") != args.final_candidate:
++            raise AssertionError("OA-02:final-preparation-mismatch: source ancestor/final identity differs")
++        # Incumbent validator proves source ancestry and exact final metadata.
++        validate_preparation(source, bound_plan, args.final_candidate, args.version)
++        (evidence / "original-release-plan.json").write_bytes(bound_bytes)
+     parameters = ["--source", str(source), "--candidate", args.candidate,
+                   "--base", args.base, "--version", args.version, "--date", args.date,
+                   "--release-plz", str(args.release_plz.resolve()),
+@@ -99,6 +137,34 @@
+         raise AssertionError("second preparation changed the deterministic release plan")
+     if {p: sha(workspace / p) for p in first_files} != first_files:
+         raise AssertionError("second preparation changed a manifest, lockfile, config or changelog")
++
++    if bound_plan is not None:
++        compare_final_preparation(source, bound_plan, receipt, workspace)
++        mismatched = copy.deepcopy(receipt)
++        mismatched["files_sha256"]["Cargo.toml"] = "0" * 64
++        try:
++            compare_final_preparation(source, bound_plan, mismatched, workspace)
++        except AssertionError as error:
++            if "OA-02:final-preparation-mismatch" not in str(error):
++                raise
++            (evidence / "final-plan-mismatch-control.json").write_text(json.dumps({
++                "expected_rejection": str(error), "original_plan_sha256": sha(args.preparation_plan),
++                "candidate": args.final_candidate, "preparation_source": args.candidate}, indent=2) + "\n")
++        else:
++            raise AssertionError("OA-02:final-preparation-mismatch control was accepted")
++        # The shared production validator must also reject an altered plan even
++        # when its package list still looks valid; never substitute a rebuilt plan.
++        altered = copy.deepcopy(bound_plan)
++        altered["files_sha256"]["Cargo.toml"] = "0" * 64
++        try:
++            validate_preparation(source, altered, args.final_candidate, args.version)
++        except ReleaseError as error:
++            if "content differs from candidate" not in str(error):
++                raise
++            (evidence / "original-plan-mismatch-control.json").write_text(json.dumps({
++                "expected_rejection": str(error), "candidate": args.final_candidate}, indent=2) + "\n")
++        else:
++            raise AssertionError("OA-02:original-plan-mismatch control was accepted")
+ 
+     with tempfile.TemporaryDirectory(prefix="parking-lot-release-controls-") as temporary:
+         controls = Path(temporary)
+@@ -139,6 +205,15 @@
+     ffi = tomllib.loads((workspace / "crates/parking-lot-ffi/Cargo.toml").read_text())
+     if ffi["package"]["publish"] is not False:
+         raise AssertionError("FFI became publishable")
++    if bound_plan is not None:
++        if args.preparation_plan.read_bytes() != bound_bytes:
++            raise AssertionError("OA-02:original-plan-mutated")
++        compare_final_preparation(source, bound_plan, json.loads(receipt_path.read_bytes()), workspace)
++        (evidence / "final-candidate-binding.json").write_text(json.dumps({
++            "candidate": args.final_candidate, "preparation_source": args.candidate,
++            "original_plan_sha256": sha(args.preparation_plan),
++            "reproduced_plan_sha256": sha(receipt_path), "files_sha256": first_files}, indent=2) + "\n")
++        print("PASS OA-02: original plan and reproduced ancestor outputs match final candidate; mismatch controls rejected")
+     print("PASS OA-02: seven crate versions/dependencies/changelog; FFI excluded; second run unchanged")
+     print("PASS OA-02 controls: dependency, package, lockfile, FFI and version-group mismatches rejected")
+     print(f"Evidence: {evidence}")

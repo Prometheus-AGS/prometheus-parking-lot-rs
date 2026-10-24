@@ -1,0 +1,23 @@
+{
+  "owner": "/root/oa04_scheduler",
+  "files": [
+    {
+      "path": "benches/pg_backend.rs",
+      "sha256": "df348839e663a9a0109d65e4d225cfa04085f5595035c78fcbc230c6fe87d63d"
+    },
+    {
+      "path": "benches/pg_measure.py",
+      "sha256": "ff97d3dd853c35f72801108797d61c40a559f0492db3642defb4cc5c098ec0c5"
+    },
+    {
+      "path": "benches/pg_measure_test.py",
+      "sha256": "48ebb5a38abe18978aa6efcb3db953f812506076a071a1d80261c0cfe16b09d6"
+    },
+    {
+      "path": "benches/oa17-quiet-machine.example.json",
+      "sha256": "402bce0fe61e6c2582f08fbbd2d4c331a26b09d6db28f9f03d7f76b51a453ede"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED",
+  "scope": "Real PG workload harness, paired sample runner/report, synthetic report classifier cases, unarmed quiet-machine attestation example"
+}

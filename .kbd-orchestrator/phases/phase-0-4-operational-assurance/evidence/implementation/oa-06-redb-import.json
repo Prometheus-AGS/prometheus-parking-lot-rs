@@ -1,0 +1,24 @@
+{
+  "owner": "/root/oa04_events",
+  "sourceWorkspace": "/Users/gqadonis/.codex/worktrees/oa04-events/prometheus-parking-lot-rs",
+  "files": [
+    {
+      "path": "crates/parking-lot-embedded/src/mailbox.rs",
+      "sha256": "c09b9cfc0a4ee9dd891f77fc96b8665d31061cd8829b18f25cf459814d6be12e"
+    },
+    {
+      "path": "crates/parking-lot-embedded/src/store.rs",
+      "sha256": "bd6a5d2fd171d62059aa615cd6342946193f0ebcc78a41743e17df90b210984a"
+    },
+    {
+      "path": "crates/parking-lot-embedded/tests/mailbox_migration.rs",
+      "sha256": "8ac072081e5d365fc6f44d42ef955e186234f89cba7f3918a827e5eae9e6fb02"
+    },
+    {
+      "path": "crates/parking-lot-embedded/tests/support/legacy_v03.rs",
+      "sha256": "5692bcdf5797a2877ff9c338059f56c2d57fb1d5bc1a75bfb3fe7eb662a32d6e"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED",
+  "legacyFixture": "frozen0.3 protocol and realredb store; publishedbinary not executed"
+}

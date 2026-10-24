@@ -1,0 +1,15 @@
+{
+  "version": "0.3.173",
+  "crate_sha256": "581521a1d9c8a490cbbd184764774f61a27e5ca0a98d12f764ebeafdb938627d",
+  "vcs": {
+    "git": {
+      "sha1": "907af6d031bbb69d392354803c04cd75bb6e6fa0"
+    },
+    "path_in_vcs": "crates/release_plz"
+  },
+  "path": "/tmp/oa04-private-tools/bin/release-plz",
+  "executable_sha256": "2ec407c1138b65e0d7e8585d17a574f35f2950e05a9ed1e309a69a1a933a4e78",
+  "build_exit": 0,
+  "build_seconds": 504,
+  "root_scope": "private /tmp prefix; no global executable installation"
+}

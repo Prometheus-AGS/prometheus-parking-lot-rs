@@ -1,0 +1,7 @@
+{
+  "owner": "/root/oa04_platform",
+  "file": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-04.md",
+  "sha256": "5832059081406c576954acbf8a474c2ee7b8059d9b3b59522d5723fa4ff3d761",
+  "publicGuidePatchApplied": ".github/scripts/proposals/oa-04-publishing.patch",
+  "runtimeEvidence": "NOT_EXERCISED"
+}

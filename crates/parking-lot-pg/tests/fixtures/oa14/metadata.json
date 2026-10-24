@@ -1,0 +1,81 @@
+{
+  "owners": [
+    [
+      "legacy",
+      {
+        "idempotency_key": "consumed-finite",
+        "key": {
+          "tenant": "tenant-a",
+          "user_id": "user",
+          "session_id": null
+        }
+      }
+    ],
+    [
+      "legacy",
+      {
+        "idempotency_key": "consumed-permanent",
+        "key": {
+          "tenant": "tenant-a",
+          "user_id": "user",
+          "session_id": null
+        }
+      }
+    ],
+    [
+      "legacy",
+      {
+        "idempotency_key": "consumed-failed",
+        "key": {
+          "tenant": "tenant-failed",
+          "user_id": "user",
+          "session_id": null
+        }
+      }
+    ]
+  ],
+  "statuses": [
+    [
+      "legacy",
+      {
+        "idempotency_key": "consumed-finite",
+        "key": {
+          "tenant": "tenant-a",
+          "user_id": "user",
+          "session_id": null
+        },
+        "status": "Completed"
+      }
+    ],
+    [
+      "legacy",
+      {
+        "idempotency_key": "consumed-permanent",
+        "key": {
+          "tenant": "tenant-a",
+          "user_id": "user",
+          "session_id": null
+        },
+        "status": "Completed"
+      }
+    ],
+    [
+      "legacy",
+      {
+        "idempotency_key": "consumed-failed",
+        "key": {
+          "tenant": "tenant-failed",
+          "user_id": "user",
+          "session_id": null
+        },
+        "status": {
+          "Failed": {
+            "kind": "executor",
+            "message": "original failure",
+            "retryable": false
+          }
+        }
+      }
+    ]
+  ]
+}

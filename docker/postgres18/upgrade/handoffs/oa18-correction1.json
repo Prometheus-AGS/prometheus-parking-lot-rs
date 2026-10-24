@@ -1,0 +1,25 @@
+{
+  "cycle": "OA18 task2 cumulative correction cycle1",
+  "execution": "NOT_EXERCISED; source reads/edits and exact-known-file hashes only; no tests/build/Cargo/Docker/validators/review/KBD/commits.",
+  "central_checkout": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs",
+  "central_runner_base_sha256": "89fd043bc24ea9b0291782b168df6babad5f50ce9fb24c012485264f982dd7cd",
+  "central_current_manifest_base_sha256": "ede6270b9288e4c186d727be06af03df0cde03e4ddee9bfa987868edce1eb5f9",
+  "held_runbook_base_sha256": "72857cf274c946f604211cfee2a1d93ff536bd1770fb78b6059fb7cc9bb97e4e",
+  "proposed_runbook_target_sha256": "3bd09b812cfbde036940b6518ace56f2c5773007e603caf54890d9124eda7a25",
+  "import_paths": {
+    "docker/postgres18/upgrade/rehearse.py": "c3761cbc959d754c361edca56de82dbd390dbd6268a92d0db23d5f152204d6e3",
+    "crates/parking-lot-pg/tests/fixtures/oa14/manifest.json": "f514920dcb2a84e9b9aaa3d6199084f7c9ae4925209803cb96f3a7f6c8e38257",
+    "docker/postgres18/upgrade/handoffs/oa18-correction1-postgres18.patch": "448d68fccc648b5ec552a628f60f89924ff795cded225f391925649edfa44e1c",
+    "docker/postgres18/upgrade/handoffs/oa18-correction1-postgres18.proposed.md": "3bd09b812cfbde036940b6518ace56f2c5773007e603caf54890d9124eda7a25"
+  },
+  "current_source_map_refresh": "Copied latest central formatted/current source map; changed only rehearse.py entry and current contract-binding/argv metadata. Other map entries preserved. Historical task1/task2 packages, hashes and frozen fixture bytes unchanged.",
+  "static_failure_trace": [
+    "Observed caller source .github/scripts/tests/negative-controls.py::upgrade passes manifest.contract_digest e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257.",
+    "Before correction: verify_inputs compared raw adopted-contract bytes SHA256 4b1ba3d9755c7b3dfe8efa5120ae62e707b7b478d3e503f3a071d1eb60d58056 with that normalized digest, so the valid route raised OA-14:contract-changed before Docker or seeded-result oracle.",
+    "After correction: adopted_contract_identity recomputes the existing canonical normalized digest, validates adopted kind/version/project/run/phase/revision and declared+requested digest equality, then populates normalized contract_sha256. This removes the raw-versus-normalized mismatch by source reasoning, not an executed result.",
+    "OA12 classify_upgrade continues comparing receipt.contract_sha256 to manifest.contract_digest; names/CLI/control/classifier remain unchanged. Raw bytes are separately contract_raw_sha256; request preserved separately; unvalidated contract_sha256 remains null.",
+    "Actual positive and missing-result delegates remain the real final-boundary regression routes. Wrong raw argument, stale declared digest or wrong identity cannot satisfy the seeded-result expected-negative classifier."
+  ],
+  "caller_classifier_changes": "None; platform and parent notified. Exact shared runbook patch only; no central/shared mutation.",
+  "remaining": "Parent imports owned runner/current manifest and applies runbook patch on held base, then refreshes cumulative source inventories/final candidate identities as needed. Runtime normalization acceptance and actual real PG control routes remain unverified."
+}

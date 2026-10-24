@@ -1,0 +1,44 @@
+{
+  "owner": "/root/oa04_platform",
+  "workspace": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs",
+  "files": [
+    {
+      "path": ".github/workflows/release.yml",
+      "sha256": "bf7ad862c41de430547990605fc0f2cb2699f95d6a8c2eaacf80b3955bd1ccba"
+    },
+    {
+      "path": ".github/scripts/release_evidence.py",
+      "sha256": "cfb3e4062a4a89bb7bcbc0a49b1cc3f8f8f07e7609a9efc2b4634584b4d5ff50"
+    },
+    {
+      "path": ".github/scripts/trusted-release.py",
+      "sha256": "63a90ac1b56db5649f4d7a99640a0bef10cc0c3e6be7a18e82c9134dd0423740"
+    },
+    {
+      "path": ".github/scripts/RELEASE_EVIDENCE.md",
+      "sha256": "998eda85f362b64420afd96084c7763288a0e99a403e336ed29ced9ffc8660d0"
+    },
+    {
+      "path": ".github/scripts/tests/trusted-publishing-fixtures.py",
+      "sha256": "7182eddb2c479cb8577eb26e156a0ae3c617f61c3741f942f85a978ec3edba62"
+    },
+    {
+      "path": ".github/release-boundary.schema.json",
+      "sha256": "d82e6530f75f7db4f35be9617ab44cf88be68146fd95ae14c7b234ed9de0995b"
+    },
+    {
+      "path": ".github/release-trust-policy.example.json",
+      "sha256": "f51f660454333023970b32df67d5e50af65f9ff2b4b2df66c19e445f8f829c42"
+    },
+    {
+      "path": ".github/release-publishing-sources.json",
+      "sha256": "9d26ef580b223b71bd7144c043d18910cf780cbd501787090d616e57399b3ef3"
+    },
+    {
+      "path": ".github/scripts/proposals/oa-04-publishing.patch",
+      "sha256": "578c4a0d7d196349e2a248d7b636e0a08479fe8450c7ceb25eb2f02cc29523a5"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED; trusted remote artifact/identity/settings unverified",
+  "producerWorkflowReserved": ".github/workflows/operational-assurance.yml"
+}

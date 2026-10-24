@@ -1,0 +1,11 @@
+{
+  "repair": "OA18 observed embedded mailbox redundant_clone, scoped repair",
+  "path": "crates/parking-lot-embedded/src/mailbox.rs",
+  "base_sha256": "aa96416ca40b775ddb43131396030569ee9efe0d8a4f4c6be9c56ea795bcebb2",
+  "target_sha256": "07203e18fb5bc39952f213d5a1a8fd8e81c3093ed920605ba8a2d0df6882cbf0",
+  "patch_path": "docker/postgres18/upgrade/handoffs/oa18-embedded-clone-repair.patch",
+  "patch_sha256": "8ca7bab93cbf8f54c0db1440ac459076a7f89dfcf5ef0b4bda89209783253cb0",
+  "rationale": "deliver_tx consumes Delivery<T> by value, builds Stored<T>, and serializes it to an owned Vec<u8> before opening the transaction. The duplicate branch only borrows stored.status and returns immediately. On the first-write path, moving stored.status into Remembered is its last use; remaining insertion uses serialized bytes and locals, not stored. The ResultMailbox::deliver caller moves delivery into deliver_tx. No later use or outstanding borrow requires the clone.",
+  "scope": "Exactly one clone removal after syncing current central file. No lint allow, refactor, map refresh, central edit or verification-tree mutation.",
+  "execution": "Source reads, one-line local authoring, exact-known-file hashes only. No tests/builds/Cargo/lints/review/commits/KBD."
+}

@@ -92,18 +92,28 @@ impl<P> TaskQueue<P> for InMemoryQueue<P> {
         Ok(self.tasks.pop().map(|pt| pt.task))
     }
 
-    fn prune_expired(&mut self, now_ms: u128) -> Result<usize, SchedulerError> {
-        let before = self.tasks.len();
-        // Rebuild heap without expired tasks. A task is expired once
-        // `now_ms > deadline` (it is still live at its deadline), the rule of
-        // `Ticket::is_expired` and the pools.
-        let tasks: Vec<_> = self.tasks.drain().collect();
+    fn prune_expired(&mut self, now_ms: u128) -> Result<Vec<ScheduledTask<P>>, SchedulerError> {
+        // Move removed tasks to the caller, preserving all metadata without
+        // requiring P: Clone. Equality at the deadline is still live.
+        let mut expired = Vec::new();
+        let tasks = std::mem::take(&mut self.tasks);
         self.tasks = tasks
             .into_iter()
-            .filter(|pt| pt.task.meta.deadline_ms.is_none_or(|d| d >= now_ms))
+            .filter_map(|task| {
+                if task
+                    .task
+                    .meta
+                    .deadline_ms
+                    .is_some_and(|deadline| now_ms > deadline)
+                {
+                    expired.push(task.task);
+                    None
+                } else {
+                    Some(task)
+                }
+            })
             .collect();
-        let after = self.tasks.len();
-        Ok(before.saturating_sub(after))
+        Ok(expired)
     }
 
     fn max_depth(&self) -> usize {
@@ -238,7 +248,10 @@ mod tests {
 
         // Prune at time 1000
         let pruned = q.prune_expired(1000).unwrap();
-        assert_eq!(pruned, 2); // Tasks 2 and 4 expired
+        let mut pruned_ids: Vec<_> = pruned.iter().map(|task| task.meta.id).collect();
+        pruned_ids.sort_unstable();
+        assert_eq!(pruned_ids, [2, 4]);
+        assert!(q.prune_expired(1000).unwrap().is_empty());
         assert_eq!(q.len(), 2);
 
         // Remaining tasks should be 3 (low, deadline 2000) and 1 (normal, no deadline)

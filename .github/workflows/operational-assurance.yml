@@ -1,0 +1,199 @@
+name: Operational assurance boundary
+
+# Source only until operator-provisioned runners, protected-main/environment,
+# exact source/public-trust pins and authority inputs exist. No provisioning,
+# remote dispatch, signing, account mutation or publication lives in this job.
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: Full clean committed candidate; must equal this protected main workflow SHA
+        required: true
+        type: string
+      purpose:
+        description: Rehearsal cannot authorize publication
+        type: choice
+        options: [rehearsal, certification]
+        default: rehearsal
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: operational-assurance-boundary
+  cancel-in-progress: false
+
+env:
+  RUSTUP_AUTO_INSTALL: '0'
+  PYTHONDONTWRITEBYTECODE: '1'
+  CARGO_TERM_COLOR: never
+  # Checkout content identities must be identical on each native OS.
+  GIT_CONFIG_COUNT: '1'
+  GIT_CONFIG_KEY_0: core.autocrlf
+  GIT_CONFIG_VALUE_0: 'false'
+
+jobs:
+  profiles:
+    if: github.ref == 'refs/heads/main' && github.run_attempt == 1 && inputs.candidate == github.sha
+    name: Boundary profile (${{ matrix.profile }})
+    # Every label is a preprovisioned, explicitly approved self-hosted host.
+    # Missing hosts are missing evidence; no hosted/paid fallback is selected.
+    runs-on: [self-hosted, '${{ matrix.profile }}']
+    environment: release-certification
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [baseline, linux, macos, windows, android, ios, macos-gui]
+    defaults:
+      run:
+        shell: bash
+    env:
+      PROFILE_ID: ${{ matrix.profile }}
+      CANDIDATE: ${{ inputs.candidate }}
+      OA18_INPUTS_JSON: ${{ vars.OA18_INPUTS_JSON }}
+      OA18_AUTHORITY_SHA256: ${{ vars.OA18_AUTHORITY_SHA256 }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve public profile inputs; never approval dispatch JSON
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          mapping = json.loads(os.environ.get('OA18_INPUTS_JSON') or '{}')
+          value = mapping.get(os.environ['PROFILE_ID'], {})
+          Path(os.environ['RUNNER_TEMP'], 'oa18-inputs.json').write_text(json.dumps(value))
+          PY
+      - name: Freeze then execute available exact commands sequentially
+        continue-on-error: true
+        run: |
+          bash .github/scripts/operational-assurance-gate.sh --candidate "$CANDIDATE" \
+            --contract .kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json \
+            --profile "$PROFILE_ID" --inputs "$RUNNER_TEMP/oa18-inputs.json" \
+            --out "$RUNNER_TEMP/oa18-$PROFILE_ID"
+      - name: Export retained raw evidence without prepared source copies or build trees
+        if: always()
+        run: |
+          python3 .github/scripts/operational-assurance.py export \
+            --receipts "$RUNNER_TEMP/oa18-$PROFILE_ID" --out "$RUNNER_TEMP/upload-$PROFILE_ID"
+      - name: Preserve immutable job receipts and redacted raw logs separately
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: oa18-${{ matrix.profile }}
+          path: ${{ runner.temp }}/upload-${{ matrix.profile }}/
+          if-no-files-found: error
+
+  quiet:
+    if: always() && github.ref == 'refs/heads/main' && github.run_attempt == 1 && inputs.candidate == github.sha
+    needs: profiles
+    name: Quiet PG benchmark measurement
+    runs-on: [self-hosted, quiet]
+    environment: release-certification
+    timeout-minutes: 360
+    defaults:
+      run:
+        shell: bash
+    env:
+      CANDIDATE: ${{ inputs.candidate }}
+      OA18_INPUTS_JSON: ${{ vars.OA18_INPUTS_JSON }}
+      OA18_AUTHORITY_SHA256: ${{ vars.OA18_AUTHORITY_SHA256 }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Read operator-provisioned quiet profile paths
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          mapping = json.loads(os.environ.get('OA18_INPUTS_JSON') or '{}')
+          Path(os.environ['RUNNER_TEMP'], 'oa18-inputs.json').write_text(json.dumps(mapping.get('quiet', {})))
+          PY
+      - name: Stage, build and measure only with actual quiet-machine authority
+        continue-on-error: true
+        run: |
+          bash .github/scripts/operational-assurance-gate.sh --candidate "$CANDIDATE" \
+            --profile quiet --inputs "$RUNNER_TEMP/oa18-inputs.json" --out "$RUNNER_TEMP/oa18-quiet"
+      - name: Export raw benchmark evidence
+        if: always()
+        run: |
+          python3 .github/scripts/operational-assurance.py export \
+            --receipts "$RUNNER_TEMP/oa18-quiet" --out "$RUNNER_TEMP/upload-quiet"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: oa18-quiet
+          path: ${{ runner.temp }}/upload-quiet/
+          if-no-files-found: error
+
+  assemble:
+    if: always() && github.ref == 'refs/heads/main' && github.run_attempt == 1 && inputs.candidate == github.sha
+    needs: [profiles, quiet]
+    runs-on: [self-hosted, oa18-collector]
+    environment: release-certification
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      CANDIDATE: ${{ inputs.candidate }}
+      PURPOSE: ${{ inputs.purpose }}
+      OA18_INPUTS_JSON: ${{ vars.OA18_INPUTS_JSON }}
+      OA18_AUTHORITY_SHA256: ${{ vars.OA18_AUTHORITY_SHA256 }}
+      RELEASE_TRUST_POLICY_JSON: ${{ vars.RELEASE_TRUST_POLICY_JSON }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Collect actual same-run immutable artifacts and independently approved external bytes
+        id: collect
+        continue-on-error: true
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess, sys
+          from pathlib import Path
+          temp = Path(os.environ['RUNNER_TEMP'])
+          mapping = json.loads(os.environ.get('OA18_INPUTS_JSON') or '{}')
+          inputs = mapping.get('collector', {})
+          (temp / 'oa18-inputs.json').write_text(json.dumps(inputs))
+          (temp / 'release-trust-policy.json').write_text(os.environ.get('RELEASE_TRUST_POLICY_JSON') or '{}')
+          argv = ['python3', '.github/scripts/operational-assurance.py', 'assemble',
+                  '--candidate', os.environ['CANDIDATE'], '--trusted', '--purpose', os.environ['PURPOSE'],
+                  '--policy', str(temp / 'release-trust-policy.json'), '--inputs', str(temp / 'oa18-inputs.json'),
+                  '--out', str(temp / 'oa18-boundary')]
+          for name in ('tag', 'preparation_plan'):
+              if inputs.get(name):
+                  argv += ['--' + name.replace('_', '-'), inputs[name]]
+          sys.exit(subprocess.run(argv, check=False).returncode)
+          PY
+      - name: Preserve full packet including FAIL/BLOCKED/NOT_EXERCISED
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: operational-assurance-packet
+          path: ${{ runner.temp }}/oa18-boundary/
+          if-no-files-found: error
+      - name: Upload only the incumbent compact protocol members
+        if: steps.collect.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: operational-assurance-boundary
+          path: |
+            ${{ runner.temp }}/oa18-boundary/compact/boundary-receipt.json
+            ${{ runner.temp }}/oa18-boundary/compact/release-plan.json
+          if-no-files-found: error
+      - name: Keep missing certification/authority visible in the workflow result
+        if: steps.collect.outcome != 'success'
+        run: exit 2

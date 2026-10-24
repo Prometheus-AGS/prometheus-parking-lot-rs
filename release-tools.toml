@@ -1,0 +1,12 @@
+# Official release identities checked 2026-10-24. Supply local executables;
+# preparation never installs tools. Actual binary hashes go in release-plan.json.
+[tools.release-plz]
+version = "0.3.173"
+version_output = "release-plz 0.3.173"
+release = "https://github.com/release-plz/release-plz/releases/tag/release-plz-v0.3.173"
+source_commit = "907af6d031bbb69d392354803c04cd75bb6e6fa0"
+
+[tools.git-cliff]
+version = "2.14.2"
+version_output = "git-cliff 2.14.2"
+release = "https://github.com/orhun/git-cliff/releases/tag/v2.14.2"

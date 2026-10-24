@@ -1,0 +1,103 @@
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -202,6 +202,100 @@
+           done
+           exit "$status"
+ 
++  loom-oa11:
++    # Additive ledger/kind-release models; incumbent Loom scenarios stay intact.
++    name: Loom OA-11 (${{ matrix.control }})
++    runs-on: ubuntu-latest
++    timeout-minutes: 20
++    strategy:
++      fail-fast: false
++      matrix:
++        include:
++          - control: models-core
++            package: prometheus-parking-lot-core
++            target: loom_kind_release
++            expect: pass
++            oracle: loom_kind_release_parallel_returns_preserve_all_kind_units
++            positive: loom_kind_release_reacquire_publishes_previous_holder_work
++            diagnostic: OA-11 kind release lost a GpuVram subtraction
++          - control: models-runtime
++            package: prometheus-parking-lot-runtime-tokio
++            target: loom_ledger
++            expect: pass
++            oracle: loom_ledger_submit_shutdown_cannot_both_miss
++            positive: loom_ledger_settlement_publishes_finished_before_zero
++            diagnostic: OA-11 ledger admission and shutdown both missed accepted work
++          - control: oa-11-kind-release
++            package: prometheus-parking-lot-core
++            target: loom_kind_release
++            expect: fail
++            oracle: loom_kind_release_parallel_returns_preserve_all_kind_units
++            positive: loom_kind_release_reacquire_publishes_previous_holder_work
++            diagnostic: OA-11 kind release lost a GpuVram subtraction
++          - control: oa-11-ledger-order
++            package: prometheus-parking-lot-runtime-tokio
++            target: loom_ledger
++            expect: fail
++            oracle: loom_ledger_submit_shutdown_cannot_both_miss
++            positive: loom_ledger_settlement_publishes_finished_before_zero
++            diagnostic: OA-11 ledger admission and shutdown both missed accepted work
++    env:
++      LOOM_MAX_PREEMPTIONS: "3"
++      CARGO_TARGET_DIR: target/loom-oa11-${{ matrix.control }}
++      CONTROL: ${{ matrix.control }}
++      PACKAGE: ${{ matrix.package }}
++      MODEL: ${{ matrix.target }}
++      EXPECT: ${{ matrix.expect }}
++      ORACLE: ${{ matrix.oracle }}
++      POSITIVE: ${{ matrix.positive }}
++      DIAGNOSTIC: ${{ matrix.diagnostic }}
++    steps:
++      - uses: actions/checkout@v7
++      - uses: dtolnay/rust-toolchain@master
++        with:
++          toolchain: ${{ env.PINNED_TOOLCHAIN }}
++      - uses: Swatinem/rust-cache@v2
++        with:
++          shared-key: loom-oa11-${{ matrix.control }}
++          save-if: ${{ github.ref == 'refs/heads/main' }}
++      - name: Build, discover and classify bounded OA-11 models
++        run: |
++          set -euo pipefail
++          RUSTFLAGS="--cfg parking_lot_loom"
++          if [ "$EXPECT" = fail ]; then
++            RUSTFLAGS="$RUSTFLAGS --cfg parking_lot_negative_control=\"$CONTROL\""
++          fi
++          export RUSTFLAGS
++          mkdir -p oa11-logs
++          # Keep compile/discovery/run evidence separate. Compile failure, zero
++          # discovery, timeout and abnormal termination cannot satisfy a control.
++          cargo test -p "$PACKAGE" --locked --test "$MODEL" --no-run 2>&1 | tee oa11-logs/build.log
++          cargo test -p "$PACKAGE" --locked --test "$MODEL" -- --list 2>&1 | tee oa11-logs/discovery.log
++          grep -Fx "$ORACLE: test" oa11-logs/discovery.log
++          grep -Fx "$POSITIVE: test" oa11-logs/discovery.log
++          awk '/: test$/{n++} END{exit n!=2}' oa11-logs/discovery.log
++          set +e
++          cargo test -p "$PACKAGE" --locked --test "$MODEL" -- --test-threads=1 2>&1 | tee oa11-logs/run.log
++          rc=${PIPESTATUS[0]}
++          set -e
++          printf '%s\n' "$rc" > oa11-logs/exit-status.txt
++          if [ "$EXPECT" = pass ]; then
++            test "$rc" -eq 0
++            grep -F '2 passed; 0 failed;' oa11-logs/run.log
++          else
++            test "$rc" -eq 101
++            grep -Fx "test $ORACLE ... FAILED" oa11-logs/run.log
++            grep -Fx "test $POSITIVE ... ok" oa11-logs/run.log
++            grep -F "$DIAGNOSTIC" oa11-logs/run.log
++            grep -F '1 passed; 1 failed;' oa11-logs/run.log
++          fi
++      - name: Preserve raw OA-11 model evidence
++        if: always()
++        uses: actions/upload-artifact@v7
++        with:
++          name: loom-oa11-${{ matrix.control }}
++          path: oa11-logs/
++
+   postgres:
+     # cr-36. Every Docker-gated Postgres test, once per supported major (17, 18):
+     # the parking-lot-pg crate's suites (lease queue, mailbox, pgmq, per-table

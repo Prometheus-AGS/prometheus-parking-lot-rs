@@ -1,0 +1,44 @@
+{
+  "owner": "/root/oa04_release",
+  "sourceManifest": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-18-files.json",
+  "sourceManifestSha256": "b466c7d5ed88be977ff85f2259d3d28058553e2a4deb99513df6974fb31e46d4",
+  "files": [
+    {
+      "path": ".github/scripts/operational-assurance-gate.sh",
+      "sha256": "4fb0dc6454a5a399ad375f6c0b334eb33daa0b53e9176c152d20013e576c519b"
+    },
+    {
+      "path": ".github/scripts/operational-assurance.py",
+      "sha256": "fd461af8a88fbb92b31fab745b69c16e92784e8a2800378eefaf402f9eaa40a5"
+    },
+    {
+      "path": ".github/operational-assurance.json",
+      "sha256": "f7e30cd7b96c938e4e05d894199a6b9fda463ea2433709a7be8197dc0288f57c"
+    },
+    {
+      "path": ".github/workflows/operational-assurance.yml",
+      "sha256": "8ce76a8736f212fe062ec8400b044d62b83625ec56d12ef3fb1d6ba41ac7a198"
+    },
+    {
+      "path": ".github/scripts/tests/boundary-packet.py",
+      "sha256": "65b4fc303fcb52ca41a2fe672b403b5a1c85bc913e6023f0b2807c697220e83b"
+    },
+    {
+      "path": ".github/operational-assurance-inputs.example.json",
+      "sha256": "e11b7f290e851851077202cf0fe0f245b4088a8074b6f2b8aa50bad49e543bd6"
+    },
+    {
+      "path": ".github/operational-assurance-authority.example.json",
+      "sha256": "2eaec4412cb489d79fee3ad1eab14805222f58b25b7dd1deba3bd1c329a0d390"
+    },
+    {
+      "path": ".github/scripts/OPERATIONAL_ASSURANCE.md",
+      "sha256": "e98375ecbb7f2204492a58ac08f37daed8fcccc6e6b1d204a57931edff0d401d"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-18.md",
+      "sha256": "f5a5a274a8335d9cc1e8f4252cbf6f926add82bfa7886f2f1289c15148ecfaf7"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED; source package identity only"
+}

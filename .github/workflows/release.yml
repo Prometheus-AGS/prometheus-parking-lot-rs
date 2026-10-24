@@ -1,0 +1,172 @@
+name: Prepare, rehearse or publish a frozen release
+
+# No push/tag trigger. Rehearsal is the default; publication is a separate
+# explicit dispatch operation plus protected environment review (G-05).
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        type: choice
+        description: Nonpublishing preparation/rehearsal, or separately approved publication
+        options: [rehearse, prepare, publish]
+        default: rehearse
+        required: true
+      candidate:
+        description: Full frozen candidate commit ID (pre-bump source for prepare)
+        type: string
+        required: true
+      tag:
+        description: Existing signed candidate tag; unused for preparation
+        type: string
+        required: false
+      boundary_artifact_id:
+        description: Trusted GitHub operational-assurance-boundary artifact ID; unused for preparation
+        type: string
+        required: false
+      base:
+        description: Full changelog base commit ID; preparation only
+        type: string
+        required: false
+      release_date:
+        description: ISO release date; preparation only
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/main' && inputs.operation == 'prepare'
+    runs-on: ${{ vars.RELEASE_RUNNER || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: release-tools
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.candidate }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare a separate seven-crate workspace without signing or publishing
+        working-directory: candidate
+        env:
+          CANDIDATE: ${{ inputs.candidate }}
+          BASE: ${{ inputs.base }}
+          RELEASE_DATE: ${{ inputs.release_date }}
+          RELEASE_PLZ: ${{ vars.RELEASE_PLZ_BIN }}
+          GIT_CLIFF: ${{ vars.GIT_CLIFF_BIN }}
+          RUSTUP_AUTO_INSTALL: '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$GITHUB_WORKSPACE/release-tools/scripts/release/prepare.py" prepare --source "$PWD" \
+            --candidate "$CANDIDATE" --base "$BASE" --version 0.4.0 --date "$RELEASE_DATE" \
+            --release-plz "$RELEASE_PLZ" --git-cliff "$GIT_CLIFF" --output "$RUNNER_TEMP/prepared-release"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-preparation
+          path: |
+            ${{ runner.temp }}/prepared-release/release-plan.json
+            ${{ runner.temp }}/prepared-release/commands.json
+          if-no-files-found: error
+
+  validate:
+    if: github.ref == 'refs/heads/main' && inputs.operation != 'prepare'
+    runs-on: ${{ vars.RELEASE_RUNNER || 'ubuntu-latest' }}
+    environment: release-signature-verification
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: release-tools
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.candidate }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate trusted artifact, candidate, seven crates and actual signed tag
+        working-directory: candidate
+        env:
+          CANDIDATE: ${{ inputs.candidate }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          ARTIFACT_ID: ${{ inputs.boundary_artifact_id }}
+          TRUST_POLICY: ${{ vars.RELEASE_TRUST_POLICY_JSON }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$TRUST_POLICY" > "$RUNNER_TEMP/release-trust-policy.json"
+          python3 "$GITHUB_WORKSPACE/release-tools/.github/scripts/trusted-release.py" --workspace "$PWD" --candidate "$CANDIDATE" \
+            --tag "$RELEASE_TAG" --artifact-id "$ARTIFACT_ID" --policy "$RUNNER_TEMP/release-trust-policy.json" \
+            --contract .kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json \
+            --output "$RUNNER_TEMP/rehearsal-result"
+
+  publish:
+    if: github.ref == 'refs/heads/main' && inputs.operation == 'publish'
+    needs: validate
+    runs-on: ${{ vars.RELEASE_RUNNER || 'ubuntu-latest' }}
+    environment: release-crates-io
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: release-tools
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.candidate }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Revalidate certification and independent current environment approval before OIDC
+        working-directory: candidate
+        env:
+          CANDIDATE: ${{ inputs.candidate }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          ARTIFACT_ID: ${{ inputs.boundary_artifact_id }}
+          TRUST_POLICY: ${{ vars.RELEASE_TRUST_POLICY_JSON }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$TRUST_POLICY" > "$RUNNER_TEMP/release-trust-policy.json"
+          python3 "$GITHUB_WORKSPACE/release-tools/.github/scripts/trusted-release.py" --mode authorize --workspace "$PWD" --candidate "$CANDIDATE" \
+            --tag "$RELEASE_TAG" --artifact-id "$ARTIFACT_ID" --policy "$RUNNER_TEMP/release-trust-policy.json" \
+            --contract .kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json \
+            --output "$RUNNER_TEMP/authorization-result"
+      - name: Exchange GitHub OIDC identity for the temporary crates.io credential
+        id: auth
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
+      - name: Publish exactly the validated lockstep workspace
+        working-directory: candidate
+        env:
+          CANDIDATE: ${{ inputs.candidate }}
+          RELEASE_TAG: ${{ inputs.tag }}
+          ARTIFACT_ID: ${{ inputs.boundary_artifact_id }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_OIDC_TOKEN: ${{ steps.auth.outputs.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$GITHUB_WORKSPACE/release-tools/.github/scripts/trusted-release.py" --mode publish --workspace "$PWD" --candidate "$CANDIDATE" \
+            --tag "$RELEASE_TAG" --artifact-id "$ARTIFACT_ID" --policy "$RUNNER_TEMP/release-trust-policy.json" \
+            --contract .kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json \
+            --output "$RUNNER_TEMP/publication-result"

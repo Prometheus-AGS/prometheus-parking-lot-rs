@@ -385,9 +385,48 @@ completions) is 0.75 to 1.24 ms.
 3. **BinaryHeap vs VecDeque:** Priority queues use heap for O(log n) vs O(n log n) sorted insertion.
 4. **No lost wakeups:** admission, parking and waking happen under the dispatcher's lock, and completion starts the parked work the freed units admit. An idle durable pool is the exception: it polls its queue (500 ms by default) for work enqueued by another process.
 
-Not measured: contention on the semaphore and dispatcher from many threads at once,
-memory use, and Postgres-backed pools (the Postgres suites need Docker; see
-`benches/README.md`).
+The historical cr-40 runs above did not measure multithread contention, memory
+use or Postgres-backed pools. They are not quiet-machine OA-17 measurements.
+
+### 7.6 Postgres comparison protocol (OA-17; not yet exercised)
+
+`benches/pg_backend.rs` and `benches/pg_measure.py` now define a separate real-PG
+comparison, requiring `tokio-runtime,postgres`. No OA-17 benchmark or report
+validator has run, so there are no PG performance numbers or gain claims here.
+The exact stage/build/measure/report commands and quiet-host protocol are in
+[benches/README.md](../benches/README.md#postgres).
+
+The identical harness is injected into the clean 0.3.0 baseline at
+`92da0d3d28f7896ddc67062fa49ba40ea48d74a3` and built against the frozen
+candidate. Only the baseline bench-target manifest registration and harness
+are added; original baseline production code and lockfile remain unchanged.
+The harness compares `Stored`, avoiding a version-specific Duplicate shim.
+Fresh disposable PG databases use each binary's own schema. Four workloads
+cover queue enqueue/lease/ack, fresh mailbox delivery/peek/consume, contended
+hot-key duplicate delivery and durable submit-to-consumed-result. Each uses
+1/8 clients, four Tokio threads, 1,024 measured operations after 128 warm-up
+operations, 256-byte payloads and the same connection/pool configuration.
+
+At least five paired samples per cell yield 80 normal processes. Build both
+arms before measurement, then keep the host free of agents/builds/other
+benchmarks for the whole attested interval. Record full source/harness/tool/
+executable identities, actual compiler/features/profile, CPU/OS/thread counts,
+Docker VM resources, immutable image identity, raw latencies/logs and sample
+hashes. Missing raw samples or mismatched machine/workload identities reject
+report validation. A separate ten-process actual slowed-PG capture must
+exercise regression classification; synthetic report fixtures cannot replace
+that run or enter the normal report.
+
+Reports retain per-process throughput, p50/p95/p99 and peak RSS samples with
+paired 95% bootstrap intervals. Peak RSS is the benchmark-client/pool process
+maximum, including startup/migration/warm-up/shutdown; PostgreSQL, Docker/VM
+and Python-runner RSS are excluded. Docker memory capacity is identity
+metadata, not RSS. This is not an isolated semaphore/dispatcher lock benchmark.
+No new release threshold or general regression budget is inferred; noise
+overlap is inconclusive, and every observed regression is reported for the
+operator's decision. The historical Criterion +25% warning policy is separate.
+All OA-17 compilation, real measurement and control results remain
+**NOT_EXERCISED** until the final phase boundary.
 
 ------
 

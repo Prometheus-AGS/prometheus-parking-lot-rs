@@ -1,0 +1,20 @@
+[
+  {
+    "repo": "nextest-rs/nextest",
+    "tag": "cargo-nextest-0.9.149",
+    "api": "https://api.github.com/repos/nextest-rs/nextest/releases/tags/cargo-nextest-0.9.149",
+    "url": "https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.149/cargo-nextest-0.9.149-universal-apple-darwin.tar.gz",
+    "archive_sha256": "47b9941765a9ff94e304a3fe5444ac1c7593da655525b8b69f8f2b31a9217507",
+    "executable_sha256": "db85ec6208e74eddb330bf900eb2b7c17b5f1a278a126f2a85feae0c170d43fa",
+    "path": "/tmp/oa04-private-tools/bin/cargo-nextest"
+  },
+  {
+    "repo": "orhun/git-cliff",
+    "tag": "v2.14.2",
+    "api": "https://api.github.com/repos/orhun/git-cliff/releases/tags/v2.14.2",
+    "url": "https://github.com/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.14.2-x86_64-apple-darwin.tar.gz",
+    "archive_sha256": "4e647d2deb152aca1e987f225cf42b080b991dd98f3bce4027ef95446d982ac3",
+    "executable_sha256": "f8dc394b3c5b8f769f2f34f19a6e29dd2ca8827200bf83a0979e60796c87452d",
+    "path": "/tmp/oa04-private-tools/bin/git-cliff"
+  }
+]

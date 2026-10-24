@@ -6,7 +6,9 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use prometheus_parking_lot_core::{Clock, SchedulerError, SystemClock};
+use prometheus_parking_lot_core::{
+    Clock, LegacyDeliveryStatus, LegacyIdempotencyOwner, SchedulerError, SystemClock,
+};
 use redb::{Database, WriteTransaction};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -16,7 +18,7 @@ use crate::mailbox::{self, RedbResultMailbox};
 use crate::queue::{self, RedbLeaseQueue};
 
 /// Version of the on-disk layout; stored in the database and checked on open.
-const SCHEMA_VERSION: u64 = 1;
+const SCHEMA_VERSION: u64 = 3;
 
 /// Name of the `schema_version` row in the queue's metadata table.
 const SCHEMA_KEY: &str = "schema_version";
@@ -46,7 +48,10 @@ impl EmbeddedStore {
     ///
     /// [`SchedulerError::Backend`] when the file cannot be created or opened (for
     /// example another process holds it open), is not a redb database, or was
-    /// written by an incompatible version of this crate.
+    /// written by an incompatible version of this crate. Incompatible layouts
+    /// and owner mappings return [`SchedulerError::InvalidConfig`].
+    /// Schema-1 and schema-2 stores require explicit conversion through
+    /// [`open_with_idempotency_metadata`](Self::open_with_idempotency_metadata).
     pub fn open(path: impl AsRef<Path>) -> Result<Self, SchedulerError> {
         Self::open_with_clock(path, SystemClock::new())
     }
@@ -61,7 +66,97 @@ impl EmbeddedStore {
         path: impl AsRef<Path>,
         clock: impl Clock + 'static,
     ) -> Result<Self, SchedulerError> {
-        let path = path.as_ref();
+        Self::open_internal(path.as_ref(), clock, None, &[])
+    }
+
+    /// Explicitly convert a legacy store using owner evidence only.
+    ///
+    /// Stop all old readers/writers and work on an isolated copy with an
+    /// untouched backup. `owners` must authoritatively identify consumed or
+    /// ambiguous unexpired legacy fences. Original status must be provable from
+    /// the exact retained generation; consumed fences with unknown status need
+    /// [`open_with_idempotency_metadata`](Self::open_with_idempotency_metadata).
+    /// Conversion preserves all results, expiry times,
+    /// legacy fences, sequence counters and queue identity in one transaction.
+    /// Old binaries reject the resulting layout. Rollback requires restoring
+    /// the backup with all new writers stopped; it loses subsequent new writes.
+    ///
+    /// # Errors
+    ///
+    /// As for [`open`](Self::open); also refuses missing, duplicate, unknown,
+    /// expired or conflicting owner assignments. Refusal leaves logical store
+    /// contents unchanged. A repeated conversion validates supplied owners
+    /// against immutable provenance and never resets an active fence's TTL.
+    pub fn open_with_idempotency_owners(
+        path: impl AsRef<Path>,
+        owners: &[LegacyIdempotencyOwner],
+    ) -> Result<Self, SchedulerError> {
+        Self::open_with_clock_and_idempotency_owners(path, SystemClock::new(), owners)
+    }
+
+    /// Like [`open_with_idempotency_owners`](Self::open_with_idempotency_owners),
+    /// with leases and TTLs timed by `clock`.
+    ///
+    /// # Errors
+    ///
+    /// As for [`open_with_idempotency_owners`](Self::open_with_idempotency_owners).
+    pub fn open_with_clock_and_idempotency_owners(
+        path: impl AsRef<Path>,
+        clock: impl Clock + 'static,
+        owners: &[LegacyIdempotencyOwner],
+    ) -> Result<Self, SchedulerError> {
+        Self::open_with_clock_and_idempotency_metadata(path, clock, owners, &[])
+    }
+
+    /// Convert schema 1 or 2 to schema 3 using authoritative original metadata,
+    /// or reopen schema 3 while validating any supplied evidence.
+    ///
+    /// `owners` resolves schema-1 addresses; `statuses` separately resolves the
+    /// original full status when no retained result proves it. Schema-2 fences
+    /// already carry addresses. Every conversion is one transaction, including
+    /// the version marker, and retains raw results, queue state/identity, TTLs,
+    /// and immutable legacy provenance. No status is taken from a retry and no
+    /// result is consumed to discover metadata. Queued/Running are preserved.
+    ///
+    /// Stop old readers/writers, keep an untouched backup, and rehearse on a
+    /// copy. Both old writer versions reject schema 3. Rollback restores the
+    /// backup with new writers stopped and requires reconciling later writes.
+    ///
+    /// # Errors
+    ///
+    /// As for [`open`](Self::open). Missing, duplicate, unknown, expired or
+    /// contradictory initial evidence refuses conversion with no logical
+    /// changes. Schema-3 replays validate immutable ownership/status evidence
+    /// without rebuilding active fences or extending their original lifetime.
+    pub fn open_with_idempotency_metadata(
+        path: impl AsRef<Path>,
+        owners: &[LegacyIdempotencyOwner],
+        statuses: &[LegacyDeliveryStatus],
+    ) -> Result<Self, SchedulerError> {
+        Self::open_with_clock_and_idempotency_metadata(path, SystemClock::new(), owners, statuses)
+    }
+
+    /// Like [`open_with_idempotency_metadata`](Self::open_with_idempotency_metadata),
+    /// with leases and TTLs timed by `clock`.
+    ///
+    /// # Errors
+    ///
+    /// As for [`open_with_idempotency_metadata`](Self::open_with_idempotency_metadata).
+    pub fn open_with_clock_and_idempotency_metadata(
+        path: impl AsRef<Path>,
+        clock: impl Clock + 'static,
+        owners: &[LegacyIdempotencyOwner],
+        statuses: &[LegacyDeliveryStatus],
+    ) -> Result<Self, SchedulerError> {
+        Self::open_internal(path.as_ref(), clock, Some(owners), statuses)
+    }
+
+    fn open_internal(
+        path: &Path,
+        clock: impl Clock + 'static,
+        owners: Option<&[LegacyIdempotencyOwner]>,
+        statuses: &[LegacyDeliveryStatus],
+    ) -> Result<Self, SchedulerError> {
         if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
             fs::create_dir_all(parent).map_err(backend("embedded::open::create_dir"))?;
         }
@@ -71,7 +166,7 @@ impl EmbeddedStore {
             clock: Arc::new(clock),
             identity: Arc::from(""),
         };
-        store.identity = store.initialise()?;
+        store.identity = store.initialise(owners, statuses)?;
         Ok(store)
     }
 
@@ -96,7 +191,11 @@ impl EmbeddedStore {
     /// Create every table (readers cannot open a table that does not exist yet),
     /// check the layout version and read (or create) the store id, in one
     /// transaction. Returns the queue identity.
-    fn initialise(&self) -> Result<Arc<str>, SchedulerError> {
+    fn initialise(
+        &self,
+        owners: Option<&[LegacyIdempotencyOwner]>,
+        statuses: &[LegacyDeliveryStatus],
+    ) -> Result<Arc<str>, SchedulerError> {
         let txn = self
             .db
             .begin_write()
@@ -105,8 +204,30 @@ impl EmbeddedStore {
         mailbox::create_tables(&txn)?;
         let found = queue::meta_get(&txn, SCHEMA_KEY)?;
         match found {
-            None => queue::meta_set(&txn, SCHEMA_KEY, SCHEMA_VERSION)?,
-            Some(SCHEMA_VERSION) => {}
+            None => {
+                mailbox::validate_idempotency_owners(&txn, owners.unwrap_or_default())?;
+                mailbox::validate_metadata(&txn, statuses)?;
+                queue::meta_set(&txn, SCHEMA_KEY, SCHEMA_VERSION)?;
+            }
+            Some(SCHEMA_VERSION) => {
+                mailbox::validate_idempotency_owners(&txn, owners.unwrap_or_default())?;
+                mailbox::validate_metadata(&txn, statuses)?;
+            }
+            Some(1 | 2) => {
+                let owners = owners.ok_or_else(|| {
+                    SchedulerError::invalid_config(
+                        "embedded schema 1 or 2 requires explicit open_with_idempotency_metadata conversion",
+                    )
+                })?;
+                let now = now_ms(&*self.clock);
+                if found == Some(1) {
+                    mailbox::migrate_idempotency(&txn, now, owners)?;
+                } else {
+                    mailbox::validate_idempotency_owners(&txn, owners)?;
+                }
+                mailbox::migrate_metadata(&txn, now, statuses)?;
+                queue::meta_set(&txn, SCHEMA_KEY, SCHEMA_VERSION)?;
+            }
             Some(other) => {
                 return Err(SchedulerError::invalid_config(format!(
                     "embedded store has layout version {other}, this build understands {SCHEMA_VERSION}"
@@ -123,7 +244,11 @@ impl EmbeddedStore {
                 value
             };
         }
-        txn.commit().map_err(backend("embedded::open::commit"))?;
+        if matches!(found, Some(1 | 2)) {
+            commit(txn, "migrate_mailbox_metadata")?;
+        } else {
+            txn.commit().map_err(backend("embedded::open::commit"))?;
+        }
         Ok(Arc::from(format!("redb:{:016x}{:016x}", id[0], id[1])))
     }
 

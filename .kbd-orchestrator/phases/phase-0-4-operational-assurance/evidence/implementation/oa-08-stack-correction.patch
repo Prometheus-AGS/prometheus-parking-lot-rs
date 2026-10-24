@@ -1,0 +1,361 @@
+--- a/crates/parking-lot-runtime-tokio/src/resource_pool.rs
++++ b/crates/parking-lot-runtime-tokio/src/resource_pool.rs
+@@ -96,7 +96,11 @@
+ //! result payload. The executor is never called for that run.
+ //!
+ //! The completion path returns its permit through the dispatcher and launches
+-//! admitted parked work before calling the mailbox or audit sink. It counts
++//! admitted parked work before calling the mailbox or audit sink. Discarded
++//! successors enter a pool-owned worklist: one synchronous drainer settles
++//! them iteratively, so an inline discarding spawner cannot recurse through a
++//! parked backlog. The worklist lock is released before dispatch or callbacks.
++//! It counts
+ //! the run in [`failed_tasks`](ResourcePool::failed_tasks) and as a finished
+ //! outcome in the shutdown ledger, then settles it when the discard action
+ //! ends. A shutdown already waiting counts it in [`ShutdownReport::completed`];
+@@ -161,6 +165,7 @@
+ //! returns every removed task through the dispatcher and uses the same
+ //! per-task expiry reporting and mailbox delivery as an expired queue head.
+ 
++use std::collections::VecDeque;
+ use std::marker::PhantomData;
+ use std::sync::Arc;
+ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+@@ -208,6 +213,13 @@
+             discarded(run);
+         }
+     }
++}
++
++/// Runs discarded before their first poll. One caller drains outside this
++/// lock; recursive or concurrent drops only transfer ownership into `pending`.
++struct DiscardedRuns<P> {
++    pending: VecDeque<(ScheduledTask<P>, Permit)>,
++    draining: bool,
+ }
+ 
+ /// The error a cancelled task's mailbox receives.
+@@ -242,6 +254,7 @@
+     /// Owns the semaphore (units held by running tasks) and the parked queue.
+     dispatcher: Dispatcher<ScheduledTask<P>, TaskQueueAdapter<P, Q>>,
+     mailbox: Mutex<M>,
++    discarded: Mutex<DiscardedRuns<P>>,
+     executor: E,
+     spawner: S,
+     audit: Mutex<Option<Box<dyn AuditSink>>>,
+@@ -303,6 +316,10 @@
+                 limits,
+                 dispatcher,
+                 mailbox: Mutex::new(mailbox),
++                discarded: Mutex::new(DiscardedRuns {
++                    pending: VecDeque::new(),
++                    draining: false,
++                }),
+                 executor,
+                 spawner,
+                 audit: Mutex::new(None),
+@@ -825,22 +842,7 @@
+         let pending = UnpolledRun {
+             run: Some((task, permit)),
+             discarded: Some(move |(task, permit): (ScheduledTask<P>, Permit)| {
+-                let _settle = SettleOnDrop(&inner.ledger);
+-                let discarded = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+-                    let error = TaskError::Cancelled {
+-                        reason: "spawner discarded resource pool task before its first poll".into(),
+-                    };
+-                    inner.events().failed(task.meta.id, &error);
+-                    // complete returns the permit and launches admitted work
+-                    // before mailbox/audit callbacks, just as for a run.
+-                    inner.finish(task.meta.id, permit, task.meta.mailbox.as_ref(), Err(error));
+-                    drop(task);
+-                }));
+-                if let Err(panicked) = discarded {
+-                    // Drop must not unwind into Spawn, even if a callback's
+-                    // panic payload would itself panic when dropped.
+-                    std::mem::forget(panicked);
+-                }
++                inner.discard(task, permit);
+             }),
+         };
+         async move {
+@@ -877,6 +879,51 @@
+                 }
+                 let woken = self.dispatcher.poke(self.now_ms());
+                 self.launch(woken, None);
++            }
++        }
++    }
++
++    /// Settle discarded runs without recursively dropping their successors.
++    /// The mutex publishes each owned task/permit to the sole drainer. Its
++    /// empty check and release of drainer ownership share that same lock, so
++    /// a concurrent enqueue either joins this drain or becomes the next one.
++    fn discard(self: &Arc<Self>, task: ScheduledTask<P>, permit: Permit) {
++        {
++            let mut discarded = self.discarded.lock();
++            discarded.pending.push_back((task, permit));
++            if discarded.draining {
++                return;
++            }
++            discarded.draining = true;
++        }
++        loop {
++            let next = {
++                let mut discarded = self.discarded.lock();
++                let next = discarded.pending.pop_front();
++                if next.is_none() {
++                    discarded.draining = false;
++                }
++                next
++            };
++            let Some((task, permit)) = next else {
++                return;
++            };
++            let _settle = SettleOnDrop(&self.ledger);
++            let settled = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
++                let error = TaskError::Cancelled {
++                    reason: "spawner discarded resource pool task before its first poll".into(),
++                };
++                self.events().failed(task.meta.id, &error);
++                // finish returns capacity and hands off every successor before
++                // callbacks. An inline discard only enqueues that successor;
++                // this loop settles it after the current task, at fixed depth.
++                self.finish(task.meta.id, permit, task.meta.mailbox.as_ref(), Err(error));
++                drop(task);
++            }));
++            if let Err(panicked) = settled {
++                // A callback (or its panic payload destructor) must not unwind
++                // through Spawn or abandon the remaining owned worklist.
++                std::mem::forget(panicked);
+             }
+         }
+     }
+--- a/crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs
++++ b/crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs
+@@ -4,7 +4,9 @@
+ //! dispatcher, mailbox and hook bus, then shutdown_with. The negative control
+ //! `--cfg parking_lot_negative_control="oa-08"` moves ownership back inside an
+ //! unpolled async body: the discarded-run outcome and shutdown oracles fail,
+-//! while the ordinary TokioSpawner control still completes normally.
++//! while the ordinary TokioSpawner control still completes normally. A child
++//! process also covers an inline-discarding spawner draining a large parked
++//! backlog on a fixed-size stack; stack overflow must not abort the suite.
+ 
+ use std::future::Future;
+ use std::pin::Pin;
+@@ -86,6 +88,45 @@
+             // launch parked work through this same spawner.
+             drop(held);
+         }
++    }
++}
++
++/// Holds the first run while the backlog is parked, then drops every
++/// successor inline. Unlike HoldingSpawner this deliberately nests Spawn
++/// calls on the completing thread, reproducing the recursive-drop defect.
++#[derive(Clone, Default)]
++struct InlineAfterReleaseSpawner(Arc<Mutex<InlineAfterRelease>>);
++
++#[derive(Default)]
++struct InlineAfterRelease {
++    first: Option<Unpolled>,
++    released: bool,
++}
++
++impl Spawn for InlineAfterReleaseSpawner {
++    fn spawn<F>(&self, future: F)
++    where
++        F: Future<Output = ()> + Send + 'static,
++    {
++        let mut state = self.0.lock();
++        if !state.released {
++            assert!(state.first.is_none(), "only one unit can start before release");
++            state.first = Some(Box::pin(future));
++            return;
++        }
++        drop(state);
++        drop(future);
++    }
++}
++
++impl InlineAfterReleaseSpawner {
++    fn release(&self) {
++        let first = {
++            let mut state = self.0.lock();
++            state.released = true;
++            state.first.take().expect("first run was held")
++        };
++        drop(first);
+     }
+ }
+ 
+@@ -326,11 +367,15 @@
+         ..SharedMailbox::default()
+     };
+     let executions = Arc::new(Mutex::new(Vec::new()));
+-    let hook = Arc::new(RecordingHook::new(8));
+-    let pool = pool(DiscardSpawner, &mailbox, &executions, &hook);
+-    pool.submit(task(0, Job::Echo, true))
+-        .await
+-        .expect("callback panic is contained");
++    let hook = Arc::new(RecordingHook::new(32));
++    let spawner = InlineAfterReleaseSpawner::default();
++    let pool = pool(spawner.clone(), &mailbox, &executions, &hook);
++    for id in 0..3 {
++        pool.submit(task(id, Job::Echo, true)).await.expect("accepted");
++    }
++    // Each mailbox stores then panics. The drainer must contain the panic
++    // and continue with successors already enqueued by inline Spawn drops.
++    spawner.release();
+     let report = tokio::time::timeout(
+         WAIT,
+         pool.shutdown_with(ShutdownPolicy::Drain { deadline: DRAIN }),
+@@ -338,9 +383,13 @@
+     .await
+     .expect("callback panic cannot leave the ledger unsettled");
+     assert_eq!(report.unsettled, 0);
+-    assert_eq!((pool.running_tasks(), pool.failed_tasks()), (0, 1));
+-    assert_cancelled(mailbox.take_once(0));
+-    assert_discarded(&events(pool.hooks(), &hook).await, 0);
++    assert_eq!((pool.running_tasks(), pool.failed_tasks()), (0, 3));
++    assert_eq!((pool.queued_tasks(), pool.active_units()), (0, 0));
++    let events = events(pool.hooks(), &hook).await;
++    for id in 0..3 {
++        assert_cancelled(mailbox.take_once(id));
++        assert_discarded(&events, id);
++    }
+ }
+ 
+ #[tokio::test]
+@@ -387,3 +436,131 @@
+         );
+     }
+ }
++
++/// The historical bug aborts its process on stack overflow rather than
++/// unwinding. Keep that failure isolated and require a normal child exit plus
++/// the marker written only after every public-path oracle has passed.
++#[test]
++fn discarded_spawn_large_backlog_is_stack_bounded() {
++    use std::process::{Command, Stdio};
++    use std::time::Instant;
++
++    let mut child = Command::new(std::env::current_exe().expect("test executable"))
++        .args([
++            "--exact",
++            "discarded_spawn_large_backlog_child",
++            "--nocapture",
++            "--test-threads=1",
++        ])
++        .env("PARKING_LOT_OA08_BACKLOG_CHILD", "1")
++        .stdout(Stdio::piped())
++        .stderr(Stdio::piped())
++        .spawn()
++        .expect("start discarded-backlog child");
++    let deadline = Instant::now() + Duration::from_secs(90);
++    let status = loop {
++        if let Some(status) = child.try_wait().expect("poll child") {
++            break status;
++        }
++        if Instant::now() >= deadline {
++            child.kill().expect("kill stalled child");
++            let output = child.wait_with_output().expect("reap stalled child");
++            panic!(
++                "OA-08:discarded-backlog-watchdog: no completion evidence: {}",
++                String::from_utf8_lossy(&output.stderr)
++            );
++        }
++        std::thread::sleep(Duration::from_millis(20));
++    };
++    let output = child.wait_with_output().expect("collect child output");
++    assert!(
++        status.success(),
++        "OA-08:discarded-backlog: child did not settle the inline-discard backlog: {status}\n{}\n{}",
++        String::from_utf8_lossy(&output.stdout),
++        String::from_utf8_lossy(&output.stderr)
++    );
++    assert!(
++        String::from_utf8_lossy(&output.stdout).contains("OA-08:discarded-backlog-settled"),
++        "OA-08:discarded-backlog: child success requires the settlement marker"
++    );
++}
++
++#[test]
++fn discarded_spawn_large_backlog_child() {
++    if !matches!(std::env::var("PARKING_LOT_OA08_BACKLOG_CHILD").as_deref(), Ok("1")) {
++        return;
++    }
++    std::thread::Builder::new()
++        .name("oa08-bounded-stack".into())
++        .stack_size(2 * 1024 * 1024)
++        .spawn(|| {
++            tokio::runtime::Builder::new_current_thread()
++                .enable_time()
++                .build()
++                .expect("child runtime")
++                .block_on(async {
++                    const TASKS: usize = 16_384;
++                    let mailbox = SharedMailbox::default();
++                    let executions = Arc::new(Mutex::new(Vec::new()));
++                    let spawner = InlineAfterReleaseSpawner::default();
++                    // No hooks in the stress leg: the bounded hook channel may
++                    // legally drop events under this burst. Existing fixtures
++                    // separately assert each discarded-run lifecycle event.
++                    let pool = ResourcePool::new(
++                        PoolLimits {
++                            max_units: 1,
++                            max_queue_depth: TASKS,
++                            default_timeout: Duration::from_secs(1),
++                        },
++                        InMemoryQueue::new(TASKS),
++                        mailbox.clone(),
++                        Executor(Arc::clone(&executions)),
++                        spawner.clone(),
++                    );
++                    for id in 0..TASKS as u64 {
++                        pool.submit(task(id, Job::Echo, true)).await.expect("accepted");
++                    }
++                    assert_eq!((pool.running_tasks(), pool.queued_tasks()), (1, TASKS - 1));
++                    let shutdown = pool.shutdown_with(ShutdownPolicy::Drain { deadline: DRAIN });
++                    tokio::pin!(shutdown);
++                    tokio::select! {
++                        biased;
++                        report = &mut shutdown => panic!("shutdown preceded release: {report:?}"),
++                        () = tokio::task::yield_now() => {},
++                    }
++                    // The old implementation recursively settles every parked
++                    // successor here and overflows the fixed 2 MiB stack.
++                    spawner.release();
++                    assert_eq!(pool.failed_tasks(), TASKS as u64,
++                        "OA-08:discarded-backlog: every accepted task failed exactly once");
++                    assert_eq!((pool.running_tasks(), pool.queued_tasks()), (0, 0));
++                    assert_eq!(pool.active_units(), 0, "every permit returned");
++                    assert_eq!(pool.completed_tasks(), 0);
++                    assert!(executions.lock().is_empty(), "no payload executed");
++                    let report = tokio::time::timeout(WAIT, shutdown).await
++                        .expect("settlement wakes shutdown before its deadline");
++                    assert_eq!((report.completed, report.cancelled, report.unsettled),
++                        (TASKS as u64, 0, 0), "one settled ledger outcome per task");
++                    let deliveries = mailbox.deliveries.lock();
++                    assert_eq!(deliveries.len(), TASKS, "one delivery per accepted task");
++                    let mut counts = vec![0_usize; TASKS];
++                    for delivered in deliveries.iter() {
++                        let id: usize = delivered.session_id.as_ref().expect("task key")
++                            .parse().expect("numeric task key");
++                        counts[id] += 1;
++                    }
++                    assert!(counts.iter().all(|count| *count == 1), "no duplicate or missing delivery");
++                    drop(deliveries);
++                    let mut stored = mailbox.stored.lock();
++                    for id in 0..TASKS as u64 {
++                        let key = key(id);
++                        assert_cancelled(stored.consume(&key).expect("consume").expect("task result"));
++                        assert!(stored.consume(&key).expect("consume again").is_none());
++                    }
++                    println!("OA-08:discarded-backlog-settled");
++                });
++        })
++        .expect("bounded-stack thread")
++        .join()
++        .expect("backlog assertions");
++}

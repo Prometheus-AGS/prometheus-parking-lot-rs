@@ -1,0 +1,11 @@
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -264,7 +264,7 @@
+         run: >
+           cargo nextest run --workspace --all-features --locked
+           --run-ignored all --no-fail-fast --no-tests=fail
+-          -E 'package(prometheus-parking-lot-pg) | test(config_postgres_example_builds_against_pg18) | test(config_pgmq_example_opens_the_queue_against_pg18) | test(pool_sigkill_) | test(shutdown_durable_pg_)'
++          -E '(package(prometheus-parking-lot-pg) & not binary(postgres_upgrade)) | test(config_postgres_example_builds_against_pg18) | test(config_pgmq_example_opens_the_queue_against_pg18) | test(pool_sigkill_) | test(shutdown_durable_pg_)'
+ 
+   iggy:
+     # cr-32 / S-11. The Docker-gated Iggy tests: a subscriber receives mailbox.ready

@@ -5,10 +5,17 @@
 //!
 //! - **Addressing.** A mailbox holds zero or more [`MailboxEntry`] values per
 //!   [`MailboxKey`], in delivery order.
-//! - **First write wins.** A [`Delivery`] with an idempotency key that the
-//!   mailbox still remembers stores nothing and resolves to
+//! - **First write wins within one address.** The idempotency identity is the
+//!   pair `(Delivery.key, Delivery.idempotency_key)`, within this mailbox's
+//!   storage namespace. All [`MailboxKey`] fields participate: tenant, user
+//!   and session, including the distinction between `None` and an empty string.
+//!   The same caller key at a different address is independent. A [`Delivery`]
+//!   with a pair that the mailbox still remembers stores nothing and resolves to
 //!   [`DeliveryOutcome::Duplicate`]; the first stored result stands, even if a
-//!   re-execution produced a different value. A key is remembered until the
+//!   re-execution produced a different value. The duplicate outcome returns
+//!   that original stored [`TaskStatus`], including its full failure details,
+//!   even after consume; reading duplicate metadata never consumes a result.
+//!   A key and its status are remembered until the
 //!   entry it arrived with is evicted by its TTL, **including after that entry
 //!   was consumed**, so a task redelivered by its queue after the client
 //!   already took the result cannot hand the client a second one.
@@ -26,6 +33,21 @@
 //! task, so a crash between the two re-runs the task without duplicating its
 //! result.
 //!
+//! # Upgrading persisted idempotency records
+//!
+//! The 0.3.0 stores remembered caller keys across the whole storage namespace,
+//! without an address on consumed-result tombstones. An upgrade must preserve
+//! results, original key lifetimes and consumed-result deduplication. It must
+//! not guess an address or silently discard an unexpired tombstone: migration
+//! refuses atomically when ownership is not provable, unless an authoritative
+//! owner mapping is supplied. Old writers must remain stopped after conversion.
+//! Fresh stores and migrated, resolved records obey the address-scoped rules
+//! above. ADR 0006 records the backend migration and rollback requirements.
+//! Legacy consumed tombstones also lack status. ADR 0007 requires a retained
+//! exact-generation proof or [`LegacyDeliveryStatus`] evidence before an atomic
+//! status-metadata conversion; neither the retry's status nor `Completed` is
+//! a substitute for an unknown historical value.
+//!
 //! # Notifications
 //!
 //! A [`Notifier`] tells an external system that an entry was stored (a
@@ -36,9 +58,81 @@
 use std::future::Future;
 use std::time::Duration;
 
+use serde::{Deserialize, Serialize};
+
 use crate::contracts::error::SchedulerError;
 use crate::contracts::task::TaskStatus;
 use crate::contracts::types::{MailboxKey, TaskId};
+
+/// An authoritative owner assignment for an idempotency tombstone written by
+/// a legacy store without address provenance.
+///
+/// Migration consumes these assignments only after the operator has identified
+/// the original owner from an external authoritative source. The assignment
+/// does not reset the stored key lifetime or create a result. Storage namespaces
+/// are supplied separately: a Postgres mailbox name, or the embedded store
+/// containing the tombstone. Backends reject duplicate, unknown or conflicting
+/// assignments and refuse atomically if any unexpired owner remains unresolved.
+///
+/// This value contains no terminal-status claim: legacy consumed tombstones
+/// do not record status either. A later metadata migration must resolve that
+/// separate missing fact rather than inventing it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[non_exhaustive]
+pub struct LegacyIdempotencyOwner {
+    /// The exact caller key remembered by the legacy store.
+    pub idempotency_key: String,
+    /// Its original complete mailbox address.
+    pub key: MailboxKey,
+}
+
+impl LegacyIdempotencyOwner {
+    /// Assign a legacy caller key to its authoritative original address.
+    #[must_use]
+    pub fn new(idempotency_key: impl Into<String>, key: MailboxKey) -> Self {
+        Self {
+            idempotency_key: idempotency_key.into(),
+            key,
+        }
+    }
+}
+
+/// Authoritative original status evidence for a legacy idempotency fence.
+///
+/// The identity includes the complete address and caller key: intermediate
+/// address-scoped stores can remember the same caller key at multiple addresses.
+/// Storage namespaces are supplied separately by each backend's migration API.
+/// Conversion retains the original lifetime and records immutable provenance;
+/// replay validates evidence without recreating expired fences.
+///
+/// This type accepts every [`TaskStatus`], including `Queued` and `Running`,
+/// just as [`Delivery`] does. A durable consumer cannot treat a nonterminal
+/// stored status as an authoritative terminal result: it reports the conflict
+/// and requeues rather than fabricating completion or resolving the lease.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[non_exhaustive]
+pub struct LegacyDeliveryStatus {
+    /// The caller key remembered by the legacy store.
+    pub idempotency_key: String,
+    /// Its complete original mailbox address.
+    pub key: MailboxKey,
+    /// The original stored status, obtained from authoritative evidence.
+    pub status: TaskStatus,
+}
+
+impl LegacyDeliveryStatus {
+    /// Associate a legacy address/caller-key fence with its original status.
+    #[must_use]
+    pub fn new(idempotency_key: impl Into<String>, key: MailboxKey, status: TaskStatus) -> Self {
+        Self {
+            idempotency_key: idempotency_key.into(),
+            key,
+            status,
+        }
+    }
+}
 
 /// A task outcome to store in a mailbox.
 #[derive(Debug, Clone)]
@@ -52,7 +146,8 @@ pub struct Delivery<T> {
     pub status: TaskStatus,
     /// The task's result, when it produced one.
     pub payload: Option<T>,
-    /// First-write-wins key; normally the task's
+    /// First-write-wins key scoped to this delivery's complete [`MailboxKey`];
+    /// normally the task's
     /// [`idempotency_key`](crate::contracts::TaskMetadata). `None` stores
     /// unconditionally.
     pub idempotency_key: Option<String>,
@@ -80,7 +175,7 @@ impl<T> Delivery<T> {
         }
     }
 
-    /// Set the first-write-wins idempotency key.
+    /// Set the first-write-wins idempotency key, scoped to [`Self::key`].
     #[must_use]
     pub fn with_idempotency_key(mut self, key: impl Into<String>) -> Self {
         self.idempotency_key = Some(key.into());
@@ -147,13 +242,18 @@ impl<T> MailboxEntry<T> {
 }
 
 /// Outcome of a successful [`ResultMailbox::deliver`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[must_use]
 pub enum DeliveryOutcome {
     /// The entry was stored.
     Stored,
-    /// The idempotency key was already remembered; nothing was stored.
-    Duplicate,
+    /// This address and idempotency-key pair was already remembered; nothing
+    /// was stored or consumed. The first delivery's status is authoritative.
+    Duplicate {
+        /// The exact original status, retained until the original key expiry
+        /// even after its result was consumed. It is never the retry's status.
+        status: TaskStatus,
+    },
 }
 
 /// An asynchronous result mailbox: the contract every mailbox storage backend
@@ -169,11 +269,16 @@ pub enum DeliveryOutcome {
 ///
 /// Methods return [`SchedulerError::Backend`] for storage failures.
 pub trait ResultMailbox<T: Send>: Send + Sync {
-    /// Store `delivery` unless its idempotency key is already remembered.
+    /// Store `delivery` unless the pair of its complete [`MailboxKey`] and
+    /// idempotency key is already remembered in this storage namespace.
+    /// A duplicate returns its original stored status atomically with the
+    /// duplicate decision, without consuming or peeking at the payload. A
+    /// backend that cannot obtain authoritative metadata returns an error;
+    /// it must not report a metadata-free success or guess a status.
     ///
     /// **Cancellation:** if dropped, the entry may or may not be stored. A
-    /// retry with the same idempotency key resolves to `Duplicate` when the
-    /// first attempt landed, so callers that retry set a key.
+    /// retry with the same address and idempotency key resolves to `Duplicate`
+    /// when the first attempt landed, so callers that retry set a key.
     fn deliver(
         &self,
         delivery: Delivery<T>,

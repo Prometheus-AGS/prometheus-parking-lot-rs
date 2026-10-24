@@ -33,14 +33,13 @@
 //! task redelivered from its queue starts at `Queued`/`Started`: its
 //! `Submitted` was emitted by the process that accepted it.
 //!
+//! A parked task removed by `ResourcePool::prune_expired` emits `Expired`, just
+//! like a task whose deadline passed before it reached the queue head. Pruning
+//! returns each removed task to the pool for terminal reporting and mailbox
+//! delivery outside the dispatcher lock (oa-10, #57).
+//!
 //! Exceptions to "exactly one terminal event":
 //!
-//! - A parked task removed by `ResourcePool::prune_expired`
-//!   (`Dispatcher::prune_expired`) emits *no* terminal event, because the
-//!   `TaskQueue` contract does not return the ids of the tasks it prunes.
-//!   Changing that contract is tracked for 0.4.0 in issue #57. A parked task
-//!   whose deadline passes and that the drain finds at the head is reported
-//!   as `Expired` as usual.
 //! - A durable pool's `submit` whose enqueue fails with an *unknown* outcome
 //!   (`SchedulerError::Backend`, for example a connection lost during the
 //!   commit) emits `Submitted` and no terminal event: the task may have been

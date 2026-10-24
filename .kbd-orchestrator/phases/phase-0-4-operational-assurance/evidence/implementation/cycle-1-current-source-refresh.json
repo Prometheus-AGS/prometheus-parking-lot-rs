@@ -1,0 +1,29 @@
+{
+  "reason": "All five unique final R2 findings corrected; owner handoffs imported; cargo fmt exit0; current source maps refreshed after dependent OA14 manifest.",
+  "changes": [
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-pg/tests/fixtures/oa14/manifest.json",
+      "before": "e3dd4df8ed4844b2ff8c4c17b09598e80607b0f8b633fb5e8afb8cd2b6f1ebb4",
+      "after": "f514920dcb2a84e9b9aaa3d6199084f7c9ae4925209803cb96f3a7f6c8e38257"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-runtime-tokio/src/resource_pool.rs",
+      "before": "84c441bd0d2030d747cb10fce5ab2eaf385864aa015160413702df1cc292791c",
+      "after": "4ef1c88a2e3c60ee48d165f578837266a1f59b88ddaa419bf32f7ed28690aaec"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs",
+      "before": "345cba56167ab7d82637ea77e6a81f01c79658ca9c81c7bebbca6b5f6afb1ba1",
+      "after": "b2cb481503d65c9fcd7bb47d36a9a5f9a0f91b3792b31b00bc6b5d0e264ae68d"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "docker/postgres18/upgrade/rehearse.py",
+      "before": "89fd043bc24ea9b0291782b168df6babad5f50ce9fb24c012485264f982dd7cd",
+      "after": "c3761cbc959d754c361edca56de82dbd390dbd6268a92d0db23d5f152204d6e3"
+    }
+  ]
+}

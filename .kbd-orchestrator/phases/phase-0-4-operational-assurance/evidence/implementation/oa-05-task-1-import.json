@@ -1,0 +1,20 @@
+{
+  "worker": "/root/oa04_platform",
+  "workspace": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs",
+  "files": [
+    {
+      "path": "docs/coding-standards/README.md",
+      "sha256": "ab20dbe07633593aaa0d125fb261be4f60274ae2ed9916991110bdf918851df7"
+    },
+    {
+      "path": ".e2b-template/SETUP.md",
+      "sha256": "5b2099b1a3b75f15eaffc3e6c338e628ade441dbdb68ce2c7b06a014fc9f12cf"
+    },
+    {
+      "path": ".github/scripts/tests/template-secret-fixtures.sh",
+      "sha256": "7a7a712f817bfd278aad8271eda536546a5b92a5e8a267f76d8157a86f76df34"
+    }
+  ],
+  "verification": "NOT_EXERCISED; production scan and controls deferred to final boundary",
+  "configChange": "none; default and sk-prefixed rules preserved"
+}

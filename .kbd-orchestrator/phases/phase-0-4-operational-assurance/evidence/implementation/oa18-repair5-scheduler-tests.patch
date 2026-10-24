@@ -1,0 +1,417 @@
+--- a/crates/parking-lot-core/tests/backend_admission_test.rs
++++ b/crates/parking-lot-core/tests/backend_admission_test.rs
+@@ -1,7 +1,7 @@
+ //! OA-09: first-observed backend heads are checked against absolute limits.
+ //!
+-//! The production Dispatcher and TaskQueueAdapter read a pre-filled real
+-//! InMemoryQueue. `parking_lot_negative_control="oa-09"` skips the head check;
++//! The production `Dispatcher` and `TaskQueueAdapter` read a pre-filled real
++//! `InMemoryQueue`. `parking_lot_negative_control="oa-09"` skips the head check;
+ //! the impossible-head oracles then fail while valid-waiting controls remain.
+ #![cfg(not(parking_lot_loom))]
+ 
+@@ -12,7 +12,7 @@
+     TaskMetadata, TaskQueue,
+ };
+ 
+-fn task(id: u64, cost: ResourceCost) -> ScheduledTask<u64> {
++const fn task(id: u64, cost: ResourceCost) -> ScheduledTask<u64> {
+     ScheduledTask {
+         meta: TaskMetadata {
+             id,
+--- a/crates/parking-lot-core/tests/loom_kind_release.rs
++++ b/crates/parking-lot-core/tests/loom_kind_release.rs
+@@ -1,8 +1,8 @@
+ //! OA-11: bounded schedules through the production kind-limited release path.
+ //!
+-//! Mapping: try_acquire_vector -> claim_with_kinds checks kind counters and
+-//! claims the packed total/permit under the kind lock. Permit::drop -> release
+-//! -> release_with_kinds returns kind counters and packed state in one kind-lock
++//! Mapping: `try_acquire_vector` -> `claim_with_kinds` checks kind counters and
++//! claims the packed total/permit under the kind lock. `Permit::drop` -> release
++//! -> `release_with_kinds` returns kind counters and packed state in one kind-lock
+ //! critical section. This target does not copy the semaphore state machine.
+ //!
+ //! The kind-lock unlock -> next lock pair publishes resource contents and
+@@ -10,8 +10,8 @@
+ //! CAS reading its release sequence supplies the resource-publication edge too.
+ //! The Relaxed resource atomic below deliberately supplies no independent edge.
+ //!
+-//! Final-boundary execution only: --cfg parking_lot_loom,
+-//! LOOM_MAX_PREEMPTIONS=3, isolated model target directory. Existing model
++//! Final-boundary execution only: `--cfg parking_lot_loom`,
++//! `LOOM_MAX_PREEMPTIONS=3`, isolated model target directory. Existing model
+ //! helper explores both yielded and non-yielded release windows. The
+ //! oa-11-kind-release control splits the actual kind release critical section;
+ //! only the parallel-return leak oracle should fail, while publication stays
+--- a/crates/parking-lot-runtime-tokio/tests/backend_admission_test.rs
++++ b/crates/parking-lot-runtime-tokio/tests/backend_admission_test.rs
+@@ -1,7 +1,7 @@
+ //! OA-09: pre-filled adapter tasks have terminal outcomes and ledger ownership.
+ //!
+-//! Real ResourcePool submit/shutdown paths use the real dispatcher, queue,
+-//! mailbox, hook bus and TokioSpawner. Under the `oa-09` negative control,
++//! Real `ResourcePool` submit/shutdown paths use the real dispatcher, queue,
++//! mailbox, hook bus and `TokioSpawner`. Under the `oa-09` negative control,
+ //! an impossible head blocks the valid followers and the bounded oracle fails.
+ 
+ use std::sync::Arc;
+@@ -44,6 +44,7 @@
+     }
+ }
+ 
++#[derive(Clone)]
+ struct Executor(Arc<Mutex<Activity>>);
+ 
+ #[async_trait]
+--- a/crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs
++++ b/crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs
+@@ -1,10 +1,10 @@
+ //! OA-08: a legal spawner may drop an accepted run without polling it.
+ //!
+-//! These fixtures enter through ResourcePool::submit, the production
+-//! dispatcher, mailbox and hook bus, then shutdown_with. The negative control
++//! These fixtures enter through `ResourcePool::submit`, the production
++//! dispatcher, mailbox and hook bus, then `shutdown_with`. The negative control
+ //! `--cfg parking_lot_negative_control="oa-08"` moves ownership back inside an
+ //! unpolled async body: the discarded-run outcome and shutdown oracles fail,
+-//! while the ordinary TokioSpawner control still completes normally. A child
++//! while the ordinary `TokioSpawner` control still completes normally. A child
+ //! process also covers an inline-discarding spawner draining a large parked
+ //! backlog on a fixed-size stack; stack overflow must not abort the suite.
+ 
+@@ -37,6 +37,7 @@
+     Pending,
+ }
+ 
++#[derive(Clone)]
+ struct Executor(Arc<Mutex<Vec<u64>>>);
+ 
+ #[async_trait]
+@@ -92,7 +93,7 @@
+ }
+ 
+ /// Holds the first run while the backlog is parked, then drops every
+-/// successor inline. Unlike HoldingSpawner this deliberately nests Spawn
++/// successor inline. Unlike `HoldingSpawner` this deliberately nests `Spawn`
+ /// calls on the completing thread, reproducing the recursive-drop defect.
+ #[derive(Clone, Default)]
+ struct InlineAfterReleaseSpawner(Arc<Mutex<InlineAfterRelease>>);
+--- a/crates/parking-lot-runtime-tokio/tests/panic_test.rs
++++ b/crates/parking-lot-runtime-tokio/tests/panic_test.rs
+@@ -16,7 +16,7 @@
+ //! ```
+ //!
+ //! Negative control: under `--cfg parking_lot_negative_control="s-3"` panics
+-//! are not caught. The designated one-in-100 ResourcePool fixture joins its
++//! are not caught. The designated one-in-100 `ResourcePool` fixture joins its
+ //! actual spawned runs before looking up outcomes, so an escaped panic fails
+ //! OA12:S3 directly. Other panic fixtures retain their bounded outcome waits.
+ 
+@@ -132,7 +132,7 @@
+     }
+ }
+ 
+-/// Record actual ResourcePool runs without retaining a lock while joining.
++/// Record actual `ResourcePool` runs without retaining a lock while joining.
+ #[derive(Clone, Default)]
+ struct CollectedSpawner {
+     spawned: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
+--- a/crates/parking-lot-runtime-tokio/tests/prune_expiry_test.rs
++++ b/crates/parking-lot-runtime-tokio/tests/prune_expiry_test.rs
+@@ -1,6 +1,6 @@
+ //! OA-10: explicit pruning reports each expired task through the real pool.
+ //!
+-//! `parking_lot_negative_control="oa-10-expiry"` omits ResourcePool Expired
++//! `parking_lot_negative_control="oa-10-expiry"` omits `ResourcePool` Expired
+ //! events while retaining removal, mailbox delivery and settlement. The main
+ //! fixture must fail its exact sequence oracle; the live-deadline control passes.
+ 
+@@ -198,6 +198,28 @@
+     assert_eq!(*executor.calls.lock(), vec![0]);
+ }
+ 
++/// Every removed task keeps its own expiry audit identity.
++fn assert_expiry_audit(audit: &Audit) {
++    let audit_events = audit.0.lock().events();
++    let expired: Vec<_> = audit_events
++        .iter()
++        .filter(|event| event.action == "expire")
++        .collect();
++    assert_eq!(
++        expired.len(),
++        2,
++        "one task-specific expiry audit per removal"
++    );
++    for id in [1, 3] {
++        assert!(
++            expired
++                .iter()
++                .any(|event| event.task_id == id.to_string() && event.tenant == key(id).tenant)
++        );
++    }
++    assert!(!audit_events.iter().any(|event| event.task_id == "batch"));
++}
++
+ #[tokio::test]
+ async fn prune_expiry_reports_each_front_and_backend_task_once_without_execution() {
+     let executor = Executor::new();
+@@ -274,24 +296,7 @@
+         assert!(mailbox.take(id).is_none());
+         mailbox.assert_delivered_once(id);
+     }
+-    let audit_events = audit.0.lock().events();
+-    let expired: Vec<_> = audit_events
+-        .iter()
+-        .filter(|event| event.action == "expire")
+-        .collect();
+-    assert_eq!(
+-        expired.len(),
+-        2,
+-        "one task-specific expiry audit per removal"
+-    );
+-    for id in [1, 3] {
+-        assert!(
+-            expired
+-                .iter()
+-                .any(|event| event.task_id == id.to_string() && event.tenant == key(id).tenant)
+-        );
+-    }
+-    assert!(!audit_events.iter().any(|event| event.task_id == "batch"));
++    assert_expiry_audit(&audit);
+     // All accounting/mailbox/survivor checks precede this exact sequence
+     // oracle: the oa-10-expiry control fails here, not on a timeout.
+     let events = flush(pool.hooks(), &log).await;
+--- a/crates/parking-lot-runtime-tokio/tests/result_slots_test.rs
++++ b/crates/parking-lot-runtime-tokio/tests/result_slots_test.rs
+@@ -100,18 +100,18 @@
+ }
+ 
+ /// Observe the first poll, rather than waiting for a missing result.
+-/// Pinned Tokio1.54.1 blocking/pool.rs::spawn_thread calls thread_name_fn
++/// Pinned Tokio1.54.1 `blocking/pool.rs::spawn_thread` calls `thread_name_fn`
+ /// synchronously before OS thread creation. This current-thread runtime has
+-/// no async worker threads; only the mutant's spawn_blocking needs a name.
++/// no async worker threads; only the mutant's `spawn_blocking` needs a name.
+ fn assert_pending_retrieve_starts_no_blocking_thread() {
+     let names = Arc::new(AtomicUsize::new(0));
+-    let named = Arc::clone(&names);
++    let factory_calls = Arc::clone(&names);
+     let runtime = tokio::runtime::Builder::new_current_thread()
+         .max_blocking_threads(1)
+         .thread_name_fn(move || {
+             // Called and observed on the polling thread, in program order;
+             // Relaxed counts calls and supplies no cross-thread publication.
+-            named.fetch_add(1, Ordering::Relaxed);
++            factory_calls.fetch_add(1, Ordering::Relaxed);
+             "oa12-s17-retrieval".to_owned()
+         })
+         .enable_all()
+--- a/tests/scheduler/durable_sigkill.rs
++++ b/tests/scheduler/durable_sigkill.rs
+@@ -396,6 +396,101 @@
+     assert_eq!((depth.live(), depth.dead_lettered), (0, 0), "{depth:?}");
+ }
+ 
++/// Inspect the original child failure and optionally consume its sole result
++/// before the renamed pool retries the task.
++async fn original_failed_entry<M: ResultMailbox<String>>(
++    mailbox: &M,
++    address: &MailboxKey,
++    error: &TaskError,
++    consume_before_retry: bool,
++) -> MailboxEntry<String> {
++    let original = mailbox
++        .peek(address)
++        .await
++        .expect("peek")
++        .expect("stored child failure");
++    assert_eq!(
++        original.status,
++        TaskStatus::Failed(error.clone()),
++        "OA-07:stored-status"
++    );
++    assert_eq!(original.task_id, 1);
++    assert_eq!(original.idempotency_key.as_deref(), Some(FAILED_CALLER_KEY));
++    assert_eq!(
++        original.payload, None,
++        "the child's failure has no success payload"
++    );
++    if consume_before_retry {
++        assert_eq!(
++            mailbox
++                .consume(address)
++                .await
++                .expect("consume before retry"),
++            Some(original.clone()),
++            "the sole original failure is consumed before the pool restarts"
++        );
++        assert!(
++            mailbox
++                .consume(address)
++                .await
++                .expect("consume again")
++                .is_none()
++        );
++    }
++
++    original
++}
++
++/// The retried lease stays dead-lettered and cannot create another result,
++/// including after the original child result was already consumed.
++async fn assert_failed_result_stays_unique<Q, M>(
++    queue: &Q,
++    mailbox: &M,
++    executor: &Executor,
++    address: &MailboxKey,
++    original: MailboxEntry<String>,
++    consume_before_retry: bool,
++) where
++    Q: LeaseQueue<String>,
++    M: ResultMailbox<String>,
++{
++    let after_retry = mailbox
++        .consume(address)
++        .await
++        .expect("consume after retry");
++    if consume_before_retry {
++        assert_eq!(
++            after_retry, None,
++            "OA-07:one-result: retry must not replace the consumed failure"
++        );
++    } else {
++        assert_eq!(
++            after_retry,
++            Some(original),
++            "OA-07:one-result: preserve the original failure"
++        );
++    }
++    tokio::time::sleep(LEASE + Duration::from_secs(1)).await;
++    assert!(
++        mailbox
++            .consume(address)
++            .await
++            .expect("consume after another lease")
++            .is_none(),
++        "OA-07:one-result: no second consumable result"
++    );
++    let depth = queue
++        .depth()
++        .await
++        .expect("depth after another lease");
++    assert_eq!(
++        (depth.live(), depth.dead_lettered),
++        (0, 1),
++        "OA-07:lease-resolution: {depth:?}"
++    );
++    assert_eq!(executor.runs(), 1);
++}
++
+ /// OA-07: the child stored a failure but died before resolving its lease.
+ /// The same task retries successfully under a different pool name. Await any
+ /// terminal event so bool-only handling fails at the event oracle immediately,
+@@ -406,40 +501,8 @@
+     M: ResultMailbox<String> + 'static,
+ {
+     let address = key(SESSION);
+-    let original = mailbox
+-        .peek(&address)
+-        .await
+-        .expect("peek")
+-        .expect("stored child failure");
+     let error = TaskError::executor(ORIGINAL_FAILURE);
+-    assert_eq!(
+-        original.status,
+-        TaskStatus::Failed(error.clone()),
+-        "OA-07:stored-status"
+-    );
+-    assert_eq!(original.task_id, 1);
+-    assert_eq!(original.idempotency_key.as_deref(), Some(FAILED_CALLER_KEY));
+-    assert_eq!(
+-        original.payload, None,
+-        "the child's failure has no success payload"
+-    );
+-    if consume_before_retry {
+-        assert_eq!(
+-            mailbox
+-                .consume(&address)
+-                .await
+-                .expect("consume before retry"),
+-            Some(original.clone()),
+-            "the sole original failure is consumed before the pool restarts"
+-        );
+-        assert!(
+-            mailbox
+-                .consume(&address)
+-                .await
+-                .expect("consume again")
+-                .is_none()
+-        );
+-    }
++    let original = original_failed_entry(&mailbox, &address, &error, consume_before_retry).await;
+ 
+     let executor = Executor::new(Behaviour::Succeed);
+     let (bus, mut log) = event_log();
+@@ -505,43 +568,15 @@
+         "the renamed retry really executed work-1 successfully once"
+     );
+ 
+-    let after_retry = pool
+-        .mailbox()
+-        .consume(&address)
+-        .await
+-        .expect("consume after retry");
+-    if consume_before_retry {
+-        assert_eq!(
+-            after_retry, None,
+-            "OA-07:one-result: retry must not replace the consumed failure"
+-        );
+-    } else {
+-        assert_eq!(
+-            after_retry,
+-            Some(original),
+-            "OA-07:one-result: preserve the original failure"
+-        );
+-    }
+-    tokio::time::sleep(LEASE + Duration::from_secs(1)).await;
+-    assert!(
+-        pool.mailbox()
+-            .consume(&address)
+-            .await
+-            .expect("consume after another lease")
+-            .is_none(),
+-        "OA-07:one-result: no second consumable result"
+-    );
+-    let depth = pool
+-        .queue()
+-        .depth()
+-        .await
+-        .expect("depth after another lease");
+-    assert_eq!(
+-        (depth.live(), depth.dead_lettered),
+-        (0, 1),
+-        "OA-07:lease-resolution: {depth:?}"
+-    );
+-    assert_eq!(executor.runs(), 1);
++    assert_failed_result_stays_unique(
++        pool.queue(),
++        pool.mailbox(),
++        &executor,
++        &address,
++        original,
++        consume_before_retry,
++    )
++    .await;
+ }
+ 
+ /// A legal generic mailbox may remember a current, nonterminal status.
+@@ -566,7 +601,7 @@
+     );
+     let mut pending = task("oa-07-nonterminal", "work-1");
+     pending.meta.idempotency_key = Some(caller_key.to_owned());
+-    queue.enqueue(pending).await.expect("enqueue the real task");
++    let _enqueued = queue.enqueue(pending).await.expect("enqueue the real task");
+     let executor = Executor::new(Behaviour::Succeed);
+     let (bus, mut log) = event_log();
+     let pool = DurableResourcePool::start(

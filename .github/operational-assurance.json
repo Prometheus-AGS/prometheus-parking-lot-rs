@@ -1,0 +1,3289 @@
+{
+  "schema_version": 1,
+  "purpose": "checked command definition; not execution evidence",
+  "contract_digest": "e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257",
+  "profiles": {
+    "baseline": "native",
+    "linux": "Linux",
+    "macos": "Darwin",
+    "windows": "Windows",
+    "android": "Linux",
+    "ios": "Darwin",
+    "macos-gui": "Darwin",
+    "quiet": "native"
+  },
+  "required_scenarios": [
+    "OA-01",
+    "OA-02",
+    "OA-03",
+    "OA-04",
+    "OA-05",
+    "OA-06",
+    "OA-07",
+    "OA-08",
+    "OA-09",
+    "OA-10",
+    "OA-11",
+    "OA-12",
+    "OA-13",
+    "OA-14",
+    "OA-15",
+    "OA-16",
+    "OA-17"
+  ],
+  "required_authority": [
+    "review",
+    "G-02",
+    "G-03",
+    "G-04",
+    "OA15-GUI"
+  ],
+  "budgets": {
+    "active_minutes": 2880,
+    "commands": 3000,
+    "targeted_repairs_per_scenario": 2,
+    "no_progress_attempts": 3,
+    "independent_correction_cycles": 1
+  },
+  "no_auto_install": true,
+  "commands": [
+    {
+      "id": "fmt",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "rustfmt"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "clippy",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "clippy"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "native-tests",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "--workspace",
+        "--all-features",
+        "--locked",
+        "--no-tests=fail"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "nextest"
+      ],
+      "timeout": 3600,
+      "tests": "nextest",
+      "discovery_argv": [
+        "cargo",
+        "nextest",
+        "list",
+        "--workspace",
+        "--all-features",
+        "--locked",
+        "--message-format",
+        "json"
+      ],
+      "discovery_kind": "nextest",
+      "include_ignored": false
+    },
+    {
+      "id": "pg17",
+      "profile": "linux",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "--workspace",
+        "--all-features",
+        "--locked",
+        "--run-ignored",
+        "all",
+        "--no-fail-fast",
+        "--no-tests=fail",
+        "-E",
+        "(package(prometheus-parking-lot-pg) | test(config_postgres_) | test(config_pgmq_) | test(pool_sigkill_) | test(shutdown_durable_pg_)) & not binary(postgres_upgrade)"
+      ],
+      "scenarios": [
+        "OA-06",
+        "OA-07"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker"
+      ],
+      "timeout": 5400,
+      "images": [
+        "parking-lot-pg:17"
+      ],
+      "env": {
+        "PARKING_LOT_PG_MAJOR": "17"
+      },
+      "tests": "nextest",
+      "discovery_argv": [
+        "cargo",
+        "nextest",
+        "list",
+        "--workspace",
+        "--all-features",
+        "--locked",
+        "-E",
+        "(package(prometheus-parking-lot-pg) | test(config_postgres_) | test(config_pgmq_) | test(pool_sigkill_) | test(shutdown_durable_pg_)) & not binary(postgres_upgrade)",
+        "--message-format",
+        "json"
+      ],
+      "discovery_kind": "nextest",
+      "include_ignored": true
+    },
+    {
+      "id": "pg18",
+      "profile": "linux",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "--workspace",
+        "--all-features",
+        "--locked",
+        "--run-ignored",
+        "all",
+        "--no-fail-fast",
+        "--no-tests=fail",
+        "-E",
+        "not binary(postgres_upgrade)"
+      ],
+      "scenarios": [
+        "OA-06",
+        "OA-07"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker"
+      ],
+      "timeout": 5400,
+      "images": [
+        "parking-lot-pg:18",
+        "apache/iggy:0.9.0@sha256:b35fc2841964f2962a5f164d33b3ae3a9de99a66920defd3cd8a1c039470602d"
+      ],
+      "env": {
+        "PARKING_LOT_PG_MAJOR": "18"
+      },
+      "tests": "nextest",
+      "discovery_argv": [
+        "cargo",
+        "nextest",
+        "list",
+        "--workspace",
+        "--all-features",
+        "--locked",
+        "-E",
+        "not binary(postgres_upgrade)",
+        "--message-format",
+        "json"
+      ],
+      "discovery_kind": "nextest",
+      "include_ignored": true
+    },
+    {
+      "id": "msrv",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "+1.95",
+        "check",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--locked"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "msrv"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "doctests",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--all-features",
+        "--locked",
+        "--doc"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "tests": "libtest"
+    },
+    {
+      "id": "rustdoc",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "doc",
+        "--workspace",
+        "--no-deps",
+        "--all-features",
+        "--locked"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "env": {
+        "RUSTDOCFLAGS": "-D warnings"
+      }
+    },
+    {
+      "id": "deny",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "deny",
+        "--workspace",
+        "--all-features",
+        "--locked",
+        "check"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "deny"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "package",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "package",
+        "--workspace",
+        "--locked",
+        "--exclude",
+        "prometheus-parking-lot-ffi"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "secrets-tree",
+      "profile": "baseline",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/candidate-tree-fixtures.py",
+        "--repository",
+        "{workspace}",
+        "--candidate",
+        "{candidate}",
+        "--output",
+        "{out}/secrets-tree"
+      ],
+      "scenarios": [
+        "OA-05"
+      ],
+      "tools": [
+        "python3",
+        "git",
+        "gitleaks"
+      ],
+      "timeout": 900
+    },
+    {
+      "id": "secrets-staged",
+      "profile": "baseline",
+      "argv": [
+        "gitleaks",
+        "git",
+        "--redact=100",
+        "--config",
+        ".gitleaks.toml",
+        "--pre-commit",
+        "--staged",
+        "."
+      ],
+      "scenarios": [
+        "OA-05"
+      ],
+      "tools": [
+        "git",
+        "gitleaks"
+      ],
+      "timeout": 900
+    },
+    {
+      "id": "supply-tracked-credentials",
+      "profile": "baseline",
+      "argv": [
+        "bash",
+        ".github/scripts/supply-chain.sh",
+        "tracked-credentials"
+      ],
+      "scenarios": [],
+      "tools": [
+        "git",
+        "gitleaks"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "supply-package-allowlist",
+      "profile": "baseline",
+      "argv": [
+        "bash",
+        ".github/scripts/supply-chain.sh",
+        "package-allowlist"
+      ],
+      "scenarios": [],
+      "tools": [
+        "git",
+        "gitleaks",
+        "cargo"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "secrets-diff",
+      "profile": "baseline",
+      "argv": [
+        "bash",
+        ".github/scripts/supply-chain.sh",
+        "secrets-diff",
+        "{base}..{candidate}"
+      ],
+      "scenarios": [],
+      "tools": [
+        "git",
+        "gitleaks"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "wasm-graph",
+      "profile": "baseline",
+      "argv": [
+        "bash",
+        ".github/scripts/check-wasm-graph.sh"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "core-graph",
+      "profile": "baseline",
+      "argv": [
+        "python3",
+        "-c",
+        "import re,subprocess; p=subprocess.run([\"cargo\",\"tree\",\"-p\",\"prometheus-parking-lot-core\",\"-e\",\"normal\",\"--locked\"],capture_output=True,text=True); print(p.stdout,end=\"\"); print(p.stderr,end=\"\"); raise SystemExit(0 if p.returncode == 0 and not re.search(r\" (tokio|sqlx|sea-orm|iggy|redb|reqwest) v\",p.stdout) else 1)"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "check-doc-snippets.py",
+      "profile": "baseline",
+      "argv": [
+        "python3",
+        ".github/scripts/check-doc-snippets.py"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "check-orphan-tests.py",
+      "profile": "baseline",
+      "argv": [
+        "python3",
+        ".github/scripts/check-orphan-tests.py"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "examples",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "build",
+        "--examples",
+        "--workspace",
+        "--all-features",
+        "--locked"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "website-build",
+      "profile": "baseline",
+      "argv": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "scenarios": [],
+      "tools": [
+        "node",
+        "npm"
+      ],
+      "timeout": 3600,
+      "cwd": "website",
+      "paths": [
+        "website/node_modules"
+      ]
+    },
+    {
+      "id": "website-verify",
+      "profile": "baseline",
+      "argv": [
+        "npm",
+        "run",
+        "verify"
+      ],
+      "scenarios": [],
+      "tools": [
+        "node",
+        "npm"
+      ],
+      "timeout": 3600,
+      "cwd": "website",
+      "paths": [
+        "website/node_modules"
+      ],
+      "env": {
+        "VERIFY_SKIP_INSTALL": "1"
+      }
+    },
+    {
+      "id": "oa18-fixtures",
+      "profile": "baseline",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/boundary-packet.py"
+      ],
+      "scenarios": [],
+      "tools": [
+        "python3"
+      ],
+      "timeout": 3600,
+      "tests": "unittest"
+    },
+    {
+      "id": "oa-01-fixtures",
+      "profile": "baseline",
+      "argv": [
+        "bash",
+        ".github/scripts/tests/containment-fixtures.sh"
+      ],
+      "scenarios": [
+        "OA-01"
+      ],
+      "tools": [
+        "git",
+        "gitleaks"
+      ],
+      "timeout": 3600,
+      "contains": "PASS: OA-01 containment fixture oracles matched"
+    },
+    {
+      "id": "oa-03-fixtures",
+      "profile": "baseline",
+      "argv": [
+        "bash",
+        ".github/scripts/tests/release-tag-fixtures.sh"
+      ],
+      "scenarios": [
+        "OA-03"
+      ],
+      "tools": [
+        "git",
+        "gpg",
+        "ssh-keygen"
+      ],
+      "timeout": 3600,
+      "contains": "PASS: OA-03 release-tag fixture oracles matched"
+    },
+    {
+      "id": "oa-05-fixtures",
+      "profile": "baseline",
+      "argv": [
+        "bash",
+        ".github/scripts/tests/template-secret-fixtures.sh"
+      ],
+      "scenarios": [
+        "OA-05"
+      ],
+      "tools": [
+        "git",
+        "gitleaks"
+      ],
+      "timeout": 3600,
+      "contains": "PASS: OA-05 template fixture oracles matched"
+    },
+    {
+      "id": "containment-real",
+      "profile": "baseline",
+      "argv": [
+        "bash",
+        "{workspace}/.github/scripts/supply-chain.sh",
+        "release-containment"
+      ],
+      "scenarios": [
+        "OA-01"
+      ],
+      "tools": [
+        "git",
+        "gitleaks"
+      ],
+      "timeout": 3600,
+      "cwd": "{fresh_mirror}",
+      "authority": "G-02"
+    },
+    {
+      "id": "oa02",
+      "profile": "baseline",
+      "argv": [
+        "python3",
+        "scripts/release/test-preparation.py",
+        "--source",
+        "{workspace}",
+        "--candidate",
+        "{preparation_source}",
+        "--base",
+        "{base}",
+        "--version",
+        "0.4.0",
+        "--date",
+        "{release_date}",
+        "--release-plz",
+        "{release_plz}",
+        "--git-cliff",
+        "{git_cliff}",
+        "--output",
+        "{out}/oa02",
+        "--final-candidate",
+        "{candidate}",
+        "--preparation-plan",
+        "{preparation_plan}"
+      ],
+      "scenarios": [
+        "OA-02"
+      ],
+      "tools": [
+        "cargo",
+        "release_plz",
+        "git_cliff"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "oa04",
+      "profile": "baseline",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/trusted-publishing-fixtures.py",
+        "--workspace",
+        "{workspace}",
+        "--contract",
+        "{contract}",
+        "--policy",
+        "{trust_policy}",
+        "--artifact-id",
+        "{rehearsal_artifact_id}",
+        "--output",
+        "{out}/oa04"
+      ],
+      "scenarios": [
+        "OA-04"
+      ],
+      "tools": [
+        "git"
+      ],
+      "timeout": 3600,
+      "authority": "G-04"
+    },
+    {
+      "id": "loom_capacity",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "prometheus-parking-lot-core",
+        "--locked",
+        "--test",
+        "loom_capacity",
+        "--",
+        "--test-threads=1"
+      ],
+      "scenarios": [
+        "OA-11"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "env": {
+        "RUSTFLAGS": "--cfg parking_lot_loom",
+        "LOOM_MAX_PREEMPTIONS": "3",
+        "CARGO_TARGET_DIR": "{workspace}/target/oa18-models"
+      },
+      "tests": "libtest",
+      "discovery_argv": [
+        "cargo",
+        "test",
+        "-p",
+        "prometheus-parking-lot-core",
+        "--locked",
+        "--test",
+        "loom_capacity",
+        "--",
+        "--list"
+      ],
+      "discovery_kind": "libtest"
+    },
+    {
+      "id": "loom_wakeup",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "prometheus-parking-lot-core",
+        "--locked",
+        "--test",
+        "loom_wakeup",
+        "--",
+        "--test-threads=1"
+      ],
+      "scenarios": [
+        "OA-11"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "env": {
+        "RUSTFLAGS": "--cfg parking_lot_loom",
+        "LOOM_MAX_PREEMPTIONS": "3",
+        "CARGO_TARGET_DIR": "{workspace}/target/oa18-models"
+      },
+      "tests": "libtest",
+      "discovery_argv": [
+        "cargo",
+        "test",
+        "-p",
+        "prometheus-parking-lot-core",
+        "--locked",
+        "--test",
+        "loom_wakeup",
+        "--",
+        "--list"
+      ],
+      "discovery_kind": "libtest"
+    },
+    {
+      "id": "loom_vector",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "prometheus-parking-lot-core",
+        "--locked",
+        "--test",
+        "loom_vector",
+        "--",
+        "--test-threads=1"
+      ],
+      "scenarios": [
+        "OA-11"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "env": {
+        "RUSTFLAGS": "--cfg parking_lot_loom",
+        "LOOM_MAX_PREEMPTIONS": "3",
+        "CARGO_TARGET_DIR": "{workspace}/target/oa18-models"
+      },
+      "tests": "libtest",
+      "discovery_argv": [
+        "cargo",
+        "test",
+        "-p",
+        "prometheus-parking-lot-core",
+        "--locked",
+        "--test",
+        "loom_vector",
+        "--",
+        "--list"
+      ],
+      "discovery_kind": "libtest"
+    },
+    {
+      "id": "loom_skip_ahead",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "prometheus-parking-lot-core",
+        "--locked",
+        "--test",
+        "loom_skip_ahead",
+        "--",
+        "--test-threads=1"
+      ],
+      "scenarios": [
+        "OA-11"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "env": {
+        "RUSTFLAGS": "--cfg parking_lot_loom",
+        "LOOM_MAX_PREEMPTIONS": "3",
+        "CARGO_TARGET_DIR": "{workspace}/target/oa18-models"
+      },
+      "tests": "libtest",
+      "discovery_argv": [
+        "cargo",
+        "test",
+        "-p",
+        "prometheus-parking-lot-core",
+        "--locked",
+        "--test",
+        "loom_skip_ahead",
+        "--",
+        "--list"
+      ],
+      "discovery_kind": "libtest"
+    },
+    {
+      "id": "loom_at_depth",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "prometheus-parking-lot-core",
+        "--locked",
+        "--test",
+        "loom_at_depth",
+        "--",
+        "--test-threads=1"
+      ],
+      "scenarios": [
+        "OA-11"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "env": {
+        "RUSTFLAGS": "--cfg parking_lot_loom",
+        "LOOM_MAX_PREEMPTIONS": "3",
+        "CARGO_TARGET_DIR": "{workspace}/target/oa18-models"
+      },
+      "tests": "libtest",
+      "discovery_argv": [
+        "cargo",
+        "test",
+        "-p",
+        "prometheus-parking-lot-core",
+        "--locked",
+        "--test",
+        "loom_at_depth",
+        "--",
+        "--list"
+      ],
+      "discovery_kind": "libtest"
+    },
+    {
+      "id": "loom_kind_release",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "prometheus-parking-lot-core",
+        "--locked",
+        "--test",
+        "loom_kind_release",
+        "--",
+        "--test-threads=1"
+      ],
+      "scenarios": [
+        "OA-11"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "env": {
+        "RUSTFLAGS": "--cfg parking_lot_loom",
+        "LOOM_MAX_PREEMPTIONS": "3",
+        "CARGO_TARGET_DIR": "{workspace}/target/oa18-models"
+      },
+      "tests": "libtest",
+      "discovery_argv": [
+        "cargo",
+        "test",
+        "-p",
+        "prometheus-parking-lot-core",
+        "--locked",
+        "--test",
+        "loom_kind_release",
+        "--",
+        "--list"
+      ],
+      "discovery_kind": "libtest"
+    },
+    {
+      "id": "loom_ledger",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "test",
+        "-p",
+        "prometheus-parking-lot-runtime-tokio",
+        "--locked",
+        "--lib",
+        "ledger::loom_ledger::",
+        "--",
+        "--test-threads=1"
+      ],
+      "scenarios": [
+        "OA-11"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "env": {
+        "RUSTFLAGS": "--cfg parking_lot_loom",
+        "LOOM_MAX_PREEMPTIONS": "3",
+        "CARGO_TARGET_DIR": "{workspace}/target/oa18-models"
+      },
+      "tests": "libtest",
+      "discovery_argv": [
+        "cargo",
+        "test",
+        "-p",
+        "prometheus-parking-lot-runtime-tokio",
+        "--locked",
+        "--lib",
+        "ledger::loom_ledger::",
+        "--",
+        "--list"
+      ],
+      "discovery_kind": "libtest"
+    },
+    {
+      "id": "oa13-node-1.99.1",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/browser-assurance.py",
+        "--mode",
+        "node",
+        "--toolchain",
+        "1.99.1",
+        "--output",
+        "{out}/oa13-node-1.99.1"
+      ],
+      "scenarios": [
+        "OA-13"
+      ],
+      "tools": [
+        "cargo",
+        "node",
+        "wasm_runner",
+        "cargo_numeric"
+      ],
+      "timeout": 3600,
+      "receipt": "{out}/oa13-node-1.99.1/fixture-summary.json"
+    },
+    {
+      "id": "oa13-node-1.95",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/browser-assurance.py",
+        "--mode",
+        "node",
+        "--toolchain",
+        "1.95",
+        "--output",
+        "{out}/oa13-node-1.95"
+      ],
+      "scenarios": [
+        "OA-13"
+      ],
+      "tools": [
+        "cargo",
+        "node",
+        "wasm_runner",
+        "msrv"
+      ],
+      "timeout": 3600,
+      "receipt": "{out}/oa13-node-1.95/fixture-summary.json"
+    },
+    {
+      "id": "oa13-browser-1.99.1",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/browser-assurance.py",
+        "--mode",
+        "browser",
+        "--toolchain",
+        "1.99.1",
+        "--output",
+        "{out}/oa13-browser-1.99.1",
+        "--chrome",
+        "{chrome}",
+        "--chromedriver",
+        "{chromedriver}"
+      ],
+      "scenarios": [
+        "OA-13"
+      ],
+      "tools": [
+        "cargo",
+        "wasm_runner",
+        "chrome",
+        "chromedriver",
+        "cargo_numeric"
+      ],
+      "timeout": 3600,
+      "receipt": "{out}/oa13-browser-1.99.1/fixture-summary.json"
+    },
+    {
+      "id": "oa13-browser-negative-1.99.1",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/browser-assurance.py",
+        "--mode",
+        "browser-negative",
+        "--toolchain",
+        "1.99.1",
+        "--output",
+        "{out}/oa13-browser-negative-1.99.1",
+        "--chrome",
+        "{chrome}",
+        "--chromedriver",
+        "{chromedriver}"
+      ],
+      "scenarios": [
+        "OA-13"
+      ],
+      "tools": [
+        "cargo",
+        "wasm_runner",
+        "chrome",
+        "chromedriver",
+        "cargo_numeric"
+      ],
+      "timeout": 3600,
+      "receipt": "{out}/oa13-browser-negative-1.99.1/fixture-summary.json"
+    },
+    {
+      "id": "iggy",
+      "profile": "linux",
+      "argv": [
+        "cargo",
+        "nextest",
+        "run",
+        "-p",
+        "prometheus-parking-lot-iggy",
+        "--all-features",
+        "--locked",
+        "--run-ignored",
+        "all",
+        "--no-fail-fast",
+        "--no-tests=fail",
+        "-E",
+        "test(iggy_)"
+      ],
+      "scenarios": [
+        "OA-16"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker"
+      ],
+      "timeout": 3600,
+      "images": [
+        "apache/iggy:0.9.0@sha256:b35fc2841964f2962a5f164d33b3ae3a9de99a66920defd3cd8a1c039470602d"
+      ],
+      "tests": "nextest",
+      "discovery_argv": [
+        "cargo",
+        "nextest",
+        "list",
+        "--all-features",
+        "--locked",
+        "-p",
+        "prometheus-parking-lot-iggy",
+        "-E",
+        "test(iggy_)",
+        "--message-format",
+        "json"
+      ],
+      "discovery_kind": "nextest",
+      "include_ignored": true
+    },
+    {
+      "id": "oa12-s-1",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-1",
+        "--output",
+        "{out}/oa12/s-1"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-1/receipt.json"
+    },
+    {
+      "id": "oa12-s-2",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-2",
+        "--output",
+        "{out}/oa12/s-2"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-2/receipt.json"
+    },
+    {
+      "id": "oa12-s-3",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-3",
+        "--output",
+        "{out}/oa12/s-3"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-3/receipt.json"
+    },
+    {
+      "id": "oa12-s-4-resource",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-4-resource",
+        "--output",
+        "{out}/oa12/s-4-resource"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-4-resource/receipt.json"
+    },
+    {
+      "id": "oa12-s-4-worker",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-4-worker",
+        "--output",
+        "{out}/oa12/s-4-worker"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-4-worker/receipt.json"
+    },
+    {
+      "id": "oa12-s-4-browser",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-4-browser",
+        "--output",
+        "{out}/oa12/s-4-browser"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "chrome",
+        "chromedriver",
+        "wasm_runner",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-4-browser/receipt.json"
+    },
+    {
+      "id": "oa12-s-5-pg17",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-5-pg17",
+        "--output",
+        "{out}/oa12/s-5-pg17"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:17"
+      ],
+      "receipt": "{out}/oa12/s-5-pg17/receipt.json"
+    },
+    {
+      "id": "oa12-s-5-fencing-pg17",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-5-fencing-pg17",
+        "--output",
+        "{out}/oa12/s-5-fencing-pg17"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:17"
+      ],
+      "receipt": "{out}/oa12/s-5-fencing-pg17/receipt.json"
+    },
+    {
+      "id": "oa12-s-6-pg17",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-6-pg17",
+        "--output",
+        "{out}/oa12/s-6-pg17"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:17"
+      ],
+      "receipt": "{out}/oa12/s-6-pg17/receipt.json"
+    },
+    {
+      "id": "oa12-s-7-pg17",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-7-pg17",
+        "--output",
+        "{out}/oa12/s-7-pg17"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:17"
+      ],
+      "receipt": "{out}/oa12/s-7-pg17/receipt.json"
+    },
+    {
+      "id": "oa12-s-18-pg17",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-18-pg17",
+        "--output",
+        "{out}/oa12/s-18-pg17"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:17"
+      ],
+      "receipt": "{out}/oa12/s-18-pg17/receipt.json"
+    },
+    {
+      "id": "oa12-oa-06-pg17",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-06-pg17",
+        "--output",
+        "{out}/oa12/oa-06-pg17"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-06"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:17"
+      ],
+      "receipt": "{out}/oa12/oa-06-pg17/receipt.json"
+    },
+    {
+      "id": "oa12-oa-07-pg17",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-07-pg17",
+        "--output",
+        "{out}/oa12/oa-07-pg17"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-07"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:17"
+      ],
+      "receipt": "{out}/oa12/oa-07-pg17/receipt.json"
+    },
+    {
+      "id": "oa12-s-5-pg18",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-5-pg18",
+        "--output",
+        "{out}/oa12/s-5-pg18"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:18"
+      ],
+      "receipt": "{out}/oa12/s-5-pg18/receipt.json"
+    },
+    {
+      "id": "oa12-s-5-fencing-pg18",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-5-fencing-pg18",
+        "--output",
+        "{out}/oa12/s-5-fencing-pg18"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:18"
+      ],
+      "receipt": "{out}/oa12/s-5-fencing-pg18/receipt.json"
+    },
+    {
+      "id": "oa12-s-6-pg18",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-6-pg18",
+        "--output",
+        "{out}/oa12/s-6-pg18"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:18"
+      ],
+      "receipt": "{out}/oa12/s-6-pg18/receipt.json"
+    },
+    {
+      "id": "oa12-s-7-pg18",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-7-pg18",
+        "--output",
+        "{out}/oa12/s-7-pg18"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:18"
+      ],
+      "receipt": "{out}/oa12/s-7-pg18/receipt.json"
+    },
+    {
+      "id": "oa12-s-18-pg18",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-18-pg18",
+        "--output",
+        "{out}/oa12/s-18-pg18"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:18"
+      ],
+      "receipt": "{out}/oa12/s-18-pg18/receipt.json"
+    },
+    {
+      "id": "oa12-oa-06-pg18",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-06-pg18",
+        "--output",
+        "{out}/oa12/oa-06-pg18"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-06"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:18"
+      ],
+      "receipt": "{out}/oa12/oa-06-pg18/receipt.json"
+    },
+    {
+      "id": "oa12-oa-07-pg18",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-07-pg18",
+        "--output",
+        "{out}/oa12/oa-07-pg18"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-07"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:18"
+      ],
+      "receipt": "{out}/oa12/oa-07-pg18/receipt.json"
+    },
+    {
+      "id": "oa12-s-8",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-8",
+        "--output",
+        "{out}/oa12/s-8"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-8/receipt.json"
+    },
+    {
+      "id": "oa12-s-9",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-9",
+        "--output",
+        "{out}/oa12/s-9"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-9/receipt.json"
+    },
+    {
+      "id": "oa12-s-10",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-10",
+        "--output",
+        "{out}/oa12/s-10"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-10/receipt.json"
+    },
+    {
+      "id": "oa12-s-11",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-11",
+        "--output",
+        "{out}/oa12/s-11"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "apache/iggy:0.9.0@sha256:b35fc2841964f2962a5f164d33b3ae3a9de99a66920defd3cd8a1c039470602d"
+      ],
+      "receipt": "{out}/oa12/s-11/receipt.json"
+    },
+    {
+      "id": "oa12-s-16-redb",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-16-redb",
+        "--output",
+        "{out}/oa12/s-16-redb"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-16-redb/receipt.json"
+    },
+    {
+      "id": "oa12-oa-07-event-redb",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-07-event-redb",
+        "--output",
+        "{out}/oa12/oa-07-event-redb"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-07"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/oa-07-event-redb/receipt.json"
+    },
+    {
+      "id": "oa12-s-16-pg17",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-16-pg17",
+        "--output",
+        "{out}/oa12/s-16-pg17"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:17"
+      ],
+      "receipt": "{out}/oa12/s-16-pg17/receipt.json"
+    },
+    {
+      "id": "oa12-oa-07-event-pg17",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-07-event-pg17",
+        "--output",
+        "{out}/oa12/oa-07-event-pg17"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-07"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:17"
+      ],
+      "receipt": "{out}/oa12/oa-07-event-pg17/receipt.json"
+    },
+    {
+      "id": "oa12-s-16-pg18",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-16-pg18",
+        "--output",
+        "{out}/oa12/s-16-pg18"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:18"
+      ],
+      "receipt": "{out}/oa12/s-16-pg18/receipt.json"
+    },
+    {
+      "id": "oa12-oa-07-event-pg18",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-07-event-pg18",
+        "--output",
+        "{out}/oa12/oa-07-event-pg18"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-07"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "parking-lot-pg:18"
+      ],
+      "receipt": "{out}/oa12/oa-07-event-pg18/receipt.json"
+    },
+    {
+      "id": "oa12-s-16-ordering",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-16-ordering",
+        "--output",
+        "{out}/oa12/s-16-ordering"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-16-ordering/receipt.json"
+    },
+    {
+      "id": "oa12-s-17",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-17",
+        "--output",
+        "{out}/oa12/s-17"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-17/receipt.json"
+    },
+    {
+      "id": "oa12-s-19",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-19",
+        "--output",
+        "{out}/oa12/s-19"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-19/receipt.json"
+    },
+    {
+      "id": "oa12-s-20-drain",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-20-drain",
+        "--output",
+        "{out}/oa12/s-20-drain"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-20-drain/receipt.json"
+    },
+    {
+      "id": "oa12-s-20-at-depth",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-20-at-depth",
+        "--output",
+        "{out}/oa12/s-20-at-depth"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-20-at-depth/receipt.json"
+    },
+    {
+      "id": "oa12-s-20-depth",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-20-depth",
+        "--output",
+        "{out}/oa12/s-20-depth"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-20-depth/receipt.json"
+    },
+    {
+      "id": "oa12-s-20-order",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-20-order",
+        "--output",
+        "{out}/oa12/s-20-order"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-20-order/receipt.json"
+    },
+    {
+      "id": "oa12-s-21-native",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-21-native",
+        "--output",
+        "{out}/oa12/s-21-native"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-21-native/receipt.json"
+    },
+    {
+      "id": "oa12-s-21-browser",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-21-browser",
+        "--output",
+        "{out}/oa12/s-21-browser"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "chrome",
+        "chromedriver",
+        "wasm_runner",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-21-browser/receipt.json"
+    },
+    {
+      "id": "oa12-s-22",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-22",
+        "--output",
+        "{out}/oa12/s-22"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/s-22/receipt.json"
+    },
+    {
+      "id": "oa12-s-33",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "s-33",
+        "--output",
+        "{out}/oa12/s-33"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "apache/iggy:0.9.0@sha256:b35fc2841964f2962a5f164d33b3ae3a9de99a66920defd3cd8a1c039470602d"
+      ],
+      "receipt": "{out}/oa12/s-33/receipt.json"
+    },
+    {
+      "id": "oa12-oa-06-redb",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-06-redb",
+        "--output",
+        "{out}/oa12/oa-06-redb"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-06"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/oa-06-redb/receipt.json"
+    },
+    {
+      "id": "oa12-oa-07-redb",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-07-redb",
+        "--output",
+        "{out}/oa12/oa-07-redb"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-07"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/oa-07-redb/receipt.json"
+    },
+    {
+      "id": "oa12-oa-07-event-nonterminal",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-07-event-nonterminal",
+        "--output",
+        "{out}/oa12/oa-07-event-nonterminal"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-07"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/oa-07-event-nonterminal/receipt.json"
+    },
+    {
+      "id": "oa12-oa-08",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-08",
+        "--output",
+        "{out}/oa12/oa-08"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-08"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/oa-08/receipt.json"
+    },
+    {
+      "id": "oa12-oa-09",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-09",
+        "--output",
+        "{out}/oa12/oa-09"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-09"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/oa-09/receipt.json"
+    },
+    {
+      "id": "oa12-oa-10-expiry",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-10-expiry",
+        "--output",
+        "{out}/oa12/oa-10-expiry"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-10"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/oa-10-expiry/receipt.json"
+    },
+    {
+      "id": "oa12-oa-11-kind-release",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-11-kind-release",
+        "--output",
+        "{out}/oa12/oa-11-kind-release"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-11"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/oa-11-kind-release/receipt.json"
+    },
+    {
+      "id": "oa12-oa-11-ledger-order",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-11-ledger-order",
+        "--output",
+        "{out}/oa12/oa-11-ledger-order"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-11"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/oa-11-ledger-order/receipt.json"
+    },
+    {
+      "id": "oa12-oa-13-budget-event",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-13-budget-event",
+        "--output",
+        "{out}/oa12/oa-13-budget-event"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-13"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "chrome",
+        "chromedriver",
+        "wasm_runner",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [],
+      "receipt": "{out}/oa12/oa-13-budget-event/receipt.json"
+    },
+    {
+      "id": "oa12-oa-14-missing-result",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-14-missing-result",
+        "--output",
+        "{out}/oa12/oa-14-missing-result",
+        "--pg17-image",
+        "{pg17_image}",
+        "--pg18-image",
+        "{pg18_image}",
+        "--upgrade-image",
+        "{upgrade_image}"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-14"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "{pg17_image}",
+        "{pg18_image}",
+        "{upgrade_image}"
+      ],
+      "receipt": "{out}/oa12/oa-14-missing-result/receipt.json"
+    },
+    {
+      "id": "oa12-oa-16",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "run",
+        "--case",
+        "oa-16",
+        "--output",
+        "{out}/oa12/oa-16"
+      ],
+      "scenarios": [
+        "OA-12",
+        "OA-16"
+      ],
+      "tools": [
+        "cargo",
+        "nextest",
+        "docker",
+        "cargo_numeric"
+      ],
+      "timeout": 10800,
+      "images": [
+        "apache/iggy:0.9.0@sha256:b35fc2841964f2962a5f164d33b3ae3a9de99a66920defd3cd8a1c039470602d"
+      ],
+      "receipt": "{out}/oa12/oa-16/receipt.json"
+    },
+    {
+      "id": "oa12-aggregate",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        ".github/scripts/tests/negative-controls.py",
+        "aggregate",
+        "--receipts",
+        "{out}/oa12",
+        "--candidate",
+        "{candidate}",
+        "--output",
+        "{out}/oa12-summary.json"
+      ],
+      "scenarios": [
+        "OA-12"
+      ],
+      "tools": [
+        "git"
+      ],
+      "timeout": 3600,
+      "receipt": "{out}/oa12-summary.json",
+      "depends": [
+        "oa12-s-1",
+        "oa12-s-2",
+        "oa12-s-3",
+        "oa12-s-4-resource",
+        "oa12-s-4-worker",
+        "oa12-s-4-browser",
+        "oa12-s-5-pg17",
+        "oa12-s-5-fencing-pg17",
+        "oa12-s-6-pg17",
+        "oa12-s-7-pg17",
+        "oa12-s-18-pg17",
+        "oa12-oa-06-pg17",
+        "oa12-oa-07-pg17",
+        "oa12-s-5-pg18",
+        "oa12-s-5-fencing-pg18",
+        "oa12-s-6-pg18",
+        "oa12-s-7-pg18",
+        "oa12-s-18-pg18",
+        "oa12-oa-06-pg18",
+        "oa12-oa-07-pg18",
+        "oa12-s-8",
+        "oa12-s-9",
+        "oa12-s-10",
+        "oa12-s-11",
+        "oa12-s-16-redb",
+        "oa12-oa-07-event-redb",
+        "oa12-s-16-pg17",
+        "oa12-oa-07-event-pg17",
+        "oa12-s-16-pg18",
+        "oa12-oa-07-event-pg18",
+        "oa12-s-16-ordering",
+        "oa12-s-17",
+        "oa12-s-19",
+        "oa12-s-20-drain",
+        "oa12-s-20-at-depth",
+        "oa12-s-20-depth",
+        "oa12-s-20-order",
+        "oa12-s-21-native",
+        "oa12-s-21-browser",
+        "oa12-s-22",
+        "oa12-s-33",
+        "oa12-oa-06-redb",
+        "oa12-oa-07-redb",
+        "oa12-oa-07-event-nonterminal",
+        "oa12-oa-08",
+        "oa12-oa-09",
+        "oa12-oa-10-expiry",
+        "oa12-oa-11-kind-release",
+        "oa12-oa-11-ledger-order",
+        "oa12-oa-13-budget-event",
+        "oa12-oa-14-missing-result",
+        "oa12-oa-16"
+      ]
+    },
+    {
+      "id": "desktop-macos",
+      "profile": "macos",
+      "argv": [
+        "python3",
+        "bindings/tauri-desktop/assurance/desktop-assurance.py",
+        "build",
+        "--output",
+        "{out}/desktop"
+      ],
+      "scenarios": [
+        "OA-15"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "receipt": "{out}/desktop/build-receipt.json",
+      "receipt_identity": {
+        "os": "Darwin",
+        "case_id": "OA15-BUILD-MACOS"
+      }
+    },
+    {
+      "id": "desktop-linux",
+      "profile": "linux",
+      "argv": [
+        "python3",
+        "bindings/tauri-desktop/assurance/desktop-assurance.py",
+        "build",
+        "--output",
+        "{out}/desktop"
+      ],
+      "scenarios": [
+        "OA-15"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "receipt": "{out}/desktop/build-receipt.json",
+      "receipt_identity": {
+        "os": "Linux",
+        "case_id": "OA15-BUILD-LINUX"
+      }
+    },
+    {
+      "id": "desktop-windows",
+      "profile": "windows",
+      "argv": [
+        "python3",
+        "bindings/tauri-desktop/assurance/desktop-assurance.py",
+        "build",
+        "--output",
+        "{out}/desktop"
+      ],
+      "scenarios": [
+        "OA-15"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "receipt": "{out}/desktop/build-receipt.json",
+      "receipt_identity": {
+        "os": "Windows",
+        "case_id": "OA15-BUILD-WINDOWS"
+      }
+    },
+    {
+      "id": "desktop-fmt",
+      "profile": "macos",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "scenarios": [
+        "OA-15"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "cwd": "bindings/tauri-desktop",
+      "tests": null
+    },
+    {
+      "id": "desktop-clippy",
+      "profile": "macos",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "scenarios": [
+        "OA-15"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "cwd": "bindings/tauri-desktop",
+      "tests": null
+    },
+    {
+      "id": "desktop-service-tests",
+      "profile": "macos",
+      "argv": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked"
+      ],
+      "scenarios": [
+        "OA-15"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "cwd": "bindings/tauri-desktop",
+      "tests": "libtest",
+      "discovery_argv": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked",
+        "--",
+        "--list"
+      ],
+      "discovery_kind": "libtest"
+    },
+    {
+      "id": "gui_positive",
+      "profile": "macos-gui",
+      "argv": [
+        "python3",
+        "bindings/tauri-desktop/assurance/desktop-assurance.py",
+        "classify",
+        "--root",
+        "{gui_positive}"
+      ],
+      "scenarios": [
+        "OA-15"
+      ],
+      "tools": [
+        "python3"
+      ],
+      "timeout": 3600,
+      "authority": "OA15-GUI",
+      "expected_exit": 0,
+      "contains": "TRACE_ORACLE_PASS:"
+    },
+    {
+      "id": "gui_control",
+      "profile": "macos-gui",
+      "argv": [
+        "python3",
+        "bindings/tauri-desktop/assurance/desktop-assurance.py",
+        "classify",
+        "--root",
+        "{gui_control}"
+      ],
+      "scenarios": [
+        "OA-15"
+      ],
+      "tools": [
+        "python3"
+      ],
+      "timeout": 3600,
+      "authority": "OA15-GUI",
+      "expected_exit": 1,
+      "contains": "FAIL: OA15_PERSISTED_RESULT_MISSING_AFTER_RESTART"
+    },
+    {
+      "id": "android",
+      "profile": "android",
+      "argv": [
+        "cargo",
+        "ndk",
+        "-t",
+        "arm64-v8a",
+        "-t",
+        "x86_64",
+        "build",
+        "--locked",
+        "-p",
+        "prometheus-parking-lot-ffi"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "ndk"
+      ],
+      "timeout": 3600,
+      "paths": [
+        "{android_ndk}"
+      ]
+    },
+    {
+      "id": "android-elf",
+      "profile": "android",
+      "argv": [
+        "python3",
+        ".github/scripts/operational-assurance.py",
+        "android-elf"
+      ],
+      "scenarios": [],
+      "tools": [
+        "python3"
+      ],
+      "timeout": 3600,
+      "paths": [
+        "{android_ndk}"
+      ]
+    },
+    {
+      "id": "android-generate",
+      "profile": "android",
+      "argv": [
+        "bash",
+        "bindings/generate.sh"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "android-smoke",
+      "profile": "android",
+      "argv": [
+        "bash",
+        "bindings/smoke/kotlin.sh"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "kotlinc",
+        "java"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "aarch64-apple-ios",
+      "profile": "ios",
+      "argv": [
+        "cargo",
+        "build",
+        "--locked",
+        "--target",
+        "aarch64-apple-ios",
+        "-p",
+        "prometheus-parking-lot-ffi"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "swift"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "aarch64-apple-ios-sim",
+      "profile": "ios",
+      "argv": [
+        "cargo",
+        "build",
+        "--locked",
+        "--target",
+        "aarch64-apple-ios-sim",
+        "-p",
+        "prometheus-parking-lot-ffi"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "swift"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "ios-generate",
+      "profile": "ios",
+      "argv": [
+        "bash",
+        "bindings/generate.sh"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "ios-smoke",
+      "profile": "ios",
+      "argv": [
+        "bash",
+        "bindings/smoke/swift.sh"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "swift"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "bindgen-fmt",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "fmt",
+        "--manifest-path",
+        "bindings/uniffi-bindgen/Cargo.toml",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "bindgen-deny",
+      "profile": "baseline",
+      "argv": [
+        "cargo",
+        "deny",
+        "--manifest-path",
+        "bindings/uniffi-bindgen/Cargo.toml",
+        "--locked",
+        "--config",
+        "bindings/uniffi-bindgen/deny.toml",
+        "check"
+      ],
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "deny"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "bench-stage",
+      "profile": "quiet",
+      "argv": [
+        "python3",
+        "benches/pg_measure.py",
+        "stage-baseline",
+        "--root",
+        "{baseline_root}",
+        "--candidate-root",
+        "{workspace}",
+        "--out",
+        "{out}/staging.json"
+      ],
+      "scenarios": [
+        "OA-17"
+      ],
+      "tools": [
+        "git"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "bench-build-baseline",
+      "profile": "quiet",
+      "argv": [
+        "python3",
+        "benches/pg_measure.py",
+        "build",
+        "--arm",
+        "baseline",
+        "--root",
+        "{baseline_root}",
+        "--revision",
+        "92da0d3d28f7896ddc67062fa49ba40ea48d74a3",
+        "--out",
+        "{out}/baseline-build.json"
+      ],
+      "scenarios": [
+        "OA-17"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "depends": [
+        "bench-stage"
+      ]
+    },
+    {
+      "id": "bench-build-candidate",
+      "profile": "quiet",
+      "argv": [
+        "python3",
+        "benches/pg_measure.py",
+        "build",
+        "--arm",
+        "candidate",
+        "--root",
+        "{workspace}",
+        "--revision",
+        "{candidate}",
+        "--out",
+        "{out}/candidate-build.json"
+      ],
+      "scenarios": [
+        "OA-17"
+      ],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600,
+      "depends": [
+        "bench-stage"
+      ]
+    },
+    {
+      "id": "quiet-attestation",
+      "profile": "quiet",
+      "argv": [
+        "python3",
+        ".github/scripts/operational-assurance.py",
+        "observe-quiet",
+        "--candidate",
+        "{candidate}",
+        "--contract",
+        "{contract}",
+        "--inputs",
+        "{out}/profile-inputs.json",
+        "--out",
+        "{out}/quiet-attestation.json"
+      ],
+      "scenarios": [
+        "OA-17"
+      ],
+      "tools": [
+        "python3"
+      ],
+      "timeout": 120,
+      "depends": [
+        "bench-build-baseline",
+        "bench-build-candidate"
+      ]
+    },
+    {
+      "id": "bench-normal",
+      "profile": "quiet",
+      "argv": [
+        "python3",
+        "benches/pg_measure.py",
+        "measure",
+        "--baseline-receipt",
+        "{out}/baseline-build.json",
+        "--candidate-receipt",
+        "{out}/candidate-build.json",
+        "--image",
+        "parking-lot-pg:18",
+        "--quiet-attestation",
+        "{out}/quiet-attestation.json",
+        "--samples",
+        "5",
+        "--max-wall-seconds",
+        "7200",
+        "--out",
+        "{out}/normal"
+      ],
+      "scenarios": [
+        "OA-17"
+      ],
+      "tools": [
+        "docker"
+      ],
+      "timeout": 7500,
+      "images": [
+        "parking-lot-pg:18"
+      ],
+      "depends": [
+        "bench-build-baseline",
+        "bench-build-candidate",
+        "quiet-attestation"
+      ]
+    },
+    {
+      "id": "bench-report-normal",
+      "profile": "quiet",
+      "argv": [
+        "python3",
+        "benches/pg_measure.py",
+        "report",
+        "--capture",
+        "{out}/normal",
+        "--out",
+        "{out}/normal-report.json"
+      ],
+      "scenarios": [
+        "OA-17"
+      ],
+      "tools": [
+        "python3"
+      ],
+      "timeout": 3600,
+      "depends": [
+        "bench-normal"
+      ]
+    },
+    {
+      "id": "bench-slow-control",
+      "profile": "quiet",
+      "argv": [
+        "python3",
+        "benches/pg_measure.py",
+        "measure",
+        "--baseline-receipt",
+        "{out}/baseline-build.json",
+        "--candidate-receipt",
+        "{out}/candidate-build.json",
+        "--image",
+        "parking-lot-pg:18",
+        "--quiet-attestation",
+        "{out}/quiet-attestation.json",
+        "--samples",
+        "5",
+        "--max-wall-seconds",
+        "7200",
+        "--out",
+        "{out}/slow-control",
+        "--slow-control"
+      ],
+      "scenarios": [
+        "OA-17"
+      ],
+      "tools": [
+        "docker"
+      ],
+      "timeout": 7500,
+      "images": [
+        "parking-lot-pg:18"
+      ],
+      "depends": [
+        "bench-build-baseline",
+        "bench-build-candidate",
+        "quiet-attestation"
+      ]
+    },
+    {
+      "id": "bench-report-slow-control",
+      "profile": "quiet",
+      "argv": [
+        "python3",
+        "benches/pg_measure.py",
+        "report",
+        "--capture",
+        "{out}/slow-control",
+        "--out",
+        "{out}/slow-control-report.json",
+        "--allow-slow-control"
+      ],
+      "scenarios": [
+        "OA-17"
+      ],
+      "tools": [
+        "python3"
+      ],
+      "timeout": 3600,
+      "depends": [
+        "bench-slow-control"
+      ]
+    },
+    {
+      "id": "bench-fixtures",
+      "profile": "quiet",
+      "argv": [
+        "python3",
+        "benches/pg_measure_test.py",
+        "-v"
+      ],
+      "scenarios": [
+        "OA-17"
+      ],
+      "tools": [
+        "python3"
+      ],
+      "timeout": 3600,
+      "tests": "unittest"
+    },
+    {
+      "id": "wasm-targets-1.99.1",
+      "argv": [
+        "cargo",
+        "+1.99.1",
+        "check",
+        "--locked",
+        "--target",
+        "wasm32-unknown-unknown",
+        "-p",
+        "prometheus-parking-lot-core",
+        "-p",
+        "prometheus-parking-lot-wasm",
+        "--all-targets"
+      ],
+      "profile": "baseline",
+      "scenarios": [],
+      "tools": [
+        "cargo_numeric"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "wasm-facade-1.99.1",
+      "argv": [
+        "cargo",
+        "+1.99.1",
+        "check",
+        "--locked",
+        "--target",
+        "wasm32-unknown-unknown",
+        "-p",
+        "prometheus_parking_lot",
+        "--no-default-features"
+      ],
+      "profile": "baseline",
+      "scenarios": [],
+      "tools": [
+        "cargo_numeric"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "wasm-targets-1.95",
+      "argv": [
+        "cargo",
+        "+1.95",
+        "check",
+        "--locked",
+        "--target",
+        "wasm32-unknown-unknown",
+        "-p",
+        "prometheus-parking-lot-core",
+        "-p",
+        "prometheus-parking-lot-wasm",
+        "--all-targets"
+      ],
+      "profile": "baseline",
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "msrv"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "wasm-facade-1.95",
+      "argv": [
+        "cargo",
+        "+1.95",
+        "check",
+        "--locked",
+        "--target",
+        "wasm32-unknown-unknown",
+        "-p",
+        "prometheus_parking_lot",
+        "--no-default-features"
+      ],
+      "profile": "baseline",
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "msrv"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "wasm-clippy",
+      "argv": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--target",
+        "wasm32-unknown-unknown",
+        "-p",
+        "prometheus-parking-lot-wasm",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "profile": "baseline",
+      "scenarios": [],
+      "tools": [
+        "cargo",
+        "clippy"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "wasm-doc",
+      "argv": [
+        "cargo",
+        "doc",
+        "--locked",
+        "--no-deps",
+        "--target",
+        "wasm32-unknown-unknown",
+        "-p",
+        "prometheus-parking-lot-wasm"
+      ],
+      "profile": "baseline",
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "native-check-macos",
+      "argv": [
+        "cargo",
+        "check",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--locked"
+      ],
+      "profile": "macos",
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600
+    },
+    {
+      "id": "native-check-windows",
+      "argv": [
+        "cargo",
+        "check",
+        "--workspace",
+        "--all-targets",
+        "--all-features",
+        "--locked"
+      ],
+      "profile": "windows",
+      "scenarios": [],
+      "tools": [
+        "cargo"
+      ],
+      "timeout": 3600
+    }
+  ]
+}

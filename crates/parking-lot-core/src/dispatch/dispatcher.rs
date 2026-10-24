@@ -27,16 +27,45 @@
 //!   priority order and the guard are unchanged; the skip is counted against
 //!   the head like any other. The check is conservative: when the head is
 //!   expired or would fit itself (a drain is pending), the item is rejected.
-//! - **drain**: while the head exists: an expired head is popped and reported;
-//!   a head that fits is popped and started; a head that does not fit stays
-//!   where it is, and the drain tries to *skip ahead* of it (below). The drain
-//!   stops when neither the head nor a skip-ahead candidate can start. The
-//!   head is never popped to be looked at and pushed back (audit C4).
+//! - **drain**: while the head exists: a head over an absolute capacity limit
+//!   is popped and rejected; otherwise an expired head is popped and reported,
+//!   a head that fits is popped and started, and a head waiting for currently
+//!   held units stays where it is while the drain tries to *skip ahead* of it
+//!   (below). The drain stops when neither the head nor a skip-ahead candidate
+//!   can start. The head is never popped to be looked at and pushed back
+//!   (audit C4).
 //! - **complete**: return the finished item's permit *under the dispatch
 //!   lock*, then drain.
 //!
 //! The dispatcher never runs anything: started items come back to the caller
 //! as [`Grant`]s (item plus [`Permit`]) to spawn outside the lock.
+//!
+//! ## Pre-filled parked queues (oa-09)
+//!
+//! A parked backend can contain work that never passed through this
+//! dispatcher's submission check. Every head observed by the drain is checked
+//! by [`check_capacity`](Dispatcher::check_capacity) against the configured
+//! total and per-kind limits, before expiry or permit acquisition. An
+//! impossible head is removed once and returned with its capacity error in
+//! [`Dispatched::rejected`]; the caller must report its terminal outcome
+//! outside the dispatch lock. A batch containing only rejections is not empty.
+//! Valid heads waiting for free capacity remain parked under the existing
+//! priority, FIFO and skip-ahead policy. Stored ticket sequences are retained;
+//! the dispatcher does not recover a global sequence counter across imported
+//! epochs and new submissions.
+//!
+//! ## Explicit expiry pruning (oa-10)
+//!
+//! [`prune_expired`](Dispatcher::prune_expired) keeps its public removal count
+//! and returns the full removed items in [`Dispatched::expired`]. Pruning and
+//! the following drain run under the same dispatch lock; the caller reports
+//! outcomes only after the method returns and releases that lock. Pruning
+//! preserves each item's metadata and payload, requires no payload clone, and
+//! expires only `now_ms > deadline_ms`; equality and missing deadlines stay
+//! live. Already removed items cannot be returned by another prune. A pruning
+//! error removes nothing under the queue contract and does not run the drain.
+//! Valid survivors retain their stored-ticket ordering and may be admitted
+//! by the drain after an expired head is removed.
 //!
 //! ## Returning permits
 //!
@@ -117,7 +146,8 @@
 //! (2) While `H` is the head, every item holding a permit is in `R` or `S`
 //! (by (1), nothing else starts). `H`'s demand is within the pool's limit in
 //! *every* dimension (the total `max_units` and each limited kind; an item
-//! over any limit is rejected at submission, cr-23), and a pool has at least
+//! over any limit is rejected at submission or when its stored head is
+//! observed, cr-23/oa-09), and a pool has at least
 //! one permit, so `H` fits as soon as no permit is held: every dimension is
 //! then back to zero. Every completion returns its permit under the dispatch lock and then
 //! drains ([`complete`](Dispatcher::complete); a permit dropped any other way
@@ -265,13 +295,17 @@ pub struct Grant<T> {
 /// Dropping it drops its grants' permits: see [`Grant`] for what that
 /// obliges.
 #[derive(Debug)]
-#[must_use = "started items must be spawned and expired items reported"]
+#[must_use = "started items must be spawned and expired/rejected items reported"]
 pub struct Dispatched<T> {
     /// Items admitted, in dispatch order. The caller must start every one.
     pub started: Vec<Grant<T>>,
     /// Items whose deadline passed while parked. They never ran; the caller
     /// reports them (for example `TaskStatus::Expired`).
     pub expired: Vec<T>,
+    /// Items found in the parked queue whose demand exceeds a configured
+    /// limit, with the capacity error. They never ran; the caller must
+    /// report a terminal outcome for each one outside the dispatch lock.
+    pub rejected: Vec<(T, SchedulerError)>,
 }
 
 impl<T> Default for Dispatched<T> {
@@ -279,15 +313,16 @@ impl<T> Default for Dispatched<T> {
         Self {
             started: Vec::new(),
             expired: Vec::new(),
+            rejected: Vec::new(),
         }
     }
 }
 
 impl<T> Dispatched<T> {
-    /// True when nothing was started or expired.
+    /// True when nothing was started, expired or rejected.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
-        self.started.is_empty() && self.expired.is_empty()
+        self.started.is_empty() && self.expired.is_empty() && self.rejected.is_empty()
     }
 }
 
@@ -296,14 +331,14 @@ impl<T> Dispatched<T> {
 /// Dropping it drops the grants in `dispatched`: see [`Grant`] for what that
 /// obliges.
 #[derive(Debug)]
-#[must_use = "started items must be spawned and expired items reported"]
+#[must_use = "started items must be spawned and expired/rejected items reported"]
 pub struct Admission<T> {
     /// The sequence number stamped on the submitted item.
     pub sequence: u64,
     /// Whether the submitted item itself is among `dispatched.started`
     /// (otherwise it is parked).
     pub started: bool,
-    /// Everything the submission started or expired, including the
+    /// Everything the submission started, expired or rejected, including the
     /// submitted item when it started.
     pub dispatched: Dispatched<T>,
 }
@@ -626,6 +661,7 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
                 dispatched: Dispatched {
                     started: vec![Grant { item, permit }],
                     expired: Vec::new(),
+                    rejected: Vec::new(),
                 },
             });
         }
@@ -711,22 +747,27 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
 
     /// Remove parked items whose deadline passed at `now_ms`, then drain
     /// (removing a head that did not fit can unblock the items behind it).
+    /// Returns the explicit removal count and every removed item in
+    /// [`Dispatched::expired`] for terminal reporting outside this lock.
     ///
     /// # Errors
     ///
     /// The parked queue's error when pruning fails; nothing is drained then.
     pub fn prune_expired(&self, now_ms: u128) -> Result<(usize, Dispatched<T>), SchedulerError> {
         let mut state = self.state.lock();
-        let removed = state.queue.prune_expired(now_ms)?;
-        let dispatched = self.drain_locked(&mut state, now_ms);
+        let expired = state.queue.prune_expired(now_ms)?;
+        let removed = expired.len();
+        let mut dispatched = self.drain_locked(&mut state, now_ms);
+        dispatched.expired.extend(expired);
         drop(state);
         Ok((removed, dispatched))
     }
 
     /// The drain. Callers hold the dispatch lock.
     ///
-    /// Peek-then-pop: the head is removed only once it is known to be expired
-    /// or admitted, so a head that does not fit never leaves the queue.
+    /// Peek-then-pop: the head is removed only once it is known to be expired,
+    /// impossible under the configured limits, or admitted. A head waiting
+    /// only for currently held capacity stays parked.
     fn drain_locked(&self, state: &mut State<Q>, now_ms: u128) -> Dispatched<T> {
         let mut dispatched = Dispatched::default();
         loop {
@@ -739,6 +780,18 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
                     break;
                 }
             };
+            // Backend tasks may predate this dispatcher and its limits. The
+            // absolute limit distinguishes impossible work from a task that
+            // merely needs units currently held by a running task.
+            #[cfg(not(parking_lot_negative_control = "oa-09"))]
+            if let Err(error) = self.check_capacity(&ticket.demand) {
+                match state.queue.pop_head() {
+                    Some(item) => dispatched.rejected.push((item, error)),
+                    None => break,
+                }
+                state.blocked = None;
+                continue;
+            }
             if ticket.is_expired(now_ms) {
                 // A queue that reports a head it then cannot pop would make
                 // `continue` spin; stop as the start path does.
@@ -877,10 +930,12 @@ impl<T: Parkable, Q: ParkedQueue<T>> Dispatcher<T, Q> {
         let mut dispatched = Dispatched {
             started: vec![Grant { item, permit }],
             expired: Vec::new(),
+            rejected: Vec::new(),
         };
         let after = self.drain_locked(state, now_ms);
         dispatched.started.extend(after.started);
         dispatched.expired.extend(after.expired);
+        dispatched.rejected.extend(after.rejected);
         Some(dispatched)
     }
 

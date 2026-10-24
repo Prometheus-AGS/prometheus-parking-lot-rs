@@ -1,0 +1,219 @@
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -222,8 +222,8 @@
+             package: prometheus-parking-lot-runtime-tokio
+             target: loom_ledger
+             expect: pass
+-            oracle: loom_ledger_submit_shutdown_cannot_both_miss
+-            positive: loom_ledger_settlement_publishes_finished_before_zero
++            oracle: ledger::loom_ledger::loom_ledger_submit_shutdown_cannot_both_miss
++            positive: ledger::loom_ledger::loom_ledger_settlement_publishes_finished_before_zero
+             diagnostic: OA-11 ledger admission and shutdown both missed accepted work
+           - control: oa-11-kind-release
+             package: prometheus-parking-lot-core
+@@ -236,8 +236,8 @@
+             package: prometheus-parking-lot-runtime-tokio
+             target: loom_ledger
+             expect: fail
+-            oracle: loom_ledger_submit_shutdown_cannot_both_miss
+-            positive: loom_ledger_settlement_publishes_finished_before_zero
++            oracle: ledger::loom_ledger::loom_ledger_submit_shutdown_cannot_both_miss
++            positive: ledger::loom_ledger::loom_ledger_settlement_publishes_finished_before_zero
+             diagnostic: OA-11 ledger admission and shutdown both missed accepted work
+     env:
+       LOOM_MAX_PREEMPTIONS: "3"
+@@ -267,15 +267,20 @@
+           fi
+           export RUSTFLAGS
+           mkdir -p oa11-logs
++          if [ "$MODEL" = loom_ledger ]; then
++            model_args=(--lib ledger::loom_ledger::)
++          else
++            model_args=(--test "$MODEL")
++          fi
+           # Keep compile/discovery/run evidence separate. Compile failure, zero
+           # discovery, timeout and abnormal termination cannot satisfy a control.
+-          cargo test -p "$PACKAGE" --locked --test "$MODEL" --no-run 2>&1 | tee oa11-logs/build.log
+-          cargo test -p "$PACKAGE" --locked --test "$MODEL" -- --list 2>&1 | tee oa11-logs/discovery.log
++          cargo test -p "$PACKAGE" --locked "${model_args[@]}" --no-run 2>&1 | tee oa11-logs/build.log
++          cargo test -p "$PACKAGE" --locked "${model_args[@]}" -- --list 2>&1 | tee oa11-logs/discovery.log
+           grep -Fx "$ORACLE: test" oa11-logs/discovery.log
+           grep -Fx "$POSITIVE: test" oa11-logs/discovery.log
+           awk '/: test$/{n++} END{exit n!=2}' oa11-logs/discovery.log
+           set +e
+-          cargo test -p "$PACKAGE" --locked --test "$MODEL" -- --test-threads=1 2>&1 | tee oa11-logs/run.log
++          cargo test -p "$PACKAGE" --locked "${model_args[@]}" -- --test-threads=1 2>&1 | tee oa11-logs/run.log
+           rc=${PIPESTATUS[0]}
+           set -e
+           printf '%s\n' "$rc" > oa11-logs/exit-status.txt
+--- a/.github/negative-controls.json
++++ b/.github/negative-controls.json
+@@ -31,7 +31,7 @@
+     ],
+     "oa-11-ledger-order": [
+       "crates/parking-lot-runtime-tokio/src/ledger.rs",
+-      "crates/parking-lot-runtime-tokio/tests/loom_ledger.rs"
++      "crates/parking-lot-runtime-tokio/src/ledger/loom_ledger.rs"
+     ],
+     "oa-13-budget-event": [
+       "crates/parking-lot-wasm/src/events.rs"
+@@ -1299,8 +1299,8 @@
+       "package": "prometheus-parking-lot-runtime-tokio",
+       "oracles": [
+         {
+-          "target": "loom_ledger",
+-          "name": "loom_ledger_submit_shutdown_cannot_both_miss",
++          "target": "prometheus_parking_lot_runtime_tokio",
++          "name": "ledger::loom_ledger::loom_ledger_submit_shutdown_cannot_both_miss",
+           "diagnostic": [
+             "OA-11 ledger admission and shutdown both missed accepted work"
+           ]
+@@ -1308,8 +1308,8 @@
+       ],
+       "companions": [
+         {
+-          "target": "loom_ledger",
+-          "name": "loom_ledger_settlement_publishes_finished_before_zero",
++          "target": "prometheus_parking_lot_runtime_tokio",
++          "name": "ledger::loom_ledger::loom_ledger_settlement_publishes_finished_before_zero",
+           "diagnostic": []
+         }
+       ]
+@@ -1395,7 +1395,7 @@
+   "source_sha256": {
+     ".github/scripts/check-wasm-graph.sh": "346147af0925cff1a5afcf4844fae6c8f514939b54ef3db7d79c25d8b426992a",
+     ".github/wasm-browser-assurance.json": "1b1f15341db1014c88e24375618f5c1f161d422f68f6643ac948c8ffed8d74f9",
+-    ".github/workflows/ci.yml": "4cd405c55f0534aa588e3ce9b9f469861f5924f4f8cd5d2b42f945934cbd3163",
++    ".github/workflows/ci.yml": "e506109620b4f5060f40f152808f0507c983c445ac3bf0d0f48cbe10f4445d0f",
+     "Cargo.lock": "7a84a14ee557b99a95ea93a4a9e78ed6e3032920115edda63badfb85b52c3371",
+     "Cargo.toml": "f628f145f4d317210688fff2a94aff0de1415f7cebe479a146b359c7c525e38b",
+     "crates/parking-lot-core/Cargo.toml": "47a7961c72d26cf1813e06149e2447377fc225e695d4c0cce47a5e8af88d0fe0",
+@@ -1452,7 +1452,8 @@
+     "crates/parking-lot-runtime-tokio/src/contain.rs": "53505193551f3864b5bb68ad1a9faadd73762052a8b7b9beb08eb22fab4a46ca",
+     "crates/parking-lot-runtime-tokio/src/durable_pool/mod.rs": "ca892b41e83cb3e4e9b9247428acc97f1bdd41c116c00efcb5fdd611b962689e",
+     "crates/parking-lot-runtime-tokio/src/events.rs": "f111d9b976fd8b7b111f4700b58cbc80b8c39630f67d65b0b9ad8b24607b7cc0",
+-    "crates/parking-lot-runtime-tokio/src/ledger.rs": "dde628e2afa5dcd67ebf1263ce201a50b520413c59016499fa77961929ade7d9",
++    "crates/parking-lot-runtime-tokio/src/ledger.rs": "9c3a4a9b7ea82e3ee28fb7153c3be360a0a089f9cfe028fe669b5860dd7ec89e",
++    "crates/parking-lot-runtime-tokio/src/ledger/loom_ledger.rs": "6236cf4e778bc0a446cadba139f9cdbe3ad93ce88ec1373e54bc542b336530ca",
+     "crates/parking-lot-runtime-tokio/src/resource_pool.rs": "4ef1c88a2e3c60ee48d165f578837266a1f59b88ddaa419bf32f7ed28690aaec",
+     "crates/parking-lot-runtime-tokio/src/worker_pool/native.rs": "fd21a74fc877f5029e1c9897e95a3d00b3c6da5be21a855f89160e6793f57cf2",
+     "crates/parking-lot-runtime-tokio/src/worker_pool/slots.rs": "a8ece770c292db251fb15c57d11af5f58875a8e3ec3d4e1c35d2828d8354be01",
+@@ -1460,7 +1461,6 @@
+     "crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs": "b2cb481503d65c9fcd7bb47d36a9a5f9a0f91b3792b31b00bc6b5d0e264ae68d",
+     "crates/parking-lot-runtime-tokio/tests/execution_timeout_test.rs": "70f28962fa5bca0420a4870c853c9487e92620b8180a32be2db26b5087d69889",
+     "crates/parking-lot-runtime-tokio/tests/lifecycle_events_test.rs": "135edb7822b12842bc6d7ff2b26be63efd5d0c88855a480e8d6912bf9bbc9fa3",
+-    "crates/parking-lot-runtime-tokio/tests/loom_ledger.rs": "1ce540848d5575a8baa2fb14e464e6fd721c350cdf83ff5a7e22381c96ceee9f",
+     "crates/parking-lot-runtime-tokio/tests/panic_test.rs": "7cb850171171a890e72c90f68adb7ce093a51e0a06e35173d6639e4bc394b43c",
+     "crates/parking-lot-runtime-tokio/tests/prune_expiry_test.rs": "d499b40da3973fa3655032d24bf8852da899774177f8d31cce451076a4ffb7f9",
+     "crates/parking-lot-runtime-tokio/tests/result_slots_test.rs": "8898eceebe895455eea6d5e58dc9bd89d74ec5ceb14ee86c80a2bb4828aebd2a",
+--- a/.github/operational-assurance.json
++++ b/.github/operational-assurance.json
+@@ -904,8 +904,8 @@
+         "-p",
+         "prometheus-parking-lot-runtime-tokio",
+         "--locked",
+-        "--test",
+-        "loom_ledger",
++        "--lib",
++        "ledger::loom_ledger::",
+         "--",
+         "--test-threads=1"
+       ],
+@@ -928,8 +928,8 @@
+         "-p",
+         "prometheus-parking-lot-runtime-tokio",
+         "--locked",
+-        "--test",
+-        "loom_ledger",
++        "--lib",
++        "ledger::loom_ledger::",
+         "--",
+         "--list"
+       ],
+--- a/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-11.md
++++ b/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-11.md
+@@ -15,7 +15,7 @@
+ [ResourcePool](../../../../../crates/parking-lot-runtime-tokio/src/resource_pool.rs),
+ [semaphore](../../../../../crates/parking-lot-core/src/semaphore/mod.rs),
+ [semaphore synchronization bindings](../../../../../crates/parking-lot-core/src/semaphore/sync.rs),
+-[ledger fixtures](../../../../../crates/parking-lot-runtime-tokio/tests/loom_ledger.rs),
++[ledger fixtures](../../../../../crates/parking-lot-runtime-tokio/src/ledger/loom_ledger.rs),
+ [kind-release fixtures](../../../../../crates/parking-lot-core/tests/loom_kind_release.rs),
+ [incumbent model helper](../../../../../crates/parking-lot-core/tests/loom_support/mod.rs),
+ and [exact additive CI handoff](oa-11-ci.patch). The driver reports the CI
+@@ -23,6 +23,21 @@
+ claim that CI executed. No shared guide change is required: this wiring
+ changes no normal public API or runtime behavior.
+ 
++## Observed integration repair
++
++The parent's first actual ledger discovery build exited101 with E0639 and
++E0004: the original integration target included ledger.rs but imported
++ShutdownReport and SinkOutcome from the external runtime crate. That moved
++construction and matching outside the non-exhaustive DTOs' defining crate.
++The deterministic repair moves the two models into src/ledger/loom_ledger.rs,
++selected by cfg(all(test, parking_lot_loom)) in ledger.rs. Models use
++super::{Ledger,Tally}; no copied DTO, wildcard status match, public API or
++shared library entrypoint is introduced. The old integration target is removed.
++CI/OA12/OA18 select the library target and qualified fixture names below.
++No repaired compiler or model outcome has been observed by this worker; the
++original compiler failure provides no ordering evidence. This route supersedes
++the earlier --test loom_ledger commands and path-inclusion description.
++
+ ## Named failures and implementation delta
+ 
+ The admission failure is a submission and shutdown each missing the other's
+@@ -38,8 +53,9 @@
+   ordering values remain unchanged. Model-only constants allow the named
+   admission-order control. Incumbent Tokio ledger unit tests are excluded
+   under that cfg so they do not access instrumented atomics outside a model.
+-- `crates/parking-lot-runtime-tokio/tests/loom_ledger.rs` includes that actual
+-  private ledger source by path, preserving the public API. It models the
++- `crates/parking-lot-runtime-tokio/src/ledger/loom_ledger.rs` is a cfg-gated
++  library test module inside the actual private ledger, preserving the public
++  API and the defining-crate visibility of its production DTOs. It models the
+   production admission/shutdown operation order and actual ledger settlement
+   calls with instrumented atomics. Its modeled shutdown flag uses the same
+   operation order and normal orderings as ResourcePool, rather than running
+@@ -114,12 +130,12 @@
+ 
+ | Package / target | Exact fixture identity | Normal oracle | Corresponding negative leg |
+ | --- | --- | --- | --- |
+-| runtime-tokio / `loom_ledger` | `loom_ledger_submit_shutdown_cannot_both_miss` | Accepted work must be visible to shutdown or refused by submission; cleanup leaves zero in flight. | `oa-11-ledger-order`: expected FAIL with `OA-11 ledger admission and shutdown both missed accepted work`. |
+-| runtime-tokio / `loom_ledger` | `loom_ledger_settlement_publishes_finished_before_zero` | Observed settled zero publishes completed tally 1; final accounting is zero/1. | `oa-11-ledger-order`: expected PASS. |
++| runtime-tokio / `--lib ledger::loom_ledger::` | `ledger::loom_ledger::loom_ledger_submit_shutdown_cannot_both_miss` | Accepted work must be visible to shutdown or refused by submission; cleanup leaves zero in flight. | `oa-11-ledger-order`: expected FAIL with `OA-11 ledger admission and shutdown both missed accepted work`. |
++| runtime-tokio / `--lib ledger::loom_ledger::` | `ledger::loom_ledger::loom_ledger_settlement_publishes_finished_before_zero` | Observed settled zero publishes completed tally 1; final accounting is zero/1. | `oa-11-ledger-order`: expected PASS. |
+ | core / `loom_kind_release` | `loom_kind_release_parallel_returns_preserve_all_kind_units` | Two multi-kind permit returns leave packed units/permits and both kind counters zero; full kind capacity can be reacquired and returned. | `oa-11-kind-release`: expected FAIL with `OA-11 kind release lost a GpuVram subtraction`. |
+ | core / `loom_kind_release` | `loom_kind_release_reacquire_publishes_previous_holder_work` | A successful bounded reacquisition observes the previous holder's resource write; an attempt before release may legally return None; final counters are zero. | `oa-11-kind-release`: expected PASS. |
+ 
+-No controls are combined. Each target must discover exactly its two named
++No controls are combined. Each selected model scope must discover exactly its two named
+ fixtures. Normal legs require exit0 and two passed/zero failed. Each
+ negative leg first requires a successful build, then run exit101, the exact
+ oracle marked FAILED, its diagnostic present, its companion marked ok, and
+@@ -155,9 +171,9 @@
+ export LOOM_MAX_PREEMPTIONS=3
+ export CARGO_TARGET_DIR="$PWD/target/loom-oa11-models-runtime"
+ export RUSTFLAGS='--cfg parking_lot_loom'
+-cargo test -p prometheus-parking-lot-runtime-tokio --locked --test loom_ledger --no-run
+-cargo test -p prometheus-parking-lot-runtime-tokio --locked --test loom_ledger -- --list
+-cargo test -p prometheus-parking-lot-runtime-tokio --locked --test loom_ledger -- --test-threads=1
++cargo test -p prometheus-parking-lot-runtime-tokio --locked --lib ledger::loom_ledger:: --no-run
++cargo test -p prometheus-parking-lot-runtime-tokio --locked --lib ledger::loom_ledger:: -- --list
++cargo test -p prometheus-parking-lot-runtime-tokio --locked --lib ledger::loom_ledger:: -- --test-threads=1
+ ```
+ 
+ Kind-release control:
+@@ -177,9 +193,9 @@
+ export LOOM_MAX_PREEMPTIONS=3
+ export CARGO_TARGET_DIR="$PWD/target/loom-oa11-oa-11-ledger-order"
+ export RUSTFLAGS='--cfg parking_lot_loom --cfg parking_lot_negative_control="oa-11-ledger-order"'
+-cargo test -p prometheus-parking-lot-runtime-tokio --locked --test loom_ledger --no-run
+-cargo test -p prometheus-parking-lot-runtime-tokio --locked --test loom_ledger -- --list
+-cargo test -p prometheus-parking-lot-runtime-tokio --locked --test loom_ledger -- --test-threads=1
++cargo test -p prometheus-parking-lot-runtime-tokio --locked --lib ledger::loom_ledger:: --no-run
++cargo test -p prometheus-parking-lot-runtime-tokio --locked --lib ledger::loom_ledger:: -- --list
++cargo test -p prometheus-parking-lot-runtime-tokio --locked --lib ledger::loom_ledger:: -- --test-threads=1
+ ```
+ 
+ The additive CI handoff records these same legs, separates build/discovery/

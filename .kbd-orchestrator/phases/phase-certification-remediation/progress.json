@@ -2,17 +2,17 @@
   "schemaVersion": "2",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 645,
-  "derivedRevision": 645,
+  "sourceRevision": 877,
+  "derivedRevision": 877,
   "frontier": {
-    "b4320c25-6bf5-4d74-9fe6-3d6b8b36bd69": 18,
+    "b4320c25-6bf5-4d74-9fe6-3d6b8b36bd69": 250,
     "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 627
   },
   "conflictCount": 0,
   "phase": "phase-certification-remediation",
   "phaseId": "phase-certification-remediation",
   "parentPhase": null,
-  "last_updated": "2026-10-24T11:17:37.025056Z",
+  "last_updated": "2026-10-24T11:52:21.539840Z",
   "last_updated_by": "kbd-runtime",
   "changes_total": 14,
   "changes_completed": 14,
@@ -50,9 +50,9 @@
     "runId": "phase-certification-remediation-20261022T103344Z",
     "primaryCounter": "implementation",
     "implementation": {
-      "completed": 21,
+      "completed": 51,
       "total": 51,
-      "status": "BLOCKED"
+      "status": "COMPLETE"
     },
     "evidence": {
       "status": "PENDING",

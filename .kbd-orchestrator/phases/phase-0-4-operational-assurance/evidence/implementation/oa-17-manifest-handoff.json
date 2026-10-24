@@ -1,0 +1,11 @@
+{
+  "approvedBy": "techlead /root/oa04_release",
+  "path": "Cargo.toml",
+  "sha256": "1a3b1372d490bd70fc0f4c725de719d13bda891957a3706545d063e3648d78b4",
+  "scope": "Five-line pg_backend harness=false target; required tokio-runtime/postgres; existing dependencies only; no lockfile change",
+  "destinations": [
+    "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/Cargo.toml",
+    "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs/Cargo.toml"
+  ],
+  "runtimeEvidence": "NOT_EXERCISED"
+}

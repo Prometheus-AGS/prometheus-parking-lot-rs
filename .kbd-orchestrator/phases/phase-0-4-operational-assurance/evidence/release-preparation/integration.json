@@ -1,0 +1,31 @@
+{
+  "preparation_exit": 0,
+  "preparation_source": "72adf5d8ad583c3b52b22194563e94f7895c5b3f",
+  "version": "0.4.0",
+  "publishable_crates": 7,
+  "excluded": [
+    "prometheus-parking-lot-ffi"
+  ],
+  "original_plan_sha256": "b3bf274bc82c843285e7889877b0b84b98474ddf72d7747aadf663321e532fd1",
+  "integrated_exact_files": [
+    "Cargo.toml",
+    "Cargo.lock",
+    "CHANGELOG.md"
+  ],
+  "all_plan_file_hashes_match": true,
+  "source_map_refresh": [
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "Cargo.lock",
+      "before": "439ea114f906832d2cff9d0379e99af21f9ffa7aed30067189aa3333c088040c",
+      "after": "7a84a14ee557b99a95ea93a4a9e78ed6e3032920115edda63badfb85b52c3371"
+    },
+    {
+      "manifest": ".github/negative-controls.json",
+      "path": "Cargo.toml",
+      "before": "1a3b1372d490bd70fc0f4c725de719d13bda891957a3706545d063e3648d78b4",
+      "after": "f628f145f4d317210688fff2a94aff0de1415f7cebe479a146b359c7c525e38b"
+    }
+  ],
+  "certification": "NOT_EXERCISED; actual boundary runner still required"
+}

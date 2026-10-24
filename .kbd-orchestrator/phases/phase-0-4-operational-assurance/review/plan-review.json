@@ -1,0 +1,23 @@
+{
+  "mode": "artifact",
+  "target": "plan",
+  "isolation_mode": "harness-native",
+  "cross_model_check": "unverified-same-family",
+  "verdict": "PASS",
+  "initialFindings": [
+    {
+      "severity": "WARNING",
+      "claim": "Mandatory core normal dependency-graph check missing from boundary command list",
+      "resolution": "Added explicit subprocess-based cargo tree check; failed cargo tree or forbidden normal dependency is non-PASS."
+    }
+  ],
+  "findings": [],
+  "checked_classes": [
+    "Scope, dependency and operator-authority consistency",
+    "Finite scenario coverage and separate completion ledgers",
+    "Future runner executable-status distinction",
+    "Model access/isolation limitations"
+  ],
+  "reviewer": "/root/oa04_artifact_critic",
+  "rounds": 2
+}

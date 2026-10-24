@@ -1,0 +1,166 @@
+--- a/docs/API.md
++++ b/docs/API.md
+@@ -203,45 +203,74 @@
+ A result's first-write-wins identity is `(storage namespace, complete MailboxKey,
+ caller idempotency key)`. Tenant, user and session all participate; `None` and
+ an empty optional identifier are distinct. Two addresses may reuse the same
+-caller key independently. Within one address, retries retain the first result
+-even after consume/reopen, until its original TTL elapses; a no-TTL fence stays
++caller key independently. Same-address retries retain the original fence
++through consume/reopen until its original expiry; no-TTL fences remain
+ permanent. Expiry at one address never releases another address's fence.
+-`DeliveryOutcome` remains `Stored` or `Duplicate`; unkeyed delivery is unchanged.
+-
+-The pure-core mapping type is
+-`prometheus_parking_lot_core::LegacyIdempotencyOwner` (`new(caller_key, key)`,
+-public `idempotency_key: String` and `key: MailboxKey`, serde with unknown fields
+-rejected). It is exported by the core crate, not by the facade's `core::backend`.
+-The supported backend entry points are:
+-
+-| Entry | Upgrade behavior |
++Unkeyed delivery is unchanged.
++
++### Authoritative duplicate status and final schema 3 (0.4, oa-07)
++
++`DeliveryOutcome::Stored` remains a unit variant;
++`DeliveryOutcome::Duplicate { status: TaskStatus }` returns the original full
++status, including the original `TaskError`, atomically with the duplicate
++choice. Status survives result consumption for the original fence lifetime.
++A retry neither replaces the result/status nor extends TTL. Missing or
++undecodable authoritative metadata is an error, never a successful duplicate
++using the retry's status. No destructive consume is needed to learn status.
++The enum loses `Copy` and `Hash`; match its payload, use `Duplicate { .. }`
++when intentionally ignoring metadata, or clone. Mailbox method signatures are
++unchanged. `StorageMailbox` notifies only `Stored` and passes metadata through.
++The FFI's existing `DeliveryResult::Duplicate` label intentionally omits it.
++
++Core mapping types are `prometheus_parking_lot_core::LegacyIdempotencyOwner`
++(`idempotency_key: String`, `key: MailboxKey`) and `LegacyDeliveryStatus`
++(the same fields plus `status: TaskStatus`), each with `new(...)`, serde and
++unknown-field rejection. Owner evidence makes no status claim. These are core
++exports, not new facade `core::backend` exports. Supported entries are:
++
++| Entry | Final upgrade behavior |
+ | --- | --- |
+-| `PgResultMailbox::<T>::migrate(&pool).await` | Fresh protocol-2 schema or locked conversion using only uniquely proven retained-result owners; refuses unresolved active legacy fences. |
+-| `PgResultMailbox::<T>::migrate_with_idempotency_owners(&pool, &owners).await` | Explicit evidence is `&[(String, LegacyIdempotencyOwner)]`; each outer string is the exact PG mailbox name. |
+-| `EmbeddedStore::open(path)` / `open_with_clock(path, clock)` | Create/reopen schema 2; refuse schema 1 rather than converting it silently. |
+-| `EmbeddedStore::open_with_idempotency_owners(path, &owners)` / `open_with_clock_and_idempotency_owners(path, clock, &owners)` | Explicit schema-1 conversion with `&[LegacyIdempotencyOwner]`, or schema-2 mapping validation. |
+-
+-Legacy consumed tombstones contain no owner address. Unexpired tombstones
+-require authoritative ownership evidence or migration refuses atomically;
+-permanent consumed tombstones cannot be resolved merely by waiting. A retained
+-row proves an owner only when its caller key and original expiry generation
+-match exactly. Multiple candidates require a mapping selecting one candidate.
+-Existing results, original expiry, consumed fences, queue identity and ordering
+-are preserved. Expired ownerless fences remain legacy provenance rather than
+-being assigned an invented tenant.
+-
+-Resolved-owner provenance remains independent of active fences: replaying a
+-recorded mapping validates it without resetting TTL or resurrecting an evicted
+-fence. Stop old readers/writers before conversion. Old PG mutation SQL is
+-rejected at the database boundary; the old redb open protocol rejects schema 2.
+-Rollback requires the untouched pre-upgrade backup with new writers stopped;
+-it does not recover subsequent new writes. Configuration builders do not
+-collect owner evidence or convert schema-1 embedded files automatically.
+-
+-Use the [ADR 0006 migration runbook](adr/0006-tenant-scoped-result-idempotency.md#operational-runbook-isolated-rehearsal-and-future-store-conversion)
+-for exact mapping, backup, replay and rollback rules. These entry points and
+-fixtures are implemented; PG17/PG18/redb final-boundary execution is unverified.
+-No live migration or owner mapping is authorized by this API description.
++| `PgResultMailbox::<T>::migrate(&pool).await` | Creates/reopens protocol 3; converts legacy sources only if original owners/statuses are provable without supplied evidence. |
++| `PgResultMailbox::<T>::migrate_with_idempotency_owners(&pool, &owners).await` | Owner-only evidence `&[(String, LegacyIdempotencyOwner)]`; supplies no missing status. Each outer string is the exact mailbox name. |
++| `PgResultMailbox::<T>::migrate_with_idempotency_metadata(&pool, &owners, &statuses).await` | Atomic direct 0.3 -> 3 or intermediate 2 -> 3; status evidence is `&[(String, LegacyDeliveryStatus)]`. |
++| `EmbeddedStore::open(path)` / `open_with_clock(path, clock)` | Creates/reopens schema 3; refuses schemas 1/2. |
++| `EmbeddedStore::open_with_idempotency_metadata(path, &owners, &statuses)` / `open_with_clock_and_idempotency_metadata(path, clock, &owners, &statuses)` | Explicit atomic 1/2 -> 3 or schema-3 evidence replay, with core record slices (no outer namespace tuple). Owner-only entry variants remain but supply empty status evidence. |
++
++Consumed 0.3 fences lack owner and status; intermediate schema-2 fences retain
++owner but lack status. Resolve every active fence from a coherent retained
++full-address/caller/exact-expiry generation or authoritative original evidence;
++ambiguous assignments must select a retained candidate. Missing, duplicate,
++unknown, expired, wrong-address or contradictory initial evidence refuses
++atomically. Direct conversion cannot commit version 2 before missing-status
++refusal. A consumed permanent fence cannot be recovered merely by waiting.
++
++PG active `pl_result_mailbox_v3`/`pl_result_mailbox_keys_v3` and immutable
++`pl_result_mailbox_metadata_v3` retain native expiry/status. PG rejects actual
++v1/v2 mutation SQL at guarded retired names. Redb uses `mb_idem_v3` active
++metadata and `mb_legacy_metadata_v3` proof, retaining entries, queue identity,
++older fences and owner provenance; both old open protocols reject schema 3.
++Replaying recorded evidence never recreates an expired fence or resets TTL.
++Stop all old readers/writers, preserve an untouched backup and rehearse on a
++copy. Rollback stops new writers and restores that backup; later writes need
++separate reconciliation. Builders collect no missing metadata authority.
++
++On duplicate delivery the durable pool chooses both its event and lease
++resolution from original status: `Completed` -> completed/ack;
++`Failed(error)` -> failed/dead-letter; `Expired` -> expired/dead-letter;
++`Dropped(reason)` -> rejected with `Custom(reason)`/dead-letter. Delivery
++precedes resolution. Generic mailbox `Queued`/`Running` remains supported;
++a durable duplicate of either warns and requeues without fabricated terminal
++truth, ack or dead-letter. A permanent nonterminal fence can retry indefinitely
++until separate explicit remediation; finite fences keep their original TTL.
++Local execution counters still describe attempts. Existing shutdown, oversize
++and resolution retry policies remain intact.
++
++See [ADR 0006](adr/0006-tenant-scoped-result-idempotency.md) for address scope
++and [ADR 0007's final-schema runbook](adr/0007-authoritative-duplicate-status.md#operational-runbook-for-final-schema-3)
++for exact mapping/backup/replay/rollback rules. PG17/PG18/redb migration and real
++Failed-after-delivery process-kill fixtures, including consume-before-retry,
++are authored; all final-boundary execution remains `NOT_EXERCISED`. This
++API description authorizes no live upgrade.
+ 
+ ## Hooks and audit
+ 
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -8,6 +8,17 @@
+ ## [Unreleased]
+ 
+ ### Fixed
++
++- **Durable stored outcome (oa-07, #78).** A duplicate returns its original full
++  status/error even after result consumption. After a Failed delivery and
++  process crash, a locally successful retry emits the original Failed and
++  dead-letters rather than emitting Completed and acking. Delivery still
++  precedes lease resolution and only the original result is consumable.
++  Generic Queued/Running metadata remains supported; the durable consumer warns
++  and requeues rather than fabricating terminal truth. A permanent nonterminal
++  fence can retry indefinitely pending explicit remediation. Real PG17/18 and
++  redb crash/restart/consumed-result fixtures are authored; execution remains
++  NOT_EXERCISED.
+ 
+ - **Per-task explicit expiry (oa-10, #57).** `ResourcePool::prune_expired`
+   retains its public removal count and now reports each removed task through
+@@ -56,15 +67,22 @@
+   Adapter pruning performs the fallible backend step before changing its
+   front. Direct dispatcher consumers retain the count plus full removed
+   items in `Dispatched.expired` for terminal reporting outside the lock.
+-- **Persistent result-mailbox upgrade (oa-06).** Postgres uses protocol-2
+-  versioned result/fence tables and rejects old mutation SQL; redb uses schema 2
+-  and ordinary open refuses schema 1. Explicit migration APIs accept the new
+-  core `LegacyIdempotencyOwner` mapping type. Unexpired consumed legacy fences
+-  without authoritative owner evidence refuse conversion atomically; no tenant
+-  or TTL is invented. Legacy data and resolved-owner provenance are retained,
+-  mapping replay cannot reset expired fences, and rollback requires an untouched
+-  pre-upgrade backup with new writers stopped. See ADR 0006 before upgrading;
+-  this implementation is not live-upgrade authorization or execution evidence.
++- **Duplicate metadata (oa-07).** `DeliveryOutcome::Duplicate` becomes
++  `Duplicate { status: TaskStatus }`; the enum loses Copy/Hash. Custom mailbox
++  implementations must retain original status atomically with the fence beyond
++  consume, and never substitute retry status or extend original TTL. Stored
++  remains a unit variant; existing mailbox method signatures are unchanged.
++- **Persistent result-mailbox upgrade (oa-06/oa-07).** Final 0.4 uses PG
++  protocol 3 and redb schema 3. Both old 0.3 and intermediate schema-2 writers
++  are rejected. Core `LegacyIdempotencyOwner` and `LegacyDeliveryStatus`
++  provide independent owner/status evidence through explicit metadata APIs.
++  Direct 0.3 -> 3 and intermediate 2 -> 3 conversion refuse atomically if
++  original active metadata cannot be proved; no owner, status or TTL is
++  invented. Results/identity/order and immutable provenance are preserved;
++  evidence replay cannot resurrect expired fences. Ordinary embedded open
++  refuses 1/2. Rollback requires an untouched pre-upgrade backup with new
++  writers stopped. See ADRs 0006/0007; implementation is not live-upgrade
++  authorization or execution evidence.
+ - **Core dispatcher result (oa-09).** `Dispatched<T>` adds
+   `rejected: Vec<(T, SchedulerError)>`; callers must report every returned
+   rejection outside the dispatch lock. Struct literals/destructuring must

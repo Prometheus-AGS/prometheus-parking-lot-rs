@@ -1,0 +1,22 @@
+{
+  "approvedBy": "techlead /root/oa04_release",
+  "scope": "existing workspace Loom pin in parking_lot_loom target only; existing lockfile package reuse",
+  "files": [
+    {
+      "path": "crates/parking-lot-runtime-tokio/Cargo.toml",
+      "sha256": "aa5998d3042f569c931aa0dc0afe10c46cc355b8dd592117b7cec266abc9960c"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "439ea114f906832d2cff9d0379e99af21f9ffa7aed30067189aa3333c088040c"
+    }
+  ],
+  "destinations": [
+    "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs",
+    "/Users/gqadonis/.codex/worktrees/oa04-release/prometheus-parking-lot-rs",
+    "/Users/gqadonis/.codex/worktrees/oa04-events/prometheus-parking-lot-rs",
+    "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs"
+  ],
+  "primarySource": "https://docs.rs/loom/0.7.2/loom/",
+  "runtimeEvidence": "NOT_EXERCISED; no Cargo executed"
+}

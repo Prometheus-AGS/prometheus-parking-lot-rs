@@ -1,0 +1,28 @@
+{
+  "owner": "/root/oa04_platform",
+  "workspace": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs",
+  "files": [
+    {
+      "path": ".github/scripts/verify-release-tag.py",
+      "sha256": "92933a1c5eac4423f0db13d1d359be7c1e48325a5f1e71b2e3d3ae095c8ab652"
+    },
+    {
+      "path": ".github/scripts/gpg-verify-only.sh",
+      "sha256": "c92db621dd0b5cb5e10c17643e9ffce7f536c463cf453f2d114e40f5f84d24b3"
+    },
+    {
+      "path": ".github/workflows/verify-release-tag.yml",
+      "sha256": "d0f0da6266ee766271c0c05c7216f71dc53d55fa4394609ae0b7d0edc4c49039"
+    },
+    {
+      "path": ".github/scripts/tests/release-tag-fixtures.sh",
+      "sha256": "1ac495d6b39699eb3b1f641bf5570be9c2463600993f98958369043f1957e5d8"
+    },
+    {
+      "path": ".github/scripts/proposals/oa-03-publishing.patch",
+      "sha256": "e4abc61063b44b83523dbd47b3c8e5a2c538e869ff577ec543a9b1c8ff6715e9"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED",
+  "realSigningAuthority": "G-03 remains unverified; no key creation/import or release signing performed"
+}

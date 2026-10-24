@@ -1,0 +1,75 @@
+{
+  "status": "NOT_EXERCISED",
+  "scope": "Observed repair5 coherent scheduler test/compiler diagnostics; eight explicitly assigned files copied from current central before edits",
+  "observed_log": "/tmp/oa04-observed-repair5-clippy.log",
+  "observed_log_sha256": "854b19785ea10560a9bd85c02af184edcf4ecab91b0da5cfb62b3d2aecf67527",
+  "observed_parent_exit": 101,
+  "files": [
+    {
+      "path": "crates/parking-lot-core/tests/backend_admission_test.rs",
+      "base_sha256": "55edd214d14c794d8d1371d0845c9ad35cbb9ad07195a0e34fe5543a8e3bcc15",
+      "target_sha256": "0f793d4c3b06839a82bbff0593c288d0c33c7fc6d0a908b41bb321323153f938"
+    },
+    {
+      "path": "crates/parking-lot-core/tests/loom_kind_release.rs",
+      "base_sha256": "6e081f68b69d1829abd3470566982e5c0ea0c3cea465675bd931403d838b048c",
+      "target_sha256": "fd346dd77e3ae48690574baf5afad1912c431e74b7a1f317b2d2cc3716000795"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/backend_admission_test.rs",
+      "base_sha256": "6950dc3f89480092ceb238bfa1ac9d7f935863d06781ad37aec48853058dbc28",
+      "target_sha256": "89d59e66f80e45cb1bc022ea17afd6368bd1b4d07e9532d3189110a6a98311db"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs",
+      "base_sha256": "b2cb481503d65c9fcd7bb47d36a9a5f9a0f91b3792b31b00bc6b5d0e264ae68d",
+      "target_sha256": "f806060d9b93161487462236259117a674a7e9fc4461385d937fd3fa33314efe"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/panic_test.rs",
+      "base_sha256": "7cb850171171a890e72c90f68adb7ce093a51e0a06e35173d6639e4bc394b43c",
+      "target_sha256": "d4718fe44458d752555f915999f2427da176845d3181bdf022f10fedea70f77a"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/prune_expiry_test.rs",
+      "base_sha256": "d499b40da3973fa3655032d24bf8852da899774177f8d31cce451076a4ffb7f9",
+      "target_sha256": "3233f4f694a38708056256be516fd26f9576bcf90994bab5b6d3f102f22ea30b"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/result_slots_test.rs",
+      "base_sha256": "8898eceebe895455eea6d5e58dc9bd89d74ec5ceb14ee86c80a2bb4828aebd2a",
+      "target_sha256": "ece6f46144c9280fcc9fcd1c97b9ceb0c69e6bdb624a7d71dcef184ed8fb0319"
+    },
+    {
+      "path": "tests/scheduler/durable_sigkill.rs",
+      "base_sha256": "f196619f0f355db788287c53e2009e51cb094dd0949701a852df209763c0a4a2",
+      "target_sha256": "ba4aea336df12cab8813d61ef26aec53c509c726c7f9ae7059d1874ce98f2765"
+    }
+  ],
+  "patch_sha256": "9bfcc2cd97d4f2bb5e8b2c7d25cf5930dbc67d01704a840788659f77fa31e1d6",
+  "changes": {
+    "core/backend_admission_test.rs": "Use const fn for task constructor; quote documented Rust identifiers. All four tests and capacity/FIFO assertions unchanged.",
+    "core/loom_kind_release.rs": "Quote six documented Rust identifiers/configuration values. Model operations, assertions and control unchanged.",
+    "runtime/backend_admission_test.rs": "Derive Clone for Arc-backed Executor to satisfy actual TaskExecutor contract; quote documented runtime names. All execution/capacity/rejection assertions unchanged.",
+    "runtime/discarded_spawn_test.rs": "Derive Clone for Arc-backed Executor; quote documented Rust identifiers. Preserve seven tests, backlog count, child/control behavior, failure/outcome/ledger/callback oracles unchanged.",
+    "runtime/panic_test.rs": "Quote the two reported ResourcePool doc references; real spawned-handle panic classifier unchanged.",
+    "runtime/prune_expiry_test.rs": "Quote ResourcePool reference; extract assert_expiry_audit helper at the same point after accounting/survivor checks and before hook flush/sequence oracle. Every audit/per-task identity/no-batch assertion retained.",
+    "runtime/result_slots_test.rs": "Rename cloned probe counter named to factory_calls; quote three reported code identifiers. Relaxed first-poll factory-call witness, unconditional cleanup and OA12:S17 assertion unchanged.",
+    "scheduler/durable_sigkill.rs": "Extract original_failed_entry (peek/exact original error/key/payload and optional consume-before-retry) and assert_failed_result_stays_unique (post-retry original result/no second result/lease interval/dead-letter/rerun count) helpers. Original terminal-event and lease-resolution/flush/execution assertions stay in restart_failed_and_check and in original order. Bind must-use enqueue receipt to _enqueued. Real PG/redb child/SIGKILL/restart callers and controls unchanged."
+  },
+  "preserved_oracles": [
+    "OA-07:stored-status",
+    "OA-07:terminal-event",
+    "OA-07:lease-resolution",
+    "OA-07:one-result",
+    "OA-07:nonterminal-event",
+    "OA-07:nonterminal-resolution",
+    "OA12:S3",
+    "OA12:S17",
+    "OA-08 discarded-terminal/backlog and callback-panic assertions",
+    "OA-09 admission capacity/FIFO controls",
+    "OA-10 expiry exact lifecycle sequence",
+    "OA-11 kind-release lost-subtraction/publication models"
+  ],
+  "limits": "Source authoring only, no assertion or negative-control removal, no lint allowance, production change, shared map/central/verification-tree edit, Cargo/tests/build/format/compiler/analyzer/scan/review/KBD/commit. Parent serial verification and final source-map hash refresh required. No compiler/Clippy PASS claim."
+}

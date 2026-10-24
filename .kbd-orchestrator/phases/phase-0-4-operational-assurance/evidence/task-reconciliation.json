@@ -1,0 +1,242 @@
+{
+  "changes": 18,
+  "tasks": 36,
+  "allPending": true,
+  "source": "kbd-apply list; canonical registrations use exact returned backend IDs",
+  "records": [
+    {
+      "change": "oa-01-containment-controls",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement prepare and enforce post-purge containment controls with the specified regression fixtures; verify OA-01 fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    },
+    {
+      "change": "oa-02-release-versioning",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement choose and automate seven-crate versioning with the specified regression fixtures; verify OA-02 fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    },
+    {
+      "change": "oa-03-signed-release-tags",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement verify operator-signed release tags with the specified regression fixtures; verify OA-03 fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    },
+    {
+      "change": "oa-04-trusted-publishing",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement gate trusted publishing on candidate evidence and approval with the specified regression fixtures; verify OA-04 fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    },
+    {
+      "change": "oa-05-template-secret-scan",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement make template scans precise without hiding real secrets with the specified regression fixtures; verify OA-05 fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    },
+    {
+      "change": "oa-06-tenant-idempotency",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement scope result idempotency to tenant/mailbox key with the specified regression fixtures; verify OA-06 fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    },
+    {
+      "change": "oa-07-stored-terminal-outcome",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement emit durable terminal events from the stored result with the specified regression fixtures; verify OA-07 fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    },
+    {
+      "change": "oa-08-discarded-spawn",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement settle accepted work when a spawner discards its future with the specified regression fixtures; verify OA-08 fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    },
+    {
+      "change": "oa-09-backend-admission",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement reject impossible pre-populated adapter work with the specified regression fixtures; verify OA-09 fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    },
+    {
+      "change": "oa-10-expiry-events",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement emit terminal events for explicitly pruned work with the specified regression fixtures; verify OA-10 fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    },
+    {
+      "change": "oa-11-concurrency-models",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement model ledger races and kind-limited release with the specified regression fixtures; verify OA-11 fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    },
+    {
+      "change": "oa-12-negative-control-ci",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement run every scenario negative control in ci with the specified regression fixtures; verify OA-12 fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    },
+    {
+      "change": "oa-13-browser-assurance",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement exercise wasm admission and events in a browser with the specified regression fixtures; verify OA-13 fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    },
+    {
+      "change": "oa-14-postgres-upgrade",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement rehearse a populated postgresql 17\u219218 upgrade with the specified regression fixtures; verify OA-14 fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    },
+    {
+      "change": "oa-15-desktop-assurance",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement build and launch the tauri embedded example with the specified regression fixtures; verify OA-15 fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    },
+    {
+      "change": "oa-16-iggy-poisoning",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement prove no stream publication beyond an abandoned chunk with the specified regression fixtures; verify OA-16 fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    },
+    {
+      "change": "oa-17-backend-benchmarks",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement measure pg throughput, contention and memory with the specified regression fixtures; verify OA-17 fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    },
+    {
+      "change": "oa-18-release-boundary",
+      "tasks": [
+        {
+          "id": "1",
+          "title": "1.1 Implement the candidate-bound boundary runner and receipt/approval verifier; verify candidate packet fixture/manifest coverage by static inspection"
+        },
+        {
+          "id": "2",
+          "title": "1.2 Assemble the completed candidate and record the final integration, review and publication dispositions; verify artifact links and contract/documentation handoff"
+        }
+      ]
+    }
+  ]
+}

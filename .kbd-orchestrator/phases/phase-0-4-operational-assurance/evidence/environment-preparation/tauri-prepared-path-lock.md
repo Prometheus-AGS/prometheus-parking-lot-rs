@@ -1,0 +1,9 @@
+# Standalone Tauri prepared-version lock proposal
+
+The driver observed Cargo exit101 from a locked fetch on clean candidate68bc: `cannot update the lock file .../bindings/tauri-desktop/Cargo.lock because --locked was passed to prevent this` (raw log `/tmp/oa04-tauri-fetch.log`). Root preparation updated workspace path packages to0.4.0, while this independent workspace's lock still records core, embedded and FFI at0.3.0. The uncomfortable limit is that this textual repair has not been accepted by Cargo; the parent must run the actual locked operation before claiming the failure resolved.
+
+The adjacent [exact patch](tauri-prepared-path-lock.patch) proposes only three `version` lines for `prometheus-parking-lot-core`, `prometheus-parking-lot-embedded`, and `prometheus-parking-lot-ffi`. All package dependency arrays and all registry package versions, sources, checksums and dependency references are unchanged. References to these unique path packages are bare names, so no qualified locked reference needs rewriting. The example shell and queue-service remain0.1.0. No root metadata or actual Tauri lock was edited.
+
+The other binding lock, `bindings/uniffi-bindgen/Cargo.lock`, has only local package `uniffi-bindgen`0.0.0 and registry `uniffi`0.32.2; the latter matches root Cargo.lock. It has no dependency on a repository path crate and is unaffected by this root version bump. No change is proposed there.
+
+The [JSON handoff](tauri-prepared-path-lock.json) binds the exact central base lock, proposed lock bytes, patch and read source identities. Static inspection used `rg`, `sed`, and Python standard-library text/TOML reads; no Cargo, build, test, installation, dependency update, syntax check, network, commit or runtime-state action was run. Production verification remains NOT_EXERCISED here. Parent owns patch integration, any narrowly scoped metadata operation, corrected-candidate freeze and restarted final control receipts.

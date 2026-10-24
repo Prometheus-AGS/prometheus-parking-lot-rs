@@ -1,0 +1,32 @@
+{
+  "owner": "/root/oa04_platform",
+  "files": [
+    {
+      "path": ".github/negative-controls.json",
+      "sha256": "ff46e88234c40c572020b37c7c3f0e4ffaacf034108e2f228170130891c55f3a"
+    },
+    {
+      "path": ".github/scripts/tests/negative-controls.py",
+      "sha256": "f58601b7290655abcb9f23fb90040142e3970f539e581d73d00719eedf0ae954"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "4cd405c55f0534aa588e3ce9b9f469861f5924f4f8cd5d2b42f945934cbd3163"
+    },
+    {
+      "path": "crates/parking-lot-wasm/tests/wasm_pool.rs",
+      "sha256": "f86703b8dec85223e10c014fcc1344ba75e944d30bcac761202215fbc898e14f"
+    }
+  ],
+  "sourceInventory": {
+    "cfgIds": 33,
+    "executionRows": 52,
+    "sourceIdentities": 99
+  },
+  "runtimeEvidence": "NOT_EXERCISED; source handoff only",
+  "ownerFixtures": [
+    "oa-12-oa08-classifier-handoff.json",
+    "oa-12-wasm-s4-classifier-handoff.json",
+    "oa-12-runtime-classifiers-import.json"
+  ]
+}
