@@ -28,8 +28,10 @@
 //! Negative controls that must make a model fail:
 //! `--cfg parking_lot_negative_control="s-1"` (no capacity check),
 //! `"s-2"` (park without a drain: lost wakeup), `"s-20"` (the starvation
-//! guard never engages) and `"s-20-depth"` (only the at-depth path forgets to
-//! charge its skip to the head; `loom_skip_ahead` does not catch it).
+//! guard never engages), `"s-20-depth"` (only the at-depth path forgets to
+//! charge its skip to the head; `loom_skip_ahead` does not catch it) and
+//! `"s-20-order"` (the at-depth path skips a head that fits; the priority
+//! check of `loom_at_depth_leaves_a_fitting_head_its_capacity` fires).
 #![cfg(parking_lot_loom)]
 
 #[allow(dead_code, reason = "this model runs jobs through run_observed")]
@@ -88,9 +90,9 @@ impl AtDepth {
     }
 
     /// The running one-unit job finishes: the oracle counts it as done, then
-    /// `release` returns its permit. No yield before the dispatch lock: a
-    /// thread that yields first is not scheduled into the window between two
-    /// submissions on another thread within loom's preemption bound.
+    /// `release` returns its permit. No yield before the dispatch lock in
+    /// either pass (see `loom_support::model`): this completion must be able
+    /// to land between the two submissions on the main thread.
     fn finish_first(&self, first: Vec<Grant<Job>>, release: impl FnOnce(Grant<Job>)) {
         let [grant] = <[Grant<Job>; 1]>::try_from(first).expect("one running job");
         self.oracle.finish(grant.item.units);
@@ -206,7 +208,7 @@ impl Outcome {
 /// it as a second skip.
 #[test]
 fn loom_at_depth_skip_races_completion_and_keeps_every_invariant() {
-    loom::model(|| {
+    loom_support::model(|| {
         let (model, first) = AtDepth::new();
         let completer = {
             let model = Arc::clone(&model);
@@ -236,7 +238,7 @@ fn loom_at_depth_skip_races_completion_and_keeps_every_invariant() {
 /// invariants hold as when the completion drains.
 #[test]
 fn loom_at_depth_leaves_a_fitting_head_its_capacity() {
-    loom::model(|| {
+    loom_support::model(|| {
         let (model, first) = AtDepth::new();
         let released = Arc::new(AtomicBool::new(false));
         let completer = {

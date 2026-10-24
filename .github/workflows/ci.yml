@@ -109,8 +109,8 @@ jobs:
     # `test result: FAILED`, or a panic raised in parking-lot-core when loom aborts on
     # a second panic while unwinding); the build runs first, so a compile error can
     # never stand in for it. The lists are every model the control is known to break
-    # (s-20-depth breaks only loom_at_depth: loom_skip_ahead never reaches the
-    # at-depth path). Issue #79 extends this to the non-loom controls: one more leg per
+    # (s-20-depth and s-20-order break only loom_at_depth: loom_skip_ahead never
+    # reaches the at-depth path). Issue #79 extends this to the non-loom controls: one more leg per
     # control, with a nextest filter in place of the model list.
     name: Loom (${{ matrix.control }})
     runs-on: ubuntu-latest
@@ -135,6 +135,9 @@ jobs:
             expect: fail
             models: loom_skip_ahead loom_at_depth
           - control: s-20-depth # at-depth skips are not charged to the head
+            expect: fail
+            models: loom_at_depth
+          - control: s-20-order # at-depth start ahead of a higher-priority item that fits
             expect: fail
             models: loom_at_depth
     env:

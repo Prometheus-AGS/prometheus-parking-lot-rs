@@ -578,7 +578,7 @@ entry names the OpenSpec change that made it.
   `.github/workflows/ci.yml` runs every loom model (`loom_capacity`,
   `loom_wakeup`, `loom_vector`, `loom_skip_ahead`, `loom_at_depth`) under
   `--cfg parking_lot_loom` with `LOOM_MAX_PREEMPTIONS=3`. One leg per
-  negative control (S-1, S-2, S-19, S-20, S-20-depth) requires the models
+  negative control (S-1, S-2, S-19, S-20, S-20-depth, S-20-order) requires the models
   that control breaks to fail, so a model that stops detecting its defect
   fails the build. Each leg is one cfg build with a cache of its own. The new
   `loom_at_depth` model uses `max_queue_depth = 1`, so submissions behind a
@@ -588,7 +588,13 @@ entry names the OpenSpec change that made it.
   permit dropped outside the dispatch lock, and checks capacity, no lost
   wakeup, the starvation bound and priority order. The new negative control
   `--cfg parking_lot_negative_control="s-20-depth"` stops charging at-depth
-  skips to the head; only `loom_at_depth` catches it.
+  skips to the head, and `"s-20-order"` lets an at-depth submission start
+  ahead of a higher-priority head that fits; only `loom_at_depth` catches
+  them. Every model now runs two loom passes, with and without a yield
+  inside a running job's window (`loom_support::model`): with the yield only,
+  loom never scheduled a completion between two dispatch-lock sections of a
+  thread that kept running, and each pass alone missed lock orders the other
+  reached.
 
 ### Removed
 
