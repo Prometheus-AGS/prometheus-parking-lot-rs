@@ -243,10 +243,11 @@ def prepare(args: argparse.Namespace) -> None:
             notes = "- No package-local commits; included in the lockstep release."
         sections.append(f"### {name}\n\n{notes}\n")
     historical = git(source, "show", f"{args.candidate}:CHANGELOG.md")
-    # set-version expects a readable latest release and renames only its heading.
-    # Seed it with the current metadata version, then preserve historical text.
+    # The pinned parser rejects duplicate versions across the entire changelog.
+    # Give set-version only the generated current-version section to rename;
+    # append the immutable historical text after its one-heading update.
     changelog = (f"# Changelog\n\n## [{current}] - {args.date}\n\n"
-                 + "\n".join(sections) + "\n" + historical.removeprefix("# Changelog").lstrip())
+                 + "\n".join(sections))
     (scratch / "CHANGELOG.md").write_text(changelog, encoding="utf-8")
     run([tools["release-plz"]["path"], "set-version", args.version,
          "--manifest-path", str(scratch / "Cargo.toml"),
@@ -255,6 +256,8 @@ def prepare(args: argparse.Namespace) -> None:
     result_changelog = (scratch / "CHANGELOG.md").read_text(encoding="utf-8")
     require(result_changelog.startswith(f"# Changelog\n\n## [{args.version}] - {args.date}\n"),
             "release-plz did not prepare the requested changelog heading")
+    (scratch / "CHANGELOG.md").write_text(
+        result_changelog + "\n" + historical.removeprefix("# Changelog").lstrip(), encoding="utf-8")
     changed = set(git(scratch, "diff", "--name-only", args.candidate, "--").splitlines())
     require(changed <= allowed_changes, f"unexpected preparation writes: {sorted(changed - allowed_changes)}")
     files = sorted({"Cargo.toml", "Cargo.lock", "CHANGELOG.md", "release-plz.toml", "cliff.toml",

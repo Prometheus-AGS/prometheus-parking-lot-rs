@@ -1,0 +1,18 @@
+{
+  "observed_at": "2026-10-24T14:49:44.688408+00:00",
+  "scope": "read-only metadata; no variable values retained; no setup/dispatch/publication",
+  "records": {
+    "runners": {
+      "total_count": 0,
+      "runners": []
+    },
+    "environment": {
+      "exit": 1,
+      "error": "gh: Not Found (HTTP 404)"
+    },
+    "variables": {
+      "exit": 1,
+      "error": "gh: Not Found (HTTP 404)"
+    }
+  }
+}

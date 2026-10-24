@@ -1,0 +1,32 @@
+{
+  "scope": "Observed local preparation; not final integration/certification",
+  "source_commit": "16db521829d83ba140bb5ce2ea8f8d3252acf35d",
+  "secrets": {
+    "tree_exit": 0,
+    "tree_result": "no leaks found;26.83MB",
+    "staged_exit": 0,
+    "staged_result": "no leaks found;4.97MB"
+  },
+  "rust": "actual rustc1.99.1, cargo1.99.1; private numeric selector verified",
+  "nextest": "actual0.9.149, private verified official archive",
+  "release_plz": "actual0.3.173;private Cargo install exit0;source907af6d031bbb69d392354803c04cd75bb6e6fa0 and cratechecksum verified",
+  "git_cliff": "actual2.14.2;private verified official archive",
+  "cargo_fetch_locked_exit": 0,
+  "npm_ci_exit": 0,
+  "playwright_private_browser_install_exit": 0,
+  "npm_audit_production_exit": 1,
+  "npm_audit_production_reported_packages": {
+    "critical": 16,
+    "moderate": 18,
+    "low": 3
+  },
+  "docker_version": "Server27.3.1;responsive",
+  "database_images": "BLOCKED local acquisition: Docker credential helper stalled. Owned build processes stopped; no credential/config change. No PG/Iggy scenario executed.",
+  "OA02_preparation": {
+    "exit": 1,
+    "failure": "multiple release notes for0.3.0",
+    "targeted_repair_attempt": 1,
+    "status": "owner source correction in progress; failed artifacts retained"
+  },
+  "github": "read-only repository runners total0;release-certification environment/variables returned404 (not accessible); no settings/dispatch mutations"
+}

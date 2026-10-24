@@ -12,6 +12,7 @@ import argparse
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -127,6 +128,19 @@ def main() -> int:
     workspace = prepared / "workspace"
     first_files = {p: sha(workspace / p) for p in receipt["files_sha256"]}
     changelog = (workspace / "CHANGELOG.md").read_text(encoding="utf-8")
+    # Preserve trailing bytes; the shared git identity helper strips stdout.
+    historical = subprocess.run(["git", "show", f"{args.candidate}:CHANGELOG.md"], cwd=source,
+                                env={**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"},
+                                capture_output=True, text=True, check=True).stdout
+    historical = historical.removeprefix("# Changelog").lstrip()
+    if not changelog.endswith(historical):
+        raise AssertionError("OA-02:historical-changelog: original release history/prose changed")
+    # The real source includes its current release (0.3.0 for this boundary).
+    # Appending it before set-version caused the actual pinned parser failure.
+    historical_headings = [line for line in historical.splitlines() if line.startswith("## ")]
+    prepared_headings = [line for line in changelog.splitlines() if line.startswith("## ")]
+    if prepared_headings != [f"## [{args.version}] - {args.date}", *historical_headings]:
+        raise AssertionError("OA-02:historical-changelog: release heading duplicated, removed or reordered")
     section = changelog.split("\n## [", 2)[1]
     headings = [line.removeprefix("### ") for line in section.splitlines() if line.startswith("### ")]
     if headings != EXPECTED or "### prometheus-parking-lot-ffi" in section:
@@ -214,7 +228,7 @@ def main() -> int:
             "original_plan_sha256": sha(args.preparation_plan),
             "reproduced_plan_sha256": sha(receipt_path), "files_sha256": first_files}, indent=2) + "\n")
         print("PASS OA-02: original plan and reproduced ancestor outputs match final candidate; mismatch controls rejected")
-    print("PASS OA-02: seven crate versions/dependencies/changelog; FFI excluded; second run unchanged")
+    print("PASS OA-02: seven crate versions/dependencies/changelog; historical releases preserved; FFI excluded; second run unchanged")
     print("PASS OA-02 controls: dependency, package, lockfile, FFI and version-group mismatches rejected")
     print(f"Evidence: {evidence}")
     return 0

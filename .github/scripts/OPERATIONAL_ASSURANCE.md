@@ -92,7 +92,13 @@ invocations and remain truthful invocation provenance. They are never rewritten
 to force byte equality. Portable plan fields, actual tool identity hashes/version
 outputs and every prepared metadata byte must agree with the original plan and
 final checkout. The reproduced plan itself must remain byte-identical on its
-second run at the same output path. The compact artifact still copies only the
+second run at the same output path. During preparation, only the new generated
+section is exposed to release-plz's set-version parser; original historical
+sections are appended unchanged after its heading update. The actual pinned
+parser rejects a temporary current-version heading alongside the historical
+heading for that same version. The real-tool fixture requires the entire
+historical body as an unchanged suffix and all original release headings in
+order, in addition to deterministic second-run output. The compact artifact still copies only the
 original plan, with its exact digest; the collector must use the same original
 plan digest retained by the baseline freeze. Neither the reproduction nor a rebuilt plan
 can replace it. Actual altered-plan controls reject metadata mismatch through

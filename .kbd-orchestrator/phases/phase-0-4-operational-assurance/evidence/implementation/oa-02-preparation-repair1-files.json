@@ -1,0 +1,52 @@
+{
+  "owner": "/root/oa04_release",
+  "scenario": "OA-02",
+  "repair_attempt": 1,
+  "review_correction_cycle": 1,
+  "runtimeEvidence": "NOT_EXERCISED",
+  "observed_source_commit": "16db521829d83ba140bb5ce2ea8f8d3252acf35d",
+  "files": [
+    {
+      "path": "scripts/release/prepare.py",
+      "base_sha256": "7c49598eefd2ffdbe6cdb33699653429eeeaa593593e8a8454afd9bb0411ae1c",
+      "sha256": "017d4615428a8d2ccc4ad2a03fbeca80e40a340dab425b6d01cde00038d461e7"
+    },
+    {
+      "path": "scripts/release/test-preparation.py",
+      "base_sha256": "d9a79ab3b80534b5d511215193fe5462547255bc15fd5f7c3c0902971e9f5d0a",
+      "sha256": "c9529501c15591004650a8789156f92ce322e69842578c021bf96a905da59420"
+    },
+    {
+      "path": "docs/adr/0005-lockstep-release-versioning.md",
+      "base_sha256": "e7a5ec8d5db997aee142dc7183b109e4631b8c3088587206d0bda8fd46fdbb39",
+      "sha256": "add45197a4b02f02cb24eece6aa009f491d083d7a4635a3c408060ab4ba170dd"
+    },
+    {
+      "path": ".github/scripts/OPERATIONAL_ASSURANCE.md",
+      "base_sha256": "7e6b9653afd07c877cdd37c670f5772ae77c614674bc95978ecf839dc7904981",
+      "sha256": "60895fa1415c4b95a83b760e6520dec50d289c7d69cfcb6cc7355eaed1ae6d8a"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-02-preparation-repair1.md",
+      "sha256": "2193aa65f1eec03183d9da2d8a6e57f9cd4421e2180794c85862b07675b8fa96"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-02-preparation-repair1.patch",
+      "sha256": "05484d3ff948ff2953f630b7019bbde9147a35b8c3bed3cf0e821270bfda6312"
+    }
+  ],
+  "primary_sources_read": [
+    {
+      "path": "/Users/gqadonis/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/release_plz_core-0.41.0/src/command/set_version.rs",
+      "sha256": "39d58a53f35ccc0da1088bb891214ba3bc1e57fadcf16cbcc38322a6a0259f11"
+    },
+    {
+      "path": "/Users/gqadonis/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/release_plz_core-0.41.0/src/changelog_parser.rs",
+      "sha256": "d2a4b439a65d1ea879f2d6850463b63969f441b7ce2ceac950402a0c22ac1e91"
+    },
+    {
+      "path": "/Users/gqadonis/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parse-changelog-0.6.17/src/lib.rs",
+      "sha256": "1b43609ae0d8869470fa2e5dbd33dfcadf55108366ee592c616fdc8240fb0f74"
+    }
+  ]
+}

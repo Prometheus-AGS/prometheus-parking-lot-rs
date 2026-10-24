@@ -59,9 +59,14 @@ the candidate. The date is supplied, never read from the clock.
 The pinned release-plz `set-version` implementation visits **all** inheriting
 members, even `release = false` members, and requires a readable changelog for
 each. All eight configuration entries therefore point at the shared changelog;
-release-plz deduplicates that path. The wrapper seeds its latest heading with
-the current metadata version, then `set-version` renames that heading to the
-requested version. No FFI changelog section is generated.
+release-plz deduplicates that path. The wrapper supplies only the generated
+section headed with the current metadata version while `set-version` renames
+that heading to the requested version. It then appends the candidate's historical
+changelog body unchanged. Passing both the temporary current-version section
+and the historical section for that same version to release-plz was observed to
+fail: its pinned parser rejects duplicate release versions. Staging the generated
+section alone preserves every historical release without asking the parser to
+rename historical entries. No FFI changelog section is generated.
 
 An existing output is accepted only for the identical source/base/candidate/
 version/date tuple. The same preparation is executed again, rather than returning
