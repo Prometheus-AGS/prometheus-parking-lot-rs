@@ -258,7 +258,9 @@ struct Unserializable;
 
 impl Serialize for Unserializable {
     fn serialize<S: serde::Serializer>(&self, _serializer: S) -> Result<S::Ok, S::Error> {
-        Err(serde::ser::Error::custom("this payload cannot be serialized"))
+        Err(serde::ser::Error::custom(
+            "this payload cannot be serialized",
+        ))
     }
 }
 
@@ -285,7 +287,12 @@ async fn enqueue_failure_before_any_write_is_not_stored() {
     );
     let depth = queue.depth().await.expect("depth");
     assert_eq!(
-        (depth.ready, depth.delayed, depth.leased, depth.dead_lettered),
+        (
+            depth.ready,
+            depth.delayed,
+            depth.leased,
+            depth.dead_lettered
+        ),
         (0, 0, 0, 0)
     );
 }
