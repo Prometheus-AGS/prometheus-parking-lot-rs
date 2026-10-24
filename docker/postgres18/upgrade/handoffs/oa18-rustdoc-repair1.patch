@@ -1,0 +1,11 @@
+--- a/crates/parking-lot-pg/src/mailbox/mod.rs
++++ b/crates/parking-lot-pg/src/mailbox/mod.rs
+@@ -134,7 +134,7 @@
+     /// # Errors
+     ///
+     /// [`SchedulerError::Backend`] on database failure, or
+-    /// [`SchedulerError::Internal`](SchedulerError::Internal) on invalid or
++    /// [`SchedulerError::Internal`] on invalid or
+     /// insufficient ownership evidence. Refusal rolls back logical changes.
+     pub async fn migrate_with_idempotency_owners(
+         pool: &PgPool,

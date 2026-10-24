@@ -1,0 +1,42 @@
+{
+  "repair": "OA18 observed embedded integration test lint batch5",
+  "observed_diagnostics": "/tmp/oa04-observed-repair5-clippy.log; parent observed --keep-going exit101",
+  "source_checkout": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs",
+  "central_checkout_read_only": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs",
+  "files": {
+    "crates/parking-lot-embedded/tests/support/legacy_v03.rs": {
+      "base_sha256": "1e4338d66848db341092ee645f284c403aff518f0e6a3a33dd84811da263c870",
+      "target_sha256": "d97e8d40e82d969db8cf9c5fcae39757f1a5bb4c046722b515b1bc3afaf0de32"
+    },
+    "crates/parking-lot-embedded/tests/support/legacy_metadata.rs": {
+      "base_sha256": "a1e99af7bd483185e44e3fe398a371ec97c8b1e043809752e4b757c1ba540857",
+      "target_sha256": "a21f32c72c252da17d28a8fb2e604be7af7b020c09592b5fd6977df324ec6a8f"
+    },
+    "crates/parking-lot-embedded/tests/mailbox_migration.rs": {
+      "base_sha256": "cfade4ff544c97ff79490731c66d970f98a143827efca97801b1b9d793b7473f",
+      "target_sha256": "9b84db14c989bdad827bce1abefa5340c3cbfcb0f8a6720c25ffa0bc11ecc2ac"
+    },
+    "crates/parking-lot-embedded/tests/mailbox_status.rs": {
+      "base_sha256": "9e3c93c624d9cdeb6831a715304ea16c12ffd622c315d59e2aa34102bf90f5da",
+      "target_sha256": "bf4f2953c9e3d00cc0f74e2cb36aafb703c95ec17da097114abdadb617c28c20"
+    }
+  },
+  "patch_path": "docker/postgres18/upgrade/handoffs/oa18-embedded-test-repair5.patch",
+  "patch_sha256": "8fac0df4828e0d729c717bc08a3d3acdd98628fef87c7a3aea4a19d66c921fb4",
+  "changes": {
+    "crates/parking-lot-embedded/tests/support/legacy_v03.rs": "Backtick EmbeddedStore in module docs. Split seed into seed_queue and seed_mailbox; retain old_open and one begin_write/commit surrounding all original raw table/value writes. Queue-table borrows end at the queue-stage helper return before mailbox seeding, inside the same transaction.",
+    "crates/parking-lot-embedded/tests/support/legacy_metadata.rs": "Make permanent_failure const. Extract only original status JSON row replacement loop into populate_original_statuses(&mut entries); preserve existing entries table handle and all subsequent schema2/ambiguous/metadata writes in the original transaction.",
+    "crates/parking-lot-embedded/tests/mailbox_migration.rs": "Borrow Result in assert_refusal and all callers; move known on final expired-case construction instead of cloning. Split the long preservation test into conversion/provenance, original mailbox results, original queue and expiry/replay assertion stages. Extract complete structured address vector construction; scope oracle and delivery/consume/restart loops retain their original order.",
+    "crates/parking-lot-embedded/tests/mailbox_status.rs": "Borrow Result in refused and all callers. Split the long schema1/schema2 status-preservation test into conversion/old-writer refusal, original status retrieval, scoped status retrieval, consume-originals, consumed restart/proof replay, expiry/replay and new-generation status stages. Existing test name drives the same sequence and final immutable-proof/backup restore assertions."
+  },
+  "preservation": [
+    "No production file, shared trait, constant source-provenance hash, frozen SQL asset or manifest changed.",
+    "Raw schema1/schema2 fixture rows, JSON statuses/payloads, identity/fence/sequence values, table names and expiry values are retained. Source helpers still generate legacy data without the new migration API.",
+    "Original test names and every assertion/expect/diagnostic are retained in extracted spans. Named OA06 address-scope and OA07 stored-status/consumed-status oracles remain on the same operations.",
+    "Open/drop order relative to snapshots, exactly1000ms clock advancement, eviction, replay, new generation and backup restore stays sequential. No scenario is replaced with an isolated mock-only test.",
+    "Existing status-binary dead_code attribute is unchanged; no lint allow/suppression was added."
+  ],
+  "semantic_implications": "Intended test behavior is unchanged. Helpers reduce function length and borrow inspection inputs; the only shorter lifetime is queue seed table handles within the same transaction. Result temporaries still drop at the statement end. Physical generated redb byte identities are captured by the boundary runner, not asserted by this source handoff.",
+  "not_run": "No tests/builds/Cargo/Clippy/fmt/analyzers/validators/review/scans/commits/KBD. Only source/log reads, scoped local authoring and exact-known-file hashes.",
+  "remaining": "Parent imports four files on recorded bases, then performs its single batched format/compiler-unblock and scoped independent repair review, refreshes current maps and executes authorized boundary checks. Syntax/lint/runtime behavior and final artifact hashes remain unverified. Central and immutable verification tree untouched."
+}

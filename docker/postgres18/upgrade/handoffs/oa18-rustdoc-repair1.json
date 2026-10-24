@@ -1,0 +1,10 @@
+{
+  "repair": "OA18 observed rustdoc redundant_explicit_links, targeted repair1",
+  "path": "crates/parking-lot-pg/src/mailbox/mod.rs",
+  "base_sha256": "9545206851d999605da4c276d450039c321050df737d41c8dfe7108ec6a65d25",
+  "target_sha256": "b7005a5ea3157b6356577e647fe957f8f972436808b1fe17600fce162ca284ba",
+  "patch_path": "docker/postgres18/upgrade/handoffs/oa18-rustdoc-repair1.patch",
+  "patch_sha256": "3a097ad9cc5f88722a9abd34f676a5c0c99d89681b6089ff0558b60efcbc5cb6",
+  "scope": "Remove only explicit redundant SchedulerError::Internal target. Synced central current bytes; no lint allow, refactor, source-map/historical-hash mutation or verification-tree edit.",
+  "execution": "No tests/Cargo/build/rustdoc/review/commit/KBD commands; source-only local edit and exact hashes."
+}
