@@ -1,10 +1,17 @@
-//! Deterministic message ids.
+//! Message ids.
 //!
-//! An id is the `UUIDv5` of a scope and the task's stable key under a fixed
+//! [`message_id`] is the `UUIDv5` of a scope and a stable key under a fixed
 //! namespace, as a `u128` (Iggy's message id type). The same scope and key give
 //! the same id in every process and after every restart, so a retried publish
-//! can be recognized and skipped. The stable key is the task's idempotency key,
-//! or, for a task without one, a key built from its mailbox address and task id.
+//! can be recognized and skipped. It is used where a stable key exists: the
+//! idempotency key of a `mailbox.ready` notification, and a stream key with a
+//! chunk's sequence number.
+//!
+//! Task ids are caller-supplied and can repeat, so no id is derived from one
+//! alone. A `mailbox.ready` notification for a result without an idempotency
+//! key, and every lifecycle event, get an id from a per-instance nonce and a
+//! sequence number instead: unique, but not reproducible across processes.
+//! Lifecycle events also bypass the publisher's repeat-skipping window.
 
 #[cfg(not(parking_lot_negative_control = "s-11"))]
 use uuid::Uuid;
