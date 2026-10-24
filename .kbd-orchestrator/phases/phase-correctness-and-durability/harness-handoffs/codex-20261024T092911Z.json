@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "1",
+  "kind": "kbd-harness-handoff",
+  "harness": "codex",
+  "fromHarness": "unknown",
+  "project": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot",
+  "phase": "phase-correctness-and-durability",
+  "phaseDir": ".kbd-orchestrator/phases/phase-correctness-and-durability",
+  "createdAt": "2026-10-24T09:29:11Z",
+  "packet": ".kbd-orchestrator/phases/phase-correctness-and-durability/harness-handoffs/codex-20261024T092911Z.md",
+  "statusVerified": true,
+  "position": {
+    "stage": "execute",
+    "lifecycle": "ready",
+    "revision": 627,
+    "planRevision": 1,
+    "implementation": {
+      "completed": 6,
+      "total": 37
+    },
+    "nextChange": "cr-15-containment",
+    "nextTask": "1",
+    "exactNextWork": "/kbd-assess phase-correctness-and-durability"
+  },
+  "repos": [
+    {
+      "path": "/Users/gqadonis/Projects/prometheus/prometheus-parking-lot",
+      "branch": "main",
+      "head": "ad07ece",
+      "clean": false,
+      "dirtyCount": 146,
+      "upstream": "origin/main",
+      "ahead": 0,
+      "pushed": true
+    }
+  ],
+  "readInOrder": [
+    ".kbd-orchestrator/phases/phase-correctness-and-durability/harness-handoffs/codex-20261024T092911Z.md",
+    "AGENTS.md",
+    ".prometheus/gotchas.md",
+    ".kbd-orchestrator/phases/phase-correctness-and-durability/plan.md",
+    ".kbd-orchestrator/phases/phase-correctness-and-durability/assessment.md",
+    ".kbd-orchestrator/phases/phase-correctness-and-durability/execution.md",
+    "openspec/changes/cr-15-containment"
+  ],
+  "targetChecks": {
+    "skillsDir": "~/.codex/skills",
+    "skillsDirExists": true,
+    "brokenSkills": [],
+    "missingSkills": [],
+    "teamDetected": true,
+    "agentsDir": ".codex/agents",
+    "missingRoleDefinitions": []
+  },
+  "warnings": [
+    "carried work: change cr-16-docs-truth was started and not finished outside the active position",
+    "carried work: change cr-19-dispatcher-semaphore was started and not finished outside the active position",
+    "carried work: change cr-20-skip-ahead was started and not finished outside the active position",
+    "carried work: change cr-21-panic-containment was started and not finished outside the active position",
+    "carried work: change cr-22-result-slots was started and not finished outside the active position",
+    "carried work: change cr-23-multi-resource was started and not finished outside the active position",
+    "carried work: change cr-25-backend-contracts was started and not finished outside the active position",
+    "carried work: change cr-26-pg-lease-queue was started and not finished outside the active position",
+    "carried work: change cr-27-pg-mailbox was started and not finished outside the active position",
+    "carried work: change cr-28-embedded-redb-queue was started and not finished outside the active position",
+    "carried work: change cr-29-shutdown-cancellation was started and not finished outside the active position",
+    "carried work: change cr-30-pgmq-sql-backend was started and not finished outside the active position",
+    "carried work: change cr-31-hook-emission was started and not finished outside the active position",
+    "carried work: change cr-32-iggy-events was started and not finished outside the active position",
+    "carried work: change cr-33-stream-replay was started and not finished outside the active position",
+    "carried work: change cr-34-mailbox-composition was started and not finished outside the active position",
+    "carried work: change cr-35-test-targets was started and not finished outside the active position",
+    "carried work: change cr-36-pg-matrix was started and not finished outside the active position",
+    "carried work: change cr-37-config-schema was started and not finished outside the active position",
+    "carried work: change cr-38-wasm-target was started and not finished outside the active position",
+    "carried work: change cr-39-dependency-hygiene was started and not finished outside the active position",
+    "carried work: change cr-40-benchmarks was started and not finished outside the active position",
+    "carried work: change cr-43-postgres18-image was started and not finished outside the active position",
+    "carried work: change cr-44-mobile-desktop-bindings was started and not finished outside the active position",
+    "carried work: change cr-46-docs-theory was started and not finished outside the active position",
+    "carried work: change cr-47-docs-guides was started and not finished outside the active position",
+    "carried work: change cr-49-durable-dispatch was started and not finished outside the active position",
+    "carried work: change cr-51-supply-chain-gates was started and not finished outside the active position",
+    "carried work: change cr-53-wasm-parity was started and not finished outside the active position",
+    "dirty worktree in /Users/gqadonis/Projects/prometheus/prometheus-parking-lot (146 entries): M .kbd-orchestrator/current-waypoint.json;M .kbd-orchestrator/phases/phase-correctness-and-durability/progress.json;M .kbd-orchestrator/phases/phase-correctness-and-durability/tasks.md;M .kbd-orchestrator/position-reminder.txt;M .kbd-orchestrator/position.json;M .prometheus/knowledge/.prompt-snapshots/project/current;M .prometheus/knowledge/wiki/index.md;M .prometheus/knowledge/wiki/log.md;?? .kbd-orchestrator/.position.json.58e66893-07a6-41a4-bae1-d0dd095eb786.tmp;?? .prometheus/knowledge/.prompt-snapshots/project/generations/01255efea600d15261417b31b03bdff3a3da6152b0107e049118df00b77ea978.json;?? .prometheus/knowledge/.prompt-snapshots/project/generations/091430d6020322ec77a969b94c2ae135f9a149bceb338fabf18cc62cdfed3afd.json;?? .prometheus/knowledge/.prompt-snapshots/project/generations/095eb33544136e5001dc70d233b142074e36c90a5ed83267df5803f3763dbc44.json;?? .prometheus/knowledge/.prompt-snapshots/project/generations/0bcf5b6f343afd9bbf93641397332c73255719c5aa8310acd1ba4f1abd5c2926.json;?? .prometheus/knowledge/.prompt-snapshots/project/generations/0c1eb261c2a43b968a9eac3051ac22e5bb3245acbb0a253644dd91c76c38d415.json;?? .prometheus/knowledge/.prompt-snapshots/project/generations/0ec9d5d10764be08adaa828a93ee242c5e58d2a982606e33128ca022a7c7bf19.json;?? .prometheus/knowledge/.prompt-snapshots/project/generations/1200109305ed34492ef2efbef60e9da57b2065a8a87ceaafa4511e6af9ba2918.json;?? .prometheus/knowledge/.prompt-snapshots/project/generations/136ac47095707396b93cd7321fd2b34bf8298576d4ae59677073a145e47c5d4b.json;?? .prometheus/knowledge/.prompt-snapshots/project/generations/15dbea6c2f742d90a3c2773a59120949e287e4c592421884c06822159592be77.json;?? .prometheus/knowledge/.prompt-snapshots/project/generations/1a478ac0ad4cb3e27e54a091384acb326839f85890cd48cd10b79f9c98274fc9.json;?? .prometheus/knowledge/.prompt-snapshots/project/generations/1ba3fd95f7637299c33705dac52fa661b5d1f09d84d3caf29f07581e9e2b954a.json"
+  ],
+  "startPrompt": "You are taking over KBD phase `phase-correctness-and-durability` in `/Users/gqadonis/Projects/prometheus/prometheus-parking-lot` on codex. Read `.kbd-orchestrator/phases/phase-correctness-and-durability/harness-handoffs/codex-20261024T092911Z.md` first, then every file in its \"Read in order\" list. Run `timeout 30 prometheus kbd --path \"/Users/gqadonis/Projects/prometheus/prometheus-parking-lot\" status --json </dev/null` and confirm phase `phase-correctness-and-durability`, stage `execute`, revision 627, next work cr-15-containment, task 1 before you change anything; if they differ, stop and report the difference. Drive every task through `~/.codex/skills/kbd-apply/kbd-apply.sh begin-task` and `end-task`, under timeout with stdin closed. Do nothing listed under \"Never do\"; ask the operator for any listed gate or open prerequisite, one batched question at a time."
+}
