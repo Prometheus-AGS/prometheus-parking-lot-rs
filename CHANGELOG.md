@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.4.0] - 2026-10-24
+
+### prometheus-parking-lot-core
+
+- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)
+
+### prometheus-parking-lot-runtime-tokio
+
+- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)
+
+### prometheus-parking-lot-pg
+
+- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)
+
+### prometheus-parking-lot-embedded
+
+- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)
+
+### prometheus-parking-lot-iggy
+
+- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)
+
+### prometheus-parking-lot-wasm
+
+- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)
+
+### prometheus_parking_lot
+
+- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)
+
 All notable changes to `prometheus_parking_lot` are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),

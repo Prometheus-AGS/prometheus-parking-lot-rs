@@ -16,7 +16,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.95"
 authors = ["Prometheus AI Team"]
@@ -26,12 +26,12 @@ license = "MIT"
 
 [workspace.dependencies]
 # Workspace crates: path for development, version for publishing.
-prometheus-parking-lot-core = { path = "crates/parking-lot-core", version = "0.3.0" }
-prometheus-parking-lot-runtime-tokio = { path = "crates/parking-lot-runtime-tokio", version = "0.3.0" }
-prometheus-parking-lot-pg = { path = "crates/parking-lot-pg", version = "0.3.0" }
-prometheus-parking-lot-embedded = { path = "crates/parking-lot-embedded", version = "0.3.0" }
-prometheus-parking-lot-iggy = { path = "crates/parking-lot-iggy", version = "0.3.0" }
-prometheus-parking-lot-wasm = { path = "crates/parking-lot-wasm", version = "0.3.0" }
+prometheus-parking-lot-core = { path = "crates/parking-lot-core", version = "0.4.0" }
+prometheus-parking-lot-runtime-tokio = { path = "crates/parking-lot-runtime-tokio", version = "0.4.0" }
+prometheus-parking-lot-pg = { path = "crates/parking-lot-pg", version = "0.4.0" }
+prometheus-parking-lot-embedded = { path = "crates/parking-lot-embedded", version = "0.4.0" }
+prometheus-parking-lot-iggy = { path = "crates/parking-lot-iggy", version = "0.4.0" }
+prometheus-parking-lot-wasm = { path = "crates/parking-lot-wasm", version = "0.4.0" }
 
 # Third-party version requirements are pinned once, here; crates add features.
 anyhow = "1"
