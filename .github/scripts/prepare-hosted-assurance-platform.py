@@ -36,14 +36,14 @@ def main() -> None:
         require(isinstance(version, str) and re.fullmatch(r'\d+\.\d+\.\d+', version) is not None,
                 'independently configured exact android_ndk_version required')
         expected = pins.get('java_version', '')
-        require(isinstance(expected, str) and re.fullmatch(r'\d+\.\d+\.\d+', expected) is not None,
+        require(isinstance(expected, str) and re.fullmatch(r'\d+\.\d+\.\d+(?:\.\d+)?', expected) is not None,
                 'exact public java_version required')
         result = subprocess.run(['java', '-version'], text=True, capture_output=True, check=True)
         require('"' + expected + '"' in result.stderr + result.stdout,
                 'preinstalled Java version differs from approved pin')
         receipt['java'] = result.stderr + result.stdout
         sdk = Path(os.environ['ANDROID_HOME']).resolve()
-        argv = ['sdkmanager', '--install', f'ndk;{version}']
+        argv = [str(sdk / 'cmdline-tools/latest/bin/sdkmanager'), '--install', f'ndk;{version}']
         subprocess.run(argv, check=True)
         receipt['commands'].append(argv)
         home = sdk / 'ndk' / version
