@@ -43,7 +43,7 @@ def main() -> None:
                 'preinstalled Java version differs from approved pin')
         receipt['java'] = result.stderr + result.stdout
         sdk = Path(os.environ['ANDROID_HOME']).resolve()
-        argv = ['sdkmanager', '--install', f'ndk;{version}']
+        argv = [str(sdk / 'cmdline-tools/latest/bin/sdkmanager'), '--install', f'ndk;{version}']
         subprocess.run(argv, check=True)
         receipt['commands'].append(argv)
         home = sdk / 'ndk' / version

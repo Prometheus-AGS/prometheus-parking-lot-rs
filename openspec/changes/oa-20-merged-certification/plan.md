@@ -80,3 +80,10 @@ and malformed/unbounded versions. This changes setup only; final certification
 must use fresh candidate-bound evidence and an independently configured exact
 17.0.20.1 pin. Preserve the original failed rehearsal and prior signed candidate
 record. No product behavior, contract oracle or credential deferral changes.
+
+The actual setup integration diagnostic 40171611838 then confirmed the corrected
+Java pin passes, but `sdkmanager` is absent from PATH. The runner image's own
+installer places it at `ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager`.
+Select that installed SDK tool by the already validated SDK root rather than
+assuming a PATH entry. Retain both failed diagnostics; the fresh hosted setup
+must exercise Java identity and actual NDK provisioning successfully.

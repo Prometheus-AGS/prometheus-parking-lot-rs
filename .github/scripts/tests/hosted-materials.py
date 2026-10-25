@@ -203,7 +203,7 @@ class AndroidJavaPins(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         home = self.root / 'sdk/ndk/27.3.13750724'
         home.mkdir(parents=True)
         (home / 'source.properties').write_text('Pkg.Revision = 27.3.13750724\n')
@@ -236,6 +236,12 @@ class AndroidJavaPins(unittest.TestCase):
                 receipt = json.loads((self.root / 'oa18-platform-preparation.json').read_bytes())
                 self.assertIn('"' + version + '"', receipt['java'])
                 self.assertEqual(receipt['pins']['java_version'], version)
+
+    def test_sdkmanager_uses_the_selected_sdk_root_without_a_path_lookup(self):
+        calls = self.prepare('17.0.20.1', '17.0.20.1')
+        self.assertEqual(calls[1].args[0], [
+            str(self.root / 'sdk/cmdline-tools/latest/bin/sdkmanager'),
+            '--install', 'ndk;27.3.13750724'])
 
     def test_four_component_runtime_cannot_match_a_three_component_pin(self):
         with self.assertRaisesRegex(SystemExit, 'preinstalled Java version differs'):
