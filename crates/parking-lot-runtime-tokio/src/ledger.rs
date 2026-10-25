@@ -31,15 +31,38 @@
 //! observed the settled state they belong to, so they are `Relaxed`: each is
 //! written before the `in_flight`/`capturing` decrement that a waiter
 //! acquires (`SeqCst` read-modify-writes are also release operations).
+//!
+//! The internal `loom_ledger` test module exercises this ledger with
+//! instrumented atomics and its defining crate's production DTOs to model the
+//! admission/shutdown pair and finish-before-settle publication. It does not
+//! call `wait_until` or model Tokio's `Notify` internals. Bounded schedules and
+//! Loom's partial coverage of Relaxed memory accesses are supporting evidence,
+//! not a proof of every hardware reordering or the complete shutdown path.
 
 use std::sync::Arc;
+#[cfg(not(parking_lot_loom))]
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
 
+#[cfg(parking_lot_loom)]
+use loom::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tokio::sync::Notify;
 
 use crate::cancellation::SinkOutcome;
 use crate::shutdown::ShutdownReport;
+
+// The model-only control weakens both sides of the submission/shutdown pair
+// (the flag side lives in loom_ledger). Release/Acquire on different atomics
+// cannot exclude both loads seeing the initial value. Normal execution keeps
+// the incumbent SeqCst total order; the settlement publication edge is unchanged.
+#[cfg(not(all(parking_lot_loom, parking_lot_negative_control = "oa-11-ledger-order")))]
+const ADMISSION_ORDER: Ordering = Ordering::SeqCst;
+#[cfg(all(parking_lot_loom, parking_lot_negative_control = "oa-11-ledger-order"))]
+const ADMISSION_ORDER: Ordering = Ordering::AcqRel;
+#[cfg(not(all(parking_lot_loom, parking_lot_negative_control = "oa-11-ledger-order")))]
+const OBSERVE_ORDER: Ordering = Ordering::SeqCst;
+#[cfg(all(parking_lot_loom, parking_lot_negative_control = "oa-11-ledger-order"))]
+const OBSERVE_ORDER: Ordering = Ordering::Acquire;
 
 /// Accepted, settled and cancelled task counts for one pool.
 #[derive(Debug, Default)]
@@ -78,7 +101,7 @@ impl Ledger {
     /// Count an accepted task. `SeqCst`: see the module docs (submission vs
     /// shutdown).
     pub fn accept(&self) {
-        self.in_flight.fetch_add(1, Ordering::SeqCst);
+        self.in_flight.fetch_add(1, ADMISSION_ORDER);
     }
 
     /// Settle `n` accepted tasks.
@@ -142,7 +165,7 @@ impl Ledger {
     }
 
     pub fn in_flight(&self) -> u64 {
-        self.in_flight.load(Ordering::SeqCst)
+        self.in_flight.load(OBSERVE_ORDER)
     }
 
     /// Background work still running (see [`Background`]).
@@ -269,7 +292,10 @@ impl Drop for SettleOnDrop<'_> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, parking_lot_loom))]
+mod loom_ledger;
+
+#[cfg(all(test, not(parking_lot_loom)))]
 mod tests {
     use super::*;
 

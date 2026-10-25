@@ -1,5 +1,5 @@
 {
-  "activePhase": "phase-correctness-and-durability",
+  "activePhase": "phase-0-4-operational-assurance",
   "agents_config": {
     "claude-code": {
       "entry": ".claude/skills + /opsx:* commands",
@@ -129,7 +129,7 @@
   "test_roots": [
     "tests"
   ],
-  "updatedAt": "2026-10-22T11:31:11Z",
+  "updatedAt": "2026-10-24T11:52:18Z",
   "ux_profile": "advanced",
   "workspace": {
     "folders": [

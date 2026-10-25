@@ -1,0 +1,15 @@
+{
+  "repair": "OA18 observed PG missing_const_for_fn/future_not_send repair3",
+  "path": "crates/parking-lot-pg/src/mailbox/mod.rs",
+  "base_sha256": "b7005a5ea3157b6356577e647fe957f8f972436808b1fe17600fce162ca284ba",
+  "target_sha256": "4068522019f33c6be8884391dac8af090f135e530e15268760860b6131fd009b",
+  "patch_path": "docker/postgres18/upgrade/handoffs/oa18-pg-clippy-repair3.patch",
+  "patch_sha256": "f7e57dedafea30f687155e148e7254fefeaed17501a5dd990b1e92536a49ba68",
+  "rationale": {
+    "private_send_bound": "deliver_keyed has exactly one caller: the existing ResultMailbox<T> implementation requiring T: Serialize + DeserializeOwned + Send + Sync. Its previously unbounded private impl independently compiled a future retaining &Delivery<T> across pool.begin().await, which needs T: Sync for Send. Add T: Sync only to that private helper impl, matching the proven caller; no public trait/type/constructor/sweeper bounds change and no owned-argument redesign.",
+    "const": "Both cfg branches of idempotency_scope return an input reference or static empty string and are const-capable. Normal duplicate_outcome only constructs DeliveryOutcome::Duplicate by moving original status; mark it const. OA07 cfg version clones retry status and stays non-const.",
+    "preserved": "Existing rustdoc repair, SQL transaction/row-lock/fresh-snapshot sequence, original status/TTL, OA06 address control, OA07 retry-status control and S7 consume control remain unchanged.",
+    "semantic_implications": "No runtime behavior change intended. Only a private helper gains an already-required caller bound; eligible pure helpers gain const qualification. The generic core ResultMailbox<T: Send> trait remains unchanged; PG existing implementation still requires Sync as before."
+  },
+  "execution": "Source reads, exact local edits and known-file hashes only. No builds/tests/Cargo/Clippy/fmt/review/lint allows/refactor/commits/KBD. Central/immutable verification tree and source maps untouched."
+}

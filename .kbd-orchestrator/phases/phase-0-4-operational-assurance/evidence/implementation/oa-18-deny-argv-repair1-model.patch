@@ -1,0 +1,25 @@
+--- a/.github/operational-assurance.json
++++ b/.github/operational-assurance.json
+@@ -279,6 +279,9 @@
+       "argv": [
+         "cargo",
+         "deny",
++        "--workspace",
++        "--all-features",
++        "--locked",
+         "check"
+       ],
+       "scenarios": [],
+@@ -2861,10 +2864,10 @@
+         "deny",
+         "--manifest-path",
+         "bindings/uniffi-bindgen/Cargo.toml",
+-        "check",
+         "--locked",
+         "--config",
+-        "bindings/uniffi-bindgen/deny.toml"
++        "bindings/uniffi-bindgen/deny.toml",
++        "check"
+       ],
+       "scenarios": [],
+       "tools": [

@@ -80,7 +80,7 @@ use crate::cancellation::{
 };
 use crate::contain::{Panicked, catch, contain};
 use crate::events::Events;
-use crate::ledger::Ledger;
+use crate::ledger::{Ledger, SettleOnDrop};
 use crate::shutdown::{ShutdownPolicy, ShutdownReport};
 
 /// Pool name used in errors (pools are not named yet).
@@ -287,7 +287,24 @@ where
     fn launch(&self, dispatched: Dispatched<WorkerTask<P>>) {
         let mut pending = dispatched;
         while !pending.is_empty() {
-            let Dispatched { started, expired } = std::mem::take(&mut pending);
+            let Dispatched {
+                started,
+                expired,
+                rejected,
+            } = std::mem::take(&mut pending);
+            // Normal submissions are validated before parking. Preserve a
+            // terminal result if an impossible parked entry is still found.
+            for (task, error) in rejected {
+                let _settle = SettleOnDrop(&self.ledger);
+                self.events().rejected(task.meta.id, &error);
+                self.finish(
+                    &task.mailbox_key,
+                    Err(TaskError::Cancelled {
+                        reason: error.to_string(),
+                    }),
+                );
+                self.ledger.finish(1);
+            }
             for task in expired {
                 warn!(
                     task_id = task.meta.id,
@@ -314,6 +331,7 @@ where
                     self.capture_unstarted(task);
                     pending.started.extend(woken.started);
                     pending.expired.extend(woken.expired);
+                    pending.rejected.extend(woken.rejected);
                 }
             }
         }

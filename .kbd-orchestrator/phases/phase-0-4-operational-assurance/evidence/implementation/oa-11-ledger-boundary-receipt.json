@@ -1,0 +1,54 @@
+{
+  "status": "NOT_EXERCISED",
+  "observed_parent_failure": "ledger discovery compile exit101 E0639/E0004; /tmp/oa04-boundary-729cc42/baseline/loom_ledger-discovery.stderr.txt",
+  "owned": [
+    {
+      "path": "crates/parking-lot-runtime-tokio/src/ledger.rs",
+      "base_sha256": "dde628e2afa5dcd67ebf1263ce201a50b520413c59016499fa77961929ade7d9",
+      "authored_sha256": "9c3a4a9b7ea82e3ee28fb7153c3be360a0a089f9cfe028fe669b5860dd7ec89e",
+      "action": "modify"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/loom_ledger.rs",
+      "base_sha256": "1ce540848d5575a8baa2fb14e464e6fd721c350cdf83ff5a7e22381c96ceee9f",
+      "authored_sha256": null,
+      "action": "delete"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/src/ledger/loom_ledger.rs",
+      "base_sha256": null,
+      "authored_sha256": "6236cf4e778bc0a446cadba139f9cdbe3ad93ce88ec1373e54bc542b336530ca",
+      "action": "add"
+    }
+  ],
+  "shared_proposals": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "base_sha256": "4cd405c55f0534aa588e3ce9b9f469861f5924f4f8cd5d2b42f945934cbd3163",
+      "proposed_sha256": "e506109620b4f5060f40f152808f0507c983c445ac3bf0d0f48cbe10f4445d0f"
+    },
+    {
+      "path": ".github/negative-controls.json",
+      "base_sha256": "5bac52f474ff4710c2d034f39d02d30520fb43f655bb9c137a34468bb2c1af74",
+      "proposed_sha256": "0627866c16725be1e32a265316ca25c773b5e9b7e54a60e7461296c7a4b649d1"
+    },
+    {
+      "path": ".github/operational-assurance.json",
+      "base_sha256": "d77f170b21dc05a6fbde6e740290b82ce178ef94d947111d4bd35d6074e5824d",
+      "proposed_sha256": "0911d5573bb09a716df8b60d8241a0175ee79334511498b265ef10e3c449e1c9"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-11.md",
+      "base_sha256": "6b3325f2e6f406bb1b33c6540b4ae3553acfc2673469ccc4f3775857bb9355ff",
+      "proposed_sha256": "49092c85c1c8c3c2f826eac13de0a5f9218e379db030bb015fc3100c3d4e0b0a"
+    }
+  ],
+  "source_patch_sha256": "f0aec2ebf6978d6ae4de06f6f20413cb1d086ab1e147f6d5bee4e9d84dc721dd",
+  "shared_patch_sha256": "42b3712934b366a242276448c26d0b1ddd607ed8ae943f1c435914ff5e6b28ea",
+  "runner_source_read": {
+    "path": ".github/scripts/tests/negative-controls.py",
+    "sha256": "f58601b7290655abcb9f23fb90040142e3970f539e581d73d00719eedf0ae954",
+    "change_required": false
+  },
+  "note": "Shared patches are proposals only; parent refreshes all final source hashes after the coherent repair batch. Preserve 52 cases and existing control IDs."
+}

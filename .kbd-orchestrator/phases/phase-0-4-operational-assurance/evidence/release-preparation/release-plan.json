@@ -1,0 +1,224 @@
+{
+  "base": "92da0d3d28f7896ddc67062fa49ba40ea48d74a3",
+  "candidate": "72adf5d8ad583c3b52b22194563e94f7895c5b3f",
+  "commands": [
+    {
+      "argv": [
+        "/private/tmp/oa04-private-tools/bin/git-cliff",
+        "--config",
+        "/private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml",
+        "--offline",
+        "--no-exec",
+        "--sort",
+        "oldest",
+        "--include-path",
+        "crates/parking-lot-core/**",
+        "--include-path",
+        "Cargo.toml",
+        "--",
+        "92da0d3d28f7896ddc67062fa49ba40ea48d74a3..72adf5d8ad583c3b52b22194563e94f7895c5b3f"
+      ],
+      "cwd": "/private/tmp/oa04-preparation-72adf5d/workspace"
+    },
+    {
+      "argv": [
+        "/private/tmp/oa04-private-tools/bin/git-cliff",
+        "--config",
+        "/private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml",
+        "--offline",
+        "--no-exec",
+        "--sort",
+        "oldest",
+        "--include-path",
+        "crates/parking-lot-runtime-tokio/**",
+        "--include-path",
+        "Cargo.toml",
+        "--",
+        "92da0d3d28f7896ddc67062fa49ba40ea48d74a3..72adf5d8ad583c3b52b22194563e94f7895c5b3f"
+      ],
+      "cwd": "/private/tmp/oa04-preparation-72adf5d/workspace"
+    },
+    {
+      "argv": [
+        "/private/tmp/oa04-private-tools/bin/git-cliff",
+        "--config",
+        "/private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml",
+        "--offline",
+        "--no-exec",
+        "--sort",
+        "oldest",
+        "--include-path",
+        "crates/parking-lot-pg/**",
+        "--include-path",
+        "Cargo.toml",
+        "--",
+        "92da0d3d28f7896ddc67062fa49ba40ea48d74a3..72adf5d8ad583c3b52b22194563e94f7895c5b3f"
+      ],
+      "cwd": "/private/tmp/oa04-preparation-72adf5d/workspace"
+    },
+    {
+      "argv": [
+        "/private/tmp/oa04-private-tools/bin/git-cliff",
+        "--config",
+        "/private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml",
+        "--offline",
+        "--no-exec",
+        "--sort",
+        "oldest",
+        "--include-path",
+        "crates/parking-lot-embedded/**",
+        "--include-path",
+        "Cargo.toml",
+        "--",
+        "92da0d3d28f7896ddc67062fa49ba40ea48d74a3..72adf5d8ad583c3b52b22194563e94f7895c5b3f"
+      ],
+      "cwd": "/private/tmp/oa04-preparation-72adf5d/workspace"
+    },
+    {
+      "argv": [
+        "/private/tmp/oa04-private-tools/bin/git-cliff",
+        "--config",
+        "/private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml",
+        "--offline",
+        "--no-exec",
+        "--sort",
+        "oldest",
+        "--include-path",
+        "crates/parking-lot-iggy/**",
+        "--include-path",
+        "Cargo.toml",
+        "--",
+        "92da0d3d28f7896ddc67062fa49ba40ea48d74a3..72adf5d8ad583c3b52b22194563e94f7895c5b3f"
+      ],
+      "cwd": "/private/tmp/oa04-preparation-72adf5d/workspace"
+    },
+    {
+      "argv": [
+        "/private/tmp/oa04-private-tools/bin/git-cliff",
+        "--config",
+        "/private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml",
+        "--offline",
+        "--no-exec",
+        "--sort",
+        "oldest",
+        "--include-path",
+        "crates/parking-lot-wasm/**",
+        "--include-path",
+        "Cargo.toml",
+        "--",
+        "92da0d3d28f7896ddc67062fa49ba40ea48d74a3..72adf5d8ad583c3b52b22194563e94f7895c5b3f"
+      ],
+      "cwd": "/private/tmp/oa04-preparation-72adf5d/workspace"
+    },
+    {
+      "argv": [
+        "/private/tmp/oa04-private-tools/bin/git-cliff",
+        "--config",
+        "/private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml",
+        "--offline",
+        "--no-exec",
+        "--sort",
+        "oldest",
+        "--include-path",
+        "src/**",
+        "--include-path",
+        "Cargo.toml",
+        "--",
+        "92da0d3d28f7896ddc67062fa49ba40ea48d74a3..72adf5d8ad583c3b52b22194563e94f7895c5b3f"
+      ],
+      "cwd": "/private/tmp/oa04-preparation-72adf5d/workspace"
+    },
+    {
+      "argv": [
+        "/private/tmp/oa04-private-tools/bin/release-plz",
+        "set-version",
+        "0.4.0",
+        "--manifest-path",
+        "/private/tmp/oa04-preparation-72adf5d/workspace/Cargo.toml",
+        "--config",
+        "/private/tmp/oa04-preparation-72adf5d/workspace/release-plz.toml"
+      ],
+      "cwd": "/private/tmp/oa04-preparation-72adf5d/workspace"
+    }
+  ],
+  "date": "2026-10-24",
+  "excluded": [
+    "prometheus-parking-lot-ffi"
+  ],
+  "files_sha256": {
+    "CHANGELOG.md": "3019f52d78054c46c32f09aaed726a0bfcd34335b3e031ed8222e25e3dddcc4a",
+    "Cargo.lock": "7a84a14ee557b99a95ea93a4a9e78ed6e3032920115edda63badfb85b52c3371",
+    "Cargo.toml": "f628f145f4d317210688fff2a94aff0de1415f7cebe479a146b359c7c525e38b",
+    "cliff.toml": "0bc074ab3ed1fed893ce9a20061fd442381e21874c29bc4594650faf161a5c5e",
+    "crates/parking-lot-core/Cargo.toml": "47a7961c72d26cf1813e06149e2447377fc225e695d4c0cce47a5e8af88d0fe0",
+    "crates/parking-lot-embedded/Cargo.toml": "9cfb2f7a0ac4a5d6d0f527dde32ee3b7255abc88cb6ef29df29f1ff31f6269a4",
+    "crates/parking-lot-ffi/Cargo.toml": "ee849a2d9925fc63412191bd3d771f7f71592a899dce11cb8c466861158d9783",
+    "crates/parking-lot-iggy/Cargo.toml": "a47bcd42b8eb18f35a9f277bf2801ae3c71aa79df362173cd4657326ffaac603",
+    "crates/parking-lot-pg/Cargo.toml": "d4cb0ad9e6d9cdf0410fda490be00d69b13f1bba2939b45cc3f977777045486a",
+    "crates/parking-lot-runtime-tokio/Cargo.toml": "aa5998d3042f569c931aa0dc0afe10c46cc355b8dd592117b7cec266abc9960c",
+    "crates/parking-lot-wasm/Cargo.toml": "cc1b3fb8e197d0d7f88b08a97051b59a91a36e52f64303e987d210c9d2064d64",
+    "release-plz.toml": "0ccb17618592637282b5bd5894b25e0ed740340004d3267a5f3656e6e6b9cc6f",
+    "release-tools.toml": "766e531eba42d24f6847f6b05cef988f729d2d04da71739ac28f18877b7228d1"
+  },
+  "packages": [
+    {
+      "name": "prometheus-parking-lot-core",
+      "path": "crates/parking-lot-core",
+      "version": "0.4.0"
+    },
+    {
+      "name": "prometheus-parking-lot-runtime-tokio",
+      "path": "crates/parking-lot-runtime-tokio",
+      "version": "0.4.0"
+    },
+    {
+      "name": "prometheus-parking-lot-pg",
+      "path": "crates/parking-lot-pg",
+      "version": "0.4.0"
+    },
+    {
+      "name": "prometheus-parking-lot-embedded",
+      "path": "crates/parking-lot-embedded",
+      "version": "0.4.0"
+    },
+    {
+      "name": "prometheus-parking-lot-iggy",
+      "path": "crates/parking-lot-iggy",
+      "version": "0.4.0"
+    },
+    {
+      "name": "prometheus-parking-lot-wasm",
+      "path": "crates/parking-lot-wasm",
+      "version": "0.4.0"
+    },
+    {
+      "name": "prometheus_parking_lot",
+      "path": ".",
+      "version": "0.4.0"
+    }
+  ],
+  "policy": "lockstep",
+  "publish": false,
+  "schema_version": 1,
+  "source": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs",
+  "tools": {
+    "git-cliff": {
+      "observed_version": "git-cliff 2.14.2",
+      "path": "/private/tmp/oa04-private-tools/bin/git-cliff",
+      "release": "https://github.com/orhun/git-cliff/releases/tag/v2.14.2",
+      "sha256": "f8dc394b3c5b8f769f2f34f19a6e29dd2ca8827200bf83a0979e60796c87452d",
+      "version": "2.14.2",
+      "version_output": "git-cliff 2.14.2"
+    },
+    "release-plz": {
+      "observed_version": "release-plz 0.3.173",
+      "path": "/private/tmp/oa04-private-tools/bin/release-plz",
+      "release": "https://github.com/release-plz/release-plz/releases/tag/release-plz-v0.3.173",
+      "sha256": "2ec407c1138b65e0d7e8585d17a574f35f2950e05a9ed1e309a69a1a933a4e78",
+      "source_commit": "907af6d031bbb69d392354803c04cd75bb6e6fa0",
+      "version": "0.3.173",
+      "version_output": "release-plz 0.3.173"
+    }
+  },
+  "version": "0.4.0"
+}

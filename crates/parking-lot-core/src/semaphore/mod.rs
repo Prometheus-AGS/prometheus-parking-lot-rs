@@ -562,11 +562,24 @@ impl UnitSemaphore {
     /// under the kind lock sees both returned or neither. Out of line for the
     /// same reason as `claim_with_kinds`.
     #[inline(never)]
+    #[cfg(not(all(parking_lot_loom, parking_lot_negative_control = "oa-11-kind-release")))]
     fn release_with_kinds(&self, kinds: &KindLimits, demand: &UnitVector) {
         let mut in_use = kinds.in_use.lock();
         kinds.apply(&mut in_use, demand, false);
         self.release_packed(demand.total());
         drop(in_use);
+    }
+
+    /// OA-11 model-only control: split the read/update/write critical section.
+    /// Two releasers can read the same counters and overwrite one another's
+    /// returned kind units. Packed decrements remain balanced, so the model
+    /// must identify the leaked kind units rather than a packed underflow.
+    #[cfg(all(parking_lot_loom, parking_lot_negative_control = "oa-11-kind-release"))]
+    fn release_with_kinds(&self, kinds: &KindLimits, demand: &UnitVector) {
+        let mut stale = *kinds.in_use.lock();
+        kinds.apply(&mut stale, demand, false);
+        self.release_packed(demand.total());
+        *kinds.in_use.lock() = stale;
     }
 
     /// Return `units` units and one permit to the packed state.

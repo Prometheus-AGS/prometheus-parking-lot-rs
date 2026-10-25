@@ -7,7 +7,7 @@ use std::time::Duration;
 use crate::config::{PoolConfig, SchedulerConfig};
 use crate::core::{
     Hook, Mailbox, PoolLimits, ResourcePool, SchedulerError, Spawn, TaskExecutor, TaskPayload,
-    TaskStatus,
+    TaskQueue, TaskStatus,
 };
 use crate::infra::{InMemoryMailbox, InMemoryQueue};
 use crate::util::MailboxKey;
@@ -52,6 +52,7 @@ pub fn build_pools<P, T, Q, M, E, S, FQ, FM, FE>(
 where
     P: TaskPayload,
     T: Send + Sync + serde::Serialize + for<'de> serde::Deserialize<'de> + 'static,
+    Q: TaskQueue<P>,
     E: TaskExecutor<P, T>,
     FQ: FnMut(&str, &PoolConfig) -> Result<Q, SchedulerError>,
     FM: FnMut(&str, &PoolConfig) -> Result<M, SchedulerError>,

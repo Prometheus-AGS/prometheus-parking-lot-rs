@@ -278,7 +278,9 @@ fn storage_mailbox_duplicate_delivery_does_not_renotify() {
     );
     assert_eq!(
         block_on(rig.mailbox.deliver(delivery(5))).unwrap(),
-        DeliveryOutcome::Duplicate
+        DeliveryOutcome::Duplicate {
+            status: TaskStatus::Completed
+        }
     );
     rig.spawner.join_all();
 

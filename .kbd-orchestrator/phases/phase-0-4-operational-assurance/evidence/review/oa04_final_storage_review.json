@@ -1,0 +1,21 @@
+{
+  "reviewer": "/root/oa04_final_storage_review",
+  "role": "rust-reviewer/sqlx",
+  "verdict": "no critical or important source defect retained; static approval only",
+  "findings": [],
+  "anchors": [
+    "mailbox/sql.rs:85 ON CONFLICT (mailbox_name, mailbox_key, idempotency_key) DO UPDATE",
+    "mailbox/mod.rs:287 fetch_one(&mut *tx); commit after duplicate status decoding",
+    "mailbox/migration.rs:85 resolve_statuses before commit",
+    "embedded/store.rs:228 migrate_metadata in version transaction",
+    "upgrade/rehearse.py:271 requires code100, OA-14:seeded-result and count1"
+  ],
+  "limits": "No Cargo/Docker/build/test runs; PG17/18, backup recovery, image availability and receipts unverified. Retained patch context whitespace is not a correctness finding.",
+  "review_cycle": 1,
+  "base": "92da0d3d28f7896ddc67062fa49ba40ea48d74a3",
+  "candidate": "uncommitted source artifact; later corrected full candidate must be confirmed",
+  "model": "gpt-6.1-sol",
+  "reasoning": "high",
+  "isolation": "fresh native context; same model family; no generation history",
+  "report_kind": "parent-preserved structured record of native final report; not a remote authority approval"
+}

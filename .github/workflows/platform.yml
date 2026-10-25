@@ -137,17 +137,33 @@ jobs:
         run: bindings/smoke/swift.sh
 
   desktop:
-    # The Tauri 2 example is its own workspace (bindings/tauri-desktop), so it is built
-    # here and nowhere else. macOS needs no system libraries for Tauri; Linux needs
-    # webkit2gtk and friends (apt) and Windows needs WebView2, so Linux and Windows are
-    # not covered by this job. The restart test is in `queue-service` and needs no GUI.
-    name: Tauri desktop example
-    runs-on: macos-latest
+    # OA-15: build the real native Tauri shell on all three OS. Linux libraries
+    # are explicitly provisioned on default hosted CI; configured runners retain
+    # the preprovisioned prerequisite contract checked by desktop-assurance.py.
+    # GUI restart certification is a separate actual macOS manual observation.
+    name: Tauri desktop shell (${{ matrix.platform }})
+    runs-on: ${{ (matrix.platform == 'linux' && vars.DESKTOP_LINUX_RUNNER) || matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            os: macos-latest
+          - platform: linux
+            os: ubuntu-latest
+          - platform: windows
+            os: windows-latest
     defaults:
       run:
         working-directory: bindings/tauri-desktop
     steps:
       - uses: actions/checkout@v7
+      - name: Provision Linux Tauri build prerequisites on the default hosted runner
+        if: matrix.platform == 'linux' && runner.environment == 'github-hosted' && vars.DESKTOP_LINUX_RUNNER == ''
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.PINNED_TOOLCHAIN }}
@@ -156,11 +172,25 @@ jobs:
         with:
           # .cargo/config.toml sends every workspace's artifacts to <repo>/target.
           workspaces: "bindings/tauri-desktop -> ../../target"
-          shared-key: desktop
+          shared-key: desktop-${{ matrix.platform }}
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - run: cargo fmt --all -- --check
-      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - name: Restart test (submit, close the app, reopen, process, collect)
+      - name: Build actual native Tauri binary and preserve build-only receipt
+        run: python assurance/desktop-assurance.py build --output '${{ runner.temp }}/oa15-${{ matrix.platform }}'
+      - name: Preserve raw native shell build evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: oa15-build-${{ matrix.platform }}
+          path: ${{ runner.temp }}/oa15-${{ matrix.platform }}/
+          if-no-files-found: error
+      - name: Desktop formatting
+        if: matrix.platform == 'macos'
+        run: cargo fmt --all -- --check
+      - name: Desktop Clippy
+        if: matrix.platform == 'macos'
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Queue-service restart regression (no GUI claim)
+        if: matrix.platform == 'macos'
         timeout-minutes: 5
         run: cargo test --workspace --locked
 

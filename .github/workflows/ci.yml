@@ -202,6 +202,242 @@ jobs:
           done
           exit "$status"
 
+  loom-oa11:
+    # Additive ledger/kind-release models; incumbent Loom scenarios stay intact.
+    name: Loom OA-11 (${{ matrix.control }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - control: models-core
+            package: prometheus-parking-lot-core
+            target: loom_kind_release
+            expect: pass
+            oracle: loom_kind_release_parallel_returns_preserve_all_kind_units
+            positive: loom_kind_release_reacquire_publishes_previous_holder_work
+            diagnostic: OA-11 kind release lost a GpuVram subtraction
+          - control: models-runtime
+            package: prometheus-parking-lot-runtime-tokio
+            target: loom_ledger
+            expect: pass
+            oracle: ledger::loom_ledger::loom_ledger_submit_shutdown_cannot_both_miss
+            positive: ledger::loom_ledger::loom_ledger_settlement_publishes_finished_before_zero
+            diagnostic: OA-11 ledger admission and shutdown both missed accepted work
+          - control: oa-11-kind-release
+            package: prometheus-parking-lot-core
+            target: loom_kind_release
+            expect: fail
+            oracle: loom_kind_release_parallel_returns_preserve_all_kind_units
+            positive: loom_kind_release_reacquire_publishes_previous_holder_work
+            diagnostic: OA-11 kind release lost a GpuVram subtraction
+          - control: oa-11-ledger-order
+            package: prometheus-parking-lot-runtime-tokio
+            target: loom_ledger
+            expect: fail
+            oracle: ledger::loom_ledger::loom_ledger_submit_shutdown_cannot_both_miss
+            positive: ledger::loom_ledger::loom_ledger_settlement_publishes_finished_before_zero
+            diagnostic: OA-11 ledger admission and shutdown both missed accepted work
+    env:
+      LOOM_MAX_PREEMPTIONS: "3"
+      CARGO_TARGET_DIR: target/loom-oa11-${{ matrix.control }}
+      CONTROL: ${{ matrix.control }}
+      PACKAGE: ${{ matrix.package }}
+      MODEL: ${{ matrix.target }}
+      EXPECT: ${{ matrix.expect }}
+      ORACLE: ${{ matrix.oracle }}
+      POSITIVE: ${{ matrix.positive }}
+      DIAGNOSTIC: ${{ matrix.diagnostic }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.PINNED_TOOLCHAIN }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: loom-oa11-${{ matrix.control }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Build, discover and classify bounded OA-11 models
+        run: |
+          set -euo pipefail
+          RUSTFLAGS="--cfg parking_lot_loom"
+          if [ "$EXPECT" = fail ]; then
+            RUSTFLAGS="$RUSTFLAGS --cfg parking_lot_negative_control=\"$CONTROL\""
+          fi
+          export RUSTFLAGS
+          mkdir -p oa11-logs
+          if [ "$MODEL" = loom_ledger ]; then
+            model_args=(--lib ledger::loom_ledger::)
+          else
+            model_args=(--test "$MODEL")
+          fi
+          # Keep compile/discovery/run evidence separate. Compile failure, zero
+          # discovery, timeout and abnormal termination cannot satisfy a control.
+          cargo test -p "$PACKAGE" --locked "${model_args[@]}" --no-run 2>&1 | tee oa11-logs/build.log
+          cargo test -p "$PACKAGE" --locked "${model_args[@]}" -- --list 2>&1 | tee oa11-logs/discovery.log
+          grep -Fx "$ORACLE: test" oa11-logs/discovery.log
+          grep -Fx "$POSITIVE: test" oa11-logs/discovery.log
+          awk '/: test$/{n++} END{exit n!=2}' oa11-logs/discovery.log
+          set +e
+          cargo test -p "$PACKAGE" --locked "${model_args[@]}" -- --test-threads=1 2>&1 | tee oa11-logs/run.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          printf '%s\n' "$rc" > oa11-logs/exit-status.txt
+          if [ "$EXPECT" = pass ]; then
+            test "$rc" -eq 0
+            grep -F '2 passed; 0 failed;' oa11-logs/run.log
+          else
+            test "$rc" -eq 101
+            grep -Fx "test $ORACLE ... FAILED" oa11-logs/run.log
+            grep -Fx "test $POSITIVE ... ok" oa11-logs/run.log
+            grep -F "$DIAGNOSTIC" oa11-logs/run.log
+            grep -F '1 passed; 1 failed;' oa11-logs/run.log
+          fi
+      - name: Preserve raw OA-11 model evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: loom-oa11-${{ matrix.control }}
+          path: oa11-logs/
+
+  negative-control-manifest:
+    # OA-12 derives its matrix from the checked source inventory. Hand-maintained
+    # YAML rows cannot quietly omit s-10/s-22, variants, or later OA controls.
+    name: Negative-control inventory
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.manifest.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: manifest
+        run: |
+          matrix=$(python3 .github/scripts/tests/negative-controls.py matrix)
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  negative-controls:
+    name: Negative control (${{ matrix.id }})
+    needs: negative-control-manifest
+    runs-on: ${{ matrix.adapter == 'browser' && (vars.WASM_BROWSER_RUNNER || 'ubuntu-latest') || matrix.adapter == 'upgrade' && (vars.PG_UPGRADE_RUNNER || 'ubuntu-latest') || 'ubuntu-latest' }}
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.negative-control-manifest.outputs.matrix) }}
+    env:
+      WASM_BROWSER_BIN: ${{ vars.WASM_CHROME_BIN }}
+      CHROMEDRIVER: ${{ vars.WASM_CHROMEDRIVER_BIN }}
+      OA12_PG17_IMAGE: ${{ vars.PG_UPGRADE_PG17_IMAGE_ID }}
+      OA12_PG18_IMAGE: ${{ vars.PG_UPGRADE_PG18_IMAGE_ID }}
+      OA12_UPGRADE_IMAGE: ${{ vars.PG_UPGRADE_IMAGE_ID }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.PINNED_TOOLCHAIN }}
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: oa12-${{ matrix.id }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+          cache-targets: "false"
+          cache-directories: |
+            target/oa12/${{ matrix.id }}/normal
+            target/oa12/${{ matrix.id }}/mutant
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest@0.9.149
+      - uses: taiki-e/install-action@v2
+        if: matrix.adapter == 'browser'
+        with:
+          tool: wasm-bindgen@0.2.129
+      - name: Provision pinned Chromium on the default hosted runner
+        if: matrix.adapter == 'browser' && runner.environment == 'github-hosted' && vars.WASM_BROWSER_RUNNER == '' && vars.WASM_CHROME_BIN == '' && vars.WASM_CHROMEDRIVER_BIN == ''
+        env:
+          BOOTSTRAP_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: python3 .github/scripts/bootstrap-hosted-browser.py
+      - uses: docker/setup-buildx-action@v4
+        if: matrix.adapter == 'pg'
+      - name: Build the real project PostgreSQL collaborator
+        if: matrix.adapter == 'pg'
+        uses: docker/build-push-action@v7
+        with:
+          context: docker
+          file: docker/postgres${{ matrix.pg }}/Dockerfile
+          tags: parking-lot-pg:${{ matrix.pg }}
+          load: true
+          push: false
+          cache-from: type=gha,scope=parking-lot-pg-${{ matrix.pg }}
+          cache-to: type=gha,mode=max,scope=parking-lot-pg-${{ matrix.pg }},ignore-error=true
+      - name: Provision physical-upgrade images on the default hosted runner
+        if: matrix.adapter == 'upgrade' && runner.environment == 'github-hosted' && vars.PG_UPGRADE_RUNNER == '' && vars.PG_UPGRADE_PG17_IMAGE_ID == '' && vars.PG_UPGRADE_PG18_IMAGE_ID == '' && vars.PG_UPGRADE_IMAGE_ID == ''
+        run: |
+          set -euo pipefail
+          # The default Docker driver can resolve the ID-derived local FROM
+          # aliases; a separate docker-container builder cannot see these images.
+          docker build --builder default -f docker/postgres17/Dockerfile -t parking-lot-pg:17 docker
+          docker build --builder default -f docker/postgres18/Dockerfile -t parking-lot-pg:18 docker
+          pg17_id=$(docker image inspect parking-lot-pg:17 --format '{{.Id}}')
+          pg18_id=$(docker image inspect parking-lot-pg:18 --format '{{.Id}}')
+          pg17_alias="oa14-local/pg17:${pg17_id#sha256:}"
+          pg18_alias="oa14-local/pg18:${pg18_id#sha256:}"
+          docker tag "$pg17_id" "$pg17_alias"
+          docker tag "$pg18_id" "$pg18_alias"
+          upgrade_tag="oa14-local/upgrade:${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker build --builder default -f docker/postgres18/upgrade/Dockerfile \
+            --build-arg "PG17_IMAGE=$pg17_alias" \
+            --build-arg "PG18_IMAGE=$pg18_alias" \
+            --build-arg "PG17_SOURCE_ID=$pg17_id" \
+            --build-arg "PG18_SOURCE_ID=$pg18_id" \
+            -t "$upgrade_tag" docker
+          upgrade_id=$(docker image inspect "$upgrade_tag" --format '{{.Id}}')
+          printf 'OA12_PG17_IMAGE=%s\nOA12_PG18_IMAGE=%s\nOA12_UPGRADE_IMAGE=%s\n' \
+            "$pg17_id" "$pg18_id" "$upgrade_id" >> "$GITHUB_ENV"
+      # Every Cargo process is awaited by one runner. Baseline and mutant use
+      # different target directories/RUSTFLAGS; compile/discovery failures and
+      # timeouts never count as a designated assertion. Browser/upgrade tools
+      # must be provisioned before validation (hosted setup above, or
+      # explicit preconfigured environments); missing inputs fail with BLOCKED.
+      - name: Compile, discover and exercise the production defect oracle
+        run: python3 .github/scripts/tests/negative-controls.py run --case '${{ matrix.id }}' --output '${{ runner.temp }}/oa12-${{ matrix.id }}'
+      - name: Preserve all raw control evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: oa12-${{ matrix.id }}
+          path: ${{ runner.temp }}/oa12-${{ matrix.id }}/
+          if-no-files-found: error
+
+  negative-control-completeness:
+    name: Negative-control completeness and verifier defects
+    if: always()
+    needs: [negative-control-manifest, negative-controls]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: oa12-*
+          path: ${{ runner.temp }}/oa12-packet
+      - name: Require every actual row and reject omission/undetected defects
+        run: |
+          # Download-artifact keeps each artifact's name as its directory.
+          # Normalize that directory name to the source-owned case identity.
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          root = Path(os.environ['RUNNER_TEMP']) / 'oa12-packet'
+          for path in root.glob('oa12-*'):
+              path.rename(path.with_name(path.name.removeprefix('oa12-')))
+          PY
+          python3 .github/scripts/tests/negative-controls.py aggregate --receipts '${{ runner.temp }}/oa12-packet' --candidate '${{ github.sha }}' --output '${{ runner.temp }}/oa12-summary.json'
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: oa12-summary
+          path: ${{ runner.temp }}/oa12-summary.json
+          if-no-files-found: error
+
   postgres:
     # cr-36. Every Docker-gated Postgres test, once per supported major (17, 18):
     # the parking-lot-pg crate's suites (lease queue, mailbox, pgmq, per-table
@@ -264,7 +500,7 @@ jobs:
         run: >
           cargo nextest run --workspace --all-features --locked
           --run-ignored all --no-fail-fast --no-tests=fail
-          -E 'package(prometheus-parking-lot-pg) | test(config_postgres_example_builds_against_pg18) | test(config_pgmq_example_opens_the_queue_against_pg18) | test(pool_sigkill_) | test(shutdown_durable_pg_)'
+          -E '(package(prometheus-parking-lot-pg) & not binary(postgres_upgrade)) | test(config_postgres_example_builds_against_pg18) | test(config_pgmq_example_opens_the_queue_against_pg18) | test(pool_sigkill_) | test(shutdown_durable_pg_)'
 
   iggy:
     # cr-32 / S-11. The Docker-gated Iggy tests: a subscriber receives mailbox.ready
@@ -363,7 +599,59 @@ jobs:
       - name: wasm-bindgen-test (smoke, capacity, priority, budget; Node.js)
         timeout-minutes: 10
         # .cargo/config.toml sets wasm-bindgen-test-runner as the wasm32 runner.
-        run: cargo +${{ matrix.toolchain }} test --locked --target wasm32-unknown-unknown -p prometheus-parking-lot-wasm
+        # OA-13 retains Node and now requires exact nonzero discovery/execution.
+        run: python3 .github/scripts/tests/browser-assurance.py --mode node --toolchain '${{ matrix.toolchain }}' --output '${{ runner.temp }}/oa13-node-${{ matrix.toolchain }}'
+      - name: Preserve raw Node WASM evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: oa13-node-${{ matrix.toolchain }}
+          path: ${{ runner.temp }}/oa13-node-${{ matrix.toolchain }}/
+          if-no-files-found: error
+
+  wasm-browser:
+    # OA-13: pinned local headless Chromium, not a Node-only browser claim.
+    # Default hosted CI provisions the checked pin in a separate setup step.
+    # Explicit runner/path settings retain the preprovisioned environment contract.
+    name: Chromium WASM (${{ matrix.control }})
+    runs-on: ${{ vars.WASM_BROWSER_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        control: [browser, browser-negative]
+    env:
+      WASM_BROWSER_BIN: ${{ vars.WASM_CHROME_BIN }}
+      CHROMEDRIVER: ${{ vars.WASM_CHROMEDRIVER_BIN }}
+      CARGO_TARGET_DIR: target/wasm-oa13-${{ matrix.control }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.PINNED_TOOLCHAIN }}
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: wasm-oa13-${{ matrix.control }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@v2
+        with:
+          # Exact CLI version matches Cargo.lock and the checked manifest.
+          tool: wasm-bindgen@0.2.129
+      - name: Provision pinned Chromium on the default hosted runner
+        if: runner.environment == 'github-hosted' && vars.WASM_BROWSER_RUNNER == '' && vars.WASM_CHROME_BIN == '' && vars.WASM_CHROMEDRIVER_BIN == ''
+        env:
+          BOOTSTRAP_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: python3 .github/scripts/bootstrap-hosted-browser.py
+      - name: Build, discover and classify real Chromium WASM suites
+        run: python3 .github/scripts/tests/browser-assurance.py --mode '${{ matrix.control }}' --output '${{ runner.temp }}/oa13-${{ matrix.control }}'
+      - name: Preserve raw Chromium and negative-control evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: oa13-${{ matrix.control }}
+          path: ${{ runner.temp }}/oa13-${{ matrix.control }}/
+          if-no-files-found: error
 
   udeps:
     # cr-39. Unused dependencies fail the build. cargo-udeps compiles every target with
@@ -582,12 +870,10 @@ jobs:
         run: .github/scripts/supply-chain.sh pre-purge
       - name: Package allowlist (cargo package --list per crate)
         run: .github/scripts/supply-chain.sh package-allowlist
-      # --- informational until cr-15 purges history; never fail the job ---
+      # Empty roots are informational; populated roots arm blocking checks.
       - name: "Pre-purge, informational: path history of purged credential files"
-        continue-on-error: true
         run: .github/scripts/supply-chain.sh path-history
       - name: "Pre-purge, informational: gitleaks over full history"
-        continue-on-error: true
         run: .github/scripts/supply-chain.sh secrets-history
 
   coverage:

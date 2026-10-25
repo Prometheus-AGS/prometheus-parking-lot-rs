@@ -105,7 +105,7 @@ code .env
 Replace `your_api_key_here` with your actual E2B API key:
 
 ```
-E2B_API_KEY=e2b_abc123def456ghi789jkl012mno345
+E2B_API_KEY=your_api_key_here
 ```
 
 **Important:**

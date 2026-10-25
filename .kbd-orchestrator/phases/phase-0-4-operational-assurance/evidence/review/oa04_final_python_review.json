@@ -1,0 +1,33 @@
+{
+  "reviewer": "/root/oa04_final_python_review",
+  "role": "python-reviewer",
+  "verdict": "corrections required",
+  "findings": [
+    {
+      "id": "R2-04",
+      "severity": "HIGH",
+      "file": "docker/postgres18/upgrade/rehearse.py",
+      "line": 103,
+      "code": "if hashlib.sha256(contract.read_bytes()).hexdigest() != self.args.contract_sha256:",
+      "failure": "Production OA12 caller supplies normalized contract e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257; raw bytes hash4b1ba3d9755c7b3dfe8efa5120ae62e707b7b478d3e503f3a071d1eb60d58056 differs, rejecting valid rehearsal before Docker.",
+      "fix": "One validated normalized adopted digest throughout runner/caller/classifier; separate raw hash if needed."
+    },
+    {
+      "duplicate_of": "R2-01"
+    }
+  ],
+  "observed_check": {
+    "command": "scoped ruff check --no-cache",
+    "exit": 1,
+    "diagnostics": 935,
+    "classification": "predominantly formatting; not promoted to correctness findings; exact argv unavailable from reviewer"
+  },
+  "limits": "No tests/builds/Cargo/GUI/Docker/signing/network actions or source mutations. Static review plus raw hash calculation and reported Ruff run.",
+  "review_cycle": 1,
+  "base": "92da0d3d28f7896ddc67062fa49ba40ea48d74a3",
+  "candidate": "uncommitted source artifact; later corrected full candidate must be confirmed",
+  "model": "gpt-6.1-sol",
+  "reasoning": "high",
+  "isolation": "fresh native context; same model family; no generation history",
+  "report_kind": "parent-preserved structured record of native final report; not a remote authority approval"
+}

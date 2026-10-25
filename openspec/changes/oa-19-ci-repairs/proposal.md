@@ -1,0 +1,7 @@
+# Proposal: Repair observed CI failures on PR94
+
+The operator explicitly requested checking PR94 CI, fixing failures, and getting the PR ready for operator merge on2026-10-24. Credential rotation remains deferred. This follow-up repairs accepted0.4 operational-assurance behavior and its existing CI paths; no acceptance scenario, release authority, version pin, or certification threshold is weakened or added.
+
+Observed source head52d4363824b5619dbe11bd2b1c2a6193381e7a99 fails Linux Tauri prerequisite discovery, browser executable discovery, PG17/18 mailbox conversions, and dependent normal paths in negative controls. Raw logs are privately retained under /Users/gqadonis/.local/state/prometheus/operational-assurance/pr94-ci-repair. The PostgreSQL diagnostic is42809: relation pl_result_mailbox_id_seq does not have a composite type. Linux lacks webkit2gtk-4.1; browser executables are unset.
+
+Implement minimal production/setup corrections through the owning roles, refresh current fixture source identities, retain failed evidence, run independent narrow review and applicable integration checks, commit after secret scan, push the fixes to this PR, and verify its full latest-head CI before marking it ready for review. No merge, credential change, history rewrite, publisher setting, or release certification/publication is authorized. Existing unsupported external certification evidence remains pending. No new capability; skip_specs is explicit.

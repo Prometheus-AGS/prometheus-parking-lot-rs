@@ -1,0 +1,246 @@
+{
+  "source": "GitHub repository issues API, read 2026-10-24 after PR #93 merge",
+  "baseline": "92da0d3d28f7896ddc67062fa49ba40ea48d74a3",
+  "issues": [
+    {
+      "number": 89,
+      "title": "Template files trip full-tree secret scans",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/89",
+      "state": "open",
+      "body": "`docs/coding-standards/README.md:942` (example UUID in a redaction test) and `.e2b-template/SETUP.md:108` (placeholder E2B key) are flagged by `gitleaks detect --no-git`. Neither is a secret or in any published crate. Allowlist them in `.gitleaks.toml` with a reason, or remove the template material.\n\nDeferred from the 0.3.0 release (2026-10-24) under the exit criteria in `.prometheus/decisions.md`.",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 88,
+      "title": "cr-15: purge leaked .codex credentials from git history",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/88",
+      "state": "open",
+      "body": "`.codex/auth.json` is in public history (`ec6b4b4`). Credential rotation is the operator's responsibility and neutralises the leak; this issue is the history rewrite (git filter-repo + force push) and arming `supply-chain.sh secrets-history` / `path-history` / `pre-purge` as blocking gates afterwards.\n\nDeferred from the 0.3.0 release (2026-10-24) under the exit criteria in `.prometheus/decisions.md`.",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 87,
+      "title": "Sign release tags",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/87",
+      "state": "open",
+      "body": "v0.3.0 is an annotated, unsigned tag because no signing key was configured. Set up SSH or GPG signing for release tags (and verify in the release workflow).\n\nDeferred from the 0.3.0 release (2026-10-24) under the exit criteria in `.prometheus/decisions.md`.",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 86,
+      "title": "Release tooling: release-plz, git-cliff and a versioning ADR",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/86",
+      "state": "open",
+      "body": "cr-52 task 1.1. Decide how versions move across the seven crates (lockstep or independent), record it as an ADR, and generate CHANGELOG entries from commits.\n\nDeferred from the 0.3.0 release (2026-10-24) under the exit criteria in `.prometheus/decisions.md`.",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 85,
+      "title": "Release automation: crates.io trusted publishing (OIDC) and a release workflow",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/85",
+      "state": "open",
+      "body": "cr-52 tasks 1.2/1.3. 0.3.0 was published by hand with `cargo publish --workspace` and a local token. Now that the crates exist, configure trusted publishing for all seven crates and add a release workflow gated on a boundary receipt and an approval environment. Note: crates.io rate-limits new crates; that only affected the first publish.\n\nDeferred from the 0.3.0 release (2026-10-24) under the exit criteria in `.prometheus/decisions.md`.",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 82,
+      "title": "Tasks in a pre-populated TaskQueueAdapter backend skip check_capacity",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/82",
+      "state": "open",
+      "body": "Tasks already present in a `TaskQueueAdapter` backend when the pool starts never pass through `Dispatcher::check_capacity`, so a task larger than the pool's limits (total or per kind) can sit at the head and block it.\n\n**Found in:** core review fix work (#76, S6).\n\n**Acceptance:** such tasks are checked on first sight (rejected or dead-lettered with a reason); test with a pre-filled backend.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 81,
+      "title": "A task is lost when a spawner discards ResourcePool's supervise future",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/81",
+      "state": "open",
+      "body": "After #76 the units are recovered when a custom `Spawn` implementation drops `ResourcePool`'s supervise future without running it (release hook), but the task itself still gets no terminal event, no mailbox result, and its shutdown-ledger entry never settles, so `shutdown_with` waits out its deadline.\n\n**Found in:** core review fix work (#76).\n\n**Acceptance:** a dropped supervise future delivers a `Failed`/`Cancelled` outcome and settles the ledger; test with a spawner that discards futures.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 80,
+      "title": "Scope mailbox idempotency keys per tenant",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/80",
+      "state": "open",
+      "body": "Result-mailbox idempotency keys are unique per mailbox, not per `MailboxKey`/tenant (`migrations/005_result_mailbox.sql`, `embedded/src/mailbox.rs`). The durable pool uses the caller's own idempotency key when set, so tenant B reusing tenant A's key gets `Duplicate` and its result is silently not stored. This follows the current contract but crosses tenants.\n\n**Found in:** phase-boundary review (backends suggestion), deferred from #76.\n\n**Acceptance:** decide the contract (key scoped by tenant, or documented as global), implement in every `ResultMailbox` backend, conformance case.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 79,
+      "title": "CI job that runs every negative control",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/79",
+      "state": "open",
+      "body": "The scenario negative controls (`--cfg parking_lot_negative_control=\"s-N\"`: S-1, S-2, S-3, S-4, S-9, S-16, S-17, S-19, S-20, S-21 and the backend controls S-5..S-8, S-11, S-18, S-33) are only run by hand, so a control can rot into one that no longer fails. A CI job should build each control (one rebuild per cfg) and require the targeted tests to fail.\n\n**Found in:** phase-boundary review (runtime S3), deferred from #76.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 78,
+      "title": "Emit a durable run's terminal event from the stored outcome",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/78",
+      "state": "open",
+      "body": "After a crash between a `Failed` delivery and the dead-letter, the redelivered run can emit `Completed` while the stored result stays `Failed`, because the event comes from the local run, not from what the mailbox kept. Fixing it needs `DeliveryOutcome::Duplicate` to carry the stored status (a `ResultMailbox` contract change).\n\n**Found in:** phase-boundary review (runtime S2), deferred from #76.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 71,
+      "title": "Benchmark the Postgres backends, contention and memory",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/71",
+      "state": "open",
+      "body": "The cr-40 suites cover in-memory and redb pools but not Postgres (needs Docker), many-thread lock contention, or memory use.\n\n**Found in:** #51 (cr-40, `benches/README.md`).\n\n**Acceptance:** Docker-gated Postgres throughput/latency cases and a contention benchmark, reported in `docs/ARCHITECTURE.md` §7.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 70,
+      "title": "Mark superseded ADRs and fix the stale WASM CI step name",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/70",
+      "state": "open",
+      "body": "- `docs/adr/0001-workspace-split.md` still lists `PostgresQueue`, `PostgresMailbox`, SeaORM entities and the Yaque backends, and says `postgres` pulls in `sea-orm`; `docs/adr/0003-backend-contracts.md` says the Postgres and Yaque backends implement the sync traits. Both need a status / superseded note (ADRs are history; do not rewrite them).\n- The CI wasm job step is still named \"smoke, capacity, priority, budget\" although it now also runs the event and skip-ahead tests.\n\n**Found in:** #41, #49.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 69,
+      "title": "Remove the stale llm_inference_test and its reqwest dev-dependency",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/69",
+      "state": "open",
+      "body": "`crates/parking-lot-runtime-tokio/tests/llm_inference_test.rs` is a parked test whose only use of `reqwest` is an unused import (and some commented-out code). Deleting or rewriting it would let the `reqwest` dev-dependency go entirely.\n\n**Found in:** #47 (cr-39).\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 68,
+      "title": "Docker test for IggyStreamSink writer poisoning",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/68",
+      "state": "open",
+      "body": "When a stream chunk is abandoned after the publisher's retry budget, the `StreamWriter` is poisoned so nothing is published past the hole. This path is covered by code and reasoning only; there is no test against a real Iggy server.\n\n**Found in:** #46 (cr-33).\n\n**Acceptance:** a Docker-gated `iggy_stream_*` test that forces an abandoned chunk and asserts the writer returns `Poisoned` and readers report no data past the gap.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 67,
+      "title": "Run the Tauri desktop example's GUI and build it on Linux and Windows",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/67",
+      "state": "open",
+      "body": "`bindings/tauri-desktop` is compiled, linted and its queue-service restart tests run on macOS in CI, but the Tauri app itself has never been launched, and Linux (webkit2gtk) and Windows builds are unchecked.\n\n**Found in:** #35 (cr-44), #50 (cr-47).\n\n**Acceptance:** a build of the shell on Linux and Windows in CI and a documented manual launch check (or an automated smoke test).\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 66,
+      "title": "Test the PostgreSQL 17 to 18 upgrade path in the runbook",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/66",
+      "state": "open",
+      "body": "`docs/runbooks/postgres18.md` describes a `pg_upgrade` from 17 to 18 (including matching data checksums) from the official docs, but it has not been exercised against the project images.\n\n**Found in:** #36 (cr-36).\n\n**Acceptance:** a scripted upgrade of a populated 17 database to 18 with the project images, after which the lease queue, mailbox and pgmq suites pass; runbook corrected from the result.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 65,
+      "title": "Run the WASM tests in a headless browser",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/65",
+      "state": "open",
+      "body": "The WASM pool tests (`wasm_pool`, `wasm_events`) run under Node.js through wasm-bindgen-test-runner only. A headless browser run (Chrome/Firefox) would cover the browser event loop and timers the crate targets.\n\n**Found in:** #29 (cr-38), #49 (cr-53).\n\n**Acceptance:** a CI job running the wasm-bindgen tests in at least one headless browser.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 64,
+      "title": "Loom models for the shutdown ledger and kind-limited permit release",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/64",
+      "state": "open",
+      "body": "Two concurrency arguments rest on reasoning, miri and threaded tests rather than a loom model:\n- the shutdown ledger's SeqCst Dekker pairs between `submit` and `shutdown_with` (cr-29, `ledger.rs`);\n- releasing a permit with per-kind limits outside the dispatch lock (cr-23).\n\n**Found in:** #39 (cr-29), #48 (cr-23).\n\n**Acceptance:** loom models under `--cfg parking_lot_loom` with bounded preemptions, each with a negative control.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 63,
+      "title": "Single-dimension dispatcher is 2–4% slower after multi-resource admission",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/63",
+      "state": "open",
+      "body": "After cr-23 the dispatcher microbenchmark (`utilization` simulation) is +2.2% to +3.6% slower for single-dimension pools than before; pool-level submit benchmarks are within noise. The residual comes from the vector claim path.\n\n**Found in:** #48 (cr-23).\n\n**Acceptance:** recover the single-dimension fast path to within noise of the pre-cr-23 numbers, measured with the cr-40 `components` and `utilization` benches.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 62,
+      "title": "Iggy: a restarted publisher can store duplicate messages",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/62",
+      "state": "open",
+      "body": "Iggy 0.9 no longer deduplicates by message id, so the publisher keeps an in-process window of recent ids. A restarted publisher has no memory and can store a second copy with the same UUIDv5 id; consumers must de-duplicate on the id (documented, and tested in #44 and #46).\n\n**Found in:** #44 (cr-32), #46 (cr-33).\n\n**Acceptance:** evaluate a persistent or server-side dedup option, or keep consumer-side dedup and add a helper for it.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 61,
+      "title": "Attach IggyHook to pools from configuration",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/61",
+      "state": "open",
+      "body": "The `iggy` config section yields `IggyOptions`, but the builder does not attach an `IggyHook` to the pools it builds; applications register it on each pool's `HookBus` themselves. `build_pools_from_scheduler_config_with_hooks` exists and could do this from the section.\n\n**Found in:** #44 (cr-32).\n\n**Acceptance:** a pool config can reference an iggy backend for lifecycle events, and the builder attaches the hook; tested against the pinned Iggy image.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 60,
+      "title": "Decide and test pgmq-backed durable pools",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/60",
+      "state": "open",
+      "body": "A `\"type\": \"pgmq\"` backend opens a `PgmqLeaseQueue` for direct use, but configuration rejects pools on it because pool-level crash durability on pgmq has not been tested (only lease redelivery, S-18). Technically `DurableResourcePool` on `PgmqLeaseQueue` + `PgResultMailbox` compiles.\n\n**Found in:** #40.\n\n**Acceptance:** operator decision; if yes, SIGKILL crash tests on pgmq and a `ConfiguredDurablePool` variant.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 59,
+      "title": "Durable mode for the native WorkerPool",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/59",
+      "state": "open",
+      "body": "Only `ResourcePool` has a durable mode (`DurableResourcePool`). A durable `WorkerPool` would need serializable payloads and results, a durable result slot (`ResultMailbox`) instead of in-process oneshot slots, lease-sourced dispatch on the worker threads, and heartbeat plus deliver-then-ack from the worker completion path.\n\n**Found in:** #37 (cr-49).\n\n**Acceptance:** design note first; then an implementation with S-16-style SIGKILL tests on PG and redb.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 58,
+      "title": "Skip-ahead for DurableResourcePool",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/58",
+      "state": "open",
+      "body": "The durable pool holds a single leased task waiting for capacity, so it dispatches strictly in order and gets none of cr-20's utilization gains (measured 0.83–0.91 saturated utilization vs 0.95–0.99 for in-memory pools in #51's benchmarks). Supporting skip-ahead means leasing a window of tasks, each with its own lease and heartbeat.\n\n**Found in:** #43 (cr-20), #37 (cr-49).\n\n**Acceptance:** a bounded leased window with per-task heartbeats; the starvation bound proof extended; SIGKILL crash tests (S-16) still pass with the window.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 57,
+      "title": "Emit a terminal lifecycle event for tasks pruned as expired",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/57",
+      "state": "open",
+      "body": "`ResourcePool::prune_expired` removes expired parked tasks, but `TaskQueue::prune_expired` returns only a count, so those tasks get no `Expired` event and observers never see a terminal event for them (audit item C8).\n\n**Found in:** #42 (cr-31 known gaps).\n\n**Acceptance:** the contract returns the pruned tasks (or their metadata); the pool emits `Expired` for each; the S-21 sequence oracle covers pruning.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 56,
+      "title": "Optional result_ttl_ms for WorkerPool result slots",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/56",
+      "state": "open",
+      "body": "The native `WorkerPool` evicts unretrieved results after `default_timeout_ms` (cr-22), which also serves as the execution budget. A separate `result_ttl_ms` would let callers keep results longer than the execution budget. The WASM pool has no eviction and must either honour or reject the field.\n\n**Found in:** cr-22 / cr-37 follow-up (deferred during #32 and #40 to avoid conflicts).\n\n**Acceptance:** `WorkerPoolConfig::result_ttl_ms: Option<u64>` + `result_ttl()`, used by the native result slots; WASM honours or rejects it at validation; tests for both.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 55,
+      "title": "Allow a SchedulerConfig with no pools (events-only configuration)",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/55",
+      "state": "open",
+      "body": "`SchedulerConfig` validation requires at least one pool, so a configuration that only declares backends (for example an `iggy` section for an application that registers hooks itself) cannot be loaded. The Iggy example works around it by parsing the section as a bare `BackendConfig`.\n\n**Found in:** #50 (cr-47).\n\n**Acceptance:** a config with only `backends` validates and builds; a test and a guide example cover it.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 54,
+      "title": "Durable pools should wake on Postgres LISTEN/NOTIFY instead of polling",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/54",
+      "state": "open",
+      "body": "An idle `DurableResourcePool` polls its queue every 500 ms by default. `PgLeaseQueue` (and `PgmqLeaseQueue`) already publish `pg_notify` on enqueue and expose a `QueueListener`, and the config's Postgres `listen` flag opens one, but the dispatch loop does not use it. This adds up to 500 ms of start latency on an idle pool and constant polling load.\n\n**Found in:** #37 (cr-49 known limits), #50.\n\n**Acceptance:** the durable dispatch loop waits on the listener (with a polling fallback for missed notifications and for redb); a latency test shows an idle pool starts a new task well under the poll interval.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 53,
+      "title": "Config-built durable pools: result TTL, heartbeat and poll intervals are not configurable",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/53",
+      "state": "open",
+      "body": "`DurableOptions` has heartbeat and poll settings and result mailboxes support TTL, but the config schema exposes none of them for durable pools, so config users get the defaults (heartbeat every third of the lease, idle poll 500 ms, no result TTL).\n\n**Found in:** #50 (cr-47), #37 (cr-49).\n\n**Acceptance:** optional pool/backend fields with `deny_unknown_fields` validation, wired into `DurableOptions`; documented in the configuration guide; doc-scan test covers an example.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    },
+    {
+      "number": 52,
+      "title": "Config-built durable pools cannot take a notifier",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/issues/52",
+      "state": "open",
+      "body": "`build_pools_from_scheduler_config` builds a `DurableResourcePool` for a pool whose queue and mailbox name a backend, but there is no way to attach a `Notifier` (e.g. `IggyNotifier` through `StorageMailbox` / `BackgroundNotifier`) to it from configuration. Applications that want `mailbox.ready` notifications must build the pool by hand.\n\n**Found in:** #50 (cr-47 guides, `iggy_events.rs`).\n\n**Acceptance:** a configured durable pool can deliver through a `StorageMailbox` with a notifier, either via a config section or a builder hook; covered by a test and the Iggy events guide.\n\nPart of the 0.4.0 follow-ups from phase-correctness-and-durability (0.3.0).\n",
+      "milestone": "0.4.0"
+    }
+  ]
+}

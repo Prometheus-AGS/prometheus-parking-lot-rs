@@ -141,12 +141,11 @@ pub async fn keys_are_isolated<H: MailboxHarness>(h: &H) {
     assert_eq!(payload(consume(&mailbox, &a).await.as_ref()), Some("for-a"));
 }
 
-/// A second delivery with a remembered idempotency key stores nothing, even
-/// under another mailbox key or with another payload; the first stands.
+/// A second delivery with the same address and remembered idempotency key
+/// stores nothing even with another task id or payload; the first stands.
 pub async fn first_write_wins<H: MailboxHarness>(h: &H) {
     let mailbox = h.mailbox().await;
     let k = key("fww");
-    let elsewhere = key("fww-elsewhere");
     let first = deliver(
         &mailbox,
         completed(&k, 1, "first").with_idempotency_key("idem"),
@@ -154,26 +153,163 @@ pub async fn first_write_wins<H: MailboxHarness>(h: &H) {
     .await;
     let again = deliver(
         &mailbox,
-        completed(&k, 1, "second").with_idempotency_key("idem"),
-    )
-    .await;
-    let moved = deliver(
-        &mailbox,
-        completed(&elsewhere, 1, "third").with_idempotency_key("idem"),
+        completed(&k, 2, "second").with_idempotency_key("idem"),
     )
     .await;
     assert_eq!(
-        (first, again, moved),
+        (first, again),
         (
             DeliveryOutcome::Stored,
-            DeliveryOutcome::Duplicate,
-            DeliveryOutcome::Duplicate
+            DeliveryOutcome::Duplicate {
+                status: TaskStatus::Completed
+            }
         )
     );
 
     assert_eq!(payload(consume(&mailbox, &k).await.as_ref()), Some("first"));
     assert!(consume(&mailbox, &k).await.is_none());
-    assert!(consume(&mailbox, &elsewhere).await.is_none());
+}
+
+/// The same caller key is independent at addresses differing in tenant, user or session.
+///
+/// `None` and an empty optional identifier are different addresses. Every address
+/// keeps its own first result and its tombstone after consume.
+pub async fn idempotency_is_scoped_to_mailbox_key<H: MailboxHarness>(h: &H) {
+    let mailbox = h.mailbox().await;
+    let base = key("idempotency-scope");
+    let addresses = [
+        base.clone(),
+        key("idempotency-other-tenant"),
+        MailboxKey {
+            user_id: Some("other-user".into()),
+            ..base.clone()
+        },
+        MailboxKey {
+            session_id: Some("other-session".into()),
+            ..base.clone()
+        },
+        MailboxKey {
+            user_id: None,
+            ..base.clone()
+        },
+        MailboxKey {
+            user_id: Some(String::new()),
+            ..base.clone()
+        },
+        MailboxKey {
+            session_id: None,
+            ..base.clone()
+        },
+        MailboxKey {
+            session_id: Some(String::new()),
+            ..base
+        },
+    ];
+    for (address, payload) in addresses.iter().zip([
+        "base",
+        "other-tenant",
+        "other-user",
+        "other-session",
+        "no-user",
+        "empty-user",
+        "no-session",
+        "empty-session",
+    ]) {
+        assert_eq!(
+            deliver(
+                &mailbox,
+                completed(address, 1, payload).with_idempotency_key("shared-key")
+            )
+            .await,
+            DeliveryOutcome::Stored,
+            "another address suppressed delivery to {address:?}"
+        );
+    }
+    for (address, expected) in addresses.iter().zip([
+        "base",
+        "other-tenant",
+        "other-user",
+        "other-session",
+        "no-user",
+        "empty-user",
+        "no-session",
+        "empty-session",
+    ]) {
+        let retry = completed(address, 2, "replacement").with_idempotency_key("shared-key");
+        assert_eq!(
+            deliver(&mailbox, retry.clone()).await,
+            DeliveryOutcome::Duplicate {
+                status: TaskStatus::Completed
+            }
+        );
+        assert_eq!(
+            payload(consume(&mailbox, address).await.as_ref()),
+            Some(expected)
+        );
+        assert_eq!(
+            deliver(&mailbox, retry).await,
+            DeliveryOutcome::Duplicate {
+                status: TaskStatus::Completed
+            }
+        );
+        assert!(consume(&mailbox, address).await.is_none());
+    }
+}
+
+/// Expiry forgets only the original address's remembered key, including after
+/// consume. An equal caller key at another address retains its own lifetime.
+pub async fn idempotency_expiry_is_scoped_to_mailbox_key<H: MailboxHarness>(h: &H) {
+    let mailbox = h.mailbox().await;
+    let a = key("scope-ttl-a");
+    let b = key("scope-ttl-b");
+    let expiring = completed(&a, 1, "a-first")
+        .with_idempotency_key("same-caller-key")
+        .with_ttl(h.ttl());
+    let permanent = completed(&b, 2, "b-first").with_idempotency_key("same-caller-key");
+    assert_eq!(
+        deliver(&mailbox, expiring.clone()).await,
+        DeliveryOutcome::Stored
+    );
+    assert_eq!(
+        deliver(&mailbox, permanent.clone()).await,
+        DeliveryOutcome::Stored
+    );
+    assert_eq!(
+        payload(consume(&mailbox, &a).await.as_ref()),
+        Some("a-first")
+    );
+    assert_eq!(
+        deliver(&mailbox, expiring.clone()).await,
+        DeliveryOutcome::Duplicate {
+            status: TaskStatus::Completed
+        }
+    );
+    h.advance(h.ttl()).await;
+    assert_eq!(
+        mailbox
+            .evict_expired()
+            .await
+            .expect("evict consumed tombstone"),
+        0
+    );
+    assert_eq!(deliver(&mailbox, expiring).await, DeliveryOutcome::Stored);
+    assert_eq!(
+        deliver(&mailbox, permanent.clone()).await,
+        DeliveryOutcome::Duplicate {
+            status: TaskStatus::Completed
+        }
+    );
+    assert_eq!(
+        payload(consume(&mailbox, &b).await.as_ref()),
+        Some("b-first")
+    );
+    assert_eq!(
+        deliver(&mailbox, permanent).await,
+        DeliveryOutcome::Duplicate {
+            status: TaskStatus::Completed
+        }
+    );
+    assert!(consume(&mailbox, &b).await.is_none());
 }
 
 /// The idempotency key is still remembered after its entry is consumed, so a
@@ -190,12 +326,121 @@ pub async fn idempotency_survives_consume<H: MailboxHarness>(h: &H) {
 
     assert_eq!(
         deliver(&mailbox, delivery).await,
-        DeliveryOutcome::Duplicate
+        DeliveryOutcome::Duplicate {
+            status: TaskStatus::Completed
+        }
     );
     assert!(
         consume(&mailbox, &k).await.is_none(),
         "a consumed result was delivered again"
     );
+}
+
+/// A duplicate returns the first status without consuming the result.
+///
+/// This includes its full failure details and applies after consume. Current
+/// statuses remain valid generic mailbox values; no terminal-only validation is
+/// introduced.
+pub async fn duplicate_returns_original_status<H: MailboxHarness>(h: &H) {
+    let mailbox = h.mailbox().await;
+    let statuses = [
+        TaskStatus::Failed(TaskError::transient("original gpu failure")),
+        TaskStatus::Completed,
+        TaskStatus::Expired,
+        TaskStatus::Dropped("original drop reason".into()),
+        TaskStatus::Queued,
+        TaskStatus::Running,
+    ];
+    for (index, status) in statuses.into_iter().enumerate() {
+        let address = key(&format!("original-status-{index}"));
+        let first = Delivery::new(address.clone(), 1, status.clone(), Some("first".into()))
+            .with_idempotency_key("same-caller");
+        assert_eq!(deliver(&mailbox, first).await, DeliveryOutcome::Stored);
+        let retried_status = if status == TaskStatus::Completed {
+            TaskStatus::Failed(TaskError::executor("different retry failure"))
+        } else {
+            TaskStatus::Completed
+        };
+        let retry = Delivery::new(
+            address.clone(),
+            2,
+            retried_status,
+            Some("replacement".into()),
+        )
+        .with_idempotency_key("same-caller");
+        let expected = DeliveryOutcome::Duplicate {
+            status: status.clone(),
+        };
+        assert_eq!(
+            deliver(&mailbox, retry.clone()).await,
+            expected,
+            "OA-07:stored-status oracle: duplicate reported the retry's status"
+        );
+        let visible = peek(&mailbox, &address)
+            .await
+            .expect("duplicate left result available");
+        assert_eq!(visible.status, status);
+        assert_eq!(visible.payload.as_deref(), Some("first"));
+        let consumed = consume(&mailbox, &address)
+            .await
+            .expect("one original result");
+        assert_eq!(consumed.status, status);
+        assert_eq!(consumed.task_id, 1);
+        assert_eq!(
+            deliver(&mailbox, retry).await,
+            expected,
+            "OA-07:consumed-status oracle: consumption lost authoritative status"
+        );
+        assert!(consume(&mailbox, &address).await.is_none());
+    }
+}
+
+/// Status metadata expires with its original fence. Reusing the key afterward
+/// establishes a new first status, without retaining the previous generation.
+pub async fn duplicate_status_expires_with_original_fence<H: MailboxHarness>(h: &H) {
+    let mailbox = h.mailbox().await;
+    let address = key("status-ttl");
+    let failure = TaskStatus::Failed(TaskError::transient("first generation"));
+    let original = Delivery::new(address.clone(), 1, failure.clone(), None)
+        .with_idempotency_key("generation-key")
+        .with_ttl(h.ttl());
+    assert_eq!(deliver(&mailbox, original).await, DeliveryOutcome::Stored);
+    assert!(consume(&mailbox, &address).await.is_some());
+    let replacement =
+        completed(&address, 2, "second generation").with_idempotency_key("generation-key");
+    assert_eq!(
+        deliver(&mailbox, replacement.clone()).await,
+        DeliveryOutcome::Duplicate {
+            status: failure.clone()
+        }
+    );
+    h.advance(h.ttl()).await;
+    assert_eq!(
+        mailbox
+            .evict_expired()
+            .await
+            .expect("expire consumed fence"),
+        0
+    );
+    assert_eq!(
+        deliver(&mailbox, replacement).await,
+        DeliveryOutcome::Stored
+    );
+    let retry =
+        Delivery::new(address.clone(), 3, failure, None).with_idempotency_key("generation-key");
+    assert_eq!(
+        deliver(&mailbox, retry).await,
+        DeliveryOutcome::Duplicate {
+            status: TaskStatus::Completed
+        }
+    );
+    let result = consume(&mailbox, &address)
+        .await
+        .expect("second generation result");
+    assert_eq!(result.task_id, 2);
+    assert_eq!(result.status, TaskStatus::Completed);
+    assert_eq!(result.payload.as_deref(), Some("second generation"));
+    assert!(consume(&mailbox, &address).await.is_none());
 }
 
 /// Deliveries without an idempotency key are all stored.
@@ -278,7 +523,11 @@ pub async fn run_all<H: MailboxHarness>(h: &H) {
     per_key_delivery_order(h).await;
     keys_are_isolated(h).await;
     first_write_wins(h).await;
+    idempotency_is_scoped_to_mailbox_key(h).await;
+    idempotency_expiry_is_scoped_to_mailbox_key(h).await;
     idempotency_survives_consume(h).await;
+    duplicate_returns_original_status(h).await;
+    duplicate_status_expires_with_original_fence(h).await;
     deliveries_without_key_all_stored(h).await;
     ttl_hides_and_evicts(h).await;
 }

@@ -1,0 +1,39 @@
+{
+  "owner": "/root/oa04_platform",
+  "files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "4c7fb1c0aca12098a1b1886883ef1a7cf890cd7c2283823482f01805ece428eb"
+    },
+    {
+      "path": ".github/wasm-browser-assurance.json",
+      "sha256": "1b1f15341db1014c88e24375618f5c1f161d422f68f6643ac948c8ffed8d74f9"
+    },
+    {
+      "path": ".github/scripts/tests/browser-assurance.py",
+      "sha256": "33ee06c160696f814d09e32dfbfb1d2f668e1ec2f073c6581e9c31b7b11b4237"
+    },
+    {
+      "path": "crates/parking-lot-wasm/src/events.rs",
+      "sha256": "900f886ec987fca629a35a421b34609263ea7ead0d0fd81ed38d3dffa078f8b3"
+    },
+    {
+      "path": "crates/parking-lot-wasm/tests/common/mod.rs",
+      "sha256": "47bd8fd8a34c68b98f7fe3fb9bcf481116da775e57c3f975c59eaaf6269b9cf4"
+    },
+    {
+      "path": "crates/parking-lot-wasm/tests/wasm_pool.rs",
+      "sha256": "80884cd19bc36a53a48aaa6ece8e1bf64922fc81edb22b6d0e248ebcc06c0f3b"
+    },
+    {
+      "path": "crates/parking-lot-wasm/tests/wasm_events.rs",
+      "sha256": "d5d4be539b88590af806088c9e0c53989cb2c4f849d2203a6c927e2639194f56"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED",
+  "discoveryRequired": {
+    "wasm_pool": 15,
+    "wasm_events": 6
+  },
+  "browserProvisioning": "pending approved Linux x86_64 Chrome/driver paths"
+}

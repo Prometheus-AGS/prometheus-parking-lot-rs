@@ -1,0 +1,24 @@
+{
+  "candidate": "68bc5f80d47119decc16de4ab70acdcbe2176042",
+  "baseline_status": "BLOCKED",
+  "baseline_exit": 2,
+  "counts": {
+    "PASS": 40,
+    "FAIL": 0,
+    "BLOCKED": 2
+  },
+  "native": {
+    "passed": 460,
+    "skipped": 119
+  },
+  "operator_blocks": [
+    "approved post-purge fresh_mirror",
+    "approved public trust_policy"
+  ],
+  "artifact_directory": "/Users/gqadonis/.local/state/prometheus/operational-assurance/68bc5f80d47119decc16de4ab70acdcbe2176042",
+  "inventory_path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/68bc5f80d47119decc16de4ab70acdcbe2176042/retained-files.json",
+  "inventory_digest": "36d65d81cbd756981c54c486793c7b7820a14dbd53aad8f6e834e300a7cdd703",
+  "publication": "NOT_EXERCISED",
+  "whole_release_certification": "BLOCKED; missing required profiles and independently authenticated authority/provenance",
+  "remaining_local_checks": "27 native/redb/Loom controls running separately; native platform profiles follow serially"
+}

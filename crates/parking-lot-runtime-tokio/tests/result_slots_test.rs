@@ -15,10 +15,14 @@
 //!
 //! Negative control: under `--cfg parking_lot_negative_control="s-17"` each
 //! waiter parks a blocking-pool thread (the 0.2 design). With the blocking
-//! pool exhausted no waiter runs, every wait times out and
-//! `waiters_no_blocking_threads` fails.
+//! pool exhausted no waiter runs. The designated fixture first polls one
+//! real pending retrieval on a current-thread runtime and observes synchronous
+//! thread-factory calls, then cleans up and fails OA12:S17 before the load
+//! scenario. A watchdog or missing result is not its negative classifier.
 
+use std::future::Future;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
@@ -95,8 +99,58 @@ const fn is_expired(error: &SchedulerError) -> bool {
     matches!(error, SchedulerError::ResultExpired { key: Some(_) })
 }
 
+/// Observe the first poll, rather than waiting for a missing result.
+/// Pinned Tokio1.54.1 `blocking/pool.rs::spawn_thread` calls `thread_name_fn`
+/// synchronously before OS thread creation. This current-thread runtime has
+/// no async worker threads; only the mutant's `spawn_blocking` needs a name.
+fn assert_pending_retrieve_starts_no_blocking_thread() {
+    let names = Arc::new(AtomicUsize::new(0));
+    let factory_calls = Arc::clone(&names);
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .max_blocking_threads(1)
+        .thread_name_fn(move || {
+            // Called and observed on the polling thread, in program order;
+            // Relaxed counts calls and supplies no cross-thread publication.
+            factory_calls.fetch_add(1, Ordering::Relaxed);
+            "oa12-s17-retrieval".to_owned()
+        })
+        .enable_all()
+        .build()
+        .expect("probe runtime");
+    let (gate, open) = watch::channel(false);
+    let pool = WorkerPool::new(
+        WorkerPoolConfig::new()
+            .with_worker_count(1)
+            .with_max_units(1)
+            .with_max_queue_depth(8),
+        Gated { open },
+    )
+    .expect("probe pool");
+    let key = pool.submit(7, meta(7)).expect("probe accepted");
+    let before = names.load(Ordering::Relaxed);
+    let pending = runtime.block_on(async {
+        let retrieval = pool.retrieve_async(&key, WAIT);
+        tokio::pin!(retrieval);
+        std::future::poll_fn(|cx| std::task::Poll::Ready(retrieval.as_mut().poll(cx).is_pending()))
+            .await
+    });
+    let spawned = names.load(Ordering::Relaxed) - before;
+    // Cleanup is unconditional before the designated assertion. Opening the
+    // real executor gate releases the mutant's detached blocking receiver too.
+    gate.send_replace(true);
+    wait_completed(&pool, 1);
+    runtime.shutdown_timeout(WAIT);
+    pool.shutdown();
+    assert!(pending, "probe requires an actual pending result");
+    assert_eq!(
+        spawned, 0,
+        "OA12:S17: pending retrieve_async started a blocking thread"
+    );
+}
+
 #[test]
 fn waiters_no_blocking_threads() {
+    assert_pending_retrieve_starts_no_blocking_thread();
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .max_blocking_threads(1)

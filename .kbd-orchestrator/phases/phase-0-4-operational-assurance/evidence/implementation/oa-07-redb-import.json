@@ -1,0 +1,39 @@
+{
+  "owner": "/root/oa04_events",
+  "files": [
+    {
+      "path": "crates/parking-lot-embedded/src/mailbox.rs",
+      "sha256": "695b6177dac06548e890575d392d9a0a992b295d00087724574d44e7373cd38c"
+    },
+    {
+      "path": "crates/parking-lot-embedded/src/store.rs",
+      "sha256": "ac1b8b1bc5b819d2690d4084f45df8e07cc9080f700046a2a058bd40b6d7dfc5"
+    },
+    {
+      "path": "crates/parking-lot-embedded/tests/mailbox_migration.rs",
+      "sha256": "a722e93add2b8f033aa6319d276245d079fe4ff66c70981326185bd81bee2f5c"
+    },
+    {
+      "path": "crates/parking-lot-embedded/tests/mailbox_status.rs",
+      "sha256": "c05453fafb3322a8a13d60bdf7700633e58c8761da71f8896cc371de77589cf2"
+    },
+    {
+      "path": "crates/parking-lot-embedded/tests/support/legacy_metadata.rs",
+      "sha256": "101a6ed2b2bd7a24fb9e05a933cf570fbfdc06161233f58cb4c6a41f2d61191e"
+    },
+    {
+      "path": "crates/parking-lot-embedded/tests/restart.rs",
+      "sha256": "1c10fe39f7be8fc3acf928f096b933f236dc8b168495f31543615a51be554e8a"
+    },
+    {
+      "path": "crates/parking-lot-embedded/tests/crash_points.rs",
+      "sha256": "a0b9f16ebf6feecb5610f65bf49c285f24d4ec7d295536c8bf2f7b55debf0513"
+    },
+    {
+      "path": "crates/parking-lot-core/src/mailbox/storage_tests.rs",
+      "sha256": "06bd5b92e2e41ab7834aa55360e964851734890f017f607642ca83569cd3a253"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED",
+  "negativeControl": "oa-07 / duplicate_status_survives_consume_restart_and_original_expiry / OA-07:stored-status"
+}

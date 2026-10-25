@@ -1,0 +1,68 @@
+--- a/docs/PUBLISHING.md
++++ b/docs/PUBLISHING.md
+@@ -209,6 +209,65 @@
+ 
+ ### 5.3 Tag and verify
+ 
++**0.4.0 verification tooling (oa-03, G-03).**
++[The verifier](../.github/scripts/verify-release-tag.py) requires an existing annotated
++signed tag, its exact short name, the full frozen candidate commit ID and an independently
++operator-approved signing identity. It rejects lightweight/unsigned tags, renamed tag objects,
++a different direct commit target and invalid signatures. It verifies the captured tag object
++and rejects a tag ref that moves during inspection. It creates no tag and performs no publish.
++
++Select one operator-approved trust mode. Do not derive the expected identity from the tag being
++checked, its message, a key comment, an email alone or a hosting-provider verification badge.
++The following commands are future boundary instructions, not observed results:
++
++```bash
++python3 .github/scripts/verify-release-tag.py \
++  --tag "$RELEASE_TAG" --candidate "$RELEASE_CANDIDATE" --format ssh \
++  --identity "$RELEASE_SSH_IDENTITY" --fingerprint "$RELEASE_SSH_FINGERPRINT" \
++  --allowed-signers "$RELEASE_SSH_ALLOWED_SIGNERS_FILE"
++
++python3 .github/scripts/verify-release-tag.py \
++  --tag "$RELEASE_TAG" --candidate "$RELEASE_CANDIDATE" --format openpgp \
++  --fingerprint "$RELEASE_GPG_FINGERPRINT" --gnupg-home "$RELEASE_GPG_HOME"
++```
++
++SSH mode pins both the exact principal and full SHA256 fingerprint and uses the operator's
++public allowed-signers file. Optional `--revocations` supplies an existing approved revocation
++file; configured revocations still apply when this option is omitted. OpenPGP mode pins a full
++primary fingerprint, including when a signing subkey made the signature. It uses the existing
++approved absolute GnuPG home and the verification-only wrapper, disables automatic key discovery/agent
++startup and rejects bad, expired or revoked signature/key status. UID text and local ownertrust
++alone are not release authority. No production key generation, import, private-key copying or
++host/global trust configuration is performed by this tooling.
++
++[The read-only reusable workflow](../.github/workflows/verify-release-tag.yml) accepts
++`candidate`, `tag` and an existing approved `runner` label. The operator must protect the default
++branch and the `release-signature-verification` environment before use. Environment variables
++`RELEASE_SIGNATURE_FORMAT`, `RELEASE_SSH_IDENTITY`, `RELEASE_SSH_FINGERPRINT` and
++`RELEASE_SSH_ALLOWED_SIGNERS` select SSH trust; the last is **public allowed-signers text**,
++never a private key. Optional `RELEASE_SSH_REVOCATIONS_FILE` names an existing runner-local
++file. OpenPGP uses `RELEASE_GPG_FINGERPRINT` and `RELEASE_GPG_HOME`; the existing approved
++runner must already have that public verification home. Missing trust/tooling fails; there is
++no key import, runner acquisition or fallback to merely accepting any valid signature.
++These environment settings, signing authority and runner availability remain unverified.
++
++At the final completed-phase boundary, capture exact argv/exit and raw public-metadata logs:
++
++```bash
++bash .github/scripts/tests/release-tag-fixtures.sh
++```
++
++The real Git/SSH/OpenPGP fixtures generate only throwaway identities inside their owned
++private temporary directory at that future invocation, without using host signing agents or
++copying private keys. They include authorized SSH/OpenPGP tags plus separate unsigned,
++wrong-identity, wrong-commit, renamed-object, tampered-signature and missing-trust controls.
++Their source is present; no fixture, verifier, syntax check or review has run. Temporary key
++material is never an evidence artifact. Bind the actual verifier PASS JSON to candidate,
++tag object, identity, approved trust/configuration digest and the final contract packet.
++Fixture success establishes the tooling path, not the operator's real G-03 release authority.
++The actual release tag and all publication actions still require G-05.
++
++
+ The following is the historical 0.3.0 signing command from the manual playbook;
+ it is not evidence that a signature was created or verified, and must not be rerun
+ as a 0.4.0 instruction:

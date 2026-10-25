@@ -1,0 +1,32 @@
+{
+  "worker": "/root/oa04_release",
+  "sourceWorkspace": "/Users/gqadonis/.codex/worktrees/oa04-release/prometheus-parking-lot-rs",
+  "imported": [
+    {
+      "path": "release-plz.toml",
+      "sha256": "0ccb17618592637282b5bd5894b25e0ed740340004d3267a5f3656e6e6b9cc6f"
+    },
+    {
+      "path": "cliff.toml",
+      "sha256": "0bc074ab3ed1fed893ce9a20061fd442381e21874c29bc4594650faf161a5c5e"
+    },
+    {
+      "path": "release-tools.toml",
+      "sha256": "766e531eba42d24f6847f6b05cef988f729d2d04da71739ac28f18877b7228d1"
+    },
+    {
+      "path": "scripts/release/prepare.py",
+      "sha256": "7c49598eefd2ffdbe6cdb33699653429eeeaa593593e8a8454afd9bb0411ae1c"
+    },
+    {
+      "path": "scripts/release/test-preparation.py",
+      "sha256": "261262e8260237fcb31e2aa85167419dd2a3d3b2731c7a84ee5049894d1fcb54"
+    },
+    {
+      "path": "docs/adr/0005-lockstep-release-versioning.md",
+      "sha256": "e7a5ec8d5db997aee142dc7183b109e4631b8c3088587206d0bda8fd46fdbb39"
+    }
+  ],
+  "testsRun": false,
+  "status": "implementation imported; final verification pending"
+}

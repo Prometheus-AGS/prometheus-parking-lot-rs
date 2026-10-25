@@ -1,0 +1,23 @@
+{
+  "owner": "/root/oa04_release",
+  "files": [
+    {
+      "path": "docs/adr/0006-tenant-scoped-result-idempotency.md",
+      "sha256": "24cd864411a94a0d14cd72332f6da957dbaae407fee497f2813c97f9e13167f0"
+    },
+    {
+      "path": "docs/adr/0007-authoritative-duplicate-status.md",
+      "sha256": "55cdff3f0ff96fc940115ee6546ef365ac76c299772c493d5424eab022a1a02f"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-07-public-docs.patch",
+      "sha256": "4d2cb4e0e15a3f67f23a793d3f39929415e8afb6748c6c4d13fa8e6cd2aba3db"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-07.md",
+      "sha256": "05fa7434642419a2381514616587ab456760a01c7eda145b625deff61f670fc1"
+    }
+  ],
+  "appliedPublicDocsPatch": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-07-public-docs.patch",
+  "runtimeEvidence": "NOT_EXERCISED"
+}

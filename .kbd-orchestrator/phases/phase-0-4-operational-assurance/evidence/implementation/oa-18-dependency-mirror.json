@@ -1,0 +1,367 @@
+{
+  "destination": "/Users/gqadonis/.codex/worktrees/oa04-release/prometheus-parking-lot-rs",
+  "purpose": "Integrated actual production source and authored implementation handoffs before OA18 source work; runtime projections excluded",
+  "updatedProductionFiles": [
+    {
+      "path": ".e2b-template/SETUP.md",
+      "sha256": "5b2099b1a3b75f15eaffc3e6c338e628ade441dbdb68ce2c7b06a014fc9f12cf"
+    },
+    {
+      "path": ".github/negative-controls.json",
+      "sha256": "ff46e88234c40c572020b37c7c3f0e4ffaacf034108e2f228170130891c55f3a"
+    },
+    {
+      "path": ".github/pre-purge-roots.txt",
+      "sha256": "acd082630405fa35ef1980be695f498bee584e4018ced8e56ac72d8f87616432"
+    },
+    {
+      "path": ".github/release-boundary.schema.json",
+      "sha256": "d82e6530f75f7db4f35be9617ab44cf88be68146fd95ae14c7b234ed9de0995b"
+    },
+    {
+      "path": ".github/release-publishing-sources.json",
+      "sha256": "9d26ef580b223b71bd7144c043d18910cf780cbd501787090d616e57399b3ef3"
+    },
+    {
+      "path": ".github/release-trust-policy.example.json",
+      "sha256": "f51f660454333023970b32df67d5e50af65f9ff2b4b2df66c19e445f8f829c42"
+    },
+    {
+      "path": ".github/scripts/RELEASE_EVIDENCE.md",
+      "sha256": "998eda85f362b64420afd96084c7763288a0e99a403e336ed29ced9ffc8660d0"
+    },
+    {
+      "path": ".github/scripts/gpg-verify-only.sh",
+      "sha256": "c92db621dd0b5cb5e10c17643e9ffce7f536c463cf453f2d114e40f5f84d24b3"
+    },
+    {
+      "path": ".github/scripts/proposals/oa-03-publishing.patch",
+      "sha256": "e4abc61063b44b83523dbd47b3c8e5a2c538e869ff577ec543a9b1c8ff6715e9"
+    },
+    {
+      "path": ".github/scripts/proposals/oa-04-publishing.patch",
+      "sha256": "578c4a0d7d196349e2a248d7b636e0a08479fe8450c7ceb25eb2f02cc29523a5"
+    },
+    {
+      "path": ".github/scripts/proposals/oa-13-wasm-readme.patch",
+      "sha256": "f43c486fab819a32981bb560f021b4fdb4524235a963b9c85e41dd2d05b811c9"
+    },
+    {
+      "path": ".github/scripts/release_evidence.py",
+      "sha256": "cfb3e4062a4a89bb7bcbc0a49b1cc3f8f8f07e7609a9efc2b4634584b4d5ff50"
+    },
+    {
+      "path": ".github/scripts/supply-chain.sh",
+      "sha256": "144a0c3fd660d63b3b02ba318596508b1e2f20f35f1439c370912d4723ac012c"
+    },
+    {
+      "path": ".github/scripts/tests/README-negative-controls.md",
+      "sha256": "981fe59490bd5142bd6582a9bb9e77f3768143d65a21cad0e297da7234ba4505"
+    },
+    {
+      "path": ".github/scripts/tests/browser-assurance.py",
+      "sha256": "33ee06c160696f814d09e32dfbfb1d2f668e1ec2f073c6581e9c31b7b11b4237"
+    },
+    {
+      "path": ".github/scripts/tests/containment-fixtures.sh",
+      "sha256": "6c037006881a963ae7365085b4cba7a4fdbdf8d1db1734c3fd9825aa1360ce6e"
+    },
+    {
+      "path": ".github/scripts/tests/negative-controls.py",
+      "sha256": "f58601b7290655abcb9f23fb90040142e3970f539e581d73d00719eedf0ae954"
+    },
+    {
+      "path": ".github/scripts/tests/release-tag-fixtures.sh",
+      "sha256": "1ac495d6b39699eb3b1f641bf5570be9c2463600993f98958369043f1957e5d8"
+    },
+    {
+      "path": ".github/scripts/tests/template-secret-fixtures.sh",
+      "sha256": "7a7a712f817bfd278aad8271eda536546a5b92a5e8a267f76d8157a86f76df34"
+    },
+    {
+      "path": ".github/scripts/tests/trusted-publishing-fixtures.py",
+      "sha256": "7182eddb2c479cb8577eb26e156a0ae3c617f61c3741f942f85a978ec3edba62"
+    },
+    {
+      "path": ".github/scripts/trusted-release.py",
+      "sha256": "63a90ac1b56db5649f4d7a99640a0bef10cc0c3e6be7a18e82c9134dd0423740"
+    },
+    {
+      "path": ".github/scripts/verify-release-tag.py",
+      "sha256": "92933a1c5eac4423f0db13d1d359be7c1e48325a5f1e71b2e3d3ae095c8ab652"
+    },
+    {
+      "path": ".github/wasm-browser-assurance.json",
+      "sha256": "1b1f15341db1014c88e24375618f5c1f161d422f68f6643ac948c8ffed8d74f9"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "4cd405c55f0534aa588e3ce9b9f469861f5924f4f8cd5d2b42f945934cbd3163"
+    },
+    {
+      "path": ".github/workflows/platform.yml",
+      "sha256": "011cf1c5fb7a58d3e2fc1599ab74c8e43bae7c0e9fbc1942799f7a64fa6496a7"
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "sha256": "bf7ad862c41de430547990605fc0f2cb2699f95d6a8c2eaacf80b3955bd1ccba"
+    },
+    {
+      "path": ".github/workflows/verify-release-tag.yml",
+      "sha256": "d0f0da6266ee766271c0c05c7216f71dc53d55fa4394609ae0b7d0edc4c49039"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "508ebccd32388fc506234b41f0142ca95e73ba68b68970655e6e115e637b0ef2"
+    },
+    {
+      "path": "benches/README.md",
+      "sha256": "55da1bd88438bf18cb9c47df3748aec1728cdc63e7d7899a55a626a5c5eaaeba"
+    },
+    {
+      "path": "benches/oa17-quiet-machine.example.json",
+      "sha256": "402bce0fe61e6c2582f08fbbd2d4c331a26b09d6db28f9f03d7f76b51a453ede"
+    },
+    {
+      "path": "benches/pg_backend.rs",
+      "sha256": "df348839e663a9a0109d65e4d225cfa04085f5595035c78fcbc230c6fe87d63d"
+    },
+    {
+      "path": "benches/pg_measure.py",
+      "sha256": "ff97d3dd853c35f72801108797d61c40a559f0492db3642defb4cc5c098ec0c5"
+    },
+    {
+      "path": "benches/pg_measure_test.py",
+      "sha256": "48ebb5a38abe18978aa6efcb3db953f812506076a071a1d80261c0cfe16b09d6"
+    },
+    {
+      "path": "bindings/tauri-desktop/assurance/RUNBOOK.md",
+      "sha256": "ebae5909647f04ce276f3799151d7df5f7d76cb74ac26316928f26a87ef8a179"
+    },
+    {
+      "path": "bindings/tauri-desktop/assurance/desktop-assurance.py",
+      "sha256": "b19d857dea1a0ee8e1e1048cbba71e0c53de027855a963c6dedf8cc7fa424471"
+    },
+    {
+      "path": "bindings/tauri-desktop/assurance/protocol.json",
+      "sha256": "b2f3e304a4dffb00e27f64e01bf1209f062d30041016f204dc5249cca8e8dbb2"
+    },
+    {
+      "path": "bindings/tauri-desktop/src-tauri/icons/icon.ico",
+      "sha256": "9facc22cd7c910f9eff95a7ec2a114511f319e00015fa543e7d178b0b9477313"
+    },
+    {
+      "path": "bindings/tauri-desktop/src-tauri/src/assurance.rs",
+      "sha256": "9c29828678e232930c54d98ed5549f90bdf0b4ea2230cd231f85e597bae91590"
+    },
+    {
+      "path": "bindings/tauri-desktop/src-tauri/src/lib.rs",
+      "sha256": "55cfd8318d296431093971d1069722fe2d36116500e7c32e70c0c88810746f50"
+    },
+    {
+      "path": "bindings/tauri-desktop/src-tauri/tauri.conf.json",
+      "sha256": "6e12b206a6ac069bb2d22bc975021f00473ec6852621a345edcadd9c046346e5"
+    },
+    {
+      "path": "crates/parking-lot-core/src/semaphore/mod.rs",
+      "sha256": "a0a0b965e3937c4a8f93b2ffc4145faf77cdccd02e66c68ad5b426e476864537"
+    },
+    {
+      "path": "crates/parking-lot-core/tests/backend_admission_test.rs",
+      "sha256": "f20533697ab14e1ee4e84a460504090096a82c2616ef6b3a399bbe01f019f115"
+    },
+    {
+      "path": "crates/parking-lot-core/tests/loom_kind_release.rs",
+      "sha256": "6e081f68b69d1829abd3470566982e5c0ea0c3cea465675bd931403d838b048c"
+    },
+    {
+      "path": "crates/parking-lot-core/tests/prune_metadata_test.rs",
+      "sha256": "34ce0cb0adf74fb1ce9c6f7519e549a266eaa0437db3071ae9d93ba16bdfa1e3"
+    },
+    {
+      "path": "crates/parking-lot-core/tests/unit/review_test.rs",
+      "sha256": "ac60189c1db00d810552c981c6e7c1450a389293af13357f3b92a789432d0e2c"
+    },
+    {
+      "path": "crates/parking-lot-ffi/src/store.rs",
+      "sha256": "07abf8982997146dda99145af5e1697bfa71416f7c78ab5e88b03876f66b052d"
+    },
+    {
+      "path": "crates/parking-lot-iggy/src/publisher.rs",
+      "sha256": "0d45308e7a32c556a831942468bc1114717950702bedef22d45a12ef6b544d07"
+    },
+    {
+      "path": "crates/parking-lot-iggy/tests/iggy_stream.rs",
+      "sha256": "fcde38b8d1d114e6a9e09e1f888e4d1a3579f6d498e3bd5f029c3bee9a79196c"
+    },
+    {
+      "path": "crates/parking-lot-iggy/tests/support/mod.rs",
+      "sha256": "d0ae623e54462208648eb29df179374a55ea60f8e1c13dbf3d2824d924c5ce4b"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa14/004_lease_queue_0_3.sql",
+      "sha256": "206b3e316b3e091dbc2c166ced30e4be71a3edaad726fbf35623a0ce7c8a2719"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa14/005_mailbox_populated_0_3.sql",
+      "sha256": "84d351cb2f340c91ba4e4d863ffea6477c5cc53ad77a1ace1958cbbd9402f1a7"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa14/006_pgmq_lease_queue_0_3.sql",
+      "sha256": "5330d7f95e22410178d0631d77269338fd276bb40fe5413959e4cad797588702"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa14/manifest.json",
+      "sha256": "e3dd4df8ed4844b2ff8c4c17b09598e80607b0f8b633fb5e8afb8cd2b6f1ebb4"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa14/metadata.json",
+      "sha256": "aa8368269db463bccb4ee111bbeb773d26f03d849bd36675cac077f5d5e7a958"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa14/populated_queues.sql",
+      "sha256": "1afa6e0facc8a851283544e194213f4abb54c8d1c71d8c02746101b67c8f85e1"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/mailbox_migration.rs",
+      "sha256": "385b6025af958addbe77867e18df92cc406b6d8facb392843263d137b3e28de9"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/mailbox_status.rs",
+      "sha256": "a7a6b565cffb9cb118ee99fbeb626ec0ea79b7fc4d73da7595579e32053b54a7"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/pg_image_smoke.rs",
+      "sha256": "8eedd6fa7a5cbf6951c732df3b3936dc8cafd5f5b76355d5553df3d69f659d9d"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/postgres_upgrade.rs",
+      "sha256": "f391f8c917a7fd68f75733bd7ece3111d6b489b771bd60b9654e1cfc7acafb31"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/support/mod.rs",
+      "sha256": "f0076a64bf20109e1c62539a399b0ab0fa2ebaf668a9c0c5d36973d9cf92dd2c"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/src/ledger.rs",
+      "sha256": "dde628e2afa5dcd67ebf1263ce201a50b520413c59016499fa77961929ade7d9"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/backend_admission_test.rs",
+      "sha256": "a6ec617f9685681d532ca0256ee61330113ad7fa605b594f469e7fc937fe9568"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/budget_test.rs",
+      "sha256": "4a74b805b6ecc7f1b11e780d8896df5ee121b7f43c9a5fa00a163209a28bcde5"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs",
+      "sha256": "c0693f884219a464bb24feb6338af0c274b4c49e66b9eefea2e41644a7534853"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/loom_ledger.rs",
+      "sha256": "1ce540848d5575a8baa2fb14e464e6fd721c350cdf83ff5a7e22381c96ceee9f"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/panic_test.rs",
+      "sha256": "7b90dbceaaaf419647302a5f772fb1bb3ac8b67c46ca22211efe43732287c2a1"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/prune_expiry_test.rs",
+      "sha256": "081e8d5dbd344d30363df0501ebb5ff5a450a5615c5b153929bc8618599cd206"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/result_slots_test.rs",
+      "sha256": "a320af8d25f1cae2811bc9f156b987cc714b0c1a275c14cf2c4e6717f80c0ab5"
+    },
+    {
+      "path": "crates/parking-lot-wasm/README.md",
+      "sha256": "f94d80e60dbfe13a115ef95982f959b8e420d8592f23f7ac9d42bb1b78845d40"
+    },
+    {
+      "path": "crates/parking-lot-wasm/src/events.rs",
+      "sha256": "900f886ec987fca629a35a421b34609263ea7ead0d0fd81ed38d3dffa078f8b3"
+    },
+    {
+      "path": "crates/parking-lot-wasm/src/pool.rs",
+      "sha256": "99b1e13ab9d50bfb62b79e06ad969631555907ad7fdd2fd1e5d749d67ddc04c9"
+    },
+    {
+      "path": "crates/parking-lot-wasm/tests/common/mod.rs",
+      "sha256": "47bd8fd8a34c68b98f7fe3fb9bcf481116da775e57c3f975c59eaaf6269b9cf4"
+    },
+    {
+      "path": "crates/parking-lot-wasm/tests/wasm_events.rs",
+      "sha256": "d5d4be539b88590af806088c9e0c53989cb2c4f849d2203a6c927e2639194f56"
+    },
+    {
+      "path": "crates/parking-lot-wasm/tests/wasm_pool.rs",
+      "sha256": "f86703b8dec85223e10c014fcc1344ba75e944d30bcac761202215fbc898e14f"
+    },
+    {
+      "path": "docker/postgres18/upgrade/Dockerfile",
+      "sha256": "378622954eb23bcd70454baff98856b8d2eaeda231c098b403fd1a326c4c36c8"
+    },
+    {
+      "path": "docker/postgres18/upgrade/cluster-rehearsal.sh",
+      "sha256": "2e43cb480fad71cae498b899e26fd4ea69b26bebc8e824c68a2d57bab7f1177d"
+    },
+    {
+      "path": "docker/postgres18/upgrade/handoffs/ci-postgres-upgrade-exclusion.patch",
+      "sha256": "89632523b755d89b688bad2e4d6831c0152dab6b7c47592d8469b64dddace422"
+    },
+    {
+      "path": "docker/postgres18/upgrade/handoffs/oa14-task1.json",
+      "sha256": "7864e5eca31ec429901532b60ec8674070dd3b9d2f8b0221b1fb94b885735f41"
+    },
+    {
+      "path": "docker/postgres18/upgrade/handoffs/oa14-task2.json",
+      "sha256": "9d5e2e97ce3e7f56cc2a912ebf1abb6467fdcd0a10bb34db897368479627270f"
+    },
+    {
+      "path": "docker/postgres18/upgrade/handoffs/postgres18-runbook.patch",
+      "sha256": "38137255ebc7c3fa281e9d62a044cd5f06a30cd56323fbd21a79a194d57f1635"
+    },
+    {
+      "path": "docker/postgres18/upgrade/handoffs/postgres18.runbook.proposed.md",
+      "sha256": "72857cf274c946f604211cfee2a1d93ff536bd1770fb78b6059fb7cc9bb97e4e"
+    },
+    {
+      "path": "docker/postgres18/upgrade/preflight.sh",
+      "sha256": "edec00c6df3de6d8c01134efc380d5b8fc842f8f04b7ada89209eb84210bfd64"
+    },
+    {
+      "path": "docker/postgres18/upgrade/rehearse.py",
+      "sha256": "89fd043bc24ea9b0291782b168df6babad5f50ce9fb24c012485264f982dd7cd"
+    },
+    {
+      "path": "docs/API.md",
+      "sha256": "5e91e54e2623d0a6dad0fc42feb633769019cd206ca38a6c7c9754dbd4f2823f"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "sha256": "331b348e5e28346010e114a6556dcf3b1ac737711b9617a47c34eba883dc4528"
+    },
+    {
+      "path": "docs/PUBLISHING.md",
+      "sha256": "f378a1e29bcee9b55395e219a924b96c00d05a804330b869fe994374314fe92c"
+    },
+    {
+      "path": "docs/coding-standards/README.md",
+      "sha256": "ab20dbe07633593aaa0d125fb261be4f60274ae2ed9916991110bdf918851df7"
+    },
+    {
+      "path": "docs/runbooks/history-containment.md",
+      "sha256": "a704ba9a0cd1ca3118b5700aad99ab97604dad7b0f84f47fb9d1632a8a920cc3"
+    },
+    {
+      "path": "docs/runbooks/postgres18.md",
+      "sha256": "72857cf274c946f604211cfee2a1d93ff536bd1770fb78b6059fb7cc9bb97e4e"
+    },
+    {
+      "path": "scripts/rehearse-postgres-upgrade.sh",
+      "sha256": "aa5484755f7ab9377ada73b91b0028fbcc639c26615606c687378ab007b64232"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED"
+}

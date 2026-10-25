@@ -1,0 +1,75 @@
+--- a/crates/parking-lot-runtime-tokio/src/durable_pool/mod.rs
++++ b/crates/parking-lot-runtime-tokio/src/durable_pool/mod.rs
+@@ -896,29 +896,8 @@
+         // storage IO and do not hold capacity.
+         self.release(permit);
+ 
+-        let (status, payload, resolution, terminal) = match outcome {
+-            Ok(value) => {
+-                // Relaxed: statistics only.
+-                self.completed.fetch_add(1, Ordering::Relaxed);
+-                (
+-                    TaskStatus::Completed,
+-                    Some(value),
+-                    Resolution::Ack,
+-                    Terminal::Completed(started),
+-                )
+-            }
+-            Err(error) => {
+-                self.failed.fetch_add(1, Ordering::Relaxed);
+-                tracing::warn!(task_id, %error, "durable task failed");
+-                let reason = error.to_string();
+-                (
+-                    TaskStatus::Failed(error.clone()),
+-                    None,
+-                    Resolution::DeadLetter(reason),
+-                    Terminal::Failed(error),
+-                )
+-            }
+-        };
++        let (status, payload, resolution, terminal) =
++            self.execution_outcome(task_id, outcome, started);
+         let settlement = Settlement {
+             task_id,
+             mailbox,
+@@ -931,6 +910,40 @@
+         };
+         self.settle(settlement, token, heartbeat, held, Some(reported))
+             .await;
++    }
++
++    /// Convert the local executor outcome after returning its capacity.
++    /// These statistics describe execution; settle still selects authoritative
++    /// duplicate status before emitting a terminal event or resolving a lease.
++    fn execution_outcome(
++        &self,
++        task_id: TaskId,
++        outcome: Result<T, TaskError>,
++        started: Option<Instant>,
++    ) -> (TaskStatus, Option<T>, Resolution, Terminal) {
++        match outcome {
++            Ok(value) => {
++                // Relaxed: statistics only.
++                self.completed.fetch_add(1, Ordering::Relaxed);
++                (
++                    TaskStatus::Completed,
++                    Some(value),
++                    Resolution::Ack,
++                    Terminal::Completed(started),
++                )
++            }
++            Err(error) => {
++                self.failed.fetch_add(1, Ordering::Relaxed);
++                tracing::warn!(task_id, %error, "durable task failed");
++                let reason = error.to_string();
++                (
++                    TaskStatus::Failed(error.clone()),
++                    None,
++                    Resolution::DeadLetter(reason),
++                    Terminal::Failed(error),
++                )
++            }
++        }
+     }
+ 
+     /// The release hook's job: spawn a drain and start what it admits, then

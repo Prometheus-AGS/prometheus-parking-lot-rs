@@ -51,9 +51,9 @@ async fn open_writer(url: &str) -> TestResult<PgConnection> {
     for statement in [
         "INSERT INTO pl_lease_queue (queue_name, priority, meta, payload)
          VALUES ('held', 1, '{}', '{}')",
-        "INSERT INTO pl_result_mailbox (mailbox_name, mailbox_key, task_id, status)
+        "INSERT INTO pl_result_mailbox_v3 (mailbox_name, mailbox_key, task_id, status)
          VALUES ('held', 'k', 1, '{}')",
-        "INSERT INTO pl_result_mailbox_keys (mailbox_name, idempotency_key) VALUES ('held', 'k')",
+        "INSERT INTO pl_result_mailbox_keys_v3 (mailbox_name, mailbox_key, idempotency_key, status) VALUES ('held', 'k', 'k', '\"Completed\"')",
         "INSERT INTO pl_pgmq_aux (queue_name, entry_id) VALUES ('held', 1)",
         "INSERT INTO pl_audit_events (event_id, task_id, pool, tenant, action)
          VALUES ('held', 't', 'p', 't', 'a')",
@@ -93,8 +93,8 @@ async fn rerun_while_locked(
     sqlx::query("BEGIN").execute(&mut holder).await?;
     let mut tables = vec![
         "pl_lease_queue".to_owned(),
-        "pl_result_mailbox".to_owned(),
-        "pl_result_mailbox_keys".to_owned(),
+        "pl_result_mailbox_v3".to_owned(),
+        "pl_result_mailbox_keys_v3".to_owned(),
         "pl_pgmq_aux".to_owned(),
         "pl_audit_events".to_owned(),
     ];

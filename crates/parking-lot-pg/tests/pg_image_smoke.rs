@@ -57,10 +57,11 @@ async fn smoke(major: u8) -> TestResult<()> {
     assert_eq!(msg_id, read_id);
 
     // template1 carries pgmq, so per-test databases inherit it.
-    sqlx::query("CREATE DATABASE smoke_child")
+    let child_name = support::database_name()?;
+    sqlx::query(sqlx::AssertSqlSafe(format!("CREATE DATABASE {child_name}")))
         .execute(&pg.pool)
         .await?;
-    let child = sqlx::PgPool::connect(&pg.url_for("smoke_child")).await?;
+    let child = sqlx::PgPool::connect(&pg.url_for(&child_name)).await?;
     let inherited: i64 =
         sqlx::query_scalar("SELECT count(*) FROM pg_extension WHERE extname = 'pgmq'")
             .fetch_one(&child)

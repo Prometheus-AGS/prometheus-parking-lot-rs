@@ -333,6 +333,15 @@ async fn budget_worker_pool_wedged_executor_is_cancelled() {
         "max_units must hold the quick task"
     );
 
+    // Observe the actual future-drop witness before awaiting its result.
+    // This fixed observation window is not a missing-result watchdog; normal
+    // cancellation has the unchanged BUDGET plus scheduling slack to run.
+    tokio::time::sleep(BUDGET + Duration::from_secs(1)).await;
+    assert!(
+        executor.wedge_cancelled.load(Ordering::SeqCst),
+        "OA12:S4:native-worker-budget: wedged executor future was not cancelled"
+    );
+
     match pool.retrieve_async(&wedged, WAIT).await {
         Err(SchedulerError::Task(TaskError::Timeout { budget })) => assert_eq!(budget, BUDGET),
         other => panic!("expected Task(Timeout), got {other:?}"),

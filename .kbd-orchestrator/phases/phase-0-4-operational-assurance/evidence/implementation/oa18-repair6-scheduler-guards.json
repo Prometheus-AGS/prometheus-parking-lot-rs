@@ -1,0 +1,27 @@
+{
+  "status": "NOT_EXERCISED",
+  "scope": "New delta after repair5: four observed significant_drop_tightening diagnostics only",
+  "parent_observed_log": "/tmp/oa04-observed-repair6-clippy.log",
+  "parent_observed_exit": 101,
+  "files": [
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/backend_admission_test.rs",
+      "base_sha256": "89d59e66f80e45cb1bc022ea17afd6368bd1b4d07e9532d3189110a6a98311db",
+      "target_sha256": "4aa0fc0b876e9eba0cb56ad14b9dd419d8d369e1df2357e0ca9c1c752614032f"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/discarded_spawn_test.rs",
+      "base_sha256": "f806060d9b93161487462236259117a674a7e9fc4461385d937fd3fa33314efe",
+      "target_sha256": "683644583389a349dd3a0204f25498b5ba2e5cbd4c504b0eaf08e8adbce89b02"
+    }
+  ],
+  "patch_sha256": "9a8d517e69d30f5ea9eabdacaebe930c0412d33c94cffe5a40b19e9d7700ecfa",
+  "changes": [
+    "backend_admission_test: drop activity after final active-capacity assertion inside its existing lock scope",
+    "backend_admission_test: drop stored after second-consume-none assertion before returning result",
+    "discarded_spawn_test: drop stored after second-consume-none assertion before returning outcome",
+    "discarded_spawn_test: drop stored after the entire backlog per-key consumption/assertion loop, before settlement marker"
+  ],
+  "preserved": "All assertions and order, fixture identities, backlog/control, panic, mailbox and capacity semantics retained. No production edits or lint allowances. Exactly four explicit drop statements added.",
+  "actions": "Fresh central two-file sync; bounded log/source reads; source authoring, exact diff and SHA256 only. No Cargo/build/test/compiler/formatter/analyzer/scan/review/KBD/commit, central/shared-map or verification-tree writes. Parent serial confirmation required."
+}

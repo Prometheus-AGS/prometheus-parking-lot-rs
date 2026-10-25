@@ -67,6 +67,10 @@ async fn autovacuum_settings_are_applied_to_every_queue_table() -> TestResult<()
         ("pl_lease_queue", 1000),
         ("pl_result_mailbox", 1000),
         ("pl_result_mailbox_keys", 500),
+        ("pl_result_mailbox_v2", 1000),
+        ("pl_result_mailbox_keys_v2", 500),
+        ("pl_result_mailbox_v3", 1000),
+        ("pl_result_mailbox_keys_v3", 500),
         ("pl_pgmq_aux", 500),
     ] {
         assert_tuned(table, &reloptions(&pg.pool, table).await?, threshold);

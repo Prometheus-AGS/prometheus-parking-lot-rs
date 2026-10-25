@@ -1,0 +1,7 @@
+Starting change 1 out of 18: Prepare and enforce post-purge containment controls
+Position: phase-0-4-operational-assurance › oa-01-containment-controls @ revision 943
+Starting task 1 out of 2: 1.1 Implement prepare and enforce post-purge containment controls with the specified regression fixtures; verify OA-01 fixture/manifest coverage by static inspection
+Position: phase-0-4-operational-assurance › oa-01-containment-controls › 1 @ revision 944
+{"code":0,"schemaVersion":1,"time":"2026-10-24T12:09:44.582Z","operation":"run","project":"/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs","status":"completed","version":"1.15.0","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/79e427e7ccf7d8a94667a005/1792843784583-893b4d5a-c895-4cfb-ba71-82b9eb034188.json"}
+Starting change 1 out of 1: oa-01-containment-controls
+Starting task 1 out of 2:   oa-01-containment-controls:1

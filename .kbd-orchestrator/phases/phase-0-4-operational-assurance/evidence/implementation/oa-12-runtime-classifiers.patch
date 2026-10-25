@@ -1,0 +1,169 @@
+--- a/crates/parking-lot-runtime-tokio/tests/panic_test.rs
++++ b/crates/parking-lot-runtime-tokio/tests/panic_test.rs
+@@ -16,8 +16,9 @@
+ //! ```
+ //!
+ //! Negative control: under `--cfg parking_lot_negative_control="s-3"` panics
+-//! are not caught, and every `panic_*` test fails (it waits, bounded by
+-//! `WAIT`, for an outcome or a worker that never comes).
++//! are not caught. The designated one-in-100 ResourcePool fixture joins its
++//! actual spawned runs before looking up outcomes, so an escaped panic fails
++//! OA12:S3 directly. Other panic fixtures retain their bounded outcome waits.
+ 
+ use std::sync::Arc;
+ use std::time::{Duration, Instant};
+@@ -131,6 +132,22 @@
+     }
+ }
+ 
++/// Record actual ResourcePool runs without retaining a lock while joining.
++#[derive(Clone, Default)]
++struct CollectedSpawner {
++    spawned: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>>,
++}
++
++impl Spawn for CollectedSpawner {
++    fn spawn<F>(&self, future: F)
++    where
++        F: std::future::Future<Output = ()> + Send + 'static,
++    {
++        let handle = tokio::spawn(future);
++        self.spawned.lock().push(handle);
++    }
++}
++
+ /// A mailbox the test reads while the pool owns a clone of it. Delivering
+ /// for the key in `panic_on` panics (once).
+ #[derive(Clone, Default)]
+@@ -281,10 +298,39 @@
+ #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+ async fn panic_resource_pool_one_in_100_is_contained() {
+     let mailbox = SharedMailbox::default();
+-    let pool = resource_pool(&mailbox);
++    let spawner = CollectedSpawner::default();
++    let pool = ResourcePool::new(
++        PoolLimits {
++            max_units: 1,
++            max_queue_depth: 128,
++            default_timeout: WAIT,
++        },
++        InMemoryQueue::new(128),
++        mailbox.clone(),
++        PanicExecutor::new(),
++        spawner.clone(),
++    );
+ 
+     for id in 0..TASKS {
+         pool.submit(task(id, job_for(id))).await.expect("accepted");
++    }
++
++    // Joining a run observes the actual containment boundary. Completions
++    // may spawn parked followers, so drain handles in rounds, outside locks.
++    // The watchdog is only harness failure; the mutant must fail is_panic.
++    loop {
++        let handles = std::mem::take(&mut *spawner.spawned.lock());
++        if handles.is_empty() {
++            break;
++        }
++        for handle in handles {
++            let joined = tokio::time::timeout(WAIT, handle).await.expect("spawned-run join watchdog");
++            assert!(
++                !matches!(&joined, Err(error) if error.is_panic()),
++                "OA12:S3: executor panic escaped the ResourcePool spawned future: {joined:?}"
++            );
++            joined.expect("ResourcePool run was unexpectedly cancelled");
++        }
+     }
+ 
+     let deadline = Instant::now() + WAIT;
+--- a/crates/parking-lot-runtime-tokio/tests/result_slots_test.rs
++++ b/crates/parking-lot-runtime-tokio/tests/result_slots_test.rs
+@@ -15,10 +15,14 @@
+ //!
+ //! Negative control: under `--cfg parking_lot_negative_control="s-17"` each
+ //! waiter parks a blocking-pool thread (the 0.2 design). With the blocking
+-//! pool exhausted no waiter runs, every wait times out and
+-//! `waiters_no_blocking_threads` fails.
+-
++//! pool exhausted no waiter runs. The designated fixture first polls one
++//! real pending retrieval on a current-thread runtime and observes synchronous
++//! thread-factory calls, then cleans up and fails OA12:S17 before the load
++//! scenario. A watchdog or missing result is not its negative classifier.
++
++use std::future::Future;
+ use std::sync::Arc;
++use std::sync::atomic::{AtomicUsize, Ordering};
+ use std::sync::mpsc;
+ use std::time::{Duration, Instant};
+ 
+@@ -95,8 +99,52 @@
+     matches!(error, SchedulerError::ResultExpired { key: Some(_) })
+ }
+ 
++/// Observe the first poll, rather than waiting for a missing result.
++/// Pinned Tokio1.54.1 blocking/pool.rs::spawn_thread calls thread_name_fn
++/// synchronously before OS thread creation. This current-thread runtime has
++/// no async worker threads; only the mutant's spawn_blocking needs a name.
++fn assert_pending_retrieve_starts_no_blocking_thread() {
++    let names = Arc::new(AtomicUsize::new(0));
++    let named = Arc::clone(&names);
++    let runtime = tokio::runtime::Builder::new_current_thread()
++        .max_blocking_threads(1)
++        .thread_name_fn(move || {
++            // Called and observed on the polling thread, in program order;
++            // Relaxed counts calls and supplies no cross-thread publication.
++            named.fetch_add(1, Ordering::Relaxed);
++            "oa12-s17-retrieval".to_owned()
++        })
++        .enable_all()
++        .build()
++        .expect("probe runtime");
++    let (gate, open) = watch::channel(false);
++    let pool = WorkerPool::new(
++        WorkerPoolConfig::new().with_worker_count(1).with_max_units(1).with_max_queue_depth(8),
++        Gated { open },
++    ).expect("probe pool");
++    let key = pool.submit(7, meta(7)).expect("probe accepted");
++    let before = names.load(Ordering::Relaxed);
++    let pending = runtime.block_on(async {
++        let retrieval = pool.retrieve_async(&key, WAIT);
++        tokio::pin!(retrieval);
++        std::future::poll_fn(|cx| {
++            std::task::Poll::Ready(retrieval.as_mut().poll(cx).is_pending())
++        }).await
++    });
++    let spawned = names.load(Ordering::Relaxed) - before;
++    // Cleanup is unconditional before the designated assertion. Opening the
++    // real executor gate releases the mutant's detached blocking receiver too.
++    gate.send_replace(true);
++    wait_completed(&pool, 1);
++    runtime.shutdown_timeout(WAIT);
++    pool.shutdown();
++    assert!(pending, "probe requires an actual pending result");
++    assert_eq!(spawned, 0, "OA12:S17: pending retrieve_async started a blocking thread");
++}
++
+ #[test]
+ fn waiters_no_blocking_threads() {
++    assert_pending_retrieve_starts_no_blocking_thread();
+     let runtime = tokio::runtime::Builder::new_multi_thread()
+         .worker_threads(2)
+         .max_blocking_threads(1)
+--- a/crates/parking-lot-runtime-tokio/tests/budget_test.rs
++++ b/crates/parking-lot-runtime-tokio/tests/budget_test.rs
+@@ -333,6 +333,15 @@
+         "max_units must hold the quick task"
+     );
+ 
++    // Observe the actual future-drop witness before awaiting its result.
++    // This fixed observation window is not a missing-result watchdog; normal
++    // cancellation has the unchanged BUDGET plus scheduling slack to run.
++    tokio::time::sleep(BUDGET + Duration::from_secs(1)).await;
++    assert!(
++        executor.wedge_cancelled.load(Ordering::SeqCst),
++        "OA12:S4:native-worker-budget: wedged executor future was not cancelled"
++    );
++
+     match pool.retrieve_async(&wedged, WAIT).await {
+         Err(SchedulerError::Task(TaskError::Timeout { budget })) => assert_eq!(budget, BUDGET),
+         other => panic!("expected Task(Timeout), got {other:?}"),

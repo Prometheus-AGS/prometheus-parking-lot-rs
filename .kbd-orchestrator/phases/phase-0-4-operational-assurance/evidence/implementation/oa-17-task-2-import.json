@@ -1,0 +1,19 @@
+{
+  "owner": "/root/oa04_scheduler",
+  "files": [
+    {
+      "path": "benches/README.md",
+      "sha256": "55da1bd88438bf18cb9c47df3748aec1728cdc63e7d7899a55a626a5c5eaaeba"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-17.md",
+      "sha256": "7a355d9c9c50625aefe78c6acda4c7da376ef086653dd085b03fc42d898f1c67"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-17-architecture.patch",
+      "sha256": "72cb5c149b1eba8624473aed31ae036d9d995104f366c8919b776aca1b8246bd"
+    }
+  ],
+  "appliedPublicDocsPatch": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-17-architecture.patch",
+  "runtimeEvidence": "NOT_EXERCISED"
+}

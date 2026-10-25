@@ -1,0 +1,102 @@
+--- a/scripts/release/prepare.py
++++ b/scripts/release/prepare.py
+@@ -243,10 +243,11 @@
+             notes = "- No package-local commits; included in the lockstep release."
+         sections.append(f"### {name}\n\n{notes}\n")
+     historical = git(source, "show", f"{args.candidate}:CHANGELOG.md")
+-    # set-version expects a readable latest release and renames only its heading.
+-    # Seed it with the current metadata version, then preserve historical text.
++    # The pinned parser rejects duplicate versions across the entire changelog.
++    # Give set-version only the generated current-version section to rename;
++    # append the immutable historical text after its one-heading update.
+     changelog = (f"# Changelog\n\n## [{current}] - {args.date}\n\n"
+-                 + "\n".join(sections) + "\n" + historical.removeprefix("# Changelog").lstrip())
++                 + "\n".join(sections))
+     (scratch / "CHANGELOG.md").write_text(changelog, encoding="utf-8")
+     run([tools["release-plz"]["path"], "set-version", args.version,
+          "--manifest-path", str(scratch / "Cargo.toml"),
+@@ -255,6 +256,8 @@
+     result_changelog = (scratch / "CHANGELOG.md").read_text(encoding="utf-8")
+     require(result_changelog.startswith(f"# Changelog\n\n## [{args.version}] - {args.date}\n"),
+             "release-plz did not prepare the requested changelog heading")
++    (scratch / "CHANGELOG.md").write_text(
++        result_changelog + "\n" + historical.removeprefix("# Changelog").lstrip(), encoding="utf-8")
+     changed = set(git(scratch, "diff", "--name-only", args.candidate, "--").splitlines())
+     require(changed <= allowed_changes, f"unexpected preparation writes: {sorted(changed - allowed_changes)}")
+     files = sorted({"Cargo.toml", "Cargo.lock", "CHANGELOG.md", "release-plz.toml", "cliff.toml",
+--- a/scripts/release/test-preparation.py
++++ b/scripts/release/test-preparation.py
+@@ -12,6 +12,7 @@
+ import copy
+ import hashlib
+ import json
++import os
+ from pathlib import Path
+ import shutil
+ import subprocess
+@@ -127,6 +128,19 @@
+     workspace = prepared / "workspace"
+     first_files = {p: sha(workspace / p) for p in receipt["files_sha256"]}
+     changelog = (workspace / "CHANGELOG.md").read_text(encoding="utf-8")
++    # Preserve trailing bytes; the shared git identity helper strips stdout.
++    historical = subprocess.run(["git", "show", f"{args.candidate}:CHANGELOG.md"], cwd=source,
++                                env={**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"},
++                                capture_output=True, text=True, check=True).stdout
++    historical = historical.removeprefix("# Changelog").lstrip()
++    if not changelog.endswith(historical):
++        raise AssertionError("OA-02:historical-changelog: original release history/prose changed")
++    # The real source includes its current release (0.3.0 for this boundary).
++    # Appending it before set-version caused the actual pinned parser failure.
++    historical_headings = [line for line in historical.splitlines() if line.startswith("## ")]
++    prepared_headings = [line for line in changelog.splitlines() if line.startswith("## ")]
++    if prepared_headings != [f"## [{args.version}] - {args.date}", *historical_headings]:
++        raise AssertionError("OA-02:historical-changelog: release heading duplicated, removed or reordered")
+     section = changelog.split("\n## [", 2)[1]
+     headings = [line.removeprefix("### ") for line in section.splitlines() if line.startswith("### ")]
+     if headings != EXPECTED or "### prometheus-parking-lot-ffi" in section:
+@@ -214,7 +228,7 @@
+             "original_plan_sha256": sha(args.preparation_plan),
+             "reproduced_plan_sha256": sha(receipt_path), "files_sha256": first_files}, indent=2) + "\n")
+         print("PASS OA-02: original plan and reproduced ancestor outputs match final candidate; mismatch controls rejected")
+-    print("PASS OA-02: seven crate versions/dependencies/changelog; FFI excluded; second run unchanged")
++    print("PASS OA-02: seven crate versions/dependencies/changelog; historical releases preserved; FFI excluded; second run unchanged")
+     print("PASS OA-02 controls: dependency, package, lockfile, FFI and version-group mismatches rejected")
+     print(f"Evidence: {evidence}")
+     return 0
+--- a/docs/adr/0005-lockstep-release-versioning.md
++++ b/docs/adr/0005-lockstep-release-versioning.md
+@@ -59,9 +59,14 @@
+ The pinned release-plz `set-version` implementation visits **all** inheriting
+ members, even `release = false` members, and requires a readable changelog for
+ each. All eight configuration entries therefore point at the shared changelog;
+-release-plz deduplicates that path. The wrapper seeds its latest heading with
+-the current metadata version, then `set-version` renames that heading to the
+-requested version. No FFI changelog section is generated.
++release-plz deduplicates that path. The wrapper supplies only the generated
++section headed with the current metadata version while `set-version` renames
++that heading to the requested version. It then appends the candidate's historical
++changelog body unchanged. Passing both the temporary current-version section
++and the historical section for that same version to release-plz was observed to
++fail: its pinned parser rejects duplicate release versions. Staging the generated
++section alone preserves every historical release without asking the parser to
++rename historical entries. No FFI changelog section is generated.
+ 
+ An existing output is accepted only for the identical source/base/candidate/
+ version/date tuple. The same preparation is executed again, rather than returning
+--- a/.github/scripts/OPERATIONAL_ASSURANCE.md
++++ b/.github/scripts/OPERATIONAL_ASSURANCE.md
+@@ -92,7 +92,13 @@
+ to force byte equality. Portable plan fields, actual tool identity hashes/version
+ outputs and every prepared metadata byte must agree with the original plan and
+ final checkout. The reproduced plan itself must remain byte-identical on its
+-second run at the same output path. The compact artifact still copies only the
++second run at the same output path. During preparation, only the new generated
++section is exposed to release-plz's set-version parser; original historical
++sections are appended unchanged after its heading update. The actual pinned
++parser rejects a temporary current-version heading alongside the historical
++heading for that same version. The real-tool fixture requires the entire
++historical body as an unchanged suffix and all original release headings in
++order, in addition to deterministic second-run output. The compact artifact still copies only the
+ original plan, with its exact digest; the collector must use the same original
+ plan digest retained by the baseline freeze. Neither the reproduction nor a rebuilt plan
+ can replace it. Actual altered-plan controls reject metadata mismatch through

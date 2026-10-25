@@ -1,0 +1,18 @@
+[
+  {
+    "name": "wasm-bindgen",
+    "version": "0.2.129",
+    "archive_url": "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.129/wasm-bindgen-0.2.129-x86_64-apple-darwin.tar.gz",
+    "archive_sha256": "7e028879a68ec53dae14048b55cc5215f6df75b17a9c1426fac8fa086d3202fd",
+    "executable_sha256": "79df2660c5f4d5d4ae79120eb0e8b06344996c9a4723ea6c50724d38d3edd377",
+    "path": "/tmp/oa04-private-tools/bin/wasm-bindgen"
+  },
+  {
+    "name": "wasm-bindgen-test-runner",
+    "version": "0.2.129",
+    "archive_url": "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.129/wasm-bindgen-0.2.129-x86_64-apple-darwin.tar.gz",
+    "archive_sha256": "7e028879a68ec53dae14048b55cc5215f6df75b17a9c1426fac8fa086d3202fd",
+    "executable_sha256": "1bc73f93d3e8cf2d0c7c49533eeb1e6db1c0353e57bd44d753181a6445cc1096",
+    "path": "/tmp/oa04-private-tools/bin/wasm-bindgen-test-runner"
+  }
+]

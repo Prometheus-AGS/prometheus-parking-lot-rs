@@ -1,0 +1,83 @@
+{
+  "owner": "/root/oa04_postgres",
+  "files": [
+    {
+      "path": "crates/parking-lot-pg/src/mailbox/mod.rs",
+      "sha256": "08b1720091cc85c190327ad544af4a3bea346df765a86641673ca59060fe807a"
+    },
+    {
+      "path": "crates/parking-lot-pg/src/mailbox/sql.rs",
+      "sha256": "abf43cde393d59f472c7255d21ec4000ea13b4a9c5e31c3030ca919a2b9a0ae6"
+    },
+    {
+      "path": "crates/parking-lot-pg/src/mailbox/migration.rs",
+      "sha256": "fa80581415a8b57055769e0eaa4eac494c7cfdd9a25739f3dc39de5f812ad91f"
+    },
+    {
+      "path": "crates/parking-lot-pg/src/mailbox/migration/owners.rs",
+      "sha256": "2040f2ffe847200279e93452388c6a1acd6d480e3ec7e0b1c4e85038e30ce4db"
+    },
+    {
+      "path": "crates/parking-lot-pg/migrations/009_result_mailbox_status.sql",
+      "sha256": "843da5dd0e5e7a8e47801c3805b45c548530fa0a0139dbfb24ae95fe8d132387"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/mailbox.rs",
+      "sha256": "148b5c34f7cfd66d0a8d0e33688cf0ea1c21cc45162c8fc3a59ea28d6f05f97c"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/mailbox_migration.rs",
+      "sha256": "ed2eeb0c3a59d06ef79610c3d8195b409e6ad1ce373508cf8d143dbdf45957d9"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/mailbox_status.rs",
+      "sha256": "cdce0428a323d358c2183284175c926ccd79d11698aed8cd88c95026d91284c3"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/migrations.rs",
+      "sha256": "fa89e49c8b487792212aab182229ed02e4c8787763f78a8a5e63db6e26fe0fdf"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/queue_autovacuum.rs",
+      "sha256": "f0e8c82db26333eac5d0e951a65a5441b322b95633a358c410f04ce0a22ed657"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa07/008_scoped_result_mailbox_v2.sql",
+      "sha256": "f583b5e14927df5a0f09974b2d1656d4bab374d5982e315ecde853298fd971aa"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa07/populated_v2.sql",
+      "sha256": "6fe271c5ff8c956e8739dc6dde068ea868f24eab0e5fe0a2d559f6517f3b6421"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa07/failed_generation_0_3.sql",
+      "sha256": "e21ee9fd180c623112515be2e462512bf226b8e6886179a3ad43a980be3d10f0"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa07/failed_generation_v2.sql",
+      "sha256": "fe1c28d1f672b19ed2dd27985a17a728c4d6eabce318ab7103a98c49293ce177"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa07/ambiguous_status_0_3.sql",
+      "sha256": "2272ad1e46195ad844ec87ed4ebc8cf349e30621f5971067390bdef734bc2826"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa07/untouched_backup_0_3.sql",
+      "sha256": "84d351cb2f340c91ba4e4d863ffea6477c5cc53ad77a1ace1958cbbd9402f1a7"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa07/untouched_backup_v2.sql",
+      "sha256": "84b866946af7549f5a4a6e17779c3e7cd2b7afc1b94d2f5657f559b1d6b43921"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa07/authoritative_metadata.json",
+      "sha256": "9f499bad0a6172608299fb5c2b7a20eded3b91745401566aeb5aa18d97548f52"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa07/manifest.json",
+      "sha256": "20f950124f348db03e33662d0c043f26bf905e4e0880409e1f7516e5b0a96a47"
+    }
+  ],
+  "mirroredTo": "/Users/gqadonis/.codex/worktrees/oa04-release/prometheus-parking-lot-rs",
+  "runtimeEvidence": "NOT_EXERCISED"
+}

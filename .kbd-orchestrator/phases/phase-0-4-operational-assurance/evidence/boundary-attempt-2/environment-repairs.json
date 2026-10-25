@@ -1,0 +1,30 @@
+{
+  "candidate": "2c18c9a309daaa22d3d50301e15509fa23c2a829",
+  "git": {
+    "old": "2.33.0",
+    "selected_existing": "/usr/bin/git",
+    "selected_version": "2.50.1 (Apple Git-155)",
+    "private_link": "/tmp/oa04-private-tools/bin/git"
+  },
+  "oa03": {
+    "exit": 0,
+    "fixture_checks": 16
+  },
+  "bindgen_locked_fetch": {
+    "exit": 0,
+    "lock_changed": false
+  },
+  "bindgen_deny": {
+    "exit": 0,
+    "result": "advisories ok, bans ok, licenses ok, sources ok"
+  },
+  "raw_directory": "/Users/gqadonis/.local/state/prometheus/operational-assurance/2c18c9a309daaa22d3d50301e15509fa23c2a829/environment-repairs",
+  "current_model_digest_updates": [
+    {
+      "path": "crates/parking-lot-runtime-tokio/src/ledger/loom_ledger.rs",
+      "before": "6236cf4e778bc0a446cadba139f9cdbe3ad93ce88ec1373e54bc542b336530ca",
+      "after": "0950b190a5b50279994b5519bf9834270485db956f35fb3a9e4fb04f19cc75b9"
+    }
+  ],
+  "scope": "Environment repair reruns are separate from original immutable full-baseline failures."
+}

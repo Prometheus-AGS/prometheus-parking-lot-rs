@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/release-boundary-v1",
+  "title": "Shared OA-04/OA-18 trusted boundary artifact receipt",
+  "description": "Content schema only; JSON alone establishes no authority. The consumer must independently verify GitHub run, workflow digest, approved environment, archive provenance and actual tag. Rehearsal cannot authorize publication.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "purpose", "candidate", "contract_digest", "tag", "tag_object", "version", "manifest_sha256", "preparation_plan_sha256", "tag_verification", "scenarios", "baseline", "review", "operator_gates", "status"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "purpose": {"enum": ["rehearsal", "certification"]},
+    "candidate": {"$ref": "#/$defs/commit"},
+    "contract_digest": {"$ref": "#/$defs/digest"},
+    "tag": {"type": "string", "minLength": 1},
+    "tag_object": {"$ref": "#/$defs/commit"},
+    "version": {"const": "0.4.0"},
+    "manifest_sha256": {"$ref": "#/$defs/digest"},
+    "preparation_plan_sha256": {"$ref": "#/$defs/digest"},
+    "status": {"enum": ["PASS", "NOT_EXERCISED"]},
+    "tag_verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "candidate", "tag", "tag_object", "format", "identity", "signing_fingerprint", "public_trust_sha256"],
+      "properties": {
+        "status": {"const": "PASS"},
+        "candidate": {"$ref": "#/$defs/commit"},
+        "tag": {"type": "string", "minLength": 1},
+        "tag_object": {"$ref": "#/$defs/commit"},
+        "format": {"enum": ["ssh", "openpgp"]},
+        "identity": {"type": "string", "minLength": 1},
+        "signing_fingerprint": {"type": "string", "minLength": 1},
+        "public_trust_sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 17,
+      "maxItems": 17,
+      "description": "Each mandatory ID occurs exactly once; the shared Python validator enforces ID uniqueness/completeness.",
+      "items": {
+        "allOf": [
+          {"$ref": "#/$defs/oracle"},
+          {"required": ["id"], "properties": {"id": {"enum": ["OA-01", "OA-02", "OA-03", "OA-04", "OA-05", "OA-06", "OA-07", "OA-08", "OA-09", "OA-10", "OA-11", "OA-12", "OA-13", "OA-14", "OA-15", "OA-16", "OA-17"]}}}
+        ]
+      }
+    },
+    "baseline": {"$ref": "#/$defs/oracle"},
+    "review": {"$ref": "#/$defs/oracle"},
+    "operator_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["G-02", "G-03", "G-04"],
+      "properties": {
+        "G-02": {"$ref": "#/$defs/oracle"},
+        "G-03": {"$ref": "#/$defs/oracle"},
+        "G-04": {"$ref": "#/$defs/oracle"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"purpose": {"const": "rehearsal"}}},
+      "then": {"properties": {"status": {"const": "NOT_EXERCISED"}}},
+      "else": {
+        "properties": {
+          "status": {"const": "PASS"},
+          "scenarios": {"items": {"properties": {"status": {"const": "PASS"}}}},
+          "baseline": {"properties": {"status": {"const": "PASS"}}},
+          "review": {"properties": {"status": {"const": "PASS"}}},
+          "operator_gates": {"properties": {
+            "G-02": {"properties": {"status": {"const": "PASS"}}},
+            "G-03": {"properties": {"status": {"const": "PASS"}}},
+            "G-04": {"properties": {"status": {"const": "PASS"}}}
+          }}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "digest": {"type": "string", "pattern": "^(?!0{64}$)[0-9a-f]{64}$"},
+    "oracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "id": {"type": "string"},
+        "status": {"enum": ["PASS", "NOT_EXERCISED"]},
+        "receipt_sha256": {"$ref": "#/$defs/digest"}
+      },
+      "if": {"properties": {"status": {"const": "PASS"}}},
+      "then": {"required": ["receipt_sha256"]}
+    }
+  }
+}

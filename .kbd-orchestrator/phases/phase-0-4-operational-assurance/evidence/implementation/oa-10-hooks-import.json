@@ -1,0 +1,8 @@
+{
+  "owner": "/root/oa04_events",
+  "task": "oa-10-expiry-events/1",
+  "file": "crates/parking-lot-core/src/hooks/mod.rs",
+  "sha256": "ca21fa47da50bf95d558dabdca4426e314e28adaf12bbbcb423b1e6d806bcc3f",
+  "scope": "exact scheduler-proposed hooks documentation handoff",
+  "runtimeEvidence": "NOT_EXERCISED; runtime consumers still in progress"
+}

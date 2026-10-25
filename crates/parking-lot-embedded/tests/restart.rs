@@ -128,7 +128,9 @@ async fn state_survives_close_and_reopen() {
     .with_idempotency_key("done");
     assert_eq!(
         mailbox.deliver(again).await.expect("deliver"),
-        DeliveryOutcome::Duplicate,
+        DeliveryOutcome::Duplicate {
+            status: TaskStatus::Completed
+        },
         "a consumed result's key is remembered across restarts"
     );
 }

@@ -1,0 +1,20 @@
+{
+  "owner": "/root/oa04_scheduler",
+  "task": "oa-12-negative-control-ci/1",
+  "proposal": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-12-runtime-classifiers.json",
+  "files": [
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/panic_test.rs",
+      "sha256": "7b90dbceaaaf419647302a5f772fb1bb3ac8b67c46ca22211efe43732287c2a1"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/result_slots_test.rs",
+      "sha256": "a320af8d25f1cae2811bc9f156b987cc714b0c1a275c14cf2c4e6717f80c0ab5"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/budget_test.rs",
+      "sha256": "4a74b805b6ecc7f1b11e780d8896df5ee121b7f43c9a5fa00a163209a28bcde5"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED"
+}

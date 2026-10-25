@@ -1,0 +1,14 @@
+{
+  "owner": "/root/oa04_platform",
+  "files": [
+    {
+      "path": "bindings/tauri-desktop/assurance/RUNBOOK.md",
+      "sha256": "ebae5909647f04ce276f3799151d7df5f7d76cb74ac26316928f26a87ef8a179"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-15.md",
+      "sha256": "2dec530be53322240ba78f0d2a6da36b9da51220c43f5bc203a4da1df7a5dd94"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED"
+}

@@ -1,15 +1,22 @@
 # Runbook: PostgreSQL 18 (and 17) for the parking-lot Postgres backends
 
 Scope: operating `PgLeaseQueue`, `PgResultMailbox` and `PgmqLeaseQueue`
-(`crates/parking-lot-pg`) on PostgreSQL 17 and 18. CI runs every Docker-gated
-suite on both majors (`postgres` job in `.github/workflows/ci.yml`, cr-36).
+(`crates/parking-lot-pg`) on PostgreSQL 17 and 18. The ordinary CI matrix selects Docker-gated
+suites on both majors (`postgres` job in `.github/workflows/ci.yml`, cr-36).
+The OA-14 upgrade binary is excluded from those fresh-cluster legs and runs
+separately against a marked, physically upgraded cluster (section 7).
 Facts about PostgreSQL and the official Docker image are cited in
 [Sources](#sources); facts about this repository were checked against the
-`parking-lot-pg:17` and `parking-lot-pg:18` images built from `docker/`.
+`parking-lot-pg:17` and `parking-lot-pg:18` images built from `docker/` in the
+prior runbook. Those historical observations do not certify the OA-14 source
+changes. **OA-14 runtime status: NOT_EXERCISED** until the OA-18 final boundary.
+No operator cluster, host package installation or production migration is
+authorized by the disposable rehearsal below.
 
 ## What differs between 17 and 18
 
-Observed on the project images (`SHOW` / `docker inspect`):
+Previously recorded on the project images (`SHOW` / `docker inspect`);
+OA-14 must record its own actual versions and image IDs:
 
 | | 17 (17.11) | 18 (18.6) |
 |---|---|---|
@@ -121,37 +128,75 @@ the server major: after a 17 to 18 upgrade, install pgmq for 18 before running
 
 ## 5. Running migrations
 
-There is no separate migration tool. Each type applies its idempotent script
-with one multi-statement call (one implicit transaction), safe to run at every
-start and from several processes at once (each script takes an advisory lock
-first):
+There is no separate migration CLI. Use the backend API; applying the numbered
+mailbox SQL files by hand bypasses owner/status resolution and is unsupported.
+Queue/audit scripts remain idempotent. Mailbox conversion is an explicit Rust
+transaction spanning the ownership and status stages:
 
-| Call | Script |
+| Call | Storage path |
 |---|---|
 | `PgLeaseQueue::migrate(&pool)` | `crates/parking-lot-pg/migrations/004_lease_queue.sql` |
-| `PgResultMailbox::migrate(&pool)` | `005_result_mailbox.sql` |
+| `PgResultMailbox::migrate(&pool)` | Metadata-aware conversion below, with empty owner/status evidence |
+| `PgResultMailbox::migrate_with_idempotency_owners(&pool, &owners)` | Same conversion with empty status evidence; unresolved consumed status refuses |
+| `PgResultMailbox::migrate_with_idempotency_metadata(&pool, &owners, &statuses)` | `mailbox/migration.rs` plus 005/008/009, one transaction to protocol 3 |
 | `PgmqLeaseQueue::prepare()` (or `migrate`, then create queues) | `006_pgmq_lease_queue.sql`, then `pgmq.create` and `pl_pgmq_tune_queue` per queue |
 | `PostgresAuditSink::migrate(&pool)` | `007_audit_events.sql` |
 
-The facade runs them for a configured Postgres backend. Manual application
-(`--single-transaction` keeps the advisory lock and `lock_timeout` in force for
-the whole script, as one call does):
-`psql -v ON_ERROR_STOP=1 --single-transaction -f crates/parking-lot-pg/migrations/004_lease_queue.sql`
-(and 005, 006, 007).
+The facade invokes the empty-evidence mailbox API. It can reopen protocol 3 or
+convert a source whose active ownership/status are all provable from retained
+rows. It cannot supply missing consumed-generation evidence automatically.
+For such a legacy store, stop the applications and use the explicit API before
+starting the facade:
 
-Because the scripts are re-applied, an upgrade of this library that changes
-storage parameters (cr-36 did) takes effect the first time the new version
-calls `migrate`/`prepare`.
+```rust
+PgResultMailbox::<String>::migrate_with_idempotency_metadata(
+    &pool, &owners, &statuses,
+).await?;
+```
+
+`owners` has type `Vec<(String, LegacyIdempotencyOwner)>`; `statuses` has type
+`Vec<(String, LegacyDeliveryStatus)>`. The outer string is the exact
+`mailbox_name`. Ownership includes the complete `MailboxKey` and caller key;
+status evidence includes that same address/caller and original full
+`TaskStatus`, including the complete `TaskError` for `Failed`. The fixed
+`fixtures/oa14/metadata.json` is authority for its synthetic fixture only.
+Never apply those values to an operator store.
+
+For direct 0.3 to protocol 3, ownership and status resolve before one commit.
+For intermediate protocol 2, the scoped address is already known but missing
+consumed status still requires proof. Retained-row inference requires the
+same namespace/caller, resolved address and native expiry generation
+(`expires_at IS NOT DISTINCT FROM forget_at`). Ambiguous supplied evidence
+must select a coherent retained owner/status pair. Zero retained candidates
+permit separate authoritative owner and status evidence; absent, duplicate,
+unknown, expired, wrong-address or contradictory assignments refuse without
+committing a partial conversion. In particular, do not commit an owner-only
+protocol-2 migration and then attempt the status conversion separately.
+See [ADR 0006](../adr/0006-tenant-scoped-result-idempotency.md) and
+[ADR 0007](../adr/0007-authoritative-duplicate-status.md).
+
+Results, full statuses, original native TTLs and sequence state are copied;
+consume does not erase the active fence's original status. Immutable conversion
+proof remains after consume or expiry, but replay does not resurrect an expired
+fence. Old 0.3 and intermediate-v2 names remain occupied by guarded tables;
+old inserts, updates, deletes and truncates fail. Stop old readers too: their
+legacy-table reads would expose the frozen pre-conversion view of results.
+
+A queue/audit script can be applied with `psql -v ON_ERROR_STOP=1
+--single-transaction -f <script>` if needed. This does **not** authorize manual
+005/008/009 mailbox conversion. Reapplying the supported API also retains
+per-table settings; it is not a reason to skip upgrade metadata resolution.
 
 ### Locks taken by a re-run
 
-A re-run takes **no table lock stronger than the catalog read it needs**. Four
-statements would, even when there is nothing to change, so each is guarded by a
-catalog check and runs only when the object is missing or the option differs
-(observed on the PG 17 and 18 images by holding an open transaction that had
-written to the table, and by holding `SHARE UPDATE EXCLUSIVE` and
-`ACCESS EXCLUSIVE` on every queue table during a full re-run; see
-`crates/parking-lot-pg/tests/migrations.rs`):
+A reopen of an already converted protocol-3 mailbox uses recorded metadata;
+queue migration reopens guard catalog-changing statements. A **first mailbox
+conversion is different**: it deliberately takes exclusive locks on source
+result/fence tables so copy, mapping resolution, write guards and protocol
+marker commit together. Perform it in the stopped-reader/writer window.
+The migration lock tests in `crates/parking-lot-pg/tests/migrations.rs` remain
+part of the real boundary suites; their source is not an OA-14 runtime result.
+Four catalog-changing statements need guards even on ordinary reopens:
 
 | Statement | Lock | Effect while held |
 |---|---|---|
@@ -174,13 +219,13 @@ trigger.
 
 ## 6. Autovacuum settings and monitoring bloat
 
-### Settings (migrations 004, 005, 006; pgmq queues via `prepare()`)
+### Settings (migrations 004, 006, 009; pgmq queues via `prepare()`)
 
 | Table | `autovacuum_vacuum_scale_factor` / `_threshold` | `autovacuum_analyze_scale_factor` / `_threshold` |
 |---|---|---|
 | `pl_lease_queue` | 0 / 1000 | 0 / 1000 |
-| `pl_result_mailbox` | 0 / 1000 | 0 / 1000 |
-| `pl_result_mailbox_keys` | 0 / 500 | 0 / 500 |
+| `pl_result_mailbox_v3` (active results) | 0 / 1000 | 0 / 1000 |
+| `pl_result_mailbox_keys_v3` (active status fences) | 0 / 500 | 0 / 500 |
 | `pl_pgmq_aux` | 0 / 500 | 0 / 500 |
 | `pgmq.q_<queue>` (each lane and dead-letter queue) | 0 / 1000 | 0 / 1000 |
 
@@ -209,7 +254,7 @@ Verify:
 ```sql
 SELECT c.relname, c.reloptions
   FROM pg_class c
- WHERE c.relname IN ('pl_lease_queue','pl_result_mailbox','pl_result_mailbox_keys','pl_pgmq_aux')
+ WHERE c.relname IN ('pl_lease_queue','pl_result_mailbox_v3','pl_result_mailbox_keys_v3','pl_pgmq_aux')
     OR c.relname LIKE 'q\_%' AND c.relnamespace = 'pgmq'::regnamespace;
 ```
 
@@ -226,7 +271,7 @@ SELECT relname, n_live_tup, n_dead_tup,
        round(100.0 * n_dead_tup / greatest(n_live_tup + n_dead_tup, 1), 1) AS dead_pct,
        last_autovacuum, autovacuum_count, last_autoanalyze
   FROM pg_stat_user_tables
- WHERE relname IN ('pl_lease_queue','pl_result_mailbox','pl_result_mailbox_keys','pl_pgmq_aux')
+ WHERE relname IN ('pl_lease_queue','pl_result_mailbox_v3','pl_result_mailbox_keys_v3','pl_pgmq_aux')
     OR relname LIKE 'q\_%'
  ORDER BY n_dead_tup DESC;
 ```
@@ -259,45 +304,255 @@ not return it to the OS (except by trailing truncation). Rewrite offline with
 `VACUUM FULL` (exclusive lock) or online with `pg_repack`; schedule it in a
 drain window.
 
-## 7. Upgrading 17 to 18
+## 7. Populated PG17 to PG18 upgrade rehearsal (OA-14)
 
-Order, with the library's constraints:
+**NOT_EXERCISED.** The following is the source procedure handed to OA-18.
+Its uncomfortable failure case is a cluster that upgrades physically while a
+consumed fence has no provable original owner or status. Physical success is
+insufficient: metadata conversion must refuse atomically, and the application
+must remain stopped until authoritative evidence or an untouched restore is
+available. A fresh PG18 test run does not prove preservation through upgrade.
 
-1. **Drain.** Stop dispatchers and wait for leases to expire or be acked. The
-   lease queue is at-least-once with fenced leases, so a task in flight at
-   cutover is redelivered after `lease_expires_at`; a brief outage loses no
-   accepted work, but a redelivered task runs again.
-2. **Prepare the new binaries.** Install PostgreSQL 18 and pgmq for 18 (section
-   4); extensions the old cluster uses must exist in the new installation.
-3. **Checksums.** Make old and new match (section 1).
-4. **Check.** `pg_upgrade --check` reads both clusters without changing data
-   [S6].
-5. **Upgrade.** `pg_upgrade` copies by default; `--link` hard-links (fast, but the
-   old cluster is unusable once the new one has started, and both directories must
-   be on one file system); 18 adds `--swap`, which can be faster still and may
-   destructively modify the old cluster if it fails late [S6]. In Docker, the 18
-   volume layout (section 2) exists so that both versions' directories sit under
-   one mount for `--link`.
-6. **Statistics.** 18's `pg_upgrade` retains optimizer statistics [S1] (extended
-   statistics are not preserved), so the post-upgrade `ANALYZE` pass is shorter;
-   still run `vacuumdb --all --analyze-in-stages --missing-stats-only` if the
-   tool is available.
-7. **Re-apply the library schema** by starting the application (it calls
-   `migrate`/`prepare`) or with `psql` (section 5). It is a no-op except for
-   anything new.
-8. **Roles.** Reset any MD5 passwords (section 3).
-9. **Smoke.** Enqueue, lease and ack one task; deliver and consume one mailbox
-   entry. The CI matrix runs the full suites on 17 and 18 against the project
-   images (`PARKING_LOT_PG_MAJOR=17|18 cargo nextest run -p prometheus-parking-lot-pg
-   --run-ignored all`).
+### Source fixture, pins and prerequisites
 
-Rollback: with copy mode, restart the old cluster. With `--link` or `--swap`,
-rollback is only possible from a backup taken before the upgrade, so take one
-(`pg_basebackup` or a volume snapshot) first.
+The only accepted source is a new, labelled, disposable PG17 volume populated
+from `crates/parking-lot-pg/tests/fixtures/oa14`. Fixture identity is
+`oa14-populated-0.3-pg17-v1`, bound to a unique run marker. Frozen 004/006 SQL
+and the byte-identical OA07 untouched 0.3 mailbox backup create the old layout;
+new APIs do not create it. Queue payloads, an expired fenced lease, delayed/dead
+entries, retained/consumed mailbox generations, full Failed status, native TTLs,
+tenant dedup state, pgmq's four lanes/archive/dead state and sequence counters
+are populated. `metadata.json` supplies the synthetic consumed-owner/status
+proof. Exact byte hashes, source URLs and argv arrays are in the fixture
+`manifest.json`.
 
-Dump and restore, or logical replication, are the other supported routes
-between majors [S1]; they avoid the checksum and volume constraints at the cost
-of a longer cutover.
+Keep the existing Dockerfile pins:
+
+| Input | Source identity |
+|---|---|
+| PG17 official base | `postgres:17-bookworm@sha256:858bb5e98eed02eb8cafbcdc007f9a65d1b613972028944a8ec2133ccaf80d27` |
+| PG18 official base | `postgres:18-bookworm@sha256:bbf83594798e144bff365a9c191c5d779f181fb3135902064ab8ff11918020fc` |
+| pgmq | `v1.13.1`, commit `8eab18272e50077ab9f72d9787296655f2849dcc` |
+| Dual-binary image PG17 package | `postgresql-17=17.11-1.pgdg12+2`; binary/server assertions require 17.11 and 18.6 |
+| Boundary test runner | Preinstalled `cargo-nextest 0.9.149` |
+
+The dual-binary image installs the PG17 package inside the disposable PG18
+image and copies PG17 pgmq extension SQL/control files from the project PG17
+image. It never installs host PostgreSQL. PG18 `pg_upgrade` needs both major
+versions' binaries and extension files [S6]. The runner requires local immutable
+`sha256:<64hex>` image IDs, checks source-ID labels and PG18 layer ancestry, and
+records inspected IDs/architecture/repository digests and actual tool versions.
+The version assertions and digest-built image compatibility remain unverified
+until execution; an unavailable exact input is not permission to float a pin.
+
+Required local tools are Docker with a usable daemon, Python 3, Git, the pinned
+Rust toolchain and the exact preinstalled nextest. The runner acquires no tools.
+The final owner must freeze a full committed candidate SHA and the normalized
+adopted `identity.contractDigest` for `--contract-sha256`. This is not the raw
+JSON file SHA256. Match OA18's existing normalization: remove only
+`identity.contractDigest` and `identity.planRevision`, emit sorted compact
+UTF-8 JSON (`ensure_ascii=False`) with a trailing LF, then SHA256. The runner
+recomputes that digest and requires equality with both the declared adopted
+digest and caller argument. It validates contract kind/version, project/run/
+phase identity and plan revision1 before Docker. The receipt's
+`contract_sha256` is null until validation, then holds the normalized identity;
+`requested_contract_sha256` retains caller input, `contract_identity` records
+the validated adoption, and `contract_raw_sha256` separately identifies raw
+file bytes. OA12's delegate and classifier use the normalized value unchanged. Working and committed bytes of the declared source set, fixtures and
+fixture manifest must match. Refresh `candidate_sources` and handoff hashes
+after final permitted formatting/source corrections **before** that freeze.
+The task1/task2 hashes are source handoff identities, not final certification.
+
+At the authorized final boundary, build the project images, inspect `.Id`, and
+replace every angle-bracket placeholder below with those observed values.
+`PG17_ID_HEX`/`PG18_ID_HEX` are the 64 hex digits after `sha256:`. The ID-derived
+aliases let Dockerfile `FROM` select local images; runtime uses only their IDs.
+Do not use an operator image, existing operator volume or host data directory.
+
+```sh
+docker build -f docker/postgres17/Dockerfile -t parking-lot-pg:17 docker
+docker build -f docker/postgres18/Dockerfile -t parking-lot-pg:18 docker
+docker image inspect parking-lot-pg:17 --format '{{.Id}}'
+docker image inspect parking-lot-pg:18 --format '{{.Id}}'
+docker tag sha256:<PG17_ID_HEX> oa14-local/pg17:<PG17_ID_HEX>
+docker tag sha256:<PG18_ID_HEX> oa14-local/pg18:<PG18_ID_HEX>
+docker build -f docker/postgres18/upgrade/Dockerfile \
+  --build-arg PG17_IMAGE=oa14-local/pg17:<PG17_ID_HEX> \
+  --build-arg PG18_IMAGE=oa14-local/pg18:<PG18_ID_HEX> \
+  --build-arg PG17_SOURCE_ID=sha256:<PG17_ID_HEX> \
+  --build-arg PG18_SOURCE_ID=sha256:<PG18_ID_HEX> \
+  -t oa14-local/upgrade:<RUN_ID> docker
+docker image inspect oa14-local/upgrade:<RUN_ID> --format '{{.Id}}'
+```
+
+### Physical conversion, then one atomic schema conversion
+
+Run the complete positive rehearsal once with a new absolute output directory
+and unique lowercase/digit/hyphen run ID (6 to 40 characters):
+
+```sh
+bash scripts/rehearse-postgres-upgrade.sh \
+  --out <NEW_ABSOLUTE_OUTPUT_DIRECTORY> --run-id <UNIQUE_SAFE_RUN_ID> \
+  --candidate <FULL_40_HEX_CANDIDATE> \
+  --contract-sha256 <NORMALIZED_ADOPTED_CONTRACT_64_HEX_SHA256> \
+  --pg17-image sha256:<64_HEX_LOCAL_PG17_ID> \
+  --pg18-image sha256:<64_HEX_LOCAL_PG18_ID> \
+  --upgrade-image sha256:<64_HEX_LOCAL_DUAL_BINARY_ID> --control none
+```
+
+The source runner performs these operations in order:
+
+1. Refuse existing resource names. Create owned work and backup volumes; boot
+   actual PG17 with checksums on and populate the frozen source in one SQL
+   transaction. Persist a full logical baseline of raw rows and sequence state.
+2. Stop PG17 cleanly before copying any data. Tar the entire source volume into
+   the separate backup volume, record its actual SHA256 and make archive/hash
+   files read-only. The backup is mounted read-only for subsequent restoration.
+3. In the dual-binary container, initialize checksummed PG18 destination data
+   plus two actual incompatible destinations. Run version/checksum preflights
+   below before `oa14_upgrade_started` or any `pg_upgrade` call.
+4. Run PG18 `pg_upgrade --retain --check`, then `--retain --copy`. Do not use
+   `--link`, `--swap` or `--no-sync`. The source stays independent [S6]. Logs
+   distinguish `OA-14:cluster-check-pass` and
+   `OA-14:physical-upgrade-complete schema=legacy-0.3`.
+5. Start actual project PG18 on the copied data and loopback-only published
+   port; verify raw legacy rows, pgmq state and counters against the persisted
+   baseline. Restore the untouched archive to a third volume and boot actual
+   PG17 there; verify the same source baseline independently.
+6. On the marked upgraded root database, the ignored
+   `postgres_upgrade_populated_0_3_to_schema3` test first invokes owner-only
+   migration. Missing consumed status must fail with no protocol/v2/v3 objects
+   committed (`OA-14:atomic-schema-refusal`). Then the explicit metadata API in
+   section 5 resolves ownership and original status in **one transaction** and
+   copies to schema3. `OA-14:atomic-schema3-conversion-complete` is a separate
+   result from physical upgrade.
+7. Compare legacy and copied schema3 result/status/timestamp/native-TTL rows,
+   fence expiry and sequence high-water. Exercise retained/consumed Failed
+   provenance, consume-once and independent tenant reuse; lease and ack SQL
+   queue rows without resetting the expired lease's fence; exercise actual
+   pgmq lanes, delayed/leased/dead depth and archive preservation.
+8. Run the existing real PG integration package, including lease kill/recovery,
+   concurrent claims, mailbox TTL/status/migration and pgmq tests, on this
+   actual upgraded server. Ordinary test helpers require its run marker and
+   server18, then create a unique owned database per test; backup/child databases
+   also use unique names. The special upgrade oracle alone uses the populated
+   root database. It cannot silently fall back to a fresh test container.
+
+The container-side physical argv is:
+
+```sh
+/usr/lib/postgresql/18/bin/pg_upgrade \
+  --old-bindir=/usr/lib/postgresql/17/bin --new-bindir=/usr/lib/postgresql/18/bin \
+  --old-datadir=/upgrade/17 --new-datadir=/upgrade/18 \
+  --old-port=50417 --new-port=50418 --socketdir=/upgrade/socket \
+  --username=postgres --retain --check
+# Same argv, with --copy replacing --check, only after the preflight/check pass.
+```
+
+The runner supplies `PARKING_LOT_PG_UPGRADE_URL` (owned loopback PG18 URL),
+`PARKING_LOT_PG_UPGRADE_RUN_ID`, `PARKING_LOT_PG_MAJOR=18` and
+`CARGO_TERM_COLOR=never` to this exact existing-suite argv:
+
+```sh
+cargo nextest run --workspace --all-features --locked --run-ignored all \
+  --no-fail-fast --no-tests=fail --test-threads=1 --retries=0 \
+  -E 'package(prometheus-parking-lot-pg)'
+```
+
+A missing URL/run ID, wrong marker, wrong server/checksum or wrong extension
+identity is an error. Nonzero discovered tests and the named upgrade test are
+required. Ordinary PG17/18 fresh-cluster success cannot replace this invocation.
+
+### Version, checksum and removed-result controls
+
+Each positive or removed-result rehearsal first constructs real negative
+cluster fixtures. Inside the owned upgrade container, `OA14_RUN_ID` must match
+`/upgrade/.oa14-owned`; the exact read-only preflight commands are:
+
+```sh
+bash /workspace/docker/postgres18/upgrade/preflight.sh /upgrade/17 /upgrade/negative-version
+bash /workspace/docker/postgres18/upgrade/preflight.sh /upgrade/17 /upgrade/negative-checksum
+bash /workspace/docker/postgres18/upgrade/preflight.sh /upgrade/17 /upgrade/18
+```
+
+| Actual fixture | Required result before upgrade starts |
+|---|---|
+| PG17 source, PG17 destination | exit 42, `OA-14:preflight-version` |
+| PG17 checksum 1, PG18 checksum 0 | exit 43, `OA-14:preflight-checksum` |
+| PG17 checksum 1, PG18 checksum 1 | exit 0, `OA-14:preflight-ok old=17 new=18 checksums=1` |
+
+Wrong-path/running/malformed fixtures exit 40/41/44. Rejection tests must also
+observe no `/upgrade/oa14_upgrade_started` marker. These commands are not host
+PGDATA commands; the complete runner creates and owns the required directories.
+
+For the removed-result control, rerun the complete rehearsal command with a
+**new** run ID/output directory and `--control missing-result`:
+
+```sh
+bash scripts/rehearse-postgres-upgrade.sh \
+  --out <NEW_ABSOLUTE_NEGATIVE_OUTPUT_DIRECTORY> --run-id <UNIQUE_NEGATIVE_RUN_ID> \
+  --candidate <FULL_40_HEX_CANDIDATE> \
+  --contract-sha256 <NORMALIZED_ADOPTED_CONTRACT_64_HEX_SHA256> \
+  --pg17-image sha256:<64_HEX_LOCAL_PG17_ID> \
+  --pg18-image sha256:<64_HEX_LOCAL_PG18_ID> \
+  --upgrade-image sha256:<64_HEX_LOCAL_DUAL_BINARY_ID> --control missing-result
+```
+
+The runner adds
+only `--cfg parking_lot_negative_control="oa-14-missing-result"` to `RUSTFLAGS`
+and changes the Cargo filter to `-E 'binary(postgres_upgrade)'`; the rest of the
+suite argv above is unchanged. It refuses inherited negative-control cfgs and
+encoded Rust flags that would mask this injection. The control deletes actual
+schema3 result ID 1 after physical upgrade and metadata conversion, then must
+fail `OA-14:seeded-result`. It does not omit the upgrade or replace the database
+with a mock. Run the normal leg with `--control none` and no control cfg.
+
+| Classifier | Required evidence |
+|---|---|
+| `PASS`, wrapper exit 0 | Complete positive route, nextest exit 0, nonzero discovery and named upgrade test |
+| `EXPECTED_FAILURE`, wrapper exit 0 | Removed-result route, nextest exit 100, exactly one discovered test and `OA-14:seeded-result` |
+| `BLOCKED`, wrapper exit 2 | Required local tool/daemon/image or exact source server unavailable; no upgrade certification |
+| `FAIL`, wrapper exit 1 | Other failures, including build exit 101, timeout, empty discovery, wrong assertion or cleanup failure |
+
+An expected-negative wrapper exit 0 is not a positive upgrade PASS. Both receipt
+status and raw process exit/assertion must be recorded.
+
+### Receipts, retained handles and rollback restrictions
+
+`<OUT>/receipt.json` records candidate/contract identities, fixture manifest hash,
+actual image/tool observations, exact argv, timestamps, exits, nonzero discovery
+and every resource handle. The effective suite environment is specified above;
+retain the generated loopback port/run ID with the final boundary evidence. Numbered `.stdout.txt` and
+`.stderr.txt` files retain raw command output; `source-logical-backup.json`
+retains the baseline. `<OUT>/cluster/version.*.txt` and `checksum.*.txt` retain
+negative preflight logs. `pg_upgrade_output.d` remains under `/work` in the
+owned work volume. The backup volume contains `pg17-source.tar` and
+`pg17-source.sha256`; the actual archive digest does not exist until execution.
+
+Names are `oa14-<RUN_ID>-work`, `oa14-<RUN_ID>-backup` and
+`oa14-<RUN_ID>-restore`; all carry `ai.prometheus.oa14.run=<RUN_ID>`.
+Containers use the same prefix, including `-pg17`, `-pg18`, `-restore17` and
+registered temporary handles. Cleanup checks the run label, captures logs and
+removes only those exact containers. A timeout does not grant permission to
+remove unrelated resources. All named volumes remain for inspection; after
+retaining evidence and authorizing their disposal, use the exact
+`resources.manual_cleanup_argv` in the receipt. For a complete run it is:
+
+```sh
+docker volume rm oa14-<RUN_ID>-work oa14-<RUN_ID>-backup oa14-<RUN_ID>-restore
+```
+
+Stop all old application **readers and writers** before physical/schema cutover,
+and keep them stopped. The database guards old v1/v2 mutations; it does not make
+old readers safe or reconcile their frozen result view. Do not serve traffic
+from both old and new stores. Copy mode retains source data, but restarting an
+old cluster after new writes would expose stale state. Rollback means stopping
+new writers and restoring the untouched pre-upgrade archive into a separate
+isolated PG17 volume, then reconciling post-cutover writes explicitly. Never
+run old binaries on converted data, downgrade schema3 or treat a raw source copy
+as a current replica. This fixture restore proves only the pre-upgrade baseline.
+Dump/restore or logical replication remain other major-upgrade strategies [S1];
+they do not remove the mailbox owner/status proof requirement.
 
 ## Running the Postgres tests locally
 
@@ -305,15 +560,24 @@ of a longer cutover.
 # build the image once per machine (the helper builds it if missing)
 docker build -f docker/postgres18/Dockerfile -t parking-lot-pg:18 docker/
 PARKING_LOT_PG_MAJOR=18 cargo nextest run --workspace --all-features --locked \
-  --run-ignored all -E 'package(prometheus-parking-lot-pg) | test(config_postgres_example_builds_against_pg18)'
+  --run-ignored all --no-tests=fail \
+  -E '(package(prometheus-parking-lot-pg) & not binary(postgres_upgrade)) | test(config_postgres_example_builds_against_pg18)'
 ```
 
 `PARKING_LOT_PG_MAJOR=17` selects the 17 image. `PARKING_LOT_PG_REBUILD=1`
-forces an image rebuild after editing a Dockerfile.
+forces an image rebuild after editing a Dockerfile. Both ordinary PG17 and PG18
+ignored legs must exclude `binary(postgres_upgrade)`. The platform-owned CI
+patch is `docker/postgres18/upgrade/handoffs/ci-postgres-upgrade-exclusion.patch`;
+its held CI base SHA256 is
+`c334b530ed7cfdf4603829ed291cb0fb4b5363bd043ce7e4ac8524783dd1f94d`.
+OA-18 must apply the same exclusion to its ordinary legs, then explicitly run
+the full OA-14 runner with the marked upgraded URL supplied by that runner.
 
 ## Sources
 
-Retrieved 2026-10-23.
+Prior runbook sources retrieved 2026-10-23. OA-14 primary-source reads on
+2026-10-24 are recorded in the fixture manifest; no runtime outcomes were
+measured during this documentation handoff.
 
 - **S1** PostgreSQL 18 release notes, <https://www.postgresql.org/docs/18/release-18.html>
   (E.6.2 Migration to Version 18: initdb checksums default, `--no-data-checksums`,
@@ -340,9 +604,24 @@ Retrieved 2026-10-23.
   (`--check`, `--link`, `--swap`); `pg_checksums`,
   <https://www.postgresql.org/docs/18/app-pgchecksums.html>.
 
-All citations above were fetched from the sources named in this session. The
+The prior runbook records the source retrievals above. The
 autovacuum trigger on 18 is `min(vacuum max threshold, base threshold + scale
 factor * tuples)` (routine-vacuuming page); on 17 there is no max term.
-`pg_checksums` requires a cleanly shut-down server (S6). The behaviour of the
-settings was confirmed by `autovacuum_reclaims_a_churned_lease_queue`, which
-fails (autovacuum never starts) when the `ALTER TABLE` is removed.
+`pg_checksums` requires a cleanly shut-down server (S6). The existing
+`autovacuum_reclaims_a_churned_lease_queue` regression and its source control
+remain in the boundary suite; this OA-14 handoff does not claim a new run.
+
+OA-14 source references (read 2026-10-24):
+
+- PG17 and PG18 `initdb`: <https://www.postgresql.org/docs/17/app-initdb.html>,
+  <https://www.postgresql.org/docs/18/app-initdb.html>.
+- `pg_controldata`: <https://www.postgresql.org/docs/18/app-pgcontroldata.html>.
+- Official image package definitions:
+  <https://raw.githubusercontent.com/docker-library/postgres/master/17/bookworm/Dockerfile>,
+  <https://raw.githubusercontent.com/docker-library/postgres/master/18/bookworm/Dockerfile>.
+- pgmq 1.13.1 extension metadata/PGXS installation:
+  <https://raw.githubusercontent.com/pgmq/pgmq/v1.13.1/pgmq-extension/pgmq.control>,
+  <https://raw.githubusercontent.com/pgmq/pgmq/v1.13.1/pgmq-extension/Makefile>.
+- nextest flags and process exit classifications:
+  <https://nexte.st/docs/running/>,
+  <https://docs.rs/nextest-metadata/latest/nextest_metadata/enum.NextestExitCode.html>.

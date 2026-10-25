@@ -1,0 +1,27 @@
+{
+  "owner": "/root/oa04_postgres",
+  "sourceWorkspace": "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs",
+  "destinations": [
+    "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs",
+    "/Users/gqadonis/.codex/worktrees/oa04-release/prometheus-parking-lot-rs"
+  ],
+  "files": [
+    {
+      "path": "crates/parking-lot-pg/src/mailbox/migration.rs",
+      "sha256": "d5073fe3f5753e3755b0858528db5776686e513a3217d41c63a004be767f973d"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/mailbox_migration.rs",
+      "sha256": "6219230e09364f9afb89a6d4fd1ab03cbe0dff105c4fd39092aa740fd1182f75"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa06/ambiguous_generation_0_3.sql",
+      "sha256": "5e6da07d580a19cb5b230cf17ccce2e20ab9fe07948fca5cdad6b08e49a10d91"
+    },
+    {
+      "path": "crates/parking-lot-pg/tests/fixtures/oa06/manifest.json",
+      "sha256": "4496322d09483a43bef2e8c4a4cc6e722f7dfc7c2fa35c1507eaeff7b25a22ed"
+    }
+  ],
+  "runtimeEvidence": "NOT_EXERCISED"
+}

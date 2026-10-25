@@ -1,0 +1,44 @@
+{
+  "owner": "/root/oa04_scheduler",
+  "sourceWorkspace": "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs",
+  "files": [
+    {
+      "path": "crates/parking-lot-core/src/dispatch/dispatcher.rs",
+      "sha256": "349c83c01995c67e18b5c37381e2001f2bb52a41a591854014b598c1de48c2ac",
+      "priorIntegrationSha256": "4f206413999f5d117894217d050405168462cf3cc3cd3ec735e37b01a40818c9"
+    },
+    {
+      "path": "crates/parking-lot-core/src/dispatch/parked.rs",
+      "sha256": "3fbd56ecc03959b468197f8328c84b297fd9f8ca98936abddb2c97d26a0b3efe",
+      "priorIntegrationSha256": "6d43345168dee4766a30d06a2e265187ad6e657cb8591ea20a1018d1b8267fb5"
+    },
+    {
+      "path": "crates/parking-lot-core/tests/backend_admission_test.rs",
+      "sha256": "f20533697ab14e1ee4e84a460504090096a82c2616ef6b3a399bbe01f019f115",
+      "priorIntegrationSha256": null
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/src/resource_pool.rs",
+      "sha256": "6b14636670316931f5a86abaace9d9c6f03aba7386f6b6eaf4eb09dc7d587d9b",
+      "priorIntegrationSha256": "e570ae539bd7bf2286b11c1bce7346fc249a64c0634397c8892a547ea648f2a4"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/src/worker_pool/native.rs",
+      "sha256": "fd21a74fc877f5029e1c9897e95a3d00b3c6da5be21a855f89160e6793f57cf2",
+      "priorIntegrationSha256": "a301e01efe6f10febecc182b5fb110bc9a65146d5473c251d8b1a8e5465745e9"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/src/durable_pool/mod.rs",
+      "sha256": "e4ade26b2f06dea63154bf320cffe2876beeda08085138ac796cdebf12e6a324",
+      "priorIntegrationSha256": "b2d284ec02f1dc38d230a02c5363b3675f62585902b14b03ec5319516813b7d4"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/tests/backend_admission_test.rs",
+      "sha256": "a6ec617f9685681d532ca0256ee61330113ad7fa605b594f469e7fc937fe9568",
+      "priorIntegrationSha256": null
+    }
+  ],
+  "companion": "oa-09-wasm-import.json",
+  "runtimeEvidence": "NOT_EXERCISED",
+  "limitation": "FIFO uses incumbent stored ticket policy; no cross-epoch global sequence recovery"
+}

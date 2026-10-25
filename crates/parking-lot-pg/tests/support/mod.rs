@@ -7,6 +7,8 @@
 //! The image is built once per machine: if `docker image inspect` finds the tag
 //! it is reused; set `PARKING_LOT_PG_REBUILD=1` to force a rebuild after editing
 //! the Dockerfile. Every container is removed when the guard is dropped.
+//! OA-14's run-bound upgraded URL instead selects fresh per-test databases on
+//! that upgraded server; the rehearsal runner owns its container and volumes.
 
 #![allow(
     dead_code,
@@ -34,7 +36,7 @@ pub const PG_DATABASE: &str = "postgres";
 
 /// Postgres major version under test: `PARKING_LOT_PG_MAJOR` (17 or 18), default 18.
 ///
-/// The CI matrix (`.github/workflows/postgres.yml`) sets it per leg. A value
+/// The CI matrix (`.github/workflows/ci.yml`) sets it per leg. A value
 /// that is set but unparsable panics instead of silently testing the default,
 /// so a typo cannot turn the 17 leg into a second 18 run.
 ///
@@ -58,7 +60,7 @@ pub struct PgContainer {
     /// Postgres major version of the image (17 or 18).
     pub major: u8,
     // Held so the container is removed on drop.
-    _container: ContainerAsync<GenericImage>,
+    _container: Option<ContainerAsync<GenericImage>>,
 }
 
 impl PgContainer {
@@ -76,6 +78,9 @@ impl PgContainer {
     /// container does not start, or Postgres does not accept connections
     /// within 60 seconds.
     pub async fn start(major: u8) -> TestResult<Self> {
+        if let Ok(url) = std::env::var("PARKING_LOT_PG_UPGRADE_URL") {
+            return Self::on_upgraded_cluster(major, &url).await;
+        }
         ensure_image(major).await?;
 
         let container = GenericImage::new("parking-lot-pg", &major.to_string())
@@ -96,7 +101,45 @@ impl PgContainer {
             pool,
             url,
             major,
-            _container: container,
+            _container: Some(container),
+        })
+    }
+
+    /// OA-14 reuses the upgraded cluster, but each ordinary suite still owns a
+    /// fresh database. A run-bound marker is checked before CREATE DATABASE;
+    /// this path cannot silently select an arbitrary operator database.
+    async fn on_upgraded_cluster(major: u8, url: &str) -> TestResult<Self> {
+        if major != 18 {
+            return Err("OA-14 upgraded-cluster suites require PARKING_LOT_PG_MAJOR=18".into());
+        }
+        let run_id = std::env::var("PARKING_LOT_PG_UPGRADE_RUN_ID")?;
+        let admin = connect_with_retry(url).await?;
+        let owned: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM oa14_rehearsal_identity \
+             WHERE run_id = $1 AND fixture_id = 'oa14-populated-0.3-pg17-v1') \
+             AND current_setting('server_version_num')::int / 10000 = 18",
+        )
+        .bind(run_id)
+        .fetch_one(&admin)
+        .await?;
+        if !owned {
+            return Err("OA-14 unsafe upgraded-cluster identity".into());
+        }
+        let database = database_name()?;
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "CREATE DATABASE {database} TEMPLATE template1"
+        )))
+        .execute(&admin)
+        .await?;
+        admin.close().await;
+        let (prefix, _) = url.rsplit_once('/').ok_or("OA-14 URL has no database")?;
+        let url = format!("{prefix}/{database}");
+        let pool = connect_with_retry(&url).await?;
+        Ok(Self {
+            pool,
+            url,
+            major,
+            _container: None,
         })
     }
 
@@ -108,6 +151,15 @@ impl PgContainer {
             None => self.url.clone(),
         }
     }
+}
+
+/// An owned SQL identifier, also used by backup/child database scenarios when
+/// many otherwise isolated tests share the OA-14 upgraded server.
+pub fn database_name() -> TestResult<String> {
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)?
+        .as_nanos();
+    Ok(format!("oa14_{}_{stamp}", std::process::id()))
 }
 
 /// The official entrypoint logs "ready" for its temporary init server too, so

@@ -1,0 +1,164 @@
+[
+  {
+    "argv": [
+      "/private/tmp/oa04-private-tools/bin/git-cliff",
+      "--config",
+      "/private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml",
+      "--offline",
+      "--no-exec",
+      "--sort",
+      "oldest",
+      "--include-path",
+      "crates/parking-lot-core/**",
+      "--include-path",
+      "Cargo.toml",
+      "--",
+      "92da0d3d28f7896ddc67062fa49ba40ea48d74a3..72adf5d8ad583c3b52b22194563e94f7895c5b3f"
+    ],
+    "cwd": "/private/tmp/oa04-preparation-72adf5d/workspace",
+    "exit": 0,
+    "stderr": "\u001b[32;1mINFO \u001b[0m \u001b[1m\u001b[90mgit_cliff\u001b[39m\u001b[0m > Using configuration from: /private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml\n",
+    "stdout": "\n\n- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)\n\n"
+  },
+  {
+    "argv": [
+      "/private/tmp/oa04-private-tools/bin/git-cliff",
+      "--config",
+      "/private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml",
+      "--offline",
+      "--no-exec",
+      "--sort",
+      "oldest",
+      "--include-path",
+      "crates/parking-lot-runtime-tokio/**",
+      "--include-path",
+      "Cargo.toml",
+      "--",
+      "92da0d3d28f7896ddc67062fa49ba40ea48d74a3..72adf5d8ad583c3b52b22194563e94f7895c5b3f"
+    ],
+    "cwd": "/private/tmp/oa04-preparation-72adf5d/workspace",
+    "exit": 0,
+    "stderr": "\u001b[32;1mINFO \u001b[0m \u001b[1m\u001b[90mgit_cliff\u001b[39m\u001b[0m > Using configuration from: /private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml\n",
+    "stdout": "\n\n- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)\n\n"
+  },
+  {
+    "argv": [
+      "/private/tmp/oa04-private-tools/bin/git-cliff",
+      "--config",
+      "/private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml",
+      "--offline",
+      "--no-exec",
+      "--sort",
+      "oldest",
+      "--include-path",
+      "crates/parking-lot-pg/**",
+      "--include-path",
+      "Cargo.toml",
+      "--",
+      "92da0d3d28f7896ddc67062fa49ba40ea48d74a3..72adf5d8ad583c3b52b22194563e94f7895c5b3f"
+    ],
+    "cwd": "/private/tmp/oa04-preparation-72adf5d/workspace",
+    "exit": 0,
+    "stderr": "\u001b[32;1mINFO \u001b[0m \u001b[1m\u001b[90mgit_cliff\u001b[39m\u001b[0m > Using configuration from: /private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml\n",
+    "stdout": "\n\n- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)\n\n"
+  },
+  {
+    "argv": [
+      "/private/tmp/oa04-private-tools/bin/git-cliff",
+      "--config",
+      "/private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml",
+      "--offline",
+      "--no-exec",
+      "--sort",
+      "oldest",
+      "--include-path",
+      "crates/parking-lot-embedded/**",
+      "--include-path",
+      "Cargo.toml",
+      "--",
+      "92da0d3d28f7896ddc67062fa49ba40ea48d74a3..72adf5d8ad583c3b52b22194563e94f7895c5b3f"
+    ],
+    "cwd": "/private/tmp/oa04-preparation-72adf5d/workspace",
+    "exit": 0,
+    "stderr": "\u001b[32;1mINFO \u001b[0m \u001b[1m\u001b[90mgit_cliff\u001b[39m\u001b[0m > Using configuration from: /private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml\n",
+    "stdout": "\n\n- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)\n\n"
+  },
+  {
+    "argv": [
+      "/private/tmp/oa04-private-tools/bin/git-cliff",
+      "--config",
+      "/private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml",
+      "--offline",
+      "--no-exec",
+      "--sort",
+      "oldest",
+      "--include-path",
+      "crates/parking-lot-iggy/**",
+      "--include-path",
+      "Cargo.toml",
+      "--",
+      "92da0d3d28f7896ddc67062fa49ba40ea48d74a3..72adf5d8ad583c3b52b22194563e94f7895c5b3f"
+    ],
+    "cwd": "/private/tmp/oa04-preparation-72adf5d/workspace",
+    "exit": 0,
+    "stderr": "\u001b[32;1mINFO \u001b[0m \u001b[1m\u001b[90mgit_cliff\u001b[39m\u001b[0m > Using configuration from: /private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml\n",
+    "stdout": "\n\n- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)\n\n"
+  },
+  {
+    "argv": [
+      "/private/tmp/oa04-private-tools/bin/git-cliff",
+      "--config",
+      "/private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml",
+      "--offline",
+      "--no-exec",
+      "--sort",
+      "oldest",
+      "--include-path",
+      "crates/parking-lot-wasm/**",
+      "--include-path",
+      "Cargo.toml",
+      "--",
+      "92da0d3d28f7896ddc67062fa49ba40ea48d74a3..72adf5d8ad583c3b52b22194563e94f7895c5b3f"
+    ],
+    "cwd": "/private/tmp/oa04-preparation-72adf5d/workspace",
+    "exit": 0,
+    "stderr": "\u001b[32;1mINFO \u001b[0m \u001b[1m\u001b[90mgit_cliff\u001b[39m\u001b[0m > Using configuration from: /private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml\n",
+    "stdout": "\n\n- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)\n\n"
+  },
+  {
+    "argv": [
+      "/private/tmp/oa04-private-tools/bin/git-cliff",
+      "--config",
+      "/private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml",
+      "--offline",
+      "--no-exec",
+      "--sort",
+      "oldest",
+      "--include-path",
+      "src/**",
+      "--include-path",
+      "Cargo.toml",
+      "--",
+      "92da0d3d28f7896ddc67062fa49ba40ea48d74a3..72adf5d8ad583c3b52b22194563e94f7895c5b3f"
+    ],
+    "cwd": "/private/tmp/oa04-preparation-72adf5d/workspace",
+    "exit": 0,
+    "stderr": "\u001b[32;1mINFO \u001b[0m \u001b[1m\u001b[90mgit_cliff\u001b[39m\u001b[0m > Using configuration from: /private/tmp/oa04-preparation-72adf5d/workspace/cliff.toml\n",
+    "stdout": "\n\n- feat: implement operational assurance for 0.4.0 (16db521829d83ba140bb5ce2ea8f8d3252acf35d)\n\n"
+  },
+  {
+    "argv": [
+      "/private/tmp/oa04-private-tools/bin/release-plz",
+      "set-version",
+      "0.4.0",
+      "--manifest-path",
+      "/private/tmp/oa04-preparation-72adf5d/workspace/Cargo.toml",
+      "--config",
+      "/private/tmp/oa04-preparation-72adf5d/workspace/release-plz.toml"
+    ],
+    "cwd": "/private/tmp/oa04-preparation-72adf5d/workspace",
+    "exit": 0,
+    "stderr": "2026-10-24T14:51:04.703834Z  INFO using release-plz config file /private/tmp/oa04-preparation-72adf5d/workspace/release-plz.toml\n",
+    "stdout": ""
+  }
+]

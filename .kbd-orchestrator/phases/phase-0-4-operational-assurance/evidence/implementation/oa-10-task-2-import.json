@@ -1,0 +1,28 @@
+{
+  "owner": "/root/oa04_scheduler",
+  "files": [
+    {
+      "path": "crates/parking-lot-core/src/dispatch/dispatcher.rs",
+      "sha256": "35ba05d5e1652476345e3a7eb0a4095856d8c8f9c2abe95fab5b4fde104cb2e8"
+    },
+    {
+      "path": "crates/parking-lot-core/src/dispatch/parked.rs",
+      "sha256": "1fd7220ab3c9ed1d33047485a2dd6d2aca7bb62c61ad9c422d689974f1b72aa2"
+    },
+    {
+      "path": "crates/parking-lot-runtime-tokio/src/resource_pool.rs",
+      "sha256": "84c441bd0d2030d747cb10fce5ab2eaf385864aa015160413702df1cc292791c"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-10.md",
+      "sha256": "90bd56061094d19ec4a43ccb77004a25a64ad8979dcd7766d728e9222a2056ad"
+    },
+    {
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/implementation/oa-10-public-docs.patch",
+      "sha256": "183512012ec787a859902adf1858a4940c8eebad8011ed71cc66a16713ff216c"
+    }
+  ],
+  "sourceDocsMirroredTo": "/Users/gqadonis/.codex/worktrees/oa04-release/prometheus-parking-lot-rs",
+  "publicGuidePatchApplied": true,
+  "runtimeEvidence": "NOT_EXERCISED"
+}

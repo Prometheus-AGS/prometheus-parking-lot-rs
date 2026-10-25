@@ -1,0 +1,64 @@
+{
+  "purpose": "Source-only minimal standalone Tauri path-version lock repair proposal; no Cargo resolution or execution",
+  "observed_at_utc": "2026-10-24T16:21:22.281106+00:00",
+  "phase": "phase-0-4-operational-assurance",
+  "observed_failure": {
+    "reported_by": "driver",
+    "operation": "private Cargo locked fetch against clean candidate68bc",
+    "exit_code": 101,
+    "log": "/tmp/oa04-tauri-fetch.log",
+    "actual_diagnostic": "cannot update the lock file /Users/gqadonis/.codex/worktrees/oa04-verification/prometheus-parking-lot-rs/bindings/tauri-desktop/Cargo.lock because --locked was passed to prevent this"
+  },
+  "base_lock_sha256": "4371afcc9837389af02ff18c516e07d50e4d022ae64b0d77588efe409010a889",
+  "proposed_lock_sha256": "5143eef312046d0eff09f0e6d6f4b840f9545e2aa8cc531c2ad98d6086343c15",
+  "patch_sha256": "4e8d06358ba640eb6eea5f4301492cf632e2981ef092ceaf802c5ab0b2940886",
+  "path_package_version_changes": [
+    {
+      "name": "prometheus-parking-lot-core",
+      "from": "0.3.0",
+      "to": "0.4.0"
+    },
+    {
+      "name": "prometheus-parking-lot-embedded",
+      "from": "0.3.0",
+      "to": "0.4.0"
+    },
+    {
+      "name": "prometheus-parking-lot-ffi",
+      "from": "0.3.0",
+      "to": "0.4.0"
+    }
+  ],
+  "qualified_locked_refs_requiring_change": [],
+  "static_explanation": "All refs to these unique path packages are bare names, so the package version lines are the only required textual proposal. No dependency arrays were edited. Registry source blocks remain byte-for-byte identical because the three exact replacements occur only in no-source path package headers.",
+  "registry_package_count": 434,
+  "registry_package_records_unchanged_by_proposal": true,
+  "other_binding_lock": {
+    "path": "bindings/uniffi-bindgen/Cargo.lock",
+    "path_packages": [
+      {
+        "name": "uniffi-bindgen",
+        "version": "0.0.0"
+      }
+    ],
+    "uniffi_version": "0.32.2",
+    "affected_by_root_path_version_bump": false,
+    "explanation": "Only local package uniffi-bindgen0.0.0; registry uniffi0.32.2 unchanged and matches root lock. No dependency on repository path crates."
+  },
+  "source_sha256": {
+    "Cargo.lock": "7a84a14ee557b99a95ea93a4a9e78ed6e3032920115edda63badfb85b52c3371",
+    "bindings/tauri-desktop/Cargo.lock": "4371afcc9837389af02ff18c516e07d50e4d022ae64b0d77588efe409010a889",
+    "bindings/uniffi-bindgen/Cargo.lock": "c7458376b448eabd83e2798c54e83ab07592b15d30a98fbca319dfcda11e9c31",
+    "Cargo.toml": "f628f145f4d317210688fff2a94aff0de1415f7cebe479a146b359c7c525e38b",
+    "bindings/tauri-desktop/Cargo.toml": "a5b6347ef9301f118773d3d984bd2bf6a9dbb3652b131b22c5526da389b84561",
+    "bindings/tauri-desktop/queue-service/Cargo.toml": "cb1edab1758ee540ce2238f79941e919b02d778dbff414e77d420dd432c094d4",
+    "bindings/tauri-desktop/src-tauri/Cargo.toml": "9efadc4ea03ec3017fb15b58448b680433141373315ea5f0aecf273a4ed3e378",
+    "bindings/uniffi-bindgen/Cargo.toml": "9200a96440f181346eb12c458919d3f0b0763b54efe8e26a2df63e9f4761cc05",
+    "crates/parking-lot-core/Cargo.toml": "47a7961c72d26cf1813e06149e2447377fc225e695d4c0cce47a5e8af88d0fe0",
+    "crates/parking-lot-embedded/Cargo.toml": "9cfb2f7a0ac4a5d6d0f527dde32ee3b7255abc88cb6ef29df29f1ff31f6269a4",
+    "crates/parking-lot-ffi/Cargo.toml": "ee849a2d9925fc63412191bd3d771f7f71592a899dce11cb8c466861158d9783"
+  },
+  "central_metadata_mutated": false,
+  "execution_status": "NOT_EXERCISED",
+  "remaining_limit": "Parent must apply proposal, run actual locked fetch/metadata as authorized, freeze corrected candidate, and restart required final-boundary receipts. No claim that Cargo accepted this lock proposal."
+}

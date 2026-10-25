@@ -1,0 +1,66 @@
+--- a/docs/PUBLISHING.md
++++ b/docs/PUBLISHING.md
+@@ -183,6 +183,63 @@
+ 
+ ### 5.2 Publish (operator approval required)
+ 
++**0.4.0 trusted release tooling (oa-04).** The authored
++[release workflow](../.github/workflows/release.yml) has separate `prepare`, default
++`rehearse`, and explicitly selected `publish` operations. Nothing has been dispatched,
++exchanged through OIDC or published by this implementation. G-04 settings and G-05
++publication approval remain operator-controlled and unverified.
++
++The shared [release evidence protocol](../.github/scripts/RELEASE_EVIDENCE.md),
++[schema](../.github/release-boundary.schema.json) and
++[consumer](../.github/scripts/trusted-release.py) require a numeric GitHub artifact ID,
++not caller JSON declaring approval. The reserved OA-18 producer is
++`operational-assurance.yml`; artifact `operational-assurance-boundary` contains exactly
++`boundary-receipt.json` and the original OA-02 `release-plan.json`. The consumer verifies
++server archive digest, repository/candidate, operator-pinned workflow source digest,
++successful first-attempt run and actual environment review history through GitHub's API.
++The first-attempt restriction prevents reuse of approval history that the API does not bind
++to a rerun. Stale, expired, unapproved or mismatched evidence fails before any publish call.
++
++`purpose=rehearsal` packets retain `NOT_EXERCISED` status and cannot authorize publication.
++Only `purpose=certification` with all seventeen scenarios, baseline, independent review and
++G-02/G-03/G-04 observed receipts PASS is publishable. The gate re-verifies the real signed tag,
++full frozen candidate and public trust digest; checks exactly seven 0.4.0 crates, FFI exclusion
++and the integrated prepared-file hashes; and checks the current publication run's independent
++`release-crates-io` approval. A requested publish never falls back to rehearsal.
++
++The operator must approve/configure the public `RELEASE_TRUST_POLICY_JSON` environment
++setting using the intentionally unarmed [policy example](../.github/release-trust-policy.example.json),
++including actual source digests, environment/reviewer IDs and existing runner-local public
++signing trust. Protect main and the named environments before using this workflow. Configure
++all seven crates' trusted publisher entries for `release.yml` and `release-crates-io` only
++through the separately authorized G-04 operation. No setup, tool install or key import occurs
++automatically. Existing preparation executables remain the pinned OA-02 inputs.
++
++Only the publication job has `id-token: write` (with contents/actions read for verification).
++It first validates certification, then uses the official Rust authentication action pinned at
++`3268eb413133e2960fa4ae0e963ca76380c54cd9` (v1.0.6). Its temporary output is the sole registry
++credential. The final gate revalidates everything before `cargo publish`; it uses a fresh Cargo
++home and has no long-lived token secret, cached credential or token fallback. This does not
++retire, rotate or revoke existing credentials; G-01 remains deferred and non-blocking.
++
++At the completed-phase boundary, provide a real approved remote rehearsal artifact and a
++clean exact candidate, capture raw logs/exit and run the real rehearsal fixtures:
++
++```bash
++python3 .github/scripts/tests/trusted-publishing-fixtures.py --workspace "$PWD" \
++  --policy "$APPROVED_PUBLIC_POLICY" --artifact-id "$BOUNDARY_ARTIFACT_ID" \
++  --contract .kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json \
++  --output "$FIXTURE_OUT"
++```
++
++The fixture exercises real Git/signature and approved GitHub provenance paths. Its Cargo shim
++records/rejects any unexpected invocation; local mutation controls supplement the real path.
++No fake local approval/API positive fixture substitutes for actual authority. Missing approved
++API/environment access is BLOCKED. The source and [official API/action pins](../.github/release-publishing-sources.json)
++are authored; no fixture, scan, syntax check, build or independent review has run. Preparation,
++rehearsal and implementation closure are not publication receipts.
++
++
+ For 0.4.0, the approval-gated workflow is owned by oa-04 and requires independently
+ verified OIDC settings (G-04), the frozen candidate's boundary PASS receipt and explicit
+ publication approval (G-05). The preparation implementation does not satisfy those gates.

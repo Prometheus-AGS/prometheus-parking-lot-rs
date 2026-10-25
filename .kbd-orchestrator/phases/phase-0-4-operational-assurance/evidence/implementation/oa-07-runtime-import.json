@@ -1,0 +1,46 @@
+{
+  "owner": "/root/oa04_scheduler",
+  "files": [
+    {
+      "path": "crates/parking-lot-runtime-tokio/src/durable_pool/mod.rs",
+      "sha256": "814fbb307815de3a14c8b1b932405771f2b4243b7cfeea4e633a04049414b32b"
+    },
+    {
+      "path": "tests/scheduler/durable_sigkill.rs",
+      "sha256": "2994064b5ce171347779e192d9879b8071d8f1082f716b784791a84f88fc1657"
+    },
+    {
+      "path": "tests/scheduler/support.rs",
+      "sha256": "cf53516e40354a969831efd7570b4a0e8f7f8d8c05d02a4837fb22c4e053fd8f"
+    }
+  ],
+  "mirroredTo": "/Users/gqadonis/.codex/worktrees/oa04-release/prometheus-parking-lot-rs",
+  "runtimeEvidence": "NOT_EXERCISED",
+  "runtimeControl": "oa-07-event; normal authoritative backend path",
+  "authoredFixtures": [
+    "durable_sigkill::postgres::pool_sigkill_pg_failed_delivery_retained_after_restart",
+    "durable_sigkill::postgres::pool_sigkill_pg_failed_delivery_consumed_before_restart",
+    "durable_sigkill::redb::pool_sigkill_redb_failed_delivery_retained_after_restart",
+    "durable_sigkill::redb::pool_sigkill_redb_failed_delivery_consumed_before_restart",
+    "durable_sigkill::redb::pool_duplicate_redb_nonterminal_status_requeues_without_false_terminal"
+  ],
+  "normalPgMajors": [
+    17,
+    18
+  ],
+  "runtimeControlClassification": {
+    "cfg": "oa-07-event",
+    "requiredFailedOracles": [
+      "OA-07:terminal-event",
+      "OA-07:nonterminal-event"
+    ],
+    "requiredPositiveCompanion": "pool_sigkill_redb_between_delivery_and_ack",
+    "reject": [
+      "compile failure",
+      "timeout",
+      "zero discovery",
+      "unrelated assertion"
+    ]
+  },
+  "leaseOracle": "OA-07:lease-resolution"
+}

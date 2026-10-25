@@ -1,0 +1,287 @@
+{
+  "schemaVersion": "2",
+  "generatedBy": "kbd-runtime",
+  "projectionContractVersion": 2,
+  "sourceRevision": 1129,
+  "derivedRevision": 1129,
+  "frontier": {
+    "3b637018-0150-4bf1-b8af-a19e9f09585f": 189,
+    "b4320c25-6bf5-4d74-9fe6-3d6b8b36bd69": 313,
+    "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 627
+  },
+  "conflictCount": 0,
+  "phase": "phase-0-4-operational-assurance",
+  "phaseId": "phase-0-4-operational-assurance",
+  "parentPhase": null,
+  "last_updated": "2026-10-24T20:10:51.055039Z",
+  "last_updated_by": "kbd-runtime",
+  "changes_total": 19,
+  "changes_completed": 19,
+  "implementation_total": 19,
+  "implementation_completed": 19,
+  "completion": {
+    "primaryCounter": "implementation",
+    "implementation": {
+      "completed": 19,
+      "total": 19,
+      "status": "COMPLETE"
+    },
+    "evidence": {
+      "status": "NOT_TRACKED",
+      "summary": null,
+      "blockers": []
+    },
+    "certification": {
+      "status": "NOT_TRACKED",
+      "summary": null,
+      "blockers": []
+    },
+    "publication": {
+      "status": "NOT_TRACKED",
+      "summary": null,
+      "blockers": []
+    }
+  },
+  "completionScopes": {
+    "completion": "phase",
+    "runCompletion": "run"
+  },
+  "runCompletion": {
+    "scope": "run",
+    "runId": "phase-certification-remediation-20261022T103344Z",
+    "primaryCounter": "implementation",
+    "implementation": {
+      "completed": 70,
+      "total": 70,
+      "status": "COMPLETE"
+    },
+    "evidence": {
+      "status": "PENDING",
+      "summary": null,
+      "blockers": []
+    },
+    "certification": {
+      "status": "PENDING",
+      "summary": null,
+      "blockers": []
+    },
+    "publication": {
+      "status": "PENDING",
+      "summary": null,
+      "blockers": []
+    }
+  },
+  "changes": [
+    {
+      "id": "oa-19-ci-repairs",
+      "title": "oa-19-ci-repairs",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 1,
+      "tasks_done": 1,
+      "last_task_completed": "1.1 Repair observed PR94 CI failures, review and verify the coherent fixes, and confirm latest-head CI before preparing operator merge",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-01-containment-controls",
+      "title": "Prepare and enforce post-purge containment controls",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-02-release-versioning",
+      "title": "Choose and automate seven-crate versioning",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-03-signed-release-tags",
+      "title": "Verify operator-signed release tags",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-04-trusted-publishing",
+      "title": "Gate trusted publishing on candidate evidence and approval",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-05-template-secret-scan",
+      "title": "Make template scans precise without hiding real secrets",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-06-tenant-idempotency",
+      "title": "Scope result idempotency to tenant/mailbox key",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-07-stored-terminal-outcome",
+      "title": "Emit durable terminal events from the stored result",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-08-discarded-spawn",
+      "title": "Settle accepted work when a spawner discards its future",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-09-backend-admission",
+      "title": "Reject impossible pre-populated adapter work",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-10-expiry-events",
+      "title": "Emit terminal events for explicitly pruned work",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-11-concurrency-models",
+      "title": "Model ledger races and kind-limited release",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-12-negative-control-ci",
+      "title": "Run every scenario negative control in CI",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-13-browser-assurance",
+      "title": "Exercise WASM admission and events in a browser",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-14-postgres-upgrade",
+      "title": "Rehearse a populated PostgreSQL 17→18 upgrade",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-15-desktop-assurance",
+      "title": "Build and launch the Tauri embedded example",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-16-iggy-poisoning",
+      "title": "Prove no stream publication beyond an abandoned chunk",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-17-backend-benchmarks",
+      "title": "Measure PG throughput, contention and memory",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Complete contract, migration/runbook documentation and static handoff for the boundary; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-18-release-boundary",
+      "title": "Assemble and evaluate one candidate boundary packet",
+      "status": "DONE",
+      "implementation_status": "COMPLETE",
+      "tasks_total": 2,
+      "tasks_done": 2,
+      "last_task_completed": "1.2 Assemble the completed candidate and record the final integration, review and publication dispositions; verify artifact links and contract/documentation handoff",
+      "next_task_pending": null,
+      "blockers": []
+    }
+  ],
+  "children": {},
+  "migrationStatus": null
+}

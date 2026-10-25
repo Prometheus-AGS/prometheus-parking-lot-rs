@@ -1,0 +1,8 @@
+{
+  "owner": "/root/oa04_platform",
+  "task": "oa-07-stored-terminal-outcome/1",
+  "file": "crates/parking-lot-ffi/src/store.rs",
+  "sha256": "07abf8982997146dda99145af5e1697bfa71416f7c78ab5e88b03876f66b052d",
+  "scope": "Duplicate { .. } compatibility match; existing FFI result surface preserved",
+  "runtimeEvidence": "NOT_EXERCISED"
+}

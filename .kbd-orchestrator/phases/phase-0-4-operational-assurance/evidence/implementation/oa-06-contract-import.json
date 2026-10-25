@@ -1,0 +1,45 @@
+{
+  "owner": "/root/oa04_release",
+  "sourceWorkspace": "/Users/gqadonis/.codex/worktrees/oa04-release/prometheus-parking-lot-rs",
+  "destinations": [
+    "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs",
+    "/Users/gqadonis/.codex/worktrees/oa04-events/prometheus-parking-lot-rs",
+    "/Users/gqadonis/.codex/worktrees/oa04-postgres/prometheus-parking-lot-rs",
+    "/Users/gqadonis/.codex/worktrees/oa04-scheduler/prometheus-parking-lot-rs"
+  ],
+  "files": [
+    {
+      "path": "crates/parking-lot-core/src/contracts/result_mailbox.rs",
+      "sha256": "44ea978ea6dc557c8f4f472802b799903988b48835f400154323bbd6b7914467"
+    },
+    {
+      "path": "crates/parking-lot-core/src/contracts/memory_result_mailbox.rs",
+      "sha256": "e6cd8ba619ddac5a7121432a1430012ab2a63d63734b1eca76bdb6b57309143f"
+    },
+    {
+      "path": "crates/parking-lot-core/src/contracts/conformance/mailbox.rs",
+      "sha256": "a3ec758e8d5619fbad5ca00a187cd2df6d2f1060492a7a9b42b692a1d0d8a394"
+    },
+    {
+      "path": "crates/parking-lot-core/src/contracts/conformance/mod.rs",
+      "sha256": "558f6b78d7451fecbf2fbf6a947c73acd481aa0fb3e8c7e6fa913e82ee59aa80"
+    },
+    {
+      "path": "crates/parking-lot-core/src/contracts/conformance/negative.rs",
+      "sha256": "128686d399f1e9bc328b692e1bce34aeef9bb421ac8e1a85a2034ec1b91b3960"
+    },
+    {
+      "path": "crates/parking-lot-core/src/contracts/mod.rs",
+      "sha256": "b1fd8633d5de21765a7d026baf99a55357743972cf8a74b4ef00270cbb6ad2de"
+    },
+    {
+      "path": "crates/parking-lot-core/src/lib.rs",
+      "sha256": "10528581d8c984fb50e7e44501748ffd80986edbbe37700253fd01858ac20319"
+    },
+    {
+      "path": "docs/adr/0006-tenant-scoped-result-idempotency.md",
+      "sha256": "e301511b987569d70d04126351ed6cde2b2b373f3e37b43535df87a1a1982828"
+    }
+  ],
+  "status": "shared contract imported; backend implementation pending; NOT_EXERCISED"
+}

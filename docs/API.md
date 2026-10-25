@@ -1,6 +1,6 @@
 # API overview
 
-A map of the public API at 0.3.0 (unreleased). The rustdoc is the reference;
+A map of the public API, including implemented 0.4 changes awaiting final verification. The rustdoc is the reference;
 build it with `cargo doc --workspace --no-deps --all-features --open`. Compiled
 examples are in the [README](../README.md). Design decisions are in
 [`adr/`](adr/).
@@ -31,6 +31,71 @@ pools take their key in `pools`), `name`, `with_audit`, `with_clock`, `with_canc
 `with_cancellation_config`, `submit`, `prune_expired`, `active_units`,
 `running_tasks`, `queued_tasks`, `shutdown` (refuse new work only),
 `shutdown_with(policy)` (async; returns a `ShutdownReport`, cr-29).
+
+`ResourcePool::prune_expired().await` retains its public
+`Result<usize, SchedulerError>` removal count (oa-10, #57). Each removed task
+uses the normal per-task expiry path outside the dispatcher lock: `Expired`
+terminal event, one configured mailbox delivery attempt of `TaskStatus::Expired`
+with no result payload, individual expiry audit, and once-only accepted-work
+settlement. It cannot execute or be returned by a repeated prune. Equality at
+a deadline is live; tasks without deadlines remain queued. Active permits
+are unchanged, and live work unblocked by removal can start in the following
+drain. This path invokes no cancellation sink.
+
+Expiry counts as a failed task and a finished ledger outcome. Settlement
+precedes mailbox/audit callbacks as for head expiry; a shutdown report is not
+an acknowledgement that storage succeeded. Mailbox errors, callback failures
+and bounded hook delivery retain their existing limits. A conforming backend
+removes nothing on a pruning error, and no per-task expiry reporting runs then.
+
+`ResourcePool::new` requires `Q: TaskQueue<P>` and includes the queue's
+existing reported depth in shutdown accounting (oa-09). Construction does not
+spawn work. After builder configuration, the first submission or
+`shutdown_with` installs the release hook and drains pre-filled entries;
+other draining operations can also observe the head.
+
+A stored head exceeding the absolute total or per-kind limit is removed once
+without execution, emits `Rejected` with `CapacityExceeded` identifying the
+dimension, and gets one configured mailbox delivery attempt of
+`TaskStatus::Dropped(capacity_error.to_string())`, with no result payload.
+It counts in `failed_tasks` and as a finished ledger outcome, then settles;
+it does not invoke the cancellation sink. Pre-filled tasks get no fabricated
+`Submitted`/`Queued` event from this pool. Valid heads waiting only for units
+held by running tasks remain parked. Head expiry and valid completion use
+their usual per-task accounting, including when shutdown is the first pool
+operation. An impossible head is capacity-rejected before its expiry is checked.
+
+FIFO follows the stored tickets and configured dispatch policy. The pool does
+not recover a global sequence counter across an arbitrary imported sequence
+epoch and new submissions. The initial ledger count relies on the backend's
+reported depth; external additions after ownership transfer are outside this
+accounting. Mailbox errors, callback panics and bounded hook delivery retain
+their existing limits. This in-memory path adds no persistent dead-letter store.
+
+`Spawn` may legally drop a supplied future without polling it. For an accepted
+`ResourcePool` run discarded this way (oa-08), the executor is never called:
+the pool emits one `Failed` lifecycle event with no `Started`, and attempts one
+mailbox delivery for a configured key, with no result payload and status
+`TaskStatus::Failed(TaskError::Cancelled { reason })`. The reason is exactly
+`spawner discarded resource pool task before its first poll`.
+
+The pool returns the permit and launches admitted parked work before mailbox
+or audit callbacks, increments `failed_tasks`, and settles shutdown accounting
+when the discard action exits. A discard during shutdown counts in
+`ShutdownReport::completed` (which includes finished failures); one settled
+before shutdown began is outside that report's interval. It does not increment
+`cancelled`, emit the shutdown `Cancelled` event, invoke the asynchronous
+`CancellationSink`, or requeue the payload. First-polled runs retain the normal
+executor panic, timeout and shutdown cancellation behavior.
+
+Discard settlement is synchronous and does not supply an unavailable runtime.
+A spawner that retains a future without polling or dropping it can still hold
+its work unsettled. Collaborators must return for settlement to finish. The
+discard path contains mailbox/audit callback unwinding and settles the ledger,
+but does not guarantee a stored result when the mailbox errors or panics before
+storage. Panicking clocks/queues can interrupt completion, blocking callbacks
+can delay it, process aborts do not run drop guards, and hook delivery retains
+the bus's bounded-queue semantics. `ResourcePool` remains an in-memory pool.
 
 `DurableResourcePool` (crash-durable mode on a `LeaseQueue` and a
 `ResultMailbox`, cr-49; top-level `DurableResourcePool`, `DurableOptions`):
@@ -105,6 +170,25 @@ synchronous pair, `DurableResourcePool` (cr-49) the async pair.
 | `LeaseQueue<P>` | async, leasing (`enqueue`, `lease`, `ack`, `nack`, `extend`, `depth`) | `infra::queue::InMemoryLeaseQueue` (reference); `infra::queue::RedbLeaseQueue` from `infra::EmbeddedStore` (`embedded`, crash-safe); `infra::queue::PgLeaseQueue` (`postgres`) |
 | `ResultMailbox<T>` + `Notifier<T>` | async, idempotent (`deliver`, `consume`, `peek`, `evict_expired`) | `infra::mailbox::InMemoryResultMailbox` (reference); `infra::mailbox::RedbResultMailbox` (`embedded`, crash-safe); `infra::mailbox::PgResultMailbox` (`postgres`); `StorageMailbox<S, N>` composes storage and notifier |
 
+Synchronous pruning returns removed tasks rather than a count:
+`TaskQueue<P>::prune_expired(&mut self, now_ms)` returns
+`Result<Vec<ScheduledTask<P>>, SchedulerError>`. Each removed task retains its
+full original metadata and payload, exactly once, without requiring `P: Clone`.
+Expiry is strict `now_ms > deadline_ms`; equality and missing deadlines stay
+live. Survivors retain their ordering metadata, removed-item ordering is
+unspecified, and `Err` must leave every task queued. Custom backends must
+implement this ownership-returning contract rather than discarding removed
+metadata. The synchronous conformance helper is
+`prometheus_parking_lot_core::conformance::task_queue::prune_returns_all_removed_tasks`
+with feature `conformance`.
+
+Core-only `dispatch::ParkedQueue<T>::prune_expired` analogously returns
+`Result<Vec<T>, SchedulerError>`. `TaskQueueAdapter` completes fallible backend
+pruning before mutating its in-memory front. `Dispatcher::prune_expired` keeps
+its `(usize, Dispatched<T>)` result and places full removed tasks in `expired`;
+callers must report those outcomes outside the dispatch lock. Custom queue
+implementations and direct consumers must preserve that reporting obligation.
+
 The async contracts live in `core::backend`; `DurableResourcePool` runs on them.
 `StorageMailbox::new(storage, notifier)` takes a `DetachedNotifier`:
 `NoopNotifier`, or `BackgroundNotifier::new(notifier, spawner, sleeper)`, which
@@ -113,6 +197,80 @@ runs any `Notifier` off the delivery path with bounded retries (`with_policy(Ret
 are in `core::backend` and at `core::*`.
 The backend conformance suite is `prometheus_parking_lot_core::conformance`
 behind that crate's `conformance` feature.
+
+### Address-scoped result idempotency (0.4, oa-06)
+
+A result's first-write-wins identity is `(storage namespace, complete MailboxKey,
+caller idempotency key)`. Tenant, user and session all participate; `None` and
+an empty optional identifier are distinct. Two addresses may reuse the same
+caller key independently. Same-address retries retain the original fence
+through consume/reopen until its original expiry; no-TTL fences remain
+permanent. Expiry at one address never releases another address's fence.
+Unkeyed delivery is unchanged.
+
+### Authoritative duplicate status and final schema 3 (0.4, oa-07)
+
+`DeliveryOutcome::Stored` remains a unit variant;
+`DeliveryOutcome::Duplicate { status: TaskStatus }` returns the original full
+status, including the original `TaskError`, atomically with the duplicate
+choice. Status survives result consumption for the original fence lifetime.
+A retry neither replaces the result/status nor extends TTL. Missing or
+undecodable authoritative metadata is an error, never a successful duplicate
+using the retry's status. No destructive consume is needed to learn status.
+The enum loses `Copy` and `Hash`; match its payload, use `Duplicate { .. }`
+when intentionally ignoring metadata, or clone. Mailbox method signatures are
+unchanged. `StorageMailbox` notifies only `Stored` and passes metadata through.
+The FFI's existing `DeliveryResult::Duplicate` label intentionally omits it.
+
+Core mapping types are `prometheus_parking_lot_core::LegacyIdempotencyOwner`
+(`idempotency_key: String`, `key: MailboxKey`) and `LegacyDeliveryStatus`
+(the same fields plus `status: TaskStatus`), each with `new(...)`, serde and
+unknown-field rejection. Owner evidence makes no status claim. These are core
+exports, not new facade `core::backend` exports. Supported entries are:
+
+| Entry | Final upgrade behavior |
+| --- | --- |
+| `PgResultMailbox::<T>::migrate(&pool).await` | Creates/reopens protocol 3; converts legacy sources only if original owners/statuses are provable without supplied evidence. |
+| `PgResultMailbox::<T>::migrate_with_idempotency_owners(&pool, &owners).await` | Owner-only evidence `&[(String, LegacyIdempotencyOwner)]`; supplies no missing status. Each outer string is the exact mailbox name. |
+| `PgResultMailbox::<T>::migrate_with_idempotency_metadata(&pool, &owners, &statuses).await` | Atomic direct 0.3 -> 3 or intermediate 2 -> 3; status evidence is `&[(String, LegacyDeliveryStatus)]`. |
+| `EmbeddedStore::open(path)` / `open_with_clock(path, clock)` | Creates/reopens schema 3; refuses schemas 1/2. |
+| `EmbeddedStore::open_with_idempotency_metadata(path, &owners, &statuses)` / `open_with_clock_and_idempotency_metadata(path, clock, &owners, &statuses)` | Explicit atomic 1/2 -> 3 or schema-3 evidence replay, with core record slices (no outer namespace tuple). Owner-only entry variants remain but supply empty status evidence. |
+
+Consumed 0.3 fences lack owner and status; intermediate schema-2 fences retain
+owner but lack status. Resolve every active fence from a coherent retained
+full-address/caller/exact-expiry generation or authoritative original evidence;
+ambiguous assignments must select a retained candidate. Missing, duplicate,
+unknown, expired, wrong-address or contradictory initial evidence refuses
+atomically. Direct conversion cannot commit version 2 before missing-status
+refusal. A consumed permanent fence cannot be recovered merely by waiting.
+
+PG active `pl_result_mailbox_v3`/`pl_result_mailbox_keys_v3` and immutable
+`pl_result_mailbox_metadata_v3` retain native expiry/status. PG rejects actual
+v1/v2 mutation SQL at guarded retired names. Redb uses `mb_idem_v3` active
+metadata and `mb_legacy_metadata_v3` proof, retaining entries, queue identity,
+older fences and owner provenance; both old open protocols reject schema 3.
+Replaying recorded evidence never recreates an expired fence or resets TTL.
+Stop all old readers/writers, preserve an untouched backup and rehearse on a
+copy. Rollback stops new writers and restores that backup; later writes need
+separate reconciliation. Builders collect no missing metadata authority.
+
+On duplicate delivery the durable pool chooses both its event and lease
+resolution from original status: `Completed` -> completed/ack;
+`Failed(error)` -> failed/dead-letter; `Expired` -> expired/dead-letter;
+`Dropped(reason)` -> rejected with `Custom(reason)`/dead-letter. Delivery
+precedes resolution. Generic mailbox `Queued`/`Running` remains supported;
+a durable duplicate of either warns and requeues without fabricated terminal
+truth, ack or dead-letter. A permanent nonterminal fence can retry indefinitely
+until separate explicit remediation; finite fences keep their original TTL.
+Local execution counters still describe attempts. Existing shutdown, oversize
+and resolution retry policies remain intact.
+
+See [ADR 0006](adr/0006-tenant-scoped-result-idempotency.md) for address scope
+and [ADR 0007's final-schema runbook](adr/0007-authoritative-duplicate-status.md#operational-runbook-for-final-schema-3)
+for exact mapping/backup/replay/rollback rules. PG17/PG18/redb migration and real
+Failed-after-delivery process-kill fixtures, including consume-before-retry,
+are authored; all final-boundary execution remains `NOT_EXERCISED`. This
+API description authorizes no live upgrade.
 
 ## Hooks and audit
 
@@ -126,9 +284,9 @@ background task, so `record` never blocks and a full buffer drops and counts).
 task, `Submitted`, then `Queued` if it parks, `Started` when the executor is
 about to run, and exactly one terminal event: `Completed`, `Failed`,
 `Rejected`, `Cancelled`, `Expired` or (durable pool) `Requeued`
-(`LifecycleEvent::is_terminal`); a task removed by `prune_expired` emits no
-terminal event (the `TaskQueue` contract does not return the pruned ids;
-issue #57). `RejectionReason::CapacityExceeded { kind }` names the dimension
+(`LifecycleEvent::is_terminal`); explicit pruning emits `Expired` for each
+removed task, without `Started` (oa-10, #57).
+`RejectionReason::CapacityExceeded { kind }` names the dimension
 that did not fit (`None`: the pool's total). For `DurableResourcePool` the one-terminal rule holds per
 run, not per task: a run that ends in `Requeued` is followed by the task's
 next run (`Queued`/`Started`, then its own terminal event), here or in another

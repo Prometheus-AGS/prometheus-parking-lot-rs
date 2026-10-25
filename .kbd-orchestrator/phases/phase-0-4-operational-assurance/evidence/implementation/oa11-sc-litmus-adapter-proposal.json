@@ -1,0 +1,22 @@
+{
+  "status": "PROPOSAL_ONLY_NOT_APPLIED",
+  "observed_direct_normal_result": "FAIL: admission oracle; publication PASS; exit101; not production-defect evidence without supported SC semantics",
+  "model_path": "crates/parking-lot-runtime-tokio/src/ledger/loom_ledger.rs",
+  "base_sha256": "6236cf4e778bc0a446cadba139f9cdbe3ad93ce88ec1373e54bc542b336530ca",
+  "proposed_sha256": "0950b190a5b50279994b5519bf9834270485db956f35fb3a9e4fb04f19cc75b9",
+  "production_ledger_sha256": "9c3a4a9b7ea82e3ee28fb7153c3be360a0a089f9cfe028fe669b5860dd7ec89e",
+  "patch_sha256": "99bd0e0c69ec7e871f8aaaaa2597a3e813ead7875a3ca6dfff94c117a1340df2",
+  "proposal_sha256": "bb3e51840e1850a3d820359d3b0cc11b87cfad974b1a3858997f5da07bca6646",
+  "pinned_primary_sources": {
+    "/Users/gqadonis/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/loom-0.7.2/README.md": "6c63e027ed64d45ee2a74b3063367403c4bb6c7d80e367b5872738485ef848d2",
+    "/Users/gqadonis/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/loom-0.7.2/src/rt/thread.rs": "a5160c8ea5ffb8de6cf7810740af5b6664f5bf26edab077c539a774fe5ac166d",
+    "/Users/gqadonis/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/loom-0.7.2/src/rt/synchronize.rs": "d3d1f858dd94a1f10704bb011caa79b5729e8720a437782f0528ad522d21129b",
+    "/Users/gqadonis/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/loom-0.7.2/src/rt/atomic.rs": "bb0bb575cd531c5cce14feef1f155b4d0c80e69a1985c5d42d618cece0081dc6"
+  },
+  "observed_logs": {
+    "/tmp/oa04-boundary-2c18c9a/baseline/loom_ledger.stdout.txt": "c18b8fd86959287e72e5aef218bd95bb85dcdeb4032acbf241b75f000a617ff1",
+    "/tmp/oa04-boundary-2c18c9a/baseline/loom_ledger.stderr.txt": "12bd5effd21622351cad29f9a96f7a05f7ea2c58c56cfe3fe1f5cd3c9d443f55",
+    "/tmp/oa04-boundary-2c18c9a/baseline/loom_ledger-discovery.stdout.txt": "0fe52ca8f2b1109f799234b9d3124eec135b4aeab89296b49bb829522ff0cb9b"
+  },
+  "actions": "Source/log reads, requested exact two-file copy, read-only primary upstream issue180, proposal authoring and SHA256 only. No Rust source edits after sync or execution. Independent R2 before implementation."
+}
