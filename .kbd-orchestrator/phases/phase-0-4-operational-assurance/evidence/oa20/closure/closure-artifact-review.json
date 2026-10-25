@@ -1,0 +1,99 @@
+{
+  "artifact_echo": {
+    "boundary_contractDigest": "b1993dbc9a81f8e688300c97e7a621f341d068c6c536222de7c0e9bb0a95c911",
+    "completion": "This record precedes terminal KBD closure",
+    "reflection": "Terminal phase-close evaluator is still a separate next boundary"
+  },
+  "candidate": "53682521cb2a7a49c06e046c826890d9e11b6bfe",
+  "closure_contract_digest": "b1993dbc9a81f8e688300c97e7a621f341d068c6c536222de7c0e9bb0a95c911",
+  "findings": [],
+  "limits": [
+    "Same-family isolated Codex artifact critic; no cross-family certification.",
+    "No source/build/test/Cargo or network-write action; previous R2 preserved and no new production acceptance asserted.",
+    "Review accepts bookkeeping artifact accuracy; terminal typed phase close must still be executed and observed separately.",
+    "Budget values are estimates with missing exact global telemetry explicitly disclosed; this review does not convert them into strict measured upper bounds."
+  ],
+  "observed_at": "2026-10-25T15:26:53.091921+00:00",
+  "observed_checks": {
+    "archives": "40 sequential actual verify/archive records exit0 with managed receipt files; 20 actual archived changes, checked tasks, no active duplicates; 8 delta files requirement titles are present in canonical specs; clean reconciliation clean=true/drift0/errors[].",
+    "budget_accounting": "Final57-session snapshot sums5612 modelcalls+5645 staticnested=11257proxy. Disclosed2000multiplicity+50root+50nested allowance/roundup and14000floor reproduce14000estimate. Elapsed1650+30allowance=1680. repairMAX2/noProgress2 remain source-backed retrospective estimates, not exact independently metered maxima. Referenced primary records match pins.",
+    "budget_lineage": "Only tool ceiling3000 to15000 changed. Original/new normalized digests verified; ssh-keygen -Y verify independently returned Good signature. Runtime authority stores manifest without terminal newline and pins those907 bytes; retained signed file908 bytes and own valid signature are preserved, same JSON.",
+    "completion_and_reflection": "Claims match scoped retained evidence:128records/52controls,7registry crates,4successful fresh consumer commands with initial rustc prerequisite failure retained;20normal regressions/1improvement/19inconclusive;website audit39 with18critical/18moderate/3low;874 classified scan matches and scanner exit1 preserved;containment/rotation remain deferred;no fabricated human/cross-family claim;successor remains recommendation.",
+    "original_software_receipt": "Actual compact ZIP hash620e7d1a94d78fa83c5129ae396deccd0709c57847489a71060c43d17410b6c0; retained receipt bytes exactly match member; full ZIP fec29ccff678660cd1b27af8cfd74aba016881507442e943c223fd09f5c2dc0a. Candidate536/original04/17PASS unchanged.",
+    "retention": "23 copied evidence files match both retained pins and original bytes.",
+    "scenario_carry": "All17 scenario objects identical across old04/newb199; exact normalized scenario digests match envelope and canonical signed binding; carriedFromContract04 and actual observed receipt hashes match.",
+    "source_digests": "All1518 listed regular committed-source blobs match actual Git candidate536 and current file bytes. Omitted1271 regular blobs are confined to .kbd-orchestrator/.prometheus/openspec; no production source omitted.",
+    "source_worktree_status": "All current status paths confined to .kbd-orchestrator/.prometheus/openspec.",
+    "terminal_state": "Observed current canonical phase Reflect IN_PROGRESS, not terminal CLOSED; documents explicitly precede terminal close."
+  },
+  "raw_proof": [
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/boundary-results.json",
+      "sha256": "e1f4e50c3a70d361dd0311fc46e5682f20542f5c7e7957aa372d9365a557c024"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json",
+      "sha256": "7841e01dac73673025d88026071c4e15861eabf6d4575bcc038f116bfe5d1139"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted/04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2.json",
+      "sha256": "04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/reflection.md",
+      "sha256": "bba21cd6bf9be77f9dd92668c5dc6729c715487ac49551e1b4a2f7a96f563f61"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/publication-completion/completion.md",
+      "sha256": "3e835296b2eb19aa5a5047f6564bbf0e73a5fdc204e0b0884c71d21aed17fe28"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/publication-completion/certification-boundary-receipt.json",
+      "sha256": "abfca20dea40f31b93e37ed3a9160b99b02c1c13d95b3e684f4a0df861077a9a"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/publication-completion/budget-usage-final-for-closure.json",
+      "sha256": "e90e8b81365d9775bdde65bc7b52dfe5d6f826d643e3b55b19f31f1f49fcaebe"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/publication-completion/retained-files.json",
+      "sha256": "8537a6d32a05767dc9bb217ceda530df730f1decb8043e3f129944177291dabe"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/publication-completion/final-r2.json",
+      "sha256": "47010cb1f0387ee40506c19e90bc87bbd1f13320c23355e5621e4cbb41281e09"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/publication-completion/post-publication-factual-verification.json",
+      "sha256": "b11411602c7240b63447ce149c41a0904aba1fca237d7e8ed395f12bf374f289"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/budget-amendment/budget-amendment.json",
+      "sha256": "83657e28ff7fc85caa2ce433378ea0f37b0b2418025052673183aaaa82f76375"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/budget-amendment/budget-amendment.json.sig",
+      "sha256": "7e826d83cb3e5c13e9d60a57d0cd2256525eb6479d389c9b03a01e30f3715a25"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/budget-amendment/bound-disposition.json",
+      "sha256": "339bade9e3c3fe36076614aa0e63271348ab0526052e56103e2f44e49ea3da33"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/verify-archive-commands.json",
+      "sha256": "cab87a3ef17c1c8c51dca7c2677473bef4112885389b55258e2dc4200455dc69"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/post-archive-reconciliation.json",
+      "sha256": "09d95b43fff4871c95004b019e688e2786d5698acfb9bb11d03715e5d5c9ba26"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/reflect-sycophancy-check.json",
+      "sha256": "8b29abb2cda423796127f28f7c40ed37e1f0289512f32b340f0183e4e8f19f10"
+    }
+  ],
+  "review_type": "final_bookkeeping_artifacts_only_not_new_R2",
+  "schema_version": 1,
+  "software_contract_digest": "04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2",
+  "verdict": "PASS"
+}

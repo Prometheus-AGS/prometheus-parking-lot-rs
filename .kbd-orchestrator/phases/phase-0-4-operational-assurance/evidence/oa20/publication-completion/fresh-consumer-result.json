@@ -1,0 +1,73 @@
+{
+  "status": "PASS",
+  "candidate": "53682521cb2a7a49c06e046c826890d9e11b6bfe",
+  "version": "0.4.0",
+  "seven_registry_checksums_vcs_verified": true,
+  "anonymous_fresh_native_and_wasm_consumers": true,
+  "commands": [
+    {
+      "consumer": "native",
+      "step": "resolve",
+      "argv": [
+        "/Users/gqadonis/.cargo/bin/cargo",
+        "generate-lockfile"
+      ],
+      "cwd": "/private/tmp/oa20-registry-consumers-536-z7vnlj43/native",
+      "started_at": "2026-10-25T15:16:13.247303+00:00",
+      "finished_at": "2026-10-25T15:16:14.939629+00:00",
+      "exit": 0,
+      "anonymous_cargo_home": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/native-anonymous-cargo-home",
+      "fresh_target": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/native-fresh-target"
+    },
+    {
+      "consumer": "native",
+      "step": "check",
+      "argv": [
+        "/Users/gqadonis/.cargo/bin/cargo",
+        "check",
+        "--locked"
+      ],
+      "cwd": "/private/tmp/oa20-registry-consumers-536-z7vnlj43/native",
+      "started_at": "2026-10-25T15:16:14.940227+00:00",
+      "finished_at": "2026-10-25T15:17:49.073657+00:00",
+      "exit": 0,
+      "anonymous_cargo_home": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/native-anonymous-cargo-home",
+      "fresh_target": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/native-fresh-target"
+    },
+    {
+      "consumer": "wasm",
+      "step": "resolve",
+      "argv": [
+        "/Users/gqadonis/.cargo/bin/cargo",
+        "generate-lockfile"
+      ],
+      "cwd": "/private/tmp/oa20-registry-consumers-536-z7vnlj43/wasm",
+      "started_at": "2026-10-25T15:17:49.097422+00:00",
+      "finished_at": "2026-10-25T15:17:49.655297+00:00",
+      "exit": 0,
+      "anonymous_cargo_home": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/wasm-anonymous-cargo-home",
+      "fresh_target": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/wasm-fresh-target"
+    },
+    {
+      "consumer": "wasm",
+      "step": "check",
+      "argv": [
+        "/Users/gqadonis/.cargo/bin/cargo",
+        "check",
+        "--locked",
+        "--target",
+        "wasm32-unknown-unknown"
+      ],
+      "cwd": "/private/tmp/oa20-registry-consumers-536-z7vnlj43/wasm",
+      "started_at": "2026-10-25T15:17:49.656004+00:00",
+      "finished_at": "2026-10-25T15:18:16.393901+00:00",
+      "exit": 0,
+      "anonymous_cargo_home": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/wasm-anonymous-cargo-home",
+      "fresh_target": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/wasm-fresh-target"
+    }
+  ],
+  "limits": [
+    "Compile verification of exact public packages; not a fresh execution of database/GUI production scenarios.",
+    "No path patches, vendoring, registry tokens, existing Cargo home or target cache used."
+  ]
+}

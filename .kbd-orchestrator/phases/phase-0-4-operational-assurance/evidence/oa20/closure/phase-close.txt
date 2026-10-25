@@ -1,0 +1,1 @@
+CLOSED phase=phase-0-4-operational-assurance verdict=PASS evidence=sha256:eeb6991401687a908265ae5ae276fe6036ec3bdd8c5cb4d385e1035bd3c5d560 contract=b1993dbc9a81f8e688300c97e7a621f341d068c6c536222de7c0e9bb0a95c911 run=phase-certification-remediation-20261022T103344Z entries=17 budget-note=budget-exhausted (dispatch for this phase now refused)

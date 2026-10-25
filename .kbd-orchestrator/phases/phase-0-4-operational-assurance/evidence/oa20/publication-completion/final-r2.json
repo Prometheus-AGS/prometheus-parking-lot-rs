@@ -1,0 +1,626 @@
+{
+  "schema_version": 1,
+  "candidate": "53682521cb2a7a49c06e046c826890d9e11b6bfe",
+  "contract_digest": "04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2",
+  "observed_at": "2026-10-25T14:54:35.912679+00:00",
+  "route": "R2",
+  "verdict": "PASS",
+  "correction_cycles": 0,
+  "open_critical_findings": 0,
+  "scope": "Single cumulative final independent source and acceptance-artifact review for this frozen software candidate under the adopted finite OA-01 through OA-17 contract. Suitable as the R2 input to the separately gated trusted collector; not an assertion that collection, publication, registry consumers or canonical phase closure have completed.",
+  "reviewer_identity": {
+    "role": "final artifact critic",
+    "context": "/root/candidate536_final_r2_artifact_critic",
+    "harness": "Codex native isolated context",
+    "configured_route": "gpt-6.1-sol / high, as supplied in review input",
+    "independence": "Fresh artifact-only native context; no generation chat, continuation logs or model rollouts read. Cross-family or separate-harness independence is not established. Runtime model identity is not independently attested.",
+    "human_observation": false
+  },
+  "artifact_echo": [
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/oa04-verification/prometheus-parking-lot-rs/crates/parking-lot-runtime-tokio/src/durable_pool/mod.rs",
+      "line": 1108,
+      "code": "            DeliveryOutcome::Duplicate { status } => {"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/oa04-verification/prometheus-parking-lot-rs/.github/scripts/operational-assurance.py",
+      "line": 1008,
+      "code": "        require(args.trusted and packet[\"provenance\"][\"status\"] == \"PASS\", compact_reason)"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/oa04-verification/prometheus-parking-lot-rs/.github/scripts/trusted-release.py",
+      "line": 85,
+      "code": "        require(args.tag == f\"v{version}\", \"publication tag must name the exact lockstep version\")"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/local-full-preview/packet.json",
+      "observed": {
+        "status": "BLOCKED",
+        "review": "BLOCKED",
+        "provenance": "BLOCKED",
+        "publication": "NOT_EXERCISED"
+      }
+    }
+  ],
+  "findings": [],
+  "judgment_basis": [
+    "No concrete blocking defect was found in the inspected production paths, authority consumers or actual acceptance artifacts. Source inspection covers the concrete functions and contracts recorded in source-inspection-notes.json, not a claim of exhaustive security proof.",
+    "All 25 final-index path/hash pins match. Independently recomputed candidate Git tree modes, object IDs, sizes and SHA256 for all 2797 tracked blobs: 29099012 bytes. Software checkout is exact candidate and clean.",
+    "Actual candidate verify_job passes all eight profiles: baseline41, Linux61, macOS5, Windows2, Android4, iOS4, native GUI2, quiet9:128 command records. These are command records, not a claimed count of individual tests.",
+    "All eight immutable ZIPs byte-match extracted files. Fresh authenticated read-only GitHub metadata independently binds the six automatic artifacts to the same first-attempt run40195944814, exact candidate, repository and server archive digests. Fresh remote workflow bytes match both approved SHA256 pins.",
+    "Independently applied the actual negative-control receipt verifier to every one of52 cases, with exact source inventory33 cfg controls, normal/mutant builds and nonzero discovery, designated expected runtime assertions, unaffected companions and real browser/PG/redb/Iggy/upgrade paths. Compile failures, timeouts and arbitrary nonzero exits were not accepted as negative-control success.",
+    "Fresh authenticated main CI40194421532 is first-attempt completed/success at this candidate, with84 actual jobs all completed/success. Independent fresh GitHub readback shows collector121200135578 waiting/null behind pending environment25255584007; this reviewer performed no approval.",
+    "Canonical v0.4.0 annotated object943c62d860e8971847334e9196ad34881658fbcb targets candidate536. Fresh remote ref/object agree with exact local and retained signed-tag bytes and recomputed Git object ID. Direct Git/OpenSSH and actual production verify_candidate_tag pass for approved principal/fingerprint and public trust SHA256. The exact previous aa32d03a64617b7c297b5e2591a0ac5a8651904d object remains under the fresh remote archive ref.",
+    "Actual validate_preparation and independent raw-byte hashing match all13 original prepared files and the seven-crate lockstep set, excluding FFI; original preparation-plan SHA256 b3bf274bc82c843285e7889877b0b84b98474ddf72d7747aadf663321e532fd1.",
+    "Read independent G03 publication-tag report and verified all its raw proof hashes; original rehearsal G03 remains separate. Local preview authority config/report/raw hashes69 proofs and both manual archive/host/time bindings match.",
+    "Actual local assemble command omits --trusted, exits2, retains all8 profiles/all17 scenarios/baseline/G02/G03/G04 PASS, but overall/review/provenance BLOCKED and no compact artifact. It is not accepted as remote publication authority.",
+    "Both relevant signed scope-amendment signatures verify against indexed public signer bytes in their actual namespace. Software04 and canonicalb199 contracts have all17 identical scenarios; only toolCalls3000 to15000 and identity digest differ. No software evidence is relabeled b199."
+  ],
+  "canonical_phase_lineage": {
+    "software_contract_digest": "04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2",
+    "canonical_phase_contract_digest": "b1993dbc9a81f8e688300c97e7a621f341d068c6c536222de7c0e9bb0a95c911",
+    "scenario_count": 17,
+    "scenarios_unchanged": true,
+    "signed_budget_only_amendment_verified": true,
+    "phase_task_remains_open": "oa-20-merged-certification/2"
+  },
+  "profiles": [
+    {
+      "profile": "baseline",
+      "status": "PASS",
+      "records": 41,
+      "receipt_sha256": "e29ad2be4616cfd89640b9cee2823ab82658bafc502eebc6d84c4456a925e3b9",
+      "manifest_sha256": "35b6b5a618f0f05d13716144434ed9bab6ac6a7480a6e2b0dfbb4485a6bde7b8",
+      "archive_sha256": "1f7733cc874cb9fef79e141c59fc3e3f768ab90ea8ff1230ae37d7ad7e0978f7",
+      "archive_members": 242,
+      "artifact_id": 12599952564,
+      "job_id": 121176680092
+    },
+    {
+      "profile": "linux",
+      "status": "PASS",
+      "records": 61,
+      "receipt_sha256": "196e5ca5eec7c24691a09ee2452a972d11479309562153325b645dbe9c94b602",
+      "manifest_sha256": "9584eeebdf93cfe3c9d03337b21cb7e4494f1b7f67570715c2794255cd4d0c93",
+      "archive_sha256": "6b5dbc91c9a06d372ad70021962512617903f13d461f15fd08ce0672796e6274",
+      "archive_members": 2701,
+      "artifact_id": 12602538831,
+      "job_id": 121176680069
+    },
+    {
+      "profile": "macos",
+      "status": "PASS",
+      "records": 5,
+      "receipt_sha256": "a06039c68dd35b4f691e342388536ae6ed110208d7d2c7643e52b506d3652fc4",
+      "manifest_sha256": "266d907dbd4ba193454406cc0c0ffa5aaed8bde3234034bfe437b4f74dfb6ca9",
+      "archive_sha256": "3ad7cec7e5d22ed38e8a3da6eda8d125975f6e5df4876cca9ef9162f478fce4f",
+      "archive_members": 66,
+      "artifact_id": 12600465884,
+      "job_id": 121176680207
+    },
+    {
+      "profile": "windows",
+      "status": "PASS",
+      "records": 2,
+      "receipt_sha256": "fcdb91d519283120ea97dac7970f9d2fee1852d16954abaf252cdc53e261cc56",
+      "manifest_sha256": "00b71759568a15adb289ea175964c1c97616799da9c5777bb3d11c6e29c11ef5",
+      "archive_sha256": "3657d967a80bc3acbfc75b35fabbb2dfbf52809ef0664045576993747de63864",
+      "archive_members": 56,
+      "artifact_id": 12599752114,
+      "job_id": 121176680018
+    },
+    {
+      "profile": "android",
+      "status": "PASS",
+      "records": 4,
+      "receipt_sha256": "f6c4f5428edcc851c86e6dd7fcfcd5c71c54a986d6d4452bb89164a700eba677",
+      "manifest_sha256": "de5bbb1d2a33caa6e7989da0c636ea7ce7a17adf13edc4d3171c532e672ff239",
+      "archive_sha256": "e0f8db4b717fdaadc77653b24a0a5cb2acc30a262b28ef628b32402020abd9e6",
+      "archive_members": 63,
+      "artifact_id": 12599706962,
+      "job_id": 121176679957
+    },
+    {
+      "profile": "ios",
+      "status": "PASS",
+      "records": 4,
+      "receipt_sha256": "d4fb29a7b152a260d5ef1ce991bec6580ae1770eaf75cddb400379219ab8720e",
+      "manifest_sha256": "0345289da9da29ce1cc3529b8d3f7632a32bcda5ea2af50258d9170393919219",
+      "archive_sha256": "32022b6c914d4ffbeb26542d2d61ed2cc484295d4a264b6592704bcaf965f3b5",
+      "archive_members": 57,
+      "artifact_id": 12600251023,
+      "job_id": 121176680078
+    },
+    {
+      "profile": "macos-gui",
+      "status": "PASS",
+      "records": 2,
+      "receipt_sha256": "ba38a23e4935f22d28c9dddbb81263294106751a7cc566199d45717075000dd3",
+      "manifest_sha256": "869abda0bbb7cb74b2b217f690bc35b8c8d056dbbac2b894daa9c84c87723b5f",
+      "archive_sha256": "0cc737d9fc495aa3e74d54e02afa2b5100973b80f15e6a4e0c3d7d2f052605c7",
+      "archive_members": 155
+    },
+    {
+      "profile": "quiet",
+      "status": "PASS",
+      "records": 9,
+      "receipt_sha256": "3730e9b47b3313f532e4ac0c8a99401468a640a39fd72ab2ad26e660866e3b68",
+      "manifest_sha256": "463567cbdbcf5c80954645cf04a3b2c6896cfc4ed16483a267f51f7d10f5b35d",
+      "archive_sha256": "2c08a170837400c32ce7f45ecc23a05bf9b661615f038c893278345f7a9b5c43",
+      "archive_members": 508
+    }
+  ],
+  "record_total": 128,
+  "negative_control_cases_verified": 52,
+  "tag_verification": {
+    "candidate": "53682521cb2a7a49c06e046c826890d9e11b6bfe",
+    "format": "ssh",
+    "identity": "travis@tribehealthsolutions.com",
+    "signing_fingerprint": "SHA256:TRubhhzq1JNXqLHymdzD8y5gjreUp2wplply9PQ11H4",
+    "status": "PASS",
+    "tag": "v0.4.0",
+    "tag_object": "943c62d860e8971847334e9196ad34881658fbcb",
+    "public_trust_sha256": "30a043a89816b8798bf0358da7d624f294fbe2eea7ab0378117d84ddd9b80b47"
+  },
+  "known_unresolved_risks": [
+    {
+      "id": "WEBSITE-AUDIT",
+      "status": "FAILED_VULNERABILITIES_REMAIN",
+      "counts": {
+        "critical": 18,
+        "moderate": 18,
+        "low": 3,
+        "total": 39
+      },
+      "assessment": "Exact b43 audit and independent assessment were read; website package, lock, config, verification and docs workflow bytes are identical in candidate536. The original failed audit is not a PASS or waiver. The counts are affected package entries, not demonstrated RCE executions. Adopted contract requires website build/verify and has no audit-clean oracle. No concrete new Rust-package, OIDC publishing escape or evidence compromise scenario is established by these supplied advisories; that bounded scope judgment does not resolve installed or browser dependency risk. open_critical_findings counts demonstrated R2 blockers, not inherited scanner severity labels."
+    },
+    {
+      "id": "MEASURED-PERFORMANCE",
+      "status": "OBSERVED_COSTS_RETAINED",
+      "normal_intervals": {
+        "regression": 20,
+        "improvement": 1,
+        "inconclusive": 19
+      },
+      "assessment": "Independently validated80 normal and10 slow-control samples and recomputed reports. Root delegated release decision explicitly accepts measured costs subject to final R2 and all mandatory certification. No numeric regression threshold, performance-gain claim or waiver is inferred. Recalculation has7 normal and1 control floating-point rounding deltas below9e-16 relative; all classifications agree. Exact deltas are retained."
+    },
+    {
+      "id": "DEFERRED-CONTAINMENT",
+      "history_cleanup": "DEFERRED",
+      "credential_rotation": "DEFERRED",
+      "signer_rotation": "DEFERRED",
+      "assessment": "Known historical credential/signer exposure remains unresolved. Current source and disposable controls are reviewed; clean-history, key revocation and issue88 purge completion are not established."
+    },
+    {
+      "id": "PACKAGE-ALLOWLIST-AUTOMATION",
+      "status": "FUTURE_AUTOMATION_GAP_REMAINS",
+      "assessment": "Inherited allowlist enumerates six packages and omits Iggy. Actual candidate-specific seventh inventory lists14 files and has independent supplemental review. This supplies current inventory evidence; the CI table does not automatically cover seven future packages."
+    },
+    {
+      "id": "BUDGET-TELEMETRY",
+      "status": "CURRENT_SOURCE_BACKED_ESTIMATES_NOT_FINAL_ACCOUNTING",
+      "estimates": {
+        "toolCalls": 13000,
+        "timeMinutes": 1595,
+        "repairAttempts": 2,
+        "noProgress": 2
+      },
+      "assessment": "Verified56-row arithmetic5302 measured model calls plus5362 static nested sites=10664 proxy,25 primary hashes, adopted units and installed estimate/at-ceiling/high-water semantics. Exact nested telemetry and exact historical global maxima remain unavailable. Per-failing-scenario/case units distinguish pre-freeze prerequisites and independent cases; three Android prerequisite source corrections remain recorded. Repair estimate is at ceiling2. Later publication/consumers/closure require refreshed cumulative accounting; no phase budget PASS or further repair3 authorization is issued."
+    }
+  ],
+  "limitations": [
+    "Per explicit task restrictions, reviewer did not rerun Cargo, compiler, production tests, benchmarks or GUI operations. Reviewer independently ran actual artifact validators, source/hash/archive checks, statistical recomputation and public signature verifiers; production execution evidence comes from authenticated actual hosted jobs and attributable manual bundles.",
+    "Native R2 isolation is weaker than cross-family review. Component reports were inputs and were not substituted for this final cumulative source/evidence judgment.",
+    "GUI evidence is automated native AX/targeted keyboard observation with four unique720x640 light-window states,8 supplied native/capture image files plus duplicate exports authenticated. Two failed positive quit-focus attempts and eventual recovery remain evidence. No submit/process/collect functional replay was performed by this reviewer. Physical human observation, other widths, dark theme, screen readers, complete keyboard traversal, reduced motion and general accessibility conformance are unverified.",
+    "Loom bounded schedules, model-only SC adaptation and partial Relaxed-order coverage are supporting evidence rather than a proof of all hardware schedules, Notify behavior or entire shutdown logic.",
+    "Quiet fixed synthetic workload uses five pairs per case/client setting; host process snapshots do not prove idle hardware between observations. Client peak RSS excludes PostgreSQL/Docker/runner memory and is not a whole-system memory measurement.",
+    "Source blob inventory is2797/29099012 bytes; actual scanner reports28331744 bytes. Staged scan is empty and supplies no nonzero staged coverage. Scanner success is not proof of no possible secret or exploit.",
+    "Public-key cryptographic signatures and actual binding/lineage were verified; no independent enrolled KBD trust lookup beyond indexed adopted artifacts. Exposed signer rotation remains deferred.",
+    "Requested rust-review and rust-testing-code-review skills were not available in installed roots. Applied installed verification protocol, Rust/Tokio/serde review guidance and source-level hazard checks; absent-skill behavior is not claimed. UI review used prometheus-ui-review/better-accessibility without taste guidance.",
+    "No production source, raw evidence, credentials, Git refs, environments, approvals, registry state or KBD runtime state was changed by this reviewer. Only assigned review artifacts were written."
+  ],
+  "mandatory_after_this_review": [
+    "Stage/pin actual independent R2/G03 public artifacts and owner-delegated pending collector review",
+    "Actual trusted collector all17/allbaseline/gates/R2/provenance PASS and whole workflowSUCCESS",
+    "Actual release rehearse and separate approved OIDC publish for all7, registry checksums/VCS and fresh native/WASM consumers",
+    "Task2 end/20 backend verification/archive/reconciliation/Reflect/canonical b199 closure with authentic software04 unchanged-scenario carry and refreshed budget accounting"
+  ],
+  "not_yet_verified": {
+    "trusted_collector": "PENDING_REAL_EXECUTION_AND_APPROVAL",
+    "whole_certification_workflow": "WAITING_NOT_SUCCESS",
+    "oidc_exchange": "NOT_EXERCISED_BY_REVIEWER",
+    "seven_crate_publication": "NOT_EXERCISED",
+    "fresh_registry_native_and_wasm_consumers": "NOT_EXERCISED",
+    "canonical_phase_closure": "OPEN"
+  },
+  "raw_proof": [
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/oa04-verification/prometheus-parking-lot-rs/.github/negative-controls.json",
+      "sha256": "083aae35c79b2877503f1f3f93067149dad639edc8e19ce010a4b2815d9fba42"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/oa04-verification/prometheus-parking-lot-rs/.github/operational-assurance.json",
+      "sha256": "839c59aae13fb4b64a26e0bb10fd2c99c65dc9dcd6648e4b57c70085a05ff965"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/oa04-verification/prometheus-parking-lot-rs/.github/scripts/operational-assurance.py",
+      "sha256": "da00202c15d07b0abb72e36b3e82d4c6c6d44d6f7da6a9242485a1138c54a169"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/oa04-verification/prometheus-parking-lot-rs/.github/scripts/release_evidence.py",
+      "sha256": "cfb3e4062a4a89bb7bcbc0a49b1cc3f8f8f07e7609a9efc2b4634584b4d5ff50"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/oa04-verification/prometheus-parking-lot-rs/.github/scripts/tests/negative-controls.py",
+      "sha256": "4079cb5fcb4e9e3ed8bf531d605e6512c0a900f7ba9aed39fc89ee676a40f78c"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/oa04-verification/prometheus-parking-lot-rs/.github/scripts/trusted-release.py",
+      "sha256": "63a90ac1b56db5649f4d7a99640a0bef10cc0c3e6be7a18e82c9134dd0423740"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/oa04-verification/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json",
+      "sha256": "14e59c25cde88e4152f3791983aacf352e172f407bb903243411af426cffde14"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/oa04-verification/prometheus-parking-lot-rs/benches/pg_measure.py",
+      "sha256": "ff97d3dd853c35f72801108797d61c40a559f0492db3642defb4cc5c098ec0c5"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json",
+      "sha256": "7841e01dac73673025d88026071c4e15861eabf6d4575bcc038f116bfe5d1139"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/budget-amendment/budget-amendment.json",
+      "sha256": "83657e28ff7fc85caa2ce433378ea0f37b0b2418025052673183aaaa82f76375"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/plan.md",
+      "sha256": "d52f5101180aa5bcbc6f177a7cdc7f4b486e2f75874786d86a5af8b0a70759fc"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/authority/delegated-performance-release-decision.json",
+      "sha256": "3eb35cfa20b0f2577b56f9559a60c6682b1e957a1d35d7170c3fb93cc85ca235"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/authority/g02.json",
+      "sha256": "1fc8a8935e78ab6c50c3bf3d0f9c79f877b515cf9ecca539e84ad5a84d806fa4"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/authority/g03-publication.json",
+      "sha256": "c3eb71ff8b3e93a5b9c9222aee4b433f1599eb0deb8fb14b30e0b507a1181c3a"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/authority/g04.json",
+      "sha256": "fdb021430102341007dee357b978021ddf1d401638f1e2c4d6c9af823c661d69"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/authority/gui.json",
+      "sha256": "041841d761446fb29b7b93d33e6483a11917d4d59f8a2838193fc050ee7e6b0e"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/authority/package-inventory-supplement-review.json",
+      "sha256": "e809a3214418f46a9e090950e441428cc57bcf45563c5ebd7f8ea44e4fffaf31"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/authority/quiet-performance-assessment.json",
+      "sha256": "242be4ff5344327ea81e1e98a263b890a36ce6fbc059699a81bd76a6d44b5548"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/authority/quiet.json",
+      "sha256": "52aaea46cd0ed741cccfbae5aa9a4a9d5610adf02b0823e60b5bce571d1c2baa"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/bootstrap-40195522575/bootstrap-observation.json",
+      "sha256": "e184f587b3a1d886a1c690622b4d2264dfaa752ad0cead6851424172c1e28f17"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/android/checked-manifest.json",
+      "sha256": "de5bbb1d2a33caa6e7989da0c636ea7ce7a17adf13edc4d3171c532e672ff239"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/android/files-sha256.json",
+      "sha256": "33ff8cb96d676978f8ef348bf2fc9e3d0f883a667f1fa799e58ed4a20220a250"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/android/job-receipt.json",
+      "sha256": "f6c4f5428edcc851c86e6dd7fcfcd5c71c54a986d6d4452bb89164a700eba677"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/baseline/checked-manifest.json",
+      "sha256": "35b6b5a618f0f05d13716144434ed9bab6ac6a7480a6e2b0dfbb4485a6bde7b8"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/baseline/files-sha256.json",
+      "sha256": "046c8dde80b588aba1edf5d0976d593ac901573704d9686c923f8143079c9881"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/baseline/job-receipt.json",
+      "sha256": "e29ad2be4616cfd89640b9cee2823ab82658bafc502eebc6d84c4456a925e3b9"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/baseline/original-release-plan.json",
+      "sha256": "b3bf274bc82c843285e7889877b0b84b98474ddf72d7747aadf663321e532fd1"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/ios/checked-manifest.json",
+      "sha256": "0345289da9da29ce1cc3529b8d3f7632a32bcda5ea2af50258d9170393919219"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/ios/files-sha256.json",
+      "sha256": "b037996ffa4720d221550222b4482056db03b7747375b8a37ab7b0a915ec74a8"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/ios/job-receipt.json",
+      "sha256": "d4fb29a7b152a260d5ef1ce991bec6580ae1770eaf75cddb400379219ab8720e"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/linux/checked-manifest.json",
+      "sha256": "9584eeebdf93cfe3c9d03337b21cb7e4494f1b7f67570715c2794255cd4d0c93"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/linux/files-sha256.json",
+      "sha256": "338671ada21c4beb6b4709d3837ca1e7af0a4f38fa072abf925999a211d18298"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/linux/job-receipt.json",
+      "sha256": "196e5ca5eec7c24691a09ee2452a972d11479309562153325b645dbe9c94b602"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/macos-gui.zip",
+      "sha256": "0cc737d9fc495aa3e74d54e02afa2b5100973b80f15e6a4e0c3d7d2f052605c7"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/macos-gui/checked-manifest.json",
+      "sha256": "869abda0bbb7cb74b2b217f690bc35b8c8d056dbbac2b894daa9c84c87723b5f"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/macos-gui/files-sha256.json",
+      "sha256": "758af418b513d20e24c89409539ef57cd8708e833a3efb26c816f884a46ce4d9"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/macos-gui/job-receipt.json",
+      "sha256": "ba38a23e4935f22d28c9dddbb81263294106751a7cc566199d45717075000dd3"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/macos/checked-manifest.json",
+      "sha256": "266d907dbd4ba193454406cc0c0ffa5aaed8bde3234034bfe437b4f74dfb6ca9"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/macos/files-sha256.json",
+      "sha256": "1cc7bdd43395b53e4a61e0496ef1315de9bcbe044640eaeaf1fbe0a67433f19c"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/macos/job-receipt.json",
+      "sha256": "a06039c68dd35b4f691e342388536ae6ed110208d7d2c7643e52b506d3652fc4"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/quiet.zip",
+      "sha256": "2c08a170837400c32ce7f45ecc23a05bf9b661615f038c893278345f7a9b5c43"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/quiet/checked-manifest.json",
+      "sha256": "463567cbdbcf5c80954645cf04a3b2c6896cfc4ed16483a267f51f7d10f5b35d"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/quiet/files-sha256.json",
+      "sha256": "4180e8667c5835cfae7696834892864a9458fb0bdc40ad8fc03f7e4a9a6cd912"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/quiet/job-receipt.json",
+      "sha256": "3730e9b47b3313f532e4ac0c8a99401468a640a39fd72ab2ad26e660866e3b68"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/windows/checked-manifest.json",
+      "sha256": "00b71759568a15adb289ea175964c1c97616799da9c5777bb3d11c6e29c11ef5"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/windows/files-sha256.json",
+      "sha256": "b60f28654445855fcd99f35132adbdfd54b62b8f483fe33b371f73b6daa1ff69"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/jobs/windows/job-receipt.json",
+      "sha256": "fcdb91d519283120ea97dac7970f9d2fee1852d16954abaf252cdc53e261cc56"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/oa18-android.zip",
+      "sha256": "e0f8db4b717fdaadc77653b24a0a5cb2acc30a262b28ef628b32402020abd9e6"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/oa18-baseline.zip",
+      "sha256": "1f7733cc874cb9fef79e141c59fc3e3f768ab90ea8ff1230ae37d7ad7e0978f7"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/oa18-ios.zip",
+      "sha256": "32022b6c914d4ffbeb26542d2d61ed2cc484295d4a264b6592704bcaf965f3b5"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/oa18-linux.zip",
+      "sha256": "6b5dbc91c9a06d372ad70021962512617903f13d461f15fd08ce0672796e6274"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/oa18-macos.zip",
+      "sha256": "3ad7cec7e5d22ed38e8a3da6eda8d125975f6e5df4876cca9ef9162f478fce4f"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/oa18-windows.zip",
+      "sha256": "3657d967a80bc3acbfc75b35fabbb2dfbf52809ef0664045576993747de63864"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/observer-summary.json",
+      "sha256": "a53844673a6c92aa706218861754c16d453df2183f65bcb3113703fd65b6efc7"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/collector-authority-preview/assemble-command.json",
+      "sha256": "c2a1f637b383cc6e3ff20863f2ab36969617dad8bf31c5392c1f988d05d24e8e"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/collector-authority-preview/authority-before-r2.json",
+      "sha256": "09b0b227ab7557f9e0a7a3dcad16bcf8bf6a27c8beff23586d5bffee603478a7"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/collector-authority-preview/local-preview-inputs.json",
+      "sha256": "c69eea85bb0ee2201ff5897ae88902ff99422878c2cf4aec5066e5555efb0cd0"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/local-full-preview/disposition.json",
+      "sha256": "9ca47eaa7dc01ea4422e7f4d1e3e3ab21469e8a6332e01e01949d525b8f7d154"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/local-full-preview/packet.json",
+      "sha256": "4f262aa4de09c24e59dd3d172c84b6595edad4866ede4f6514b05320a5f75e31"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/oa04-real-rehearsal/fixture-summary.json",
+      "sha256": "9b2ec0c18d15db791cfeca8e7458dbd4ccf7bfb6f8c2fd9895f48fd89fdedc8c"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/publication-tag/final-annotated-tag.txt",
+      "sha256": "a46234807f1e2022bab03df89b5db89db19e8a2fc160bb0046606831c3b570e0"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/publication-tag/final-tag-verification.json",
+      "sha256": "2176194964877b043120c262e278323e9f1bd865568674d56bd4a166bdabe8ff"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review-inputs/candidate-production.diff",
+      "sha256": "8a604d41815db958efd4643703989105f5f6a5672f64e059bc850a53e6489415"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review-inputs/final-pending-deployments.json",
+      "sha256": "d8e897213b5d9dfa6bc7719338e046f3c0922f0c0ff8d94e77748fc22751c7e1"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review-inputs/review-input-index-final.json",
+      "sha256": "5b646523b70ce7309f255dc0352952417dfe5fbd2b5c3171bd5f4937b516b10a"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review-inputs/review-input-index-initial.json",
+      "sha256": "55bff87410e4090e4ee2973824e7b0641dc05cef65b8dfbb4bf8c25008d7506a"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/all-profile-control-verification.json",
+      "sha256": "9e575121fa55146befb39feec6d7497871db11e60588d08d09aa44986de6c7c4"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/contract-lineage-observation.json",
+      "sha256": "424786cbbf2b8c956598cf242e42849230d4b40de7439e8d0a7a4a08ecb74a4c"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/final-tag-preparation-preview-observation.json",
+      "sha256": "228a681db79f88a050b215ad0b0129c3dcf48ade295ccef70dfa9272ad6d2e01"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/fresh-boundary-workflow-source.json",
+      "sha256": "a1d6e3adda733ab175d05636b351d8a217bfd63afc5801ac4c52cb0c774f660f"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/fresh-cert-approvals.json",
+      "sha256": "a5b97ab809133534aab46ccbd51b0045f313618f8d1c0612f86e132f8cc3c807"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/fresh-cert-artifacts.json",
+      "sha256": "5375cd7105c7a67843fc230822260a8e45486ee787c92f37065cf7fd2032b5d5"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/fresh-cert-jobs.json",
+      "sha256": "00657f04975e8b3f07b65f1d7fbe57ddccc5e014aee4ae8822967710523e571d"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/fresh-cert-pending.json",
+      "sha256": "d8e897213b5d9dfa6bc7719338e046f3c0922f0c0ff8d94e77748fc22751c7e1"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/fresh-cert-run.json",
+      "sha256": "9319b893ca057d7c639f84b4c10acc454448b3bf1881c664bced8c5f0e6b6597"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/fresh-main-ci-jobs.json",
+      "sha256": "7c5ac42e12fc57b84132c2487b445cb94f68d87ef46de76f1c1351746381bbe7"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/fresh-main-ci-run.json",
+      "sha256": "e52227dc2ee53ac49f60dd8b696acf55abfb2c6318192d55e8e89da28e27b3d9"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/fresh-preserved-tag-ref.json",
+      "sha256": "b16a0b109bb8438d8c4af39aacd31143319fe807b28cc581d20c3db9e035cb3e"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/fresh-publication-tag-object.json",
+      "sha256": "d1f334d5438c93432495987d760765575765fb55fd1226b613ca6e2eff2f8f8c"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/fresh-publication-tag-ref.json",
+      "sha256": "5566112a2bf871ac9eb1cf825a6d4dc622acbf64bd37dc554cebb1303bf09fe8"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/fresh-quiet-artifacts.json",
+      "sha256": "791cd7ba8bf07f1f531d2bbe57ecc1cc89bf5c7772688213a6e940ce5ca318b3"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/fresh-quiet-run.json",
+      "sha256": "a3b1dbc242b67c49f9809710da06652ac368b866759340059ca58459ca481d39"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/fresh-release-workflow-source.json",
+      "sha256": "bfc6dd1f81fee7734868c00d60f003c29ea699f31a431cc43197136a1505483a"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/fresh-remote-provenance-observation.json",
+      "sha256": "fa17b88b6dba73c220d19e5ad3add21897ef6dede402d10ab7c1afdd3769ed26"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/quiet-recomputation.json",
+      "sha256": "255819fcdd7a324db6b7ffbe82c4d369eccaa9ab83089d8e3ef91a07702f2f11"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/source-inspection-notes.json",
+      "sha256": "09f6b08d5e51b36c51956686d9bd60ea410cd67d17e10d214530866fdb39cf18"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/source-inventory-observation.json",
+      "sha256": "f7630acd2be6ea3d40f33365a927948b9e046461fe28662eb988db9c60ffe642"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/budget-accounting-review.json",
+      "sha256": "6d7c15c2dd323456818004d968d85137f686c1aff206163ee5f4ae80e2536e59"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/historical-repair-ledger.json",
+      "sha256": "7d7f2d9c8d3ff057949bb87b588405af43321907220620734cdb4a870cc6fc6e"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/kbd-authority-before-final-review.json",
+      "sha256": "8a71f37d4279870ba224eb95fd5d26f708ef97761fb17e5754bf85a86a40cad7"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/pre-publication-budget-disposition.json",
+      "sha256": "ead0a7b0ec24d6705722c86adfcaa5bddf1b6123ce6716715e7af7f9262bed60"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/source-controls/current-source-evidence.json",
+      "sha256": "343efb9e1c81e96c884ba215c79b12c5643df87eb6f91e3e09b0d25defc251bf"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/source-controls/iggy-package-inventory-supplement.json",
+      "sha256": "704c252bf142236f524306557c4e43bc33f76c3239337613b7a371ea25eb9f46"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/source-tree/receipt.json",
+      "sha256": "3c9a160a1d2596702ba4a39c99c6fcc6a2b2b10ac89575a705b2ecb597167ee4"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/source-tree/source-files.json",
+      "sha256": "444a502999033cc2599d6547051fc5d924db639e77115f098bca0d0144d9113d"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/b43ff00e6c43bb249eac9a4882814de8b2c067ea/authority/website-dependency-audit-b43-assessment.json",
+      "sha256": "59032120163a814c7d03bc3e786fa7e1d35bb7ae1bd254832b2331e6570b645b"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/b43ff00e6c43bb249eac9a4882814de8b2c067ea/setup/website-npm-audit-b43.json",
+      "sha256": "81b29c4e6bb5382d7e1ee53f2602f08c89b9c619e1da3e1869e527a2672a1a23"
+    }
+  ]
+}

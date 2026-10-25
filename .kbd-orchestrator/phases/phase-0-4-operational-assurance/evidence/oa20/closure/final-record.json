@@ -1,0 +1,26 @@
+{
+  "status": "CLOSED_PASS",
+  "evidence_sha256": "eeb6991401687a908265ae5ae276fe6036ec3bdd8c5cb4d385e1035bd3c5d560",
+  "contract_digest": "b1993dbc9a81f8e688300c97e7a621f341d068c6c536222de7c0e9bb0a95c911",
+  "actual_disposition": "closed-disposition.json",
+  "phase_after": "phase-after.txt",
+  "phase_after_dispatches": 1,
+  "actual_hook_statuses": "all0",
+  "memory_limitation": "Progress hook durably appended session log and queued outbox because pk exited1; direct configured memory add_observations succeeded afterward. Unrelated global outbox not flushed.",
+  "successor": "No successor started; raw successorAllowed=true records eligibility, not signed start authority.",
+  "external_evidence": "external-evidence.json",
+  "source_map_correction": "Actual initial helper refusal from one archived documentation whitespace filename retained; independently reviewed evidence-only correction leaves1517 regular source pins unchanged.",
+  "untracked_local_originals": [
+    ".kbd-orchestrator/phases/phase-0-4-operational-assurance/boundary-results.json",
+    ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/budget-amendment/signature-verification.txt",
+    ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/publication-completion/cert-secret-disposition.json",
+    ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/closed-disposition.json"
+  ],
+  "git_fixture_delivery": {
+    "softwareContract": "04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2",
+    "canonicalBudgetContract": "b1993dbc9a81f8e688300c97e7a621f341d068c6c536222de7c0e9bb0a95c911",
+    "intentional_local_modified_projection": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json",
+    "review": "software-contract-delivery-review.json",
+    "product_or_ci_policy_changes": false
+  }
+}

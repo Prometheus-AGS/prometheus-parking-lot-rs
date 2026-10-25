@@ -1,0 +1,719 @@
+{
+  "status": "FINAL_BUDGET_ESTIMATE_FOR_CLOSURE_NOT_ITSELF_PHASE_PASS",
+  "observed_at": "2026-10-25T15:20:41.348328+00:00",
+  "candidate": "53682521cb2a7a49c06e046c826890d9e11b6bfe",
+  "phase": "phase-0-4-operational-assurance",
+  "root_thread_id": "01a16d7b-c65a-7122-a821-046145b69217",
+  "accounting_start": "2026-10-24T11:51:37.800Z",
+  "prior_disposition": {
+    "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/budget-usage-latest.json",
+    "sha256": "1f193b36c5f73adbcddc0eeff68d52b91e14d9f504c557987013baf0a846516f"
+  },
+  "primary_semantics_disposition": {
+    "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/pre-publication-budget-disposition.json",
+    "sha256": "ead0a7b0ec24d6705722c86adfcaa5bddf1b6123ce6716715e7af7f9262bed60"
+  },
+  "measurements": {
+    "session_count": 57,
+    "model_tool_calls_measured_lower_bound": 5612,
+    "root_model_calls": 2923,
+    "descendant_model_calls": 2689,
+    "static_nested_call_sites": 5645,
+    "model_plus_static_proxy": 11257,
+    "elapsed_utc_wall_minutes_at_snapshot": 1650
+  },
+  "sessions": [
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T05-36-31-01a16d7b-c65a-7122-a821-046145b69217.jsonl",
+      "parent": null,
+      "agent": null,
+      "depth": 0,
+      "id": "01a16d7b-c65a-7122-a821-046145b69217",
+      "model_tool_calls": 2923,
+      "static_nested_call_sites": 2889,
+      "last_timestamp": "2026-10-25T15:20:36.840Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T06-41-23-01a16db7-277d-7681-95b1-c13c1625cbb0.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/artifact_critic",
+      "depth": 1,
+      "id": "01a16db7-277d-7681-95b1-c13c1625cbb0",
+      "model_tool_calls": 27,
+      "static_nested_call_sites": 28,
+      "last_timestamp": "2026-10-25T10:05:27.325Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T06-54-22-01a16dc3-0f0f-7db1-bb9a-66b0297076e0.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa04_artifact_critic",
+      "depth": 1,
+      "id": "01a16dc3-0f0f-7db1-bb9a-66b0297076e0",
+      "model_tool_calls": 18,
+      "static_nested_call_sites": 27,
+      "last_timestamp": "2026-10-25T10:21:03.034Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T07-10-12-01a16dd1-8d46-7653-9b04-0b5a86ef103e.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa04_platform",
+      "depth": 1,
+      "id": "01a16dd1-8d46-7653-9b04-0b5a86ef103e",
+      "model_tool_calls": 233,
+      "static_nested_call_sites": 269,
+      "last_timestamp": "2026-10-24T16:21:34.200Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T07-11-34-01a16dd2-cc72-78a2-aba8-6f7a9d4b3ce8.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa04_release",
+      "depth": 1,
+      "id": "01a16dd2-cc72-78a2-aba8-6f7a9d4b3ce8",
+      "model_tool_calls": 208,
+      "static_nested_call_sites": 196,
+      "last_timestamp": "2026-10-24T16:28:38.436Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T07-13-07-01a16dd4-34dc-7212-b9f5-502c5b4b99ec.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa04_scheduler",
+      "depth": 1,
+      "id": "01a16dd4-34dc-7212-b9f5-502c5b4b99ec",
+      "model_tool_calls": 229,
+      "static_nested_call_sites": 259,
+      "last_timestamp": "2026-10-24T15:49:23.573Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T07-14-53-01a16dd5-d137-7960-a8a9-68d50195e4e7.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa04_events",
+      "depth": 1,
+      "id": "01a16dd5-d137-7960-a8a9-68d50195e4e7",
+      "model_tool_calls": 77,
+      "static_nested_call_sites": 64,
+      "last_timestamp": "2026-10-24T15:29:18.670Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T07-29-17-01a16de3-0413-7692-ad6b-160a49a9ae7c.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa04_postgres",
+      "depth": 1,
+      "id": "01a16de3-0413-7692-ad6b-160a49a9ae7c",
+      "model_tool_calls": 139,
+      "static_nested_call_sites": 157,
+      "last_timestamp": "2026-10-24T15:32:05.059Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T09-34-06-01a16e55-4969-7891-b88a-5d0d46107e44.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa04_final_contract_review",
+      "depth": 1,
+      "id": "01a16e55-4969-7891-b88a-5d0d46107e44",
+      "model_tool_calls": 35,
+      "static_nested_call_sites": 50,
+      "last_timestamp": "2026-10-24T15:17:28.839Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T09-34-20-01a16e55-7ebf-77b3-9dae-f6fdff8caa30.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa04_final_runtime_review",
+      "depth": 1,
+      "id": "01a16e55-7ebf-77b3-9dae-f6fdff8caa30",
+      "model_tool_calls": 55,
+      "static_nested_call_sites": 61,
+      "last_timestamp": "2026-10-24T16:28:53.427Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T09-34-30-01a16e55-a78e-7fa1-a1b5-7f7b29cdbc64.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa04_final_storage_review",
+      "depth": 1,
+      "id": "01a16e55-a78e-7fa1-a1b5-7f7b29cdbc64",
+      "model_tool_calls": 20,
+      "static_nested_call_sites": 24,
+      "last_timestamp": "2026-10-24T14:53:23.084Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T09-34-41-01a16e55-d1ca-79d2-b5d9-5f7a1344422b.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa04_final_python_review",
+      "depth": 1,
+      "id": "01a16e55-d1ca-79d2-b5d9-5f7a1344422b",
+      "model_tool_calls": 44,
+      "static_nested_call_sites": 46,
+      "last_timestamp": "2026-10-24T15:58:59.007Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T09-34-55-01a16e56-07f6-72d2-890d-592d9d8dc3f5.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa04_final_security_review",
+      "depth": 1,
+      "id": "01a16e56-07f6-72d2-890d-592d9d8dc3f5",
+      "model_tool_calls": 20,
+      "static_nested_call_sites": 18,
+      "last_timestamp": "2026-10-24T14:53:36.944Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T10-49-51-01a16e9a-a34a-7140-8fb9-40b2ad0d2b1c.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa11_artifact_critic",
+      "depth": 1,
+      "id": "01a16e9a-a34a-7140-8fb9-40b2ad0d2b1c",
+      "model_tool_calls": 12,
+      "static_nested_call_sites": 15,
+      "last_timestamp": "2026-10-24T15:52:49.933Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T12-14-46-01a16ee8-60c9-7722-9397-109080bdbcd5.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa18_handoff_critic",
+      "depth": 1,
+      "id": "01a16ee8-60c9-7722-9397-109080bdbcd5",
+      "model_tool_calls": 16,
+      "static_nested_call_sites": 17,
+      "last_timestamp": "2026-10-24T17:17:34.455Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T13-39-36-01a16f36-0ee3-7f60-9c6a-3a06e9fc52c2.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa19_platform",
+      "depth": 1,
+      "id": "01a16f36-0ee3-7f60-9c6a-3a06e9fc52c2",
+      "model_tool_calls": 34,
+      "static_nested_call_sites": 47,
+      "last_timestamp": "2026-10-24T19:28:30.856Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T13-39-49-01a16f36-423d-7c72-8975-189ff26894aa.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa19_postgres",
+      "depth": 1,
+      "id": "01a16f36-423d-7c72-8975-189ff26894aa",
+      "model_tool_calls": 8,
+      "static_nested_call_sites": 20,
+      "last_timestamp": "2026-10-24T18:41:53.255Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T13-43-16-01a16f39-6932-7c01-8d60-df4b025a344f.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa19_rust_review",
+      "depth": 1,
+      "id": "01a16f39-6932-7c01-8d60-df4b025a344f",
+      "model_tool_calls": 8,
+      "static_nested_call_sites": 16,
+      "last_timestamp": "2026-10-24T18:44:37.879Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T13-43-27-01a16f39-9497-7af3-8550-63a181eeb7b7.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa19_ci_review",
+      "depth": 1,
+      "id": "01a16f39-9497-7af3-8550-63a181eeb7b7",
+      "model_tool_calls": 11,
+      "static_nested_call_sites": 14,
+      "last_timestamp": "2026-10-24T19:29:33.875Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T15-11-49-01a16f8a-7a7e-75e0-a85f-0937d37f99c1.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa19_closeout_critic",
+      "depth": 1,
+      "id": "01a16f8a-7a7e-75e0-a85f-0937d37f99c1",
+      "model_tool_calls": 5,
+      "static_nested_call_sites": 5,
+      "last_timestamp": "2026-10-24T20:12:41.551Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T23-15-34-01a17145-5d1c-7110-a382-249330a8b4e4.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_readiness",
+      "depth": 1,
+      "id": "01a17145-5d1c-7110-a382-249330a8b4e4",
+      "model_tool_calls": 30,
+      "static_nested_call_sites": 35,
+      "last_timestamp": "2026-10-25T04:19:43.438Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T23-31-44-01a17154-2aba-79d0-880c-c91546f59734.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_artifact_critic",
+      "depth": 1,
+      "id": "01a17154-2aba-79d0-880c-c91546f59734",
+      "model_tool_calls": 8,
+      "static_nested_call_sites": 11,
+      "last_timestamp": "2026-10-25T04:33:05.067Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T23-38-34-01a1715a-6dd4-7b80-8e65-915c8ab355ce.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_release_route",
+      "depth": 1,
+      "id": "01a1715a-6dd4-7b80-8e65-915c8ab355ce",
+      "model_tool_calls": 11,
+      "static_nested_call_sites": 12,
+      "last_timestamp": "2026-10-25T04:40:10.807Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T23-39-06-01a1715a-e9ee-70b2-9231-e7faf16dc6a3.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_amendment_plan",
+      "depth": 1,
+      "id": "01a1715a-e9ee-70b2-9231-e7faf16dc6a3",
+      "model_tool_calls": 20,
+      "static_nested_call_sites": 24,
+      "last_timestamp": "2026-10-25T05:38:42.248Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T23-42-03-01a1715d-9de3-7390-a87c-528544e972ec.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_scope_critic",
+      "depth": 1,
+      "id": "01a1715d-9de3-7390-a87c-528544e972ec",
+      "model_tool_calls": 5,
+      "static_nested_call_sites": 6,
+      "last_timestamp": "2026-10-25T04:42:55.510Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T23-43-43-01a1715f-2554-70d2-b507-80babf403c8e.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_collector_impl",
+      "depth": 1,
+      "id": "01a1715f-2554-70d2-b507-80babf403c8e",
+      "model_tool_calls": 33,
+      "static_nested_call_sites": 24,
+      "last_timestamp": "2026-10-25T04:56:07.669Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T23-44-02-01a1715f-6c4e-7a62-89a1-de0ffe3287dc.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_hosted_impl",
+      "depth": 1,
+      "id": "01a1715f-6c4e-7a62-89a1-de0ffe3287dc",
+      "model_tool_calls": 41,
+      "static_nested_call_sites": 34,
+      "last_timestamp": "2026-10-25T04:54:57.647Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T23-51-54-01a17166-a29d-7200-a1eb-970c712c0b47.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_code_critic",
+      "depth": 1,
+      "id": "01a17166-a29d-7200-a1eb-970c712c0b47",
+      "model_tool_calls": 15,
+      "static_nested_call_sites": 13,
+      "last_timestamp": "2026-10-25T04:56:56.515Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/24/rollout-2026-10-24T23-52-04-01a17166-c8a2-7353-a468-5853ff7e595e.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_python_review",
+      "depth": 1,
+      "id": "01a17166-c8a2-7353-a468-5853ff7e595e",
+      "model_tool_calls": 18,
+      "static_nested_call_sites": 16,
+      "last_timestamp": "2026-10-25T04:56:56.847Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T00-43-21-01a17195-ba6e-7c41-8c99-70651061dca5.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_native_driver",
+      "depth": 1,
+      "id": "01a17195-ba6e-7c41-8c99-70651061dca5",
+      "model_tool_calls": 111,
+      "static_nested_call_sites": 112,
+      "last_timestamp": "2026-10-25T05:55:58.462Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T00-44-40-01a17196-f149-7f10-b9fe-fde12af2a944.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_material_bootstrap",
+      "depth": 1,
+      "id": "01a17196-f149-7f10-b9fe-fde12af2a944",
+      "model_tool_calls": 96,
+      "static_nested_call_sites": 94,
+      "last_timestamp": "2026-10-25T05:47:19.405Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T00-45-52-01a17198-0b3a-71e0-af94-d08f7288b1ed.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_quiet_host",
+      "depth": 1,
+      "id": "01a17198-0b3a-71e0-af94-d08f7288b1ed",
+      "model_tool_calls": 102,
+      "static_nested_call_sites": 100,
+      "last_timestamp": "2026-10-25T05:48:15.543Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T00-46-28-01a17198-95ff-7e93-8455-7bc59d6cd9a5.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_native_python_review",
+      "depth": 1,
+      "id": "01a17198-95ff-7e93-8455-7bc59d6cd9a5",
+      "model_tool_calls": 10,
+      "static_nested_call_sites": 15,
+      "last_timestamp": "2026-10-25T05:49:21.814Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T00-46-36-01a17198-b69a-7e71-a284-a5d17953be85.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_native_swift_review",
+      "depth": 1,
+      "id": "01a17198-b69a-7e71-a284-a5d17953be85",
+      "model_tool_calls": 9,
+      "static_nested_call_sites": 8,
+      "last_timestamp": "2026-10-25T05:56:25.848Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T00-49-15-01a1719b-2407-7e62-8487-b5657154dcbd.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_autonomous_code_review",
+      "depth": 1,
+      "id": "01a1719b-2407-7e62-8487-b5657154dcbd",
+      "model_tool_calls": 35,
+      "static_nested_call_sites": 37,
+      "last_timestamp": "2026-10-25T10:05:21.019Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T00-49-27-01a1719b-50b6-7c43-a230-7f6f0ab1d6a9.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_autonomous_security_review",
+      "depth": 1,
+      "id": "01a1719b-50b6-7c43-a230-7f6f0ab1d6a9",
+      "model_tool_calls": 87,
+      "static_nested_call_sites": 87,
+      "last_timestamp": "2026-10-25T11:51:04.814Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T00-57-44-01a171a2-e685-7f12-ba94-0ad18eafbd71.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_native_observer",
+      "depth": 1,
+      "id": "01a171a2-e685-7f12-ba94-0ad18eafbd71",
+      "model_tool_calls": 11,
+      "static_nested_call_sites": 13,
+      "last_timestamp": "2026-10-25T05:59:21.262Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T01-43-08-01a171cc-76fe-7a01-be0c-aa17acfe2367.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_final_gui_observer",
+      "depth": 1,
+      "id": "01a171cc-76fe-7a01-be0c-aa17acfe2367",
+      "model_tool_calls": 22,
+      "static_nested_call_sites": 29,
+      "last_timestamp": "2026-10-25T07:36:37.498Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T02-05-23-01a171e0-d689-7882-bd90-90f1d4247b00.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/java_pin_review",
+      "depth": 1,
+      "id": "01a171e0-d689-7882-bd90-90f1d4247b00",
+      "model_tool_calls": 32,
+      "static_nested_call_sites": 45,
+      "last_timestamp": "2026-10-25T09:22:03.081Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T02-58-54-01a17211-d51e-7712-8fd0-b48faf957ab0.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/registry_consumer_review",
+      "depth": 1,
+      "id": "01a17211-d51e-7712-8fd0-b48faf957ab0",
+      "model_tool_calls": 2,
+      "static_nested_call_sites": 4,
+      "last_timestamp": "2026-10-25T07:59:22.004Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T03-29-17-01a1722d-a627-78e2-9818-99bebae22c2e.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/oa20_gui_8a8_observer",
+      "depth": 1,
+      "id": "01a1722d-a627-78e2-9818-99bebae22c2e",
+      "model_tool_calls": 29,
+      "static_nested_call_sites": 32,
+      "last_timestamp": "2026-10-25T10:11:56.337Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T04-10-58-01a17253-ce1b-7273-af07-2ebdc31595bb.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/hosted_build_storage",
+      "depth": 1,
+      "id": "01a17253-ce1b-7273-af07-2ebdc31595bb",
+      "model_tool_calls": 38,
+      "static_nested_call_sites": 29,
+      "last_timestamp": "2026-10-25T12:18:50.561Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T05-21-57-01a17294-cb8c-7c62-b8b5-1dcc3577b59f.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/b43_r2_cumulative_review",
+      "depth": 1,
+      "id": "01a17294-cb8c-7c62-b8b5-1dcc3577b59f",
+      "model_tool_calls": 36,
+      "static_nested_call_sites": 34,
+      "last_timestamp": "2026-10-25T11:15:47.083Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T06-11-57-01a172c2-9483-7f31-b5e9-3214f66d7392.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/budget_amendment_review",
+      "depth": 1,
+      "id": "01a172c2-9483-7f31-b5e9-3214f66d7392",
+      "model_tool_calls": 57,
+      "static_nested_call_sites": 49,
+      "last_timestamp": "2026-10-25T15:20:39.649Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T07-08-29-01a172f6-544c-7e31-ba05-df74dff1ddb4.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/rehearsal_bootstrap_design",
+      "depth": 1,
+      "id": "01a172f6-544c-7e31-ba05-df74dff1ddb4",
+      "model_tool_calls": 17,
+      "static_nested_call_sites": 15,
+      "last_timestamp": "2026-10-25T12:25:21.077Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T07-22-50-01a17303-77bd-7913-ab24-58deeb1910eb.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/windows_bootstrap_code_review",
+      "depth": 1,
+      "id": "01a17303-77bd-7913-ab24-58deeb1910eb",
+      "model_tool_calls": 14,
+      "static_nested_call_sites": 14,
+      "last_timestamp": "2026-10-25T12:31:53.979Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T07-23-04-01a17303-b042-7440-b76f-60903c8da02f.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/windows_bootstrap_security_review",
+      "depth": 1,
+      "id": "01a17303-b042-7440-b76f-60903c8da02f",
+      "model_tool_calls": 9,
+      "static_nested_call_sites": 8,
+      "last_timestamp": "2026-10-25T12:24:50.262Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T07-23-17-01a17303-e3af-73e0-b7f0-fed9c43fd8fa.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/windows_bootstrap_python_review",
+      "depth": 1,
+      "id": "01a17303-e3af-73e0-b7f0-fed9c43fd8fa",
+      "model_tool_calls": 7,
+      "static_nested_call_sites": 13,
+      "last_timestamp": "2026-10-25T12:24:46.420Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T07-53-02-01a1731f-1db3-7180-bf0a-6d09128db3ba.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/candidate536_operator_gate_review",
+      "depth": 1,
+      "id": "01a1731f-1db3-7180-bf0a-6d09128db3ba",
+      "model_tool_calls": 30,
+      "static_nested_call_sites": 27,
+      "last_timestamp": "2026-10-25T14:48:22.294Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T07-53-49-01a1731f-d46c-73f3-9421-03641e8f24f2.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/candidate536_native_gui_observer",
+      "depth": 1,
+      "id": "01a1731f-d46c-73f3-9421-03641e8f24f2",
+      "model_tool_calls": 36,
+      "static_nested_call_sites": 31,
+      "last_timestamp": "2026-10-25T13:00:43.635Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T07-57-05-01a17322-d344-7030-b8c3-586a6c5b85c6.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/candidate536_evidence_secret_triage",
+      "depth": 1,
+      "id": "01a17322-d344-7030-b8c3-586a6c5b85c6",
+      "model_tool_calls": 81,
+      "static_nested_call_sites": 71,
+      "last_timestamp": "2026-10-25T15:14:41.386Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T08-01-57-01a17327-4a03-7fd2-9f16-40fbf37c50b2.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/candidate536_quiet_measurement_review",
+      "depth": 1,
+      "id": "01a17327-4a03-7fd2-9f16-40fbf37c50b2",
+      "model_tool_calls": 22,
+      "static_nested_call_sites": 19,
+      "last_timestamp": "2026-10-25T13:05:06.378Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T08-06-49-01a1732b-ba3b-7bb3-a398-7cd27c80f509.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/candidate536_hosted_profile_observer",
+      "depth": 1,
+      "id": "01a1732b-ba3b-7bb3-a398-7cd27c80f509",
+      "model_tool_calls": 252,
+      "static_nested_call_sites": 199,
+      "last_timestamp": "2026-10-25T14:46:27.819Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T08-10-07-01a1732e-c15c-7873-84bf-77f8d41c04f5.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/candidate536_registry_consumer_helper_review",
+      "depth": 1,
+      "id": "01a1732e-c15c-7873-84bf-77f8d41c04f5",
+      "model_tool_calls": 16,
+      "static_nested_call_sites": 15,
+      "last_timestamp": "2026-10-25T13:28:48.140Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T08-46-38-01a17350-3003-7fd0-ab32-0d54467c4c45.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/candidate536_closure_bookkeeping_preflight",
+      "depth": 1,
+      "id": "01a17350-3003-7fd0-ab32-0d54467c4c45",
+      "model_tool_calls": 26,
+      "static_nested_call_sites": 23,
+      "last_timestamp": "2026-10-25T15:09:32.088Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T09-14-34-01a17369-c457-74e0-9a1b-f16cfb5244a4.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/candidate536_final_r2_artifact_critic",
+      "depth": 1,
+      "id": "01a17369-c457-74e0-9a1b-f16cfb5244a4",
+      "model_tool_calls": 102,
+      "static_nested_call_sites": 103,
+      "last_timestamp": "2026-10-25T15:20:35.243Z"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/sessions/2026/10/25/rollout-2026-10-25T09-27-06-01a17375-3d16-7cc3-867f-3f65114d5813.jsonl",
+      "parent": "01a16d7b-c65a-7122-a821-046145b69217",
+      "agent": "/root/candidate536_private_helper_code_review",
+      "depth": 1,
+      "id": "01a17375-3d16-7cc3-867f-3f65114d5813",
+      "model_tool_calls": 20,
+      "static_nested_call_sites": 22,
+      "last_timestamp": "2026-10-25T15:16:06.633Z"
+    }
+  ],
+  "budgetConsumption": {
+    "source": "Independent local root+recursive-descendant rollout metadata from accounting_start; call_id deduplicated within session. Modelcallcount is observedlowerbound, nestedtools countisstaticproxy. Estimate retains previous14000floor, adds2000nestedmultiplicityallowance plus explicit50remainingrootcalls+50nestedcalls, roundsupto1000; elapsedwallplus30minremainingrecordsallowance. Cumulativeper-failing-scenarioMAXrepair2 and noProgress2 remainretrospectiveestimateswithpreviousprimarysourcebasis. Valuesareestimates, notindependentexactglobaltelemetry/strictupperbounds.",
+    "values": {
+      "timeMinutes": {
+        "class": "estimate",
+        "value": 1680
+      },
+      "toolCalls": {
+        "class": "estimate",
+        "value": 14000
+      },
+      "repairAttempts": {
+        "class": "estimate",
+        "value": 2
+      },
+      "noProgress": {
+        "class": "estimate",
+        "value": 2
+      }
+    }
+  },
+  "estimation_allowances": {
+    "nested_multiplicity_and_unmeasured_call_allowance": 2000,
+    "remaining_root_model_call_allowance": 50,
+    "remaining_nested_tool_allowance": 50,
+    "remaining_wall_minutes_allowance": 30,
+    "prior_tool_estimate_floor": 14000,
+    "method": "max(previousestimate,ceil((currentmodel+staticproxy+2000+50+50)/1000)*1000). Futureallowanceisnotmeasuredconsumption; estimatecoversanticipatedarchive/reflection/closure/recorddelivery."
+  },
+  "ceilings": {
+    "contractDigest": "b1993dbc9a81f8e688300c97e7a621f341d068c6c536222de7c0e9bb0a95c911",
+    "timeMinutes": 2880,
+    "toolCalls": 15000,
+    "repairAttempts": 2,
+    "noProgress": 3
+  },
+  "headroom": {
+    "tool_calls_against_estimate": 1000,
+    "tool_calls_against_current_model_plus_static_proxy": 3743,
+    "time_minutes_against_estimate": 1200,
+    "same_scenario_targeted_repairs": 0,
+    "consecutive_no_progress": 1
+  },
+  "consumer_prerequisite_disposition": {
+    "initial_attempt": {
+      "step": "resolve",
+      "started_at": "2026-10-25T15:14:36.743006+00:00",
+      "finished_at": "2026-10-25T15:14:36.887527+00:00",
+      "exit": 101,
+      "classification": "Privateconsumerenvironmentprerequisitefailurebeforecompilation:isolatedPATHlackedrustc; notexecutedproductscenariooracleFAIL."
+    },
+    "reviewed_correction": {
+      "review_verdict": "APPROVE",
+      "reviewed_helper_sha256": "36d561a064ba61e4a5cd0c5235a374671ec0d05e54e84026bbe8c7d111ce1110",
+      "classification": "PrivatePATHtoolprovisioningcorrection; unchangedconsumerfixtures/productsource. Retainfailedattemptasfailure; noresetofsamescenarioorunknownaszero.",
+      "review_record_sha256": "e2b497e7bbbcfab8c7b95b6e1c2497a1914ed1fce69dfad58e74649dacffc954"
+    },
+    "subsequent_actual_commands": [
+      {
+        "consumer": "native",
+        "step": "resolve",
+        "exit": 0,
+        "finished_at": "2026-10-25T15:16:14.939629+00:00"
+      },
+      {
+        "consumer": "native",
+        "step": "check",
+        "exit": 0,
+        "finished_at": "2026-10-25T15:17:49.073657+00:00"
+      },
+      {
+        "consumer": "wasm",
+        "step": "resolve",
+        "exit": 0,
+        "finished_at": "2026-10-25T15:17:49.655297+00:00"
+      },
+      {
+        "consumer": "wasm",
+        "step": "check",
+        "exit": 0,
+        "finished_at": "2026-10-25T15:18:16.393901+00:00"
+      }
+    ],
+    "result": {
+      "status": "PASS",
+      "seven_registry_checksums_vcs_verified": true,
+      "anonymous_fresh_native_and_wasm_consumers": true
+    },
+    "evidence": [
+      {
+        "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers-initial-missing-rustc/consumer-commands.json",
+        "sha256": "4713c12dcd8d990d8c402a049a0e21e9cb7ab71aebaf1387e87705e71246cf83"
+      },
+      {
+        "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers-initial-missing-rustc/native-resolve.stderr.txt",
+        "sha256": "235382520425c4841a699c405e75ba1b581db26e68d7ff626656e0302cd25dec"
+      },
+      {
+        "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/private-consumer-path-review.json",
+        "sha256": "e2b497e7bbbcfab8c7b95b6e1c2497a1914ed1fce69dfad58e74649dacffc954"
+      },
+      {
+        "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/fresh-consumer-rustc-path-observation.json",
+        "sha256": "535a7a1e1212bec312e39766af956f9ed651bde119cad3b805e2cd68cc1af939"
+      },
+      {
+        "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/result.json",
+        "sha256": "315c177b151a7173f154f9a2f04b3f09da045f136eb8ac8885f710c234b6d9b4"
+      },
+      {
+        "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/consumer-commands.json",
+        "sha256": "bb669f4a58ed083585d6fb602422f9ed64a9fbb9bee4bcaef719cd74c250e516"
+      }
+    ]
+  },
+  "limit_disposition": {
+    "demonstrated_model_lower_bound_breach": false,
+    "estimate_exceeds_tool_ceiling": false,
+    "estimate_exceeds_time_ceiling": false,
+    "judgment": "No demonstratedbreach at snapshot. Estimateincludesremainingrecordwork; no newoperatorgate fromthesevalues. RepairMAX2isATCEILING permittingclosureofotherwisecompletework, neverthirdsame-scenariorepair. Preservehighwaterfloor andallpriorattempts.",
+    "scope": "Notanindependentre-runofcertificate/publication/consumerchecks; actualconsumerrecordsherewereinspected, notreexecuted. Canonicalclosureandremainingrecordworkarecoordinator-owned. No limits/canonicalstate/source/network/credential mutations."
+  }
+}

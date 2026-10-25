@@ -1,0 +1,13 @@
+{
+  "recorded_at": "2026-10-25T11:12:31.482591+00:00",
+  "source": "Direct human user reply in this Codex conversation",
+  "question": "Approve the prepared budget-only amendment raising the phase tool-call cap from 3000 to15000 so certification and publication can finish autonomously; tests, scope, paid services, time/repair limits and credential-rotation deferral unchanged",
+  "answer": "Approve higher cap and finish autonomously",
+  "changes": {
+    "budgets.toolCalls": {
+      "from": 3000,
+      "to": 15000
+    }
+  },
+  "publication_authority": "Previously granted; not requested again"
+}

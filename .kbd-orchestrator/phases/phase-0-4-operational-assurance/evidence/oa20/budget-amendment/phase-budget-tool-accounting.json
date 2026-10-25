@@ -1,0 +1,177 @@
+{
+  "from": "2026-10-24T11:51:37.800Z",
+  "root_as_of_measurement": 2466,
+  "direct_agent_calls": 1968,
+  "combined_lower_bound": 4434,
+  "agents": [
+    {
+      "agent": "/root/oa04_platform",
+      "model_tool_invocations": 233
+    },
+    {
+      "agent": "/root/oa04_artifact_critic",
+      "model_tool_invocations": 18
+    },
+    {
+      "agent": "/root/oa04_release",
+      "model_tool_invocations": 208
+    },
+    {
+      "agent": "/root/oa04_final_contract_review",
+      "model_tool_invocations": 35
+    },
+    {
+      "agent": "/root/oa04_postgres",
+      "model_tool_invocations": 139
+    },
+    {
+      "agent": "/root/oa20_collector_impl",
+      "model_tool_invocations": 33
+    },
+    {
+      "agent": "/root/oa20_hosted_impl",
+      "model_tool_invocations": 41
+    },
+    {
+      "agent": "/root/oa04_final_python_review",
+      "model_tool_invocations": 44
+    },
+    {
+      "agent": "/root/oa04_scheduler",
+      "model_tool_invocations": 229
+    },
+    {
+      "agent": "/root/oa04_events",
+      "model_tool_invocations": 77
+    },
+    {
+      "agent": "/root/oa19_ci_review",
+      "model_tool_invocations": 11
+    },
+    {
+      "agent": "/root/oa11_artifact_critic",
+      "model_tool_invocations": 12
+    },
+    {
+      "agent": "/root/oa04_final_storage_review",
+      "model_tool_invocations": 20
+    },
+    {
+      "agent": "/root/oa20_artifact_critic",
+      "model_tool_invocations": 8
+    },
+    {
+      "agent": "/root/oa19_platform",
+      "model_tool_invocations": 34
+    },
+    {
+      "agent": "/root/oa20_readiness",
+      "model_tool_invocations": 30
+    },
+    {
+      "agent": "/root/oa20_code_critic",
+      "model_tool_invocations": 15
+    },
+    {
+      "agent": "/root/oa04_final_security_review",
+      "model_tool_invocations": 20
+    },
+    {
+      "agent": "/root/oa19_postgres",
+      "model_tool_invocations": 8
+    },
+    {
+      "agent": "/root/oa19_rust_review",
+      "model_tool_invocations": 8
+    },
+    {
+      "agent": "/root/oa20_release_route",
+      "model_tool_invocations": 11
+    },
+    {
+      "agent": "/root/oa04_final_runtime_review",
+      "model_tool_invocations": 55
+    },
+    {
+      "agent": "/root/oa18_handoff_critic",
+      "model_tool_invocations": 16
+    },
+    {
+      "agent": "/root/oa20_scope_critic",
+      "model_tool_invocations": 5
+    },
+    {
+      "agent": "/root/oa20_python_review",
+      "model_tool_invocations": 18
+    },
+    {
+      "agent": "/root/oa19_closeout_critic",
+      "model_tool_invocations": 5
+    },
+    {
+      "agent": "/root/artifact_critic",
+      "model_tool_invocations": 27
+    },
+    {
+      "agent": "/root/oa20_amendment_plan",
+      "model_tool_invocations": 20
+    },
+    {
+      "agent": "/root/hosted_build_storage",
+      "model_tool_invocations": 19
+    },
+    {
+      "agent": "/root/b43_r2_cumulative_review",
+      "model_tool_invocations": 26
+    },
+    {
+      "agent": "/root/oa20_native_driver",
+      "model_tool_invocations": 111
+    },
+    {
+      "agent": "/root/oa20_autonomous_security_review",
+      "model_tool_invocations": 84
+    },
+    {
+      "agent": "/root/oa20_native_swift_review",
+      "model_tool_invocations": 9
+    },
+    {
+      "agent": "/root/oa20_material_bootstrap",
+      "model_tool_invocations": 96
+    },
+    {
+      "agent": "/root/oa20_native_python_review",
+      "model_tool_invocations": 10
+    },
+    {
+      "agent": "/root/oa20_autonomous_code_review",
+      "model_tool_invocations": 35
+    },
+    {
+      "agent": "/root/oa20_quiet_host",
+      "model_tool_invocations": 102
+    },
+    {
+      "agent": "/root/oa20_native_observer",
+      "model_tool_invocations": 11
+    },
+    {
+      "agent": "/root/java_pin_review",
+      "model_tool_invocations": 32
+    },
+    {
+      "agent": "/root/registry_consumer_review",
+      "model_tool_invocations": 2
+    },
+    {
+      "agent": "/root/oa20_gui_8a8_observer",
+      "model_tool_invocations": 29
+    },
+    {
+      "agent": "/root/oa20_final_gui_observer",
+      "model_tool_invocations": 22
+    }
+  ],
+  "limitations": "Root count excludes later calls, nested tool invocations and grandchildren; cumulative lower bound, not total telemetry"
+}

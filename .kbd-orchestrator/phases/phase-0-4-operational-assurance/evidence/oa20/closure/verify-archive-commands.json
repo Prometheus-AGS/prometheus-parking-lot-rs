@@ -1,0 +1,522 @@
+[
+  {
+    "change": "oa-01-containment-controls",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-01-containment-controls"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:46.393313+00:00"
+  },
+  {
+    "change": "oa-01-containment-controls",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-01-containment-controls"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:46.880279+00:00"
+  },
+  {
+    "change": "oa-02-release-versioning",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-02-release-versioning"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:47.351467+00:00"
+  },
+  {
+    "change": "oa-02-release-versioning",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-02-release-versioning"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:47.840434+00:00"
+  },
+  {
+    "change": "oa-03-signed-release-tags",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-03-signed-release-tags"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:48.301453+00:00"
+  },
+  {
+    "change": "oa-03-signed-release-tags",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-03-signed-release-tags"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:48.792994+00:00"
+  },
+  {
+    "change": "oa-04-trusted-publishing",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-04-trusted-publishing"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:49.262023+00:00"
+  },
+  {
+    "change": "oa-04-trusted-publishing",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-04-trusted-publishing"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:49.758476+00:00"
+  },
+  {
+    "change": "oa-05-template-secret-scan",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-05-template-secret-scan"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:50.217414+00:00"
+  },
+  {
+    "change": "oa-05-template-secret-scan",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-05-template-secret-scan"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:50.759805+00:00"
+  },
+  {
+    "change": "oa-06-tenant-idempotency",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-06-tenant-idempotency"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:51.239970+00:00"
+  },
+  {
+    "change": "oa-06-tenant-idempotency",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-06-tenant-idempotency"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:51.740766+00:00"
+  },
+  {
+    "change": "oa-07-stored-terminal-outcome",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-07-stored-terminal-outcome"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:52.200693+00:00"
+  },
+  {
+    "change": "oa-07-stored-terminal-outcome",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-07-stored-terminal-outcome"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:52.691197+00:00"
+  },
+  {
+    "change": "oa-08-discarded-spawn",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-08-discarded-spawn"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:53.154542+00:00"
+  },
+  {
+    "change": "oa-08-discarded-spawn",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-08-discarded-spawn"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:53.659548+00:00"
+  },
+  {
+    "change": "oa-09-backend-admission",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-09-backend-admission"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:54.126653+00:00"
+  },
+  {
+    "change": "oa-09-backend-admission",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-09-backend-admission"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:54.639880+00:00"
+  },
+  {
+    "change": "oa-10-expiry-events",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-10-expiry-events"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:55.103536+00:00"
+  },
+  {
+    "change": "oa-10-expiry-events",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-10-expiry-events"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:55.598078+00:00"
+  },
+  {
+    "change": "oa-11-concurrency-models",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-11-concurrency-models"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:56.066440+00:00"
+  },
+  {
+    "change": "oa-11-concurrency-models",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-11-concurrency-models"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:56.569586+00:00"
+  },
+  {
+    "change": "oa-12-negative-control-ci",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-12-negative-control-ci"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:57.222904+00:00"
+  },
+  {
+    "change": "oa-12-negative-control-ci",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-12-negative-control-ci"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:57.745589+00:00"
+  },
+  {
+    "change": "oa-13-browser-assurance",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-13-browser-assurance"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:58.274817+00:00"
+  },
+  {
+    "change": "oa-13-browser-assurance",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-13-browser-assurance"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:58.790505+00:00"
+  },
+  {
+    "change": "oa-14-postgres-upgrade",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-14-postgres-upgrade"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:59.276580+00:00"
+  },
+  {
+    "change": "oa-14-postgres-upgrade",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-14-postgres-upgrade"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:19:59.830484+00:00"
+  },
+  {
+    "change": "oa-15-desktop-assurance",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-15-desktop-assurance"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:20:00.308403+00:00"
+  },
+  {
+    "change": "oa-15-desktop-assurance",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-15-desktop-assurance"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:20:00.809907+00:00"
+  },
+  {
+    "change": "oa-16-iggy-poisoning",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-16-iggy-poisoning"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:20:01.272079+00:00"
+  },
+  {
+    "change": "oa-16-iggy-poisoning",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-16-iggy-poisoning"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:20:01.757504+00:00"
+  },
+  {
+    "change": "oa-17-backend-benchmarks",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-17-backend-benchmarks"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:20:02.208621+00:00"
+  },
+  {
+    "change": "oa-17-backend-benchmarks",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-17-backend-benchmarks"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:20:02.704901+00:00"
+  },
+  {
+    "change": "oa-18-release-boundary",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-18-release-boundary"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:20:03.167994+00:00"
+  },
+  {
+    "change": "oa-18-release-boundary",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-18-release-boundary"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:20:03.639364+00:00"
+  },
+  {
+    "change": "oa-19-ci-repairs",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-19-ci-repairs"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:20:04.091601+00:00"
+  },
+  {
+    "change": "oa-19-ci-repairs",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-19-ci-repairs"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:20:04.573590+00:00"
+  },
+  {
+    "change": "oa-20-merged-certification",
+    "action": "verify",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "verify",
+      "oa-20-merged-certification"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:20:05.035078+00:00"
+  },
+  {
+    "change": "oa-20-merged-certification",
+    "action": "archive",
+    "argv": [
+      "timeout",
+      "90",
+      "/Users/gqadonis/.codex/skills/kbd-apply/kbd-apply.sh",
+      "archive",
+      "oa-20-merged-certification"
+    ],
+    "exit": 0,
+    "at": "2026-10-25T15:20:05.516304+00:00"
+  }
+]

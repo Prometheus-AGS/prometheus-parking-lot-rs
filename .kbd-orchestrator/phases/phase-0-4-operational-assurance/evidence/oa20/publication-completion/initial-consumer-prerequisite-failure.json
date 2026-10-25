@@ -1,0 +1,16 @@
+[
+  {
+    "consumer": "native",
+    "step": "resolve",
+    "argv": [
+      "/Users/gqadonis/.cargo/bin/cargo",
+      "generate-lockfile"
+    ],
+    "cwd": "/private/tmp/oa20-registry-consumers-536-of8rmvvp/native",
+    "started_at": "2026-10-25T15:14:36.743006+00:00",
+    "finished_at": "2026-10-25T15:14:36.887527+00:00",
+    "exit": 101,
+    "anonymous_cargo_home": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/native-anonymous-cargo-home",
+    "fresh_target": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/native-fresh-target"
+  }
+]

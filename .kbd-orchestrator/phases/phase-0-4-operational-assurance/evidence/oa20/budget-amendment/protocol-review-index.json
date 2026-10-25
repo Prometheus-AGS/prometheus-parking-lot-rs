@@ -1,0 +1,19 @@
+{
+  "recorded_at": "2026-10-25T11:22:55.461165+00:00",
+  "author": "Root controller recording actual independent native reviewer findings",
+  "reviewer": "/root/budget_amendment_review",
+  "verdict": "Budget-only amendment does not require new software candidate or all-new unchanged scenario evidence",
+  "scope": "Protocol/evidence identity only; not certification or publication PASS",
+  "verified_rules": {
+    "unchanged_scenarios": "phase_closure.rs64-67 and842-849 permit carriedFromContract only when scenario is unchanged and exact scenarioDigest matches",
+    "signed_authority": "phase_closure.rs633-687 binds authenticated previous/new digests and exact empty scenarioChanges",
+    "strict_release_identity": "release_evidence.py230-231 and trusted-release.py64-75 require candidateb43/originalcontract04/policy04/receipt04 identities consistently; no relabeling",
+    "closure_envelope": "kbd-phase-close-eval.sh147-166 requires new currentb199 envelope plus current production sourceDigests; attach authentic original release receipts and signed lineage explicitly"
+  },
+  "independent_supplemental_review": "/Users/gqadonis/.local/state/prometheus/operational-assurance/b43ff00e6c43bb249eac9a4882814de8b2c067ea/r2-review/supplemental-preliminary.json",
+  "limitations": [
+    "Native same-family isolation, not verified cross-family",
+    "Runtime carry field alone does not authenticate historical receipt; controller and R2 must verify actual receipt/provenance/source hashes",
+    "No final certification/publication is established by this protocol finding"
+  ]
+}

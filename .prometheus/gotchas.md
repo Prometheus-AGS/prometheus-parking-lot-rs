@@ -35,3 +35,7 @@ The real pinned release-plz0.3.173 parser rejects duplicate historical version h
 OA20 merged-candidate certification: existing private Playwright cache /tmp/oa04-private-tools/playwright must be selected through PLAYWRIGHT_BROWSERS_PATH for website verification. Default macOS cache absence caused an actual launch failure; standalone production rerun passed, then fresh sealed baseline40PASS/0FAIL/2BLOCKED. Preserve initial failed receipt; do not edit it into PASS. Website Chrome156.0.8078.4 is not Linux OA13’s156.0.8078.47 proof.
 
 Hosted assurance: offline validators require locked dependency prefetch for root and standalone workspaces before freeze. Cross-OS receipts need POSIX repository/packet identities and Git-index symlink-target semantics; native execution argv/cwd stay native. Observed independent-review failures fixed in OA20 task2; 17packet/9manual/18hosted/40containment checks passed, not final certification.
+
+## 2026-10-25T15:23:04.157934+00:00 — 0.4.0 final boundary
+
+Fresh anonymous Cargo homes do not put rustc on PATH. Pin the existing private toolchain bin explicitly; the initial postpublication resolve failed before compilation, and the corrected fresh native/WASM checks passed. Do not reuse HOME ancestor Cargo config or cached target when claiming fresh registry installability.
