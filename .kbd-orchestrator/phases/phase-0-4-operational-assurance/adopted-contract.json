@@ -6,14 +6,14 @@
     "runId": "phase-certification-remediation-20261022T103344Z",
     "phaseId": "phase-0-4-operational-assurance",
     "planRevision": 1,
-    "contractDigest": "e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257"
+    "contractDigest": "04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2"
   },
   "digestNormalization": {
     "algorithm": "sha256",
     "command": "jq -S -c 'del(.identity.contractDigest) | del(.identity.planRevision)'",
     "stalenessRule": "Reject a digest different from the latest non-superseded canonical adoption for this exact contract path; preserve historical receipts."
   },
-  "adoptionSource": "2026-10-24 chat: operator requested Assess and Plan for phase-0-4-operational-assurance, then answered the one batched gate question: 'Defer credential rotation for now and accept your recommendations on the rest. We need stuff to get finished before we start blocking things and making it hard to finish. We will handle keys and stuff later.' Scope accepted: 17 listed issues; credential and exposed KBD signer rotation deferred and non-blocking. This is plan adoption, not publication/history-rewrite authorization.",
+  "adoptionSource": "2026-10-24 chat: operator requested Assess and Plan for phase-0-4-operational-assurance, then answered the one batched gate question: 'Defer credential rotation for now and accept your recommendations on the rest. We need stuff to get finished before we start blocking things and making it hard to finish. We will handle keys and stuff later.' Scope accepted: 17 listed issues; credential and exposed KBD signer rotation deferred and non-blocking. This is plan adoption, not publication/history-rewrite authorization. Superseding operator instruction: 'Go with your fastest and safest recommendation and then publish the crate'. Proposed amendment implements the immediately preceding recommendation: defer history cleanup and rotation from 0.4.0 certification, use GitHub-hosted OS runners plus attributable manual GUI/performance checks, and retain signed-tag/OIDC/evidence verification before authorized publication. Adoption remains pending the supported operator-signed amendment.",
   "decisionOwner": "Human operator GQAdonis",
   "amendmentPolicy": "Material scope, API compatibility, safety, scenario/environment or budget changes need explicit operator adoption, a superseding canonical decision and supported signed amendment lineage. Do not re-add rotation as a blocker without an operator decision.",
   "releaseClaim": {
@@ -25,7 +25,8 @@
       "Pinned real Iggy server",
       "WASM in headless Chromium plus existing Node coverage",
       "Tauri builds macOS/Linux/Windows; actual macOS GUI restart/retrieve; no unverified Linux/Windows GUI runtime claim",
-      "Existing Android/iOS compile/binding regression jobs"
+      "Existing Android/iOS compile/binding regression jobs",
+      "Certification uses GitHub-hosted OS runners for automated profiles plus attributable candidate-bound manual macOS GUI and quiet-machine performance evidence; no self-hosted runner requirement. Existing production oracles and supported OS/backend coverage remain mandatory."
     ],
     "currentCapabilities": "0.3.0 published; 37 predecessor changes archived. Named correctness and verification gaps are open. No 0.4.0 implementation or fresh production test occurred during planning. Credential rotation and signer replacement explicitly deferred; exposure is not neutralized.",
     "explicitUnknowns": [
@@ -46,14 +47,14 @@
   "scenarioMatrix": [
     {
       "id": "OA-01",
-      "name": "Prepare and enforce post-purge containment controls",
+      "name": "Enforce current-source credential controls and retain deferred containment risk",
       "ownerTask": "phase-0-4-operational-assurance/oa-01-containment-controls/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
-      "productionEntry": "bash .github/scripts/supply-chain.sh tracked-credentials; post-purge secrets-history/path-history/pre-purge in an approved fresh mirror",
+      "productionEntry": "bash .github/scripts/supply-chain.sh tracked-credentials; staged/diff/full-tree redacted secret scans; disposable containment regression fixtures; no actual history purge or cache removal required for 0.4.0",
       "realCollaborators": [
         "Git/GitHub/crates.io controls or disposable rehearsals as applicable; actual writes require operator authority"
       ],
-      "oracle": "After separately approved purge, history/path scans are blocking and clean, roots are nonempty, and a scratch branch with an old root is rejected; a clean candidate passes. Operator cache-removal evidence is recorded without credential values.",
-      "negativeControl": "A scratch clone/ref deliberately retaining one recorded pre-purge root must fail the pre-purge check; an intentionally tracked credential path must fail.",
+      "oracle": "Current tracked source and publishable package contents contain no newly introduced secret material; deliberately tracked credential paths and synthetic secret canaries are rejected. Disposable old-root containment fixtures pass their positive and expected-negative assertions. Actual repository history cleanup/cache removal and credential/signer rotation are operator-deferred and must remain explicitly recorded as unresolved; no clean-history or credential-revocation claim.",
+      "negativeControl": "A deliberately tracked forbidden credential path and a synthetic nonfunctional secret canary outside exact exceptions are rejected. A disposable ref retaining a recorded old root is rejected by the containment fixture; this is not proof that the real repository was purged.",
       "fixtures": "Per-run isolated test roots/DBs/volumes/streams with content digests and tool/image/OS versions frozen in the final checked boundary manifest. Never production data. Record 0.3.0 fixture and migration order where applicable.",
       "evidence": "Candidate SHA and contract digest, exact argv, exit code, nonzero discovery count, timestamps, raw redacted stdout/stderr .txt logs, fixture/environment identities and expected-negative assertion; operator receipt only for external authority."
     },
@@ -215,7 +216,7 @@
     },
     {
       "id": "OA-14",
-      "name": "Rehearse a populated PostgreSQL 17\u219218 upgrade",
+      "name": "Rehearse a populated PostgreSQL 17→18 upgrade",
       "ownerTask": "phase-0-4-operational-assurance/oa-14-postgres-upgrade/1+phase-0-4-operational-assurance/oa-18-release-boundary/2",
       "productionEntry": "Project PG17 image populated with queue/mailbox/pgmq fixtures, pg_upgrade into project PG18 image, then real integration suites",
       "realCollaborators": [
@@ -267,17 +268,17 @@
     }
   ],
   "functionalScope": [
-    "Close issues #57,#64,#65,#66,#67,#68,#71,#78,#79,#80,#81,#82,#85,#86,#87,#88,#89 within their stated acceptance scope",
+    "Implement the accepted 17-issue source scope; actual #88 repository history purge/cache removal is deferred beyond 0.4.0 certification. Do not close #88 as purged or relabel deferred cleanup as passing.",
     "Eighteen changes and 36 backend tasks listed in plan.md; no optional backlog inferred into totals",
     "Implement code, fixtures, documentation and boundary machinery before one cumulative integration packet",
     "Keep implementation, evidence/certification, authorization and publication outcomes separate"
   ],
   "resilienceScope": {
-    "policy": "Every adopted scenario remains mandatory for certification; environment/authority/budget exhaustion records BLOCKED, never silent PASS or automatic deferral. External pending work does not reopen completed implementation.",
+    "policy": "Every adopted scenario remains mandatory for certification with OA-01 limited to current-source controls and disposable containment fixtures by explicit operator amendment. Environment/authority/budget exhaustion records BLOCKED, never silent PASS. External pending work does not reopen completed implementation.",
     "deferredOptional": [
       "#70: Mark superseded ADRs and fix the stale WASM CI step name",
       "#69: Remove the stale llm_inference_test and its reqwest dev-dependency",
-      "#63: Single-dimension dispatcher is 2\u20134% slower after multi-resource admission",
+      "#63: Single-dimension dispatcher is 2–4% slower after multi-resource admission",
       "#62: Iggy: a restarted publisher can store duplicate messages",
       "#61: Attach IggyHook to pools from configuration",
       "#60: Decide and test pgmq-backed durable pools",
@@ -292,14 +293,15 @@
   },
   "exclusions": [
     "Credential revocation/rotation and exposed KBD signer replacement: operator-deferred, non-blocking for implementation and this release contract; preserve known exposure",
-    "No unattended history rewriting, force-push, Support submission, credential/enrollment change, registry publication or release tag creation",
+    "History rewriting, force-push, Support/cache-removal submissions, credential/enrollment changes and paid-host acquisition remain unauthorized. Operator now authorizes publication of 0.4.0 after all amended certification criteria and signing/OIDC gates pass; this is not evidence those criteria passed.",
     "No durable WorkerPool, durable skip-ahead or new pgmq pool support",
     "No FFI publication, global toolchain/MSRV upgrades or UI redesign",
-    "No claims of Linux/Windows GUI runtime execution without actual corresponding receipts"
+    "No claims of Linux/Windows GUI runtime execution without actual corresponding receipts",
+    "Actual history purge/cache removal is deferred beyond 0.4.0 certification; known historical credential exposure remains unresolved."
   ],
   "requiredSafetyChecks": [
     "No tracked credentials or new unredacted secret material; staged/diff/full-tree scans and package allowlist",
-    "Post-purge clean-history/path/root checks with old-branch negative control after exact separately approved rewrite; this does not revoke copied credentials",
+    "Current-source and package secret scans plus disposable old-root/credential-path negative controls remain mandatory. Actual post-purge clean-history/path/root checks and cache removal are deferred, never represented as completed.",
     "Core normal graph remains runtime/IO-free and wasm graph has no tokio; unsafe denied, pinned/MSRV compile/clippy/docs checks",
     "Real PG/redb migration/crash and Iggy/browser/desktop production evidence, not mock-only assertions",
     "Candidate/digest and signing-identity verification; actual publication requires separate operator approval",
@@ -330,18 +332,18 @@
       "bash .github/scripts/operational-assurance-gate.sh --candidate \"$KBD_BOUNDARY_CANDIDATE\" --contract .kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json --out \"$KBD_BOUNDARY_OUT\""
     ],
     "expectedEffects": [
-      "One candidate-bound receipt collection covering OA-01\u2026OA-17, full baseline regression and approved operator evidence",
+      "One candidate-bound receipt collection covering OA-01…OA-17, full baseline regression and approved operator evidence",
       "No production publication, history rewrite, credential mutation or host acquisition inside unattended validation",
       "Implementation may be complete while certification/publication remain pending; only observed scenario receipts can certify release readiness",
       "The runner path is a planned deliverable of oa-18 task 1, not executable during planning; KBD_BOUNDARY_CANDIDATE and KBD_BOUNDARY_OUT are mandatory declared invocation inputs, resolved to literal values in the boundary receipt. The checked manifest includes every exact regression/scenario command from the plan, including the blocking core normal dependency-graph check; no missing dependency or failed cargo tree invocation is PASS."
     ],
-    "requiredApprovals": "G-02 exact backup/ref/reclone plan before history purge; operator signing identity and OIDC account settings before external change; paid/host acquisition before use; G-05 candidate-naming approval before publish. G-01 rotation is deferred and not a prerequisite.",
+    "requiredApprovals": "Operator authorizes 0.4.0 publication after amended certification PASS. Actual history purge/cache removal and credential rotation remain deferred; no destructive history/account/credential operation is authorized. Approved public signing identity, verified GitHub/crates.io OIDC publisher ownership, environment protections and attributable manual evidence are still required. Use GitHub-hosted automated OS runners and approved manual GUI/quiet evidence; no paid resources or private-key transfer.",
     "receipts": [
       "Full candidate SHA, contract digest, checked boundary manifest",
       "Raw logs and per-scenario/OS/backend discovery and oracle results",
       "Image/tool/fixture identities, populated migrations and crash outcomes",
       "Independent cumulative review and one batched correction/confirmation cycle",
-      "Separately authorized purge/signing/publisher/publication receipts; no private values"
+      "Operator-signed scope-amendment and retained history-cleanup deferral; approved signing/publisher/environment/publication receipts; no private values."
     ],
     "cleanup": [
       "Remove only test-owned DBs/volumes/streams/GUI stores",

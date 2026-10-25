@@ -102,12 +102,14 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           ARTIFACT_ID: ${{ inputs.boundary_artifact_id }}
           TRUST_POLICY: ${{ vars.RELEASE_TRUST_POLICY_JSON }}
+          RELEASE_SSH_ALLOWED_SIGNERS: ${{ vars.RELEASE_SSH_ALLOWED_SIGNERS }}
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           umask 077
           printf '%s\n' "$TRUST_POLICY" > "$RUNNER_TEMP/release-trust-policy.json"
+          python3 "$GITHUB_WORKSPACE/release-tools/.github/scripts/stage-release-trust.py" --policy "$RUNNER_TEMP/release-trust-policy.json"
           python3 "$GITHUB_WORKSPACE/release-tools/.github/scripts/trusted-release.py" --workspace "$PWD" --candidate "$CANDIDATE" \
             --tag "$RELEASE_TAG" --artifact-id "$ARTIFACT_ID" --policy "$RUNNER_TEMP/release-trust-policy.json" \
             --contract .kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json \
@@ -142,12 +144,14 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
           ARTIFACT_ID: ${{ inputs.boundary_artifact_id }}
           TRUST_POLICY: ${{ vars.RELEASE_TRUST_POLICY_JSON }}
+          RELEASE_SSH_ALLOWED_SIGNERS: ${{ vars.RELEASE_SSH_ALLOWED_SIGNERS }}
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
           umask 077
           printf '%s\n' "$TRUST_POLICY" > "$RUNNER_TEMP/release-trust-policy.json"
+          python3 "$GITHUB_WORKSPACE/release-tools/.github/scripts/stage-release-trust.py" --policy "$RUNNER_TEMP/release-trust-policy.json"
           python3 "$GITHUB_WORKSPACE/release-tools/.github/scripts/trusted-release.py" --mode authorize --workspace "$PWD" --candidate "$CANDIDATE" \
             --tag "$RELEASE_TAG" --artifact-id "$ARTIFACT_ID" --policy "$RUNNER_TEMP/release-trust-policy.json" \
             --contract .kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json \

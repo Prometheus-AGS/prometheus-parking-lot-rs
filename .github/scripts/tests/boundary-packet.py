@@ -5,8 +5,12 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import os
+import subprocess
 from pathlib import Path
 import sys
+import tempfile
+from unittest.mock import patch
 import unittest
 
 sys.dont_write_bytecode = True
@@ -118,6 +122,91 @@ class PacketControls(unittest.TestCase):
     def test_caller_flag_has_no_external_authority(self):
         result = boundary.authority("review", {"approved": "true"}, self.candidate, self.binding)
         self.assertEqual(result["status"], "BLOCKED")
+
+
+class SourcePortabilityControls(unittest.TestCase):
+    def test_git_symlink_and_windows_materialization_bind_identical_source_bytes(self):
+        with tempfile.TemporaryDirectory(prefix="oa20-source-portability-") as temporary:
+            root = Path(temporary)
+            env = {**os.environ, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull}
+            for key in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+                        "GIT_ALTERNATE_OBJECT_DIRECTORIES"):
+                env.pop(key, None)
+            def git(*argv, data=None):
+                return subprocess.run(["git", *argv], cwd=root, env=env, input=data,
+                                      capture_output=True, check=True).stdout.strip()
+            git("init", "-q")
+            git("config", "core.symlinks", "false")
+            (root / "nested").mkdir()
+            (root / "nested/source.py").write_bytes(b"source bytes\n")
+            git("add", "nested/source.py")
+            target = b"nested/source.py"
+            blob = git("hash-object", "-w", "--stdin", data=target).decode()
+            git("update-index", "--add", "--cacheinfo", "120000," + blob + ",CLAUDE.md")
+            # This is what core.symlinks=false materializes on Windows: the
+            # tracked target payload, not a copy of nested/source.py's content.
+            (root / "CLAUDE.md").write_bytes(target)
+            with patch.object(boundary, "ROOT", root):
+                materialized = boundary.sources()
+                self.assertEqual(materialized, {"nested/source.py": boundary.sha256(b"source bytes\n"),
+                                                "CLAUDE.md": boundary.sha256(target)})
+                self.assertNotEqual(materialized["CLAUDE.md"], materialized["nested/source.py"])
+                (root / "CLAUDE.md").unlink()
+                try:
+                    (root / "CLAUDE.md").symlink_to("nested/source.py")
+                except OSError:
+                    # Windows without link privileges still exercised the real
+                    # index mode and materialized working-tree representation.
+                    return
+                self.assertEqual(boundary.sources(), materialized)
+                (root / "nested/source.py").write_bytes(b"changed referent\n")
+                changed = boundary.sources()
+                self.assertEqual(changed["CLAUDE.md"], materialized["CLAUDE.md"])
+                self.assertNotEqual(changed["nested/source.py"], materialized["nested/source.py"])
+
+
+
+class ScopedContainmentControls(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="oa20-scope-fixture-")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.binding = "2" * 64
+        amendment = self.root / ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/publication-preparation/scope-amendment.json"
+        amendment.parent.mkdir(parents=True)
+        boundary.write(amendment, {"newContractDigest": self.binding, "action": "amend-contract",
+            "scenarioChanges": {"added": [], "modified": ["OA-01"], "removed": []}})
+        self.pin = boundary.digest(amendment)
+        self.model = {"containment_scope": "current-source-and-fixtures",
+                      "containment_scope_amendment_sha256": self.pin}
+        self.report = {"scope": "current-source-and-fixtures", "history_cleanup": "DEFERRED",
+                       "credential_rotation": "DEFERRED", "scope_amendment_sha256": self.pin,
+                       "current_source_evidence_sha256": "3" * 64}
+        self.proofs = [{"sha256": self.pin}, {"sha256": "3" * 64}]
+        patch.object(boundary, "ROOT", self.root).start()
+        patch.object(boundary, "definition", lambda: self.model).start()
+        self.addCleanup(patch.stopall)
+
+    def test_exact_amendment_deferral_and_evidence_accepted(self):
+        boundary.scoped_containment(self.report, self.proofs, self.binding)
+
+    def test_missing_deferral_false_cleanup_wrong_amendment_and_missing_evidence_rejected(self):
+        for key, value in (("history_cleanup", "PASS"), ("credential_rotation", "PASS"),
+                           ("scope", "clean-history"), ("scope_amendment_sha256", "4" * 64),
+                           ("current_source_evidence_sha256", "5" * 64)):
+            with self.subTest(field=key):
+                with self.assertRaises(boundary.ReleaseError):
+                    boundary.scoped_containment({**self.report, key: value}, self.proofs, self.binding)
+        with self.assertRaises(boundary.ReleaseError):
+            boundary.scoped_containment(self.report, self.proofs[1:], self.binding)
+        with self.assertRaises(boundary.ReleaseError):
+            boundary.scoped_containment(self.report, self.proofs, "6" * 64)
+
+    def test_old_scope_still_requires_actual_rewrite_cache_evidence(self):
+        self.model = {}
+        with self.assertRaisesRegex(boundary.ReleaseError, "rewrite/refplan/cache"):
+            boundary.scoped_containment(self.report, self.proofs, self.binding)
+
 
 
 if __name__ == "__main__":

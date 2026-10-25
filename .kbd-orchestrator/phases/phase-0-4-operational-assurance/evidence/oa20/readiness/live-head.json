@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "git",
+    "ls-remote",
+    "--symref",
+    "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs.git",
+    "HEAD"
+  ],
+  "observed_at": "2026-10-25T04:17:18.215391+00:00",
+  "exit_code": 0,
+  "stdout": "ref: refs/heads/main\tHEAD\nce034cb44d94bb4805ede4583a575f4e5215b728\tHEAD\n",
+  "stderr": ""
+}

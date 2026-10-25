@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "gh",
+    "api",
+    "repos/Prometheus-AGS/prometheus-parking-lot-rs/environments",
+    "--jq",
+    "{total_count,environments:[.environments[]|{id,name,protection_rules,deployment_branch_policy}]}"
+  ],
+  "observed_at": "2026-10-25T04:17:05.724123+00:00",
+  "exit_code": 0,
+  "stdout": "{\"environments\":[{\"deployment_branch_policy\":{\"custom_branch_policies\":true,\"protected_branches\":false},\"id\":25047369513,\"name\":\"github-pages\",\"protection_rules\":[{\"id\":69750011,\"node_id\":\"GA_kwDOQkMxIc4EKEz7\",\"type\":\"branch_policy\"}]}],\"total_count\":1}\n",
+  "stderr": ""
+}

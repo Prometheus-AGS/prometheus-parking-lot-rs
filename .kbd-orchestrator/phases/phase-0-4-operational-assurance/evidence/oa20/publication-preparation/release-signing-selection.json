@@ -1,0 +1,14 @@
+{
+  "purpose": "Selected existing operator release identity for requested 0.4.0 publication; not actual tag verification",
+  "principal": "travis@tribehealthsolutions.com",
+  "format": "ssh",
+  "fingerprint": "SHA256:TRubhhzq1JNXqLHymdzD8y5gjreUp2wplply9PQ11H4",
+  "github_owner": "GQAdonis",
+  "github_signing_key_id": 1050763,
+  "github_signing_key_title": "UAR release signing 2026-07",
+  "public_trust_sha256": "30a043a89816b8798bf0358da7d624f294fbe2eea7ab0378117d84ddd9b80b47",
+  "selection_rationale": "Existing enrolled operator key successfully signed the authorized scope amendment and independently matches an existing public GitHub release-signing key. Reuse for explicitly requested publication avoids new key generation, enrollment, transfer or global Git configuration. Exact final candidate tag remains uncreated/unverified.",
+  "private_key_exported": false,
+  "global_config_changed": false,
+  "allowed_signers_sha256": "01fd98d730a5ac4de2984f6b4bcdacc23ee2c069e367f0bdfbc8c5af18648fcd"
+}

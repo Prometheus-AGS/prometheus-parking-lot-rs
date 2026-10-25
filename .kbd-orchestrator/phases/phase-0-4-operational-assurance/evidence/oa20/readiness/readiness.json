@@ -1,0 +1,237 @@
+{
+  "schema": "private OA20 readiness evidence only; not release-certificate schema",
+  "phase": "phase-0-4-operational-assurance",
+  "stage": "Execute",
+  "change": "oa-20-merged-certification",
+  "backend_task": "1/readiness only",
+  "candidate": "ce034cb44d94bb4805ede4583a575f4e5215b728",
+  "branch": "codex/release-certification",
+  "observed_at": "2026-10-25T04:19:33.029468+00:00",
+  "source_checkout": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs",
+  "source_head_matches_requested": true,
+  "source_worktree_state": "root runtime records dirty as assigned; preserved; no source or records written by readiness worker",
+  "contract_digest": "e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257",
+  "source_identities": {
+    ".github/workflows/operational-assurance.yml": {
+      "exit_code": 0,
+      "sha256": "8ce76a8736f212fe062ec8400b044d62b83625ec56d12ef3fb1d6ba41ac7a198",
+      "variable_names": [
+        "OA18_AUTHORITY_SHA256",
+        "OA18_INPUTS_JSON",
+        "RELEASE_TRUST_POLICY_JSON"
+      ]
+    },
+    ".github/workflows/release.yml": {
+      "exit_code": 0,
+      "sha256": "bf7ad862c41de430547990605fc0f2cb2699f95d6a8c2eaacf80b3955bd1ccba",
+      "variable_names": [
+        "GIT_CLIFF_BIN",
+        "RELEASE_PLZ_BIN",
+        "RELEASE_RUNNER",
+        "RELEASE_TRUST_POLICY_JSON"
+      ]
+    },
+    ".github/workflows/verify-release-tag.yml": {
+      "exit_code": 0,
+      "sha256": "d0f0da6266ee766271c0c05c7216f71dc53d55fa4394609ae0b7d0edc4c49039",
+      "variable_names": [
+        "RELEASE_GPG_FINGERPRINT",
+        "RELEASE_GPG_HOME",
+        "RELEASE_SIGNATURE_FORMAT",
+        "RELEASE_SSH_ALLOWED_SIGNERS",
+        "RELEASE_SSH_FINGERPRINT",
+        "RELEASE_SSH_IDENTITY",
+        "RELEASE_SSH_REVOCATIONS_FILE"
+      ]
+    },
+    ".github/workflows/ci.yml": {
+      "exit_code": 0,
+      "sha256": "46f93e6c0552445480e50cf7708c795aa785dc873abf3ce23dd8e92ac6b8fb45",
+      "variable_names": [
+        "PG_UPGRADE_IMAGE_ID",
+        "PG_UPGRADE_PG17_IMAGE_ID",
+        "PG_UPGRADE_PG18_IMAGE_ID",
+        "PG_UPGRADE_RUNNER",
+        "WASM_BROWSER_RUNNER",
+        "WASM_CHROMEDRIVER_BIN",
+        "WASM_CHROME_BIN"
+      ]
+    },
+    ".github/workflows/platform.yml": {
+      "exit_code": 0,
+      "sha256": "7cd508afe4fd602fe61bf8d2b4cfcc9d83937fb028c054403a6dc446f983ae26",
+      "variable_names": [
+        "DESKTOP_LINUX_RUNNER"
+      ]
+    },
+    ".github/release-boundary.schema.json": {
+      "exit_code": 0,
+      "sha256": "d82e6530f75f7db4f35be9617ab44cf88be68146fd95ae14c7b234ed9de0995b"
+    },
+    ".github/release-trust-policy.example.json": {
+      "exit_code": 0,
+      "sha256": "f51f660454333023970b32df67d5e50af65f9ff2b4b2df66c19e445f8f829c42"
+    },
+    ".kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json": {
+      "exit_code": 0,
+      "sha256": "4b1ba3d9755c7b3dfe8efa5120ae62e707b7b478d3e503f3a071d1eb60d58056"
+    },
+    "docs/runbooks/history-containment.md": {
+      "exit_code": 0,
+      "sha256": "a704ba9a0cd1ca3118b5700aad99ab97604dad7b0f84f47fb9d1632a8a920cc3"
+    }
+  },
+  "current_readonly_github": {
+    "runners": {
+      "runners": [],
+      "total_count": 0
+    },
+    "environments": {
+      "environments": [
+        {
+          "deployment_branch_policy": {
+            "custom_branch_policies": true,
+            "protected_branches": false
+          },
+          "id": 25047369513,
+          "name": "github-pages",
+          "protection_rules": [
+            {
+              "id": 69750011,
+              "node_id": "GA_kwDOQkMxIc4EKEz7",
+              "type": "branch_policy"
+            }
+          ]
+        }
+      ],
+      "total_count": 1
+    },
+    "main": {
+      "commit": "ce034cb44d94bb4805ede4583a575f4e5215b728",
+      "name": "main",
+      "protected": false,
+      "protection": {
+        "enabled": false,
+        "required_status_checks": {
+          "checks": [],
+          "contexts": [],
+          "enforcement_level": "off"
+        }
+      }
+    },
+    "main_protection_api": {
+      "exit": 1,
+      "output": {
+        "message": "Branch not protected",
+        "documentation_url": "https://docs.github.com/rest/branches/branch-protection#get-branch-protection",
+        "status": "404"
+      }
+    },
+    "rulesets": [],
+    "repository_variable_names": {
+      "names": [],
+      "total_count": 0
+    },
+    "certification_environment": "GET404 Not Found",
+    "publish_environment": "GET404 Not Found",
+    "scope_limit": "accessible repository API state only; no organization-wide runner/variable enumeration or local trust/key search"
+  },
+  "ordinary_ci": {
+    "merged_candidate_ci": {
+      "conclusion": "",
+      "createdAt": "2026-10-25T04:11:14Z",
+      "databaseId": 40160960448,
+      "event": "push",
+      "headBranch": "main",
+      "headSha": "ce034cb44d94bb4805ede4583a575f4e5215b728",
+      "name": "CI",
+      "status": "queued",
+      "updatedAt": "2026-10-25T04:11:14Z",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40160960448"
+    },
+    "merged_candidate_platform": {
+      "conclusion": "success",
+      "createdAt": "2026-10-25T04:11:14Z",
+      "databaseId": 40160960445,
+      "event": "push",
+      "headBranch": "main",
+      "headSha": "ce034cb44d94bb4805ede4583a575f4e5215b728",
+      "name": "Platform",
+      "status": "completed",
+      "updatedAt": "2026-10-25T04:15:28Z",
+      "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40160960445"
+    },
+    "historical_PR94": {
+      "head": "dcfffe1d918d941af2efd7a0c2367497960caedc",
+      "merge": "ce034cb44d94bb4805ede4583a575f4e5215b728",
+      "checks": 91,
+      "success": 91,
+      "source_tree_delta_command": {
+        "argv": [
+          "git",
+          "diff",
+          "--name-only",
+          "dcfffe1d918d941af2efd7a0c2367497960caedc",
+          "ce034cb44d94bb4805ede4583a575f4e5215b728"
+        ],
+        "observed_at": "2026-10-25T04:19:01.592934+00:00",
+        "exit_code": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      "limitation": "identical source tree/green PR does not replace fresh merged-candidate receipts or accepted full certification"
+    },
+    "note": "as-of timestamps recorded per command; no ordinary CI status is certification PASS"
+  },
+  "G02": {
+    "status": "BLOCKED; Stage A NOT_EXERCISED/unapproved",
+    "inventory_delta": {
+      "previous_count": 134,
+      "previous_sha256": "031da0603315b133361951432235fba208526c563414de043f85ec3c6620372b",
+      "current_count": 136,
+      "current_sha256": "b26b813e09f69c210620adf7f3a43a8e1f82c7cfa1fead6c659e11d6fc91f510",
+      "added": [
+        {
+          "ref": "refs/heads/codex/operational-assurance",
+          "sha": "dcfffe1d918d941af2efd7a0c2367497960caedc"
+        },
+        {
+          "ref": "refs/pull/94/head",
+          "sha": "dcfffe1d918d941af2efd7a0c2367497960caedc"
+        }
+      ],
+      "removed": [],
+      "changed": [
+        {
+          "ref": "refs/heads/main",
+          "old": "92da0d3d28f7896ddc67062fa49ba40ea48d74a3",
+          "new": "ce034cb44d94bb4805ede4583a575f4e5215b728"
+        }
+      ]
+    },
+    "approval_scope": "136 advertised refs inventoried;73 candidate writable heads/tags;63 server-owned pull refs excluded from client pushes; exact five-path set in refreshed proposal; actual new IDs unavailable until approved rewrite",
+    "refreshed_proposal": "g02-proposed-ref-scope-refreshed.json",
+    "refreshed_proposal_sha256": "7c0ca334b40d430141d5e7ee932eeeed3fcfdfbc30a13a5f67f1fdb55de77fb5",
+    "destinations": "proposed-private-destinations.json; all absent; no creation"
+  },
+  "gates": {
+    "G01": "DEFERRED, nonblocking by operator; no rotation request",
+    "G03": "BLOCKED actual approved public signing identity/public trust policy and signed candidate tag not established; example policy deliberately empty; no private keys requested/read",
+    "G04": "BLOCKED attributable seven-crate publisher/environment authority evidence not supplied; no account settings inspected or changed",
+    "G05": "NOT_AUTHORIZED / NOT_EXERCISED; separate exact publication approval",
+    "G06_and_provenance": "BLOCKED applicable self-hosted profiles/protected certification environment/main unavailable in accessible repo metadata; hosted ordinary CI cannot amend contract",
+    "independent_authority": "BLOCKED candidate/contract-bound fresh review, G02/G03/G04, actual GUI and quiet-machine evidence not supplied to readiness"
+  },
+  "recommended_batch": "operator-batch-draft.md",
+  "not_exercised": [
+    "Cargo/tests/tool installation/Docker",
+    "mirrors/backups/rewrite/archive/remote pushes/cache/Support actions",
+    "global config or network mutations",
+    "remote dispatch/runner registration/settings",
+    "private key or credential/config reads",
+    "full OA01\u2013OA17 certification"
+  ],
+  "command_evidence": "commands.json contains exact argv/exit/stdout/stderr; individual metadata commands retained; source-identities.json contains git-show exit/hash",
+  "unrequested_changes": "none; private readiness artifacts only; PR91 metadata accidentally queried read-only, excluded from candidate proof",
+  "remaining_unverified": "full production/certification gate, host tool health, approved public trust, publisher accounts, operator authority/raw receipts; owned by parent or future approved task2"
+}

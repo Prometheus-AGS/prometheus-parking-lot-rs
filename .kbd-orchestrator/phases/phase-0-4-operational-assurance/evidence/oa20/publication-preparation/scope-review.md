@@ -1,0 +1,1 @@
+Fresh artifact-only reviewer accepted the exact draft and independently verified previous/new digests, scenario changes, target/identity and SSH signature using existing enrolled public trust. No blocking findings. Review does not certify library release or publish authority.

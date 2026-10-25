@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "gh",
+    "api",
+    "repos/Prometheus-AGS/prometheus-parking-lot-rs/environments/release-crates-io/variables",
+    "--jq",
+    "{total_count,names:[.variables[].name]}"
+  ],
+  "observed_at": "2026-10-25T04:17:11.109229+00:00",
+  "exit_code": 1,
+  "stdout": "{\"message\":\"Not Found\",\"documentation_url\":\"https://docs.github.com/rest/actions/variables#list-environment-variables\",\"status\":\"404\"}",
+  "stderr": "gh: Not Found (HTTP 404)\n"
+}

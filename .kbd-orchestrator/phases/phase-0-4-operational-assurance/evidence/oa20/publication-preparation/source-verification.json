@@ -1,0 +1,78 @@
+{
+  "purpose": "Actual source-boundary verification only; not release certification",
+  "observed_at": "2026-10-25T04:57:52.212317+00:00",
+  "contract_digest": "04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2",
+  "phase": "phase-0-4-operational-assurance",
+  "task": "oa-20-merged-certification:2",
+  "task_status": "in_progress",
+  "results": {
+    "boundary_packet": {
+      "tests": 17,
+      "exit": 0
+    },
+    "manual_bundles": {
+      "tests": 9,
+      "exit": 0
+    },
+    "hosted_materials": {
+      "tests": 18,
+      "exit": 0
+    },
+    "containment_real_git_gitleaks": {
+      "checks": 40,
+      "exit": 0
+    },
+    "yaml_syntax": {
+      "workflows": 2,
+      "exit": 0
+    },
+    "python_ast": {
+      "files": 7,
+      "exit": 0
+    },
+    "source_staged_gitleaks": {
+      "exit": 0,
+      "findings": 0
+    },
+    "npm_audit_unchanged_website": {
+      "exit": 1,
+      "entries": 39,
+      "critical_package_entries": 18,
+      "high": 0,
+      "moderate": 18,
+      "low": 3,
+      "registry_packages_include_website": false
+    },
+    "complete_staged_gitleaks": {
+      "exit": 0,
+      "findings": 0,
+      "prior_false_positive_matches": 12,
+      "scanner_policy_changed": false
+    }
+  },
+  "review": {
+    "code_critic": "APPROVE after one batched correction; both high findings fixed",
+    "python_security": "No new verified security finding; portability correction confirmed",
+    "same_family_limitation": true,
+    "release_authority": false
+  },
+  "raw_files_sha256": {
+    "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/amendment-verification/1.stderr.txt": "82b169f1d80056f41f03e80e5daa4f87f504b4d1fc16299feaf784f841e29dad",
+    "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/amendment-verification/1.stdout.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/amendment-verification/2.stderr.txt": "c0e0baf9f28d5255a087515160fe81587f2ac850f4ff4cae0be6c2ea31254dd4",
+    "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/amendment-verification/2.stdout.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/amendment-verification/3.stderr.txt": "3ead1c8890757a77e192ba42615850407c99abb48a0322d7692304b6c852df21",
+    "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/amendment-verification/3.stdout.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/amendment-verification/4.stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/amendment-verification/4.stdout.txt": "3ef4656691b1c39b7628fc62d562f91374a10ab75fe8b2decd4c948ce9a867d6",
+    "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/amendment-verification/commands.json": "7a6b392f9ada16697edcc4b48b5a4633d3fcb417603258f6dcb7460186dbaeaf",
+    "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/amendment-verification/correction-1.stderr.txt": "1968a56c4f71aa76439eae0737877c60c16ca50a34629170f7301ad2fd70ff81",
+    "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/amendment-verification/correction-1.stdout.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/amendment-verification/correction-2.stderr.txt": "6c236a0ca4983c3cb1cc0310ecbc937df76005cc8066b837c7bda4f6416661df",
+    "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/amendment-verification/correction-2.stdout.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/amendment-verification/correction-commands.json": "a7005ce35dbc953f7371491f9611e98f68241aece97f628076fdf96f23744130",
+    "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/amendment-verification/npm-audit.json": "faccd152b23d876885594de0c49ff3d74f80ccd514a7f857d33525c151ef2014"
+  },
+  "release_certification": "BLOCKED",
+  "publication": "NOT_EXERCISED"
+}

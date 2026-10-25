@@ -1,0 +1,17 @@
+{
+  "status": "DRAFT_NOT_APPLIED",
+  "repository": "Prometheus-AGS/prometheus-parking-lot-rs",
+  "workflow": "release.yml",
+  "environment": "release-crates-io",
+  "registry_owner": "GQAdonis",
+  "packages": [
+    "prometheus-parking-lot-core",
+    "prometheus-parking-lot-runtime-tokio",
+    "prometheus-parking-lot-pg",
+    "prometheus-parking-lot-embedded",
+    "prometheus-parking-lot-iggy",
+    "prometheus-parking-lot-wasm",
+    "prometheus_parking_lot"
+  ],
+  "note": "Owner session must configure/verify each trusted publisher. FFI excluded. Do not substitute a long-lived registry token."
+}

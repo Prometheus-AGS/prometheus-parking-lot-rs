@@ -1,0 +1,32 @@
+{
+  "source_private_directory": "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/readiness",
+  "files_sha256": {
+    "readiness.md": "cfd3baa2e6f465cda3d1dd0fafcc88b67e2f51cefe15341569169b2728ea5a93",
+    "readiness.json": "eb81fd3491702f5acf0ae62284ea72d68b4c752a4e6ed5b3f87728c1bfaa3ac7",
+    "source-identities.json": "95a4d7af1f267b886b8e5526c595c16cae4597b7552d3f4aef152d4d9525b71b",
+    "commands.json": "ee9284344c6c8bd6d2a1870d3efd4f04abb2e89af80f00fa105fdb94d02c8504",
+    "ref-delta.json": "155444ee66af803c461940cff4cbf2a3dc46027624afcc1b2c3839f21d5ee9a6",
+    "g02-proposed-ref-scope-refreshed.json": "7c0ca334b40d430141d5e7ee932eeeed3fcfdfbc30a13a5f67f1fdb55de77fb5",
+    "proposed-private-destinations.json": "e93f8c1c94c3c64dcd1aeaea41e3209a5e0c07df773a5584ff8fdd9931b89c2e",
+    "live-refs.before.tsv": "b26b813e09f69c210620adf7f3a43a8e1f82c7cfa1fead6c659e11d6fc91f510",
+    "runners.json": "703b7ab95eeccb642367bafeb7dd56ba24ac060f2e831b52fc2aa5275277eb76",
+    "environments.json": "374cb7b7f859ee278c42326fc982e6231c222c35f430f0003a0e2213d54b877f",
+    "certification-environment.json": "16ee9f78ebec1ffd3df28f52d759cfe5247f621931a5e581e23d0338f3cd5292",
+    "branch-main.json": "9dbee1496f514ca62b6b2d5692daa554f781aabf48ee64f7ab024916ba8237f4",
+    "protection-main.json": "3cdc06603d53d30d445aaa35f28c95623959450e3271f8a1c71e62ec95f16c3d",
+    "rulesets.json": "87ba65a39588b3e2ed9c60699fd9a5088f0ae85f7e7bc444a0a42415dff1318d",
+    "repository-variable-names.json": "21fcb642f8dd42d38f815479c22c1745157981d274bbc3d9e8ad6485e158093a",
+    "certification-variable-names.json": "809d8af2c4396d767c64f9e07876c54f35da68be66e8b24ecf28994821aee244",
+    "main-ci.json": "b4c67f9299546aec33226f2fd241a371e1a260af9a0c0fcba1f1277fdfd5913c",
+    "main-platform.json": "1b88230944bb9ed5886e10d96cbe09d389ecd9f2fc0004e46ec82b24041d36c4",
+    "pr94.json": "f9d2a646c5e5fa95b31c15bf89362d6e1e7514957ae68e6ffd95da4bcebe9570",
+    "publish-environment.json": "692547ad2428767c5362aecb243c2b0d8a9b0b41a067e4109a1e763beed49d78",
+    "publish-variable-names.json": "cd154e5c42eb376bc155e262dc8f9c59330ea6622e2f29977409aa27176fc6b7",
+    "peeled-tags.json": "7b117c91e139e3ba084f11dde5929ca3985c000d25a8acbfde5d140c0525ed88",
+    "live-head.json": "a6f004ac3fa2f0a89e21a5bf2f7a696811b76dfcc2d72375794059592e384824",
+    "live-refs.json": "4fc56e7e4a25f55e463721d55fcae631081d169800eb7675706e39c539061a98",
+    "operator-batch-draft.md": "5fc28605d4a7f6228f5ced0f0ff19c162259dd34fcc023c9100b84c188c70037"
+  },
+  "scope": "Read-only evidence only. External action proposals remain unapproved; no certification PASS.",
+  "excluded": "Historical PR91 lookup was unrelated and is retained privately only, not used as certification evidence."
+}

@@ -181,3 +181,11 @@ exchange, publication, syntax check, build, scan, fixture or review was performe
 G-04's seven actual publisher/environment settings and G-05 approval remain
 operator-controlled and unverified. G-01 remains deferred/non-blocking. This
 protocol prepares those operations without claiming they happened.
+
+### Superseding0.4.0 certification scope
+
+Signed operator amendment04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2 defers actual repository history purge/cache removal and credential rotation beyond0.4.0. Known historical exposure remains unresolved; no clean-history or credential-retirement claim follows. Current candidate/package secret checks and disposable containment fixture negative controls remain blocking. Under this contractG02 refers to attributable deferral and those actual controls, rather than completed purge evidence. Historical receipts retain the earlier contract meaning. #88 must not be closed as purged.
+
+Automated certification profiles use matching GitHub-hosted OS runners; actual macOSGUI and quiet performance evidence enters through independently approved sealed manual bundles. A build or an approval alone cannot replace GUI restart/retrieve, real benchmark measurements or any backend/browser/migration oracle. The collector still requires all seventeen scenarios, independent review, exact candidate/digest/raw evidence, public signing trust and authenticated publisher/environment authority. Original release preparation is preserved. New source/contract invalidates earlier complete-candidate receipts; do not relabel them.
+
+The operator explicitly authorized publication after amended certification passes. SourcePRs remain for the operator to merge. Actual release-tag verification, protected-environment reviews and seven-crate OIDC settings remain required. No long-lived token fallback or signing/trust bypass is authorized. Detailed implementation/staging instructions accompany the hosted preparation helper; unarmed examples confer no authority.

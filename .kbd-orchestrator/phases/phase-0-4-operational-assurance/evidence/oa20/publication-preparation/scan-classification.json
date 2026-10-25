@@ -1,0 +1,11 @@
+{
+  "findings": 12,
+  "classification": {
+    "sha256_file_digests": 10,
+    "git_revision_ranges": 2
+  },
+  "actual_credential_values_detected": 0,
+  "policy_changed": false,
+  "original_receipts_modified": false,
+  "retention": "Original sealed receipts kept privately and indexed by SHA256; published metadata uses digest-first artifact records"
+}

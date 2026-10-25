@@ -2,10 +2,10 @@
   "schemaVersion": "2",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 1129,
-  "derivedRevision": 1129,
+  "sourceRevision": 1140,
+  "derivedRevision": 1140,
   "frontier": {
-    "3b637018-0150-4bf1-b8af-a19e9f09585f": 189,
+    "3b637018-0150-4bf1-b8af-a19e9f09585f": 200,
     "b4320c25-6bf5-4d74-9fe6-3d6b8b36bd69": 313,
     "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 627
   },
@@ -13,18 +13,18 @@
   "phase": "phase-0-4-operational-assurance",
   "phaseId": "phase-0-4-operational-assurance",
   "parentPhase": null,
-  "last_updated": "2026-10-24T20:10:51.055039Z",
+  "last_updated": "2026-10-25T04:43:13.603160Z",
   "last_updated_by": "kbd-runtime",
-  "changes_total": 19,
+  "changes_total": 20,
   "changes_completed": 19,
-  "implementation_total": 19,
+  "implementation_total": 20,
   "implementation_completed": 19,
   "completion": {
     "primaryCounter": "implementation",
     "implementation": {
       "completed": 19,
-      "total": 19,
-      "status": "COMPLETE"
+      "total": 20,
+      "status": "IN_PROGRESS"
     },
     "evidence": {
       "status": "NOT_TRACKED",
@@ -52,8 +52,8 @@
     "primaryCounter": "implementation",
     "implementation": {
       "completed": 70,
-      "total": 70,
-      "status": "COMPLETE"
+      "total": 71,
+      "status": "IN_PROGRESS"
     },
     "evidence": {
       "status": "PENDING",
@@ -81,6 +81,17 @@
       "tasks_done": 1,
       "last_task_completed": "1.1 Repair observed PR94 CI failures, review and verify the coherent fixes, and confirm latest-head CI before preparing operator merge",
       "next_task_pending": null,
+      "blockers": []
+    },
+    {
+      "id": "oa-20-merged-certification",
+      "title": "oa-20-merged-certification",
+      "status": "IN_PROGRESS",
+      "implementation_status": "IN_PROGRESS",
+      "tasks_total": 2,
+      "tasks_done": 1,
+      "last_task_completed": "1.1 Freeze merged candidate, assess prerequisites, run available production checks and retain readiness evidence",
+      "next_task_pending": "1.2 Complete candidate-bound OA01–OA17 certification with independent authority on approved environments",
       "blockers": []
     },
     {

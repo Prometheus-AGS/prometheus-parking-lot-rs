@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "purpose": "checked command definition; not execution evidence",
-  "contract_digest": "e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257",
+  "contract_digest": "04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2",
   "profiles": {
     "baseline": "native",
     "linux": "Linux",
@@ -322,7 +322,8 @@
         "{out}/secrets-tree"
       ],
       "scenarios": [
-        "OA-05"
+        "OA-05",
+        "OA-01"
       ],
       "tools": [
         "python3",
@@ -345,7 +346,8 @@
         "."
       ],
       "scenarios": [
-        "OA-05"
+        "OA-05",
+        "OA-01"
       ],
       "tools": [
         "git",
@@ -361,7 +363,9 @@
         ".github/scripts/supply-chain.sh",
         "tracked-credentials"
       ],
-      "scenarios": [],
+      "scenarios": [
+        "OA-01"
+      ],
       "tools": [
         "git",
         "gitleaks"
@@ -376,7 +380,9 @@
         ".github/scripts/supply-chain.sh",
         "package-allowlist"
       ],
-      "scenarios": [],
+      "scenarios": [
+        "OA-01"
+      ],
       "tools": [
         "git",
         "gitleaks",
@@ -393,7 +399,9 @@
         "secrets-diff",
         "{base}..{candidate}"
       ],
-      "scenarios": [],
+      "scenarios": [
+        "OA-01"
+      ],
       "tools": [
         "git",
         "gitleaks"
@@ -576,25 +584,6 @@
       ],
       "timeout": 3600,
       "contains": "PASS: OA-05 template fixture oracles matched"
-    },
-    {
-      "id": "containment-real",
-      "profile": "baseline",
-      "argv": [
-        "bash",
-        "{workspace}/.github/scripts/supply-chain.sh",
-        "release-containment"
-      ],
-      "scenarios": [
-        "OA-01"
-      ],
-      "tools": [
-        "git",
-        "gitleaks"
-      ],
-      "timeout": 3600,
-      "cwd": "{fresh_mirror}",
-      "authority": "G-02"
     },
     {
       "id": "oa02",
@@ -3285,5 +3274,17 @@
       ],
       "timeout": 3600
     }
-  ]
+  ],
+  "profile_sources": {
+    "baseline": "github-actions",
+    "linux": "github-actions",
+    "macos": "github-actions",
+    "windows": "github-actions",
+    "android": "github-actions",
+    "ios": "github-actions",
+    "macos-gui": "approved-manual-bundle",
+    "quiet": "approved-manual-bundle"
+  },
+  "containment_scope": "current-source-and-fixtures",
+  "containment_scope_amendment_sha256": "683e1ffa0e138897ae6231a5c3f322840b4d8137a372464907bb4d99aa0351ee"
 }

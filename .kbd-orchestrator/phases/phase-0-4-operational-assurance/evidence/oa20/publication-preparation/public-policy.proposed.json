@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "repository": "Prometheus-AGS/prometheus-parking-lot-rs",
+  "branch": "main",
+  "version": "0.4.0",
+  "boundary_workflow_sha256": "f2151487639fdcf0ba9d66816578f3e5cead0872f69c2d2802a3f4aa4e036bbf",
+  "release_workflow_sha256": "9b31ee2bbc17cfa9940405d992ea799bfd158abf2e45da2308d2bf98a22c368b",
+  "contract_digest": "04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2",
+  "max_age_seconds": 86400,
+  "boundary_environment": {
+    "name": "release-certification",
+    "id": 0,
+    "reviewer_ids": []
+  },
+  "publish_environment": {
+    "name": "release-crates-io",
+    "id": 0,
+    "reviewer_ids": []
+  },
+  "signature": {
+    "format": "ssh",
+    "identity": "travis@tribehealthsolutions.com",
+    "fingerprint": "SHA256:TRubhhzq1JNXqLHymdzD8y5gjreUp2wplply9PQ11H4",
+    "allowed_signers_file": "/tmp/prometheus-release-trust/allowed_signers",
+    "revocations_file": null,
+    "public_trust_sha256": "30a043a89816b8798bf0358da7d624f294fbe2eea7ab0378117d84ddd9b80b47"
+  }
+}

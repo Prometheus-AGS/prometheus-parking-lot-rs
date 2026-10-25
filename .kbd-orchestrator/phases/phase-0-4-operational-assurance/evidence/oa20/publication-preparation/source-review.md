@@ -1,0 +1,5 @@
+# Independent completed-source review
+
+Fresh code reviewer found two concrete blockers: missing prefreeze locked dependency downloads for empty hosted caches, and native Windows separators in sealed source/packet identities. One batched correction added serialized root/standalone locked fetches with network enabled only in preparation, canonical POSIX identities, Git-index symlink/materialization handling, and discriminating portability fixtures. The same isolated reviewer confirmed both resolved, zero remaining findings, verdict APPROVE.
+
+Separate fresh Python/security reviewer confirmed no introduced security findings and independently confirmed the portability correction. Ruff style noise and unavailable mypy were reported, not treated as production evidence. Both reviews are same-family independent contexts, not external release authority. No reviewer ran Cargo, installed tools, dispatched workflows or changed settings. Root ran the source fixtures and retained actual results; final hosted/manual certification is still outstanding.

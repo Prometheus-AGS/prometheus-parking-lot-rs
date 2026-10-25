@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "gh",
+    "api",
+    "repos/Prometheus-AGS/prometheus-parking-lot-rs/branches/main/protection"
+  ],
+  "observed_at": "2026-10-25T04:17:08.505698+00:00",
+  "exit_code": 1,
+  "stdout": "{\"message\":\"Branch not protected\",\"documentation_url\":\"https://docs.github.com/rest/branches/branch-protection#get-branch-protection\",\"status\":\"404\"}",
+  "stderr": "gh: Branch not protected (HTTP 404)\n"
+}
