@@ -1,0 +1,2 @@
+archived: oa-20-merged-certification
+{"code":0,"schemaVersion":1,"time":"2026-10-25T15:20:05.504Z","operation":"run","project":"/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs","status":"completed","version":"1.15.0","latestVerified":false,"policy":"selected-cache","cliExitCode":0,"receipt":"/Users/gqadonis/.prometheus/openspec/receipts/79e427e7ccf7d8a94667a005/1792941605504-45d97e9f-84bc-4b60-9c8a-ba01e2b81389.json"}

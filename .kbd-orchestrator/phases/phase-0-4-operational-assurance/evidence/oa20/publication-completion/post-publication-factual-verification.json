@@ -1,0 +1,438 @@
+{
+  "schema_version": 1,
+  "review_type": "narrow_post_review_factual_verification",
+  "observed_at": "2026-10-25T15:20:25.995810+00:00",
+  "candidate": "53682521cb2a7a49c06e046c826890d9e11b6bfe",
+  "software_contract_digest": "04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2",
+  "status": "PASS",
+  "prior_R2_unchanged": {
+    "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/r2-final.json",
+    "sha256": "47010cb1f0387ee40506c19e90bc87bbd1f13320c23355e5621e4cbb41281e09",
+    "correction_cycles": 0
+  },
+  "certification": {
+    "run_id": 40195944814,
+    "attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "compact_artifact_id": 12603782092,
+    "compact_archive_sha256": "620e7d1a94d78fa83c5129ae396deccd0709c57847489a71060c43d17410b6c0",
+    "all17_scenarios_baseline_review_and3_operator_gates": "PASS",
+    "tag_object": "943c62d860e8971847334e9196ad34881658fbcb",
+    "original_preparation_bytes_verified": true
+  },
+  "publication": {
+    "run_id": 40205691112,
+    "attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "validate_and_publish_jobs": "success",
+    "approved_publisher_environment": 25255584621,
+    "oidc_exchange_and_cleanup": "Successful retrieval and revocation observed in actual log; no token values inspected",
+    "published_crates": [
+      {
+        "name": "prometheus-parking-lot-core",
+        "version": "0.4.0",
+        "checksum": "37efae347dedc41cfb3c89ad85b6408773c43eca232a416d9879d97997d0a619",
+        "vcs": {
+          "git": {
+            "sha1": "53682521cb2a7a49c06e046c826890d9e11b6bfe"
+          },
+          "path_in_vcs": "crates/parking-lot-core"
+        }
+      },
+      {
+        "name": "prometheus-parking-lot-runtime-tokio",
+        "version": "0.4.0",
+        "checksum": "bd3c5216df0ec37d700096635c4f573530eb22193971f5694992a3eef1448dc1",
+        "vcs": {
+          "git": {
+            "sha1": "53682521cb2a7a49c06e046c826890d9e11b6bfe"
+          },
+          "path_in_vcs": "crates/parking-lot-runtime-tokio"
+        }
+      },
+      {
+        "name": "prometheus-parking-lot-pg",
+        "version": "0.4.0",
+        "checksum": "7eb896b765c55f41021be8c0c67e5f27a3920b09920e2a57aa658ed3b6deb9f9",
+        "vcs": {
+          "git": {
+            "sha1": "53682521cb2a7a49c06e046c826890d9e11b6bfe"
+          },
+          "path_in_vcs": "crates/parking-lot-pg"
+        }
+      },
+      {
+        "name": "prometheus-parking-lot-embedded",
+        "version": "0.4.0",
+        "checksum": "d70ce353b84ec8f79893376c935d2ddb701c3583e1ce47e4988b9d2802921c9c",
+        "vcs": {
+          "git": {
+            "sha1": "53682521cb2a7a49c06e046c826890d9e11b6bfe"
+          },
+          "path_in_vcs": "crates/parking-lot-embedded"
+        }
+      },
+      {
+        "name": "prometheus-parking-lot-iggy",
+        "version": "0.4.0",
+        "checksum": "a88ddbc73aaaa68f9f26ba763390caabdef55bdd2b81a717da41258857871958",
+        "vcs": {
+          "git": {
+            "sha1": "53682521cb2a7a49c06e046c826890d9e11b6bfe"
+          },
+          "path_in_vcs": "crates/parking-lot-iggy"
+        }
+      },
+      {
+        "name": "prometheus-parking-lot-wasm",
+        "version": "0.4.0",
+        "checksum": "07b6eca53078269df378860016285dc69fd840d551363b0f9f3f57fcfe9e0657",
+        "vcs": {
+          "git": {
+            "sha1": "53682521cb2a7a49c06e046c826890d9e11b6bfe"
+          },
+          "path_in_vcs": "crates/parking-lot-wasm"
+        }
+      },
+      {
+        "name": "prometheus_parking_lot",
+        "version": "0.4.0",
+        "checksum": "7826ffe61b0c6aff9b36aea2ea02d86d207124d90edf4243d5dea375a6ad4b7e",
+        "vcs": {
+          "git": {
+            "sha1": "53682521cb2a7a49c06e046c826890d9e11b6bfe"
+          },
+          "path_in_vcs": ""
+        }
+      }
+    ]
+  },
+  "fresh_consumers": {
+    "status": "PASS",
+    "commands": [
+      {
+        "consumer": "native",
+        "step": "resolve",
+        "argv": [
+          "/Users/gqadonis/.cargo/bin/cargo",
+          "generate-lockfile"
+        ],
+        "cwd": "/private/tmp/oa20-registry-consumers-536-z7vnlj43/native",
+        "started_at": "2026-10-25T15:16:13.247303+00:00",
+        "finished_at": "2026-10-25T15:16:14.939629+00:00",
+        "exit": 0,
+        "anonymous_cargo_home": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/native-anonymous-cargo-home",
+        "fresh_target": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/native-fresh-target"
+      },
+      {
+        "consumer": "native",
+        "step": "check",
+        "argv": [
+          "/Users/gqadonis/.cargo/bin/cargo",
+          "check",
+          "--locked"
+        ],
+        "cwd": "/private/tmp/oa20-registry-consumers-536-z7vnlj43/native",
+        "started_at": "2026-10-25T15:16:14.940227+00:00",
+        "finished_at": "2026-10-25T15:17:49.073657+00:00",
+        "exit": 0,
+        "anonymous_cargo_home": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/native-anonymous-cargo-home",
+        "fresh_target": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/native-fresh-target"
+      },
+      {
+        "consumer": "wasm",
+        "step": "resolve",
+        "argv": [
+          "/Users/gqadonis/.cargo/bin/cargo",
+          "generate-lockfile"
+        ],
+        "cwd": "/private/tmp/oa20-registry-consumers-536-z7vnlj43/wasm",
+        "started_at": "2026-10-25T15:17:49.097422+00:00",
+        "finished_at": "2026-10-25T15:17:49.655297+00:00",
+        "exit": 0,
+        "anonymous_cargo_home": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/wasm-anonymous-cargo-home",
+        "fresh_target": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/wasm-fresh-target"
+      },
+      {
+        "consumer": "wasm",
+        "step": "check",
+        "argv": [
+          "/Users/gqadonis/.cargo/bin/cargo",
+          "check",
+          "--locked",
+          "--target",
+          "wasm32-unknown-unknown"
+        ],
+        "cwd": "/private/tmp/oa20-registry-consumers-536-z7vnlj43/wasm",
+        "started_at": "2026-10-25T15:17:49.656004+00:00",
+        "finished_at": "2026-10-25T15:18:16.393901+00:00",
+        "exit": 0,
+        "anonymous_cargo_home": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/wasm-anonymous-cargo-home",
+        "fresh_target": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/wasm-fresh-target"
+      }
+    ],
+    "registry_locked_packages": {
+      "native": [
+        "prometheus-parking-lot-core",
+        "prometheus-parking-lot-embedded",
+        "prometheus-parking-lot-iggy",
+        "prometheus-parking-lot-pg",
+        "prometheus-parking-lot-runtime-tokio",
+        "prometheus-parking-lot-wasm",
+        "prometheus_parking_lot"
+      ],
+      "wasm": [
+        "prometheus-parking-lot-core",
+        "prometheus-parking-lot-wasm"
+      ]
+    },
+    "coverage": "Fresh registry resolution plus cargo check only; native and wasm32-unknown-unknown. Not runtime/database/browser/GUI reexecution.",
+    "isolation": "Actual source copies hash-match unchanged templates; exact=0.4.0 public registry dependencies with no path/git/patch/replace. Retained private helper creates fresh anonymous Cargo homes/targets and checks ancestor config absence. Credential/config files absent from both observed fresh Cargo homes; environment allowlist excludes registry tokens."
+  },
+  "initial_failure_retained": {
+    "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers-initial-missing-rustc/native-resolve.stderr.txt",
+    "failure": "rustc -vV never executed; missing executable in isolated PATH",
+    "correction": "Only prepend existing private1.99.1 toolchain bin. Exact before/after bytes independently verified against separately reviewed correction; no product source or public artifact repair.",
+    "correction_review_sha256": "e2b497e7bbbcfab8c7b95b6e1c2497a1914ed1fce69dfad58e74649dacffc954"
+  },
+  "findings": [],
+  "limits": [
+    "Artifact/hash/identity/log verification and three fresh read-only connected GitHub calls only; no Cargo, repo/KBD mutation, approval, publication or consumer execution by verifier.",
+    "Fresh consumers establish public-package compilation and lock/checksum provenance, not a fresh execution of production scenarios.",
+    "Original R2 findings, measured regressions, failed website audit, deferred credential/history/signer rotation, package-allowlist automation gap and same-family-isolation limits remain unchanged.",
+    "GitHub release423199372 publication and later KBD bookkeeping/Reflect/closure were not inspected or certified here. Final budgets and current canonicalb199 closure require their separate actual artifacts.",
+    "Anonymous execution environment and initially fresh directories are evidenced by inspected helper and retained records; no independent process-environment attestation or rerun was performed."
+  ],
+  "raw_proof": [
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/boundary-receipt.json",
+      "sha256": "abfca20dea40f31b93e37ed3a9160b99b02c1c13d95b3e684f4a0df861077a9a"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/final-approvals.json",
+      "sha256": "8d9b720a5eff25512bac97492566ac92437967d4d72ba02ecb11d84728506141"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/final-artifacts.json",
+      "sha256": "48c0348e5f219051617dabdf1eb0b2d2d9a62d9af4156ea702f125068eda9185"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/final-jobs.json",
+      "sha256": "53a80d5efbfd6002068872c5cc3ef5df51666b0a239ed4f7bc6d807613e12c35"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/final-run.json",
+      "sha256": "9bc29e643691e94b37cfac96f48229b192fb3870636c7fb312431d9aaf262605"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/certification-40195944814/operational-assurance-boundary.zip",
+      "sha256": "620e7d1a94d78fa83c5129ae396deccd0709c57847489a71060c43d17410b6c0"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/post-cert-artifacts.json",
+      "sha256": "48c0348e5f219051617dabdf1eb0b2d2d9a62d9af4156ea702f125068eda9185"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/post-cert-run.json",
+      "sha256": "9bc29e643691e94b37cfac96f48229b192fb3870636c7fb312431d9aaf262605"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/post-publication-run.json",
+      "sha256": "df049d99fdf9171e67495995a5f83a58662c2d3da92bfdf3d5fd3cfd80893445"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/r2-review/r2-final.json",
+      "sha256": "47010cb1f0387ee40506c19e90bc87bbd1f13320c23355e5621e4cbb41281e09"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers-initial-missing-rustc/native-resolve.stderr.txt",
+      "sha256": "235382520425c4841a699c405e75ba1b581db26e68d7ff626656e0302cd25dec"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/consumer-commands.json",
+      "sha256": "bb669f4a58ed083585d6fb602422f9ed64a9fbb9bee4bcaef719cd74c250e516"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/fresh-consumer-workspace.json",
+      "sha256": "1ef8d1c7eea2041f140b8488014bfc596777bd602d50cf3c01a2827a64809056"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/native-Cargo.lock",
+      "sha256": "a4b4090f2ec3856b73d1b0cfe39485873b15ea229b2046e6600a7867107374cf"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/native-check.stderr.txt",
+      "sha256": "5cfd6bce77395191a1605919dbb3ba0f816489ddcb7abb522f057e69429c89ab"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/native-check.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/native-resolve.stderr.txt",
+      "sha256": "7db9992420569d78b34dff94eace3968b55dc5d2d68791c299a5183a7af506c4"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/native-resolve.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/prometheus-parking-lot-core-0.4.0.crate",
+      "sha256": "37efae347dedc41cfb3c89ad85b6408773c43eca232a416d9879d97997d0a619"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/prometheus-parking-lot-core-metadata.json",
+      "sha256": "2dbfc2705acc1225512fe54ed420eed8e45b83ba442deec3bc6ce46396e41f35"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/prometheus-parking-lot-embedded-0.4.0.crate",
+      "sha256": "d70ce353b84ec8f79893376c935d2ddb701c3583e1ce47e4988b9d2802921c9c"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/prometheus-parking-lot-embedded-metadata.json",
+      "sha256": "9531b40933bfcf7ea797351cf6509d6ad50fc4a057170a45fb88639683b85def"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/prometheus-parking-lot-iggy-0.4.0.crate",
+      "sha256": "a88ddbc73aaaa68f9f26ba763390caabdef55bdd2b81a717da41258857871958"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/prometheus-parking-lot-iggy-metadata.json",
+      "sha256": "984a5fb8154037baf264b92d13a56de2f7e8c77004dccb9a5323dee05a3dfb71"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/prometheus-parking-lot-pg-0.4.0.crate",
+      "sha256": "7eb896b765c55f41021be8c0c67e5f27a3920b09920e2a57aa658ed3b6deb9f9"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/prometheus-parking-lot-pg-metadata.json",
+      "sha256": "af2d02ab3974e774cbb44540ffea8c32f37315b3f7f088d788a4154c2f99570e"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/prometheus-parking-lot-runtime-tokio-0.4.0.crate",
+      "sha256": "bd3c5216df0ec37d700096635c4f573530eb22193971f5694992a3eef1448dc1"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/prometheus-parking-lot-runtime-tokio-metadata.json",
+      "sha256": "39aca1c8e06bcb9d7d261762b1e8e2e433c650434c881f18ff5ff220cea5a966"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/prometheus-parking-lot-wasm-0.4.0.crate",
+      "sha256": "07b6eca53078269df378860016285dc69fd840d551363b0f9f3f57fcfe9e0657"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/prometheus-parking-lot-wasm-metadata.json",
+      "sha256": "8c0d3359f269ae31cd0c6f0b1ad867bff010ce9b034fb72d007e25c9ead19206"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/prometheus_parking_lot-0.4.0.crate",
+      "sha256": "7826ffe61b0c6aff9b36aea2ea02d86d207124d90edf4243d5dea375a6ad4b7e"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/prometheus_parking_lot-metadata.json",
+      "sha256": "d431a1c749b54dfe0504875765f2b507f57488f0362c0b25827c323dd82538dd"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/registry-verification.json",
+      "sha256": "37e1fa3bf04ecce869b184a973306a4daf709979f320c8eefbf1124bc1806a18"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/result.json",
+      "sha256": "315c177b151a7173f154f9a2f04b3f09da045f136eb8ac8885f710c234b6d9b4"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/wasm-Cargo.lock",
+      "sha256": "7f0e7b6e70ebec860ea9ff151753ecb58e9a3a41f90daed9ca6b22f457718188"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/wasm-check.stderr.txt",
+      "sha256": "67bd1d1c2b96b94fac3feea653b2e8ad1e22c53367c7896a23199ec3cab8285d"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/wasm-check.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/wasm-resolve.stderr.txt",
+      "sha256": "cf1dc59afbc93d7c06cb734f84fdd8183c0aabde90e8d14e1d65841404995a16"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/registry-and-fresh-consumers/wasm-resolve.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/fresh-consumer-rustc-path-observation.json",
+      "sha256": "535a7a1e1212bec312e39766af956f9ed651bde119cad3b805e2cd68cc1af939"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/private-consumer-path-review.json",
+      "sha256": "e2b497e7bbbcfab8c7b95b6e1c2497a1914ed1fce69dfad58e74649dacffc954"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/registry-and-fresh-consumers-console.txt",
+      "sha256": "cafbaff99bbec171798808389db12af9fec86581a85686639a5b61c5c3e1bdd4"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/registry-and-fresh-consumers-initial-console.txt",
+      "sha256": "82a98e0fdaae5f5109018e31ee55c19ba1c365f8843f35b9441142047660b1f5"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/registry-consumer-helper-before-rustc-path.py",
+      "sha256": "74181d0c23f8c68908ee11c26be68447e858754b555b3d33ad3982c1d305d022"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/release-publication-approvals.json",
+      "sha256": "883e987f83334d0bdcfd81e1c19c11c576e4fe239734ddb48c96b89e18e705e7"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/release-publication-jobs.json",
+      "sha256": "36b60e5807932547fb2c7863415ef491db35972829292e649701eddad6d365a8"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/release-publication-run.json",
+      "sha256": "df049d99fdf9171e67495995a5f83a58662c2d3da92bfdf3d5fd3cfd80893445"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/release-publication.log",
+      "sha256": "2ec1e83ff38307f3b3028aca23dbf615d2d0be43d9ebaa2c2fd0b86e92e91bcc"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/registry-consumers-0.4.0/native/Cargo.toml",
+      "sha256": "5744452d71c13e25f97f78411521af74965f5ca6276afd41ce6a72ff994fb6fb"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/registry-consumers-0.4.0/native/src/lib.rs",
+      "sha256": "7e61ce4786bb8822fab0a6731eb7b19da5e73f4cdaff25e0b8e2da2e48567c5a"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/registry-consumers-0.4.0/wasm/Cargo.toml",
+      "sha256": "e9a9f1b6c36b508b27d25e91b754d8f1c2cc70a62f18a5a03b3fa7664f6e5f81"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/registry-consumers-0.4.0/wasm/src/lib.rs",
+      "sha256": "8714877c725950357c1c347a79dc9fd2d1896a26263706d07c0fcc54b2c6c85f"
+    },
+    {
+      "path": "/private/tmp/oa20-registry-consumers-536-z7vnlj43/native/Cargo.toml",
+      "sha256": "5744452d71c13e25f97f78411521af74965f5ca6276afd41ce6a72ff994fb6fb"
+    },
+    {
+      "path": "/private/tmp/oa20-registry-consumers-536-z7vnlj43/native/src/lib.rs",
+      "sha256": "7e61ce4786bb8822fab0a6731eb7b19da5e73f4cdaff25e0b8e2da2e48567c5a"
+    },
+    {
+      "path": "/private/tmp/oa20-registry-consumers-536-z7vnlj43/wasm/Cargo.toml",
+      "sha256": "e9a9f1b6c36b508b27d25e91b754d8f1c2cc70a62f18a5a03b3fa7664f6e5f81"
+    },
+    {
+      "path": "/private/tmp/oa20-registry-consumers-536-z7vnlj43/wasm/src/lib.rs",
+      "sha256": "8714877c725950357c1c347a79dc9fd2d1896a26263706d07c0fcc54b2c6c85f"
+    },
+    {
+      "path": "/tmp/oa20-registry-and-consumers-536.py",
+      "sha256": "36d561a064ba61e4a5cd0c5235a374671ec0d05e54e84026bbe8c7d111ce1110"
+    }
+  ]
+}

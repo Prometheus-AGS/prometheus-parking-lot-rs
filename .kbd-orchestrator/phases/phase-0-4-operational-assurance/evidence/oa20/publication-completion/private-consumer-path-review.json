@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "review_type": "independent_narrow_observed_prerequisite_correction",
+  "observed_at": "2026-10-25T15:16:01.542108+00:00",
+  "verdict": "APPROVE",
+  "findings": [],
+  "helper": "/tmp/oa20-registry-and-consumers-536.py",
+  "sha256": "36d561a064ba61e4a5cd0c5235a374671ec0d05e54e84026bbe8c7d111ce1110",
+  "prior_sha256": "74181d0c23f8c68908ee11c26be68447e858754b555b3d33ad3982c1d305d022",
+  "artifact_echo": {
+    "file": "/tmp/oa20-registry-and-consumers-536.py",
+    "line": 27,
+    "code": "baseenv={k:os.environ[k] for k in ['HOME','USER','LOGNAME','LANG','LC_ALL','TMPDIR','SDKROOT','MACOSX_DEPLOYMENT_TARGET','DEVELOPER_DIR'] if k in os.environ};baseenv.update(PATH='/tmp/oa04-private-tools/rustup/toolchains/1.99.1-x86_64-apple-darwin/bin:/tmp/oa20-selected-tools:/tmp/oa04-private-tools/bin:/Users/gqadonis/.volta/tools/image/node/24.18.0/bin:/usr/bin:/bin:/usr/sbin:/sbin',RUSTUP_HOME='/tmp/oa04-private-tools/rustup',RUSTUP_TOOLCHAIN='1.99.1',RUSTUP_AUTO_INSTALL='0',CARGO_BUILD_JOBS='4',CARGO_TERM_COLOR='never');records=[]"
+  },
+  "exact_change_verified": "Only prepends existing private Rust 1.99.1 toolchain bin directory to the isolated PATH; removing that single prefix reproduces retained old helper bytes exactly.",
+  "observed_failure": "Retained native-resolve.stderr.txt states rustc -vV never executed: No such file or directory (os error 2).",
+  "checks_observed": [
+    "Both hashes match assigned exact versions.",
+    "AST parse of revised script succeeded without executing it.",
+    "Existing private rustc and rustdoc executables observed at prepended toolchain bin.",
+    "Recorded prerequisite rustc -vV observation has exit 0, Rust 1.99.1, x86_64-apple-darwin, and revised helper hash.",
+    "Fresh Cargo home/target, token-stripped environment, cwd isolation, registry checks and all remaining helper bytes unchanged."
+  ],
+  "limitations": [
+    "Revised helper not executed by this review; consumer resolution/compilation outcomes remain unverified.",
+    "Recorded prerequisite observation was read, not independently reexecuted.",
+    "No Cargo commands, repository/source edits, network writes, or user configuration writes performed; only this review artifact written."
+  ],
+  "severity_counts": {
+    "CRITICAL": 0,
+    "HIGH": 0,
+    "MEDIUM": 0,
+    "LOW": 0
+  }
+}

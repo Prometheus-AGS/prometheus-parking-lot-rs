@@ -1,0 +1,90 @@
+{
+  "candidate": "53682521cb2a7a49c06e046c826890d9e11b6bfe",
+  "observed_at": "2026-10-25T15:16:13.244526+00:00",
+  "crates": {
+    "prometheus-parking-lot-core": {
+      "version": "0.4.0",
+      "checksum": "37efae347dedc41cfb3c89ad85b6408773c43eca232a416d9879d97997d0a619",
+      "vcs": {
+        "git": {
+          "sha1": "53682521cb2a7a49c06e046c826890d9e11b6bfe"
+        },
+        "path_in_vcs": "crates/parking-lot-core"
+      },
+      "created_at": "2026-10-25T15:13:35.146925Z",
+      "yanked": false
+    },
+    "prometheus-parking-lot-runtime-tokio": {
+      "version": "0.4.0",
+      "checksum": "bd3c5216df0ec37d700096635c4f573530eb22193971f5694992a3eef1448dc1",
+      "vcs": {
+        "git": {
+          "sha1": "53682521cb2a7a49c06e046c826890d9e11b6bfe"
+        },
+        "path_in_vcs": "crates/parking-lot-runtime-tokio"
+      },
+      "created_at": "2026-10-25T15:13:37.753574Z",
+      "yanked": false
+    },
+    "prometheus-parking-lot-pg": {
+      "version": "0.4.0",
+      "checksum": "7eb896b765c55f41021be8c0c67e5f27a3920b09920e2a57aa658ed3b6deb9f9",
+      "vcs": {
+        "git": {
+          "sha1": "53682521cb2a7a49c06e046c826890d9e11b6bfe"
+        },
+        "path_in_vcs": "crates/parking-lot-pg"
+      },
+      "created_at": "2026-10-25T15:13:37.561557Z",
+      "yanked": false
+    },
+    "prometheus-parking-lot-embedded": {
+      "version": "0.4.0",
+      "checksum": "d70ce353b84ec8f79893376c935d2ddb701c3583e1ce47e4988b9d2802921c9c",
+      "vcs": {
+        "git": {
+          "sha1": "53682521cb2a7a49c06e046c826890d9e11b6bfe"
+        },
+        "path_in_vcs": "crates/parking-lot-embedded"
+      },
+      "created_at": "2026-10-25T15:13:37.027749Z",
+      "yanked": false
+    },
+    "prometheus-parking-lot-iggy": {
+      "version": "0.4.0",
+      "checksum": "a88ddbc73aaaa68f9f26ba763390caabdef55bdd2b81a717da41258857871958",
+      "vcs": {
+        "git": {
+          "sha1": "53682521cb2a7a49c06e046c826890d9e11b6bfe"
+        },
+        "path_in_vcs": "crates/parking-lot-iggy"
+      },
+      "created_at": "2026-10-25T15:13:37.298701Z",
+      "yanked": false
+    },
+    "prometheus-parking-lot-wasm": {
+      "version": "0.4.0",
+      "checksum": "07b6eca53078269df378860016285dc69fd840d551363b0f9f3f57fcfe9e0657",
+      "vcs": {
+        "git": {
+          "sha1": "53682521cb2a7a49c06e046c826890d9e11b6bfe"
+        },
+        "path_in_vcs": "crates/parking-lot-wasm"
+      },
+      "created_at": "2026-10-25T15:13:38.101146Z",
+      "yanked": false
+    },
+    "prometheus_parking_lot": {
+      "version": "0.4.0",
+      "checksum": "7826ffe61b0c6aff9b36aea2ea02d86d207124d90edf4243d5dea375a6ad4b7e",
+      "vcs": {
+        "git": {
+          "sha1": "53682521cb2a7a49c06e046c826890d9e11b6bfe"
+        },
+        "path_in_vcs": ""
+      },
+      "created_at": "2026-10-25T15:13:39.848049Z",
+      "yanked": false
+    }
+  }
+}

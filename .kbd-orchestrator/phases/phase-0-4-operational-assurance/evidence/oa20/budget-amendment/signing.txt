@@ -1,0 +1,2 @@
+Signing file .kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/budget-amendment/budget-amendment.json
+Write signature to .kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/budget-amendment/budget-amendment.json.sig

@@ -1,0 +1,3 @@
+    Updating crates.io index
+     Locking 412 packages to highest Rust 1.99.1 compatible versions
+      Adding crypto-common v0.1.6 (available: v0.1.7)

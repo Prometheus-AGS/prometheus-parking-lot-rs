@@ -1,0 +1,46 @@
+{
+  "artifact_echo": {
+    "actual_parser": "while IFS=' ' read -r path digest; do",
+    "actual_refusal": "BLOCKED phase=phase-0-4-operational-assurance reason=evidence-stale-sources(missing(docs/archive/Comprehensive))",
+    "removed_source_digest": {
+      "docs/archive/Comprehensive Architectural Report Distributed Parking Management Systems and High-Performance Rust Audit Infrastructur.md": "90d322f926e7912f6a0e2951eb49cc339f1cc8ad4112da5e57f3063893612c56"
+    }
+  },
+  "candidate": "53682521cb2a7a49c06e046c826890d9e11b6bfe",
+  "contract_digest": "b1993dbc9a81f8e688300c97e7a621f341d068c6c536222de7c0e9bb0a95c911",
+  "findings": [],
+  "limits": [
+    "Original artifact review remains preserved, superseded only for boundary envelope hash by this narrow delta.",
+    "This is not a new R2 or product test; no terminal PASS/CLOSED or rerun outcome is asserted. Root must rerun and observe terminal helper separately.",
+    "Same-family isolated Codex review."
+  ],
+  "observed_at": "2026-10-25T15:30:14.121853+00:00",
+  "raw_proof": [
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/boundary-results-before-path-representation.json",
+      "sha256": "e1f4e50c3a70d361dd0311fc46e5682f20542f5c7e7957aa372d9365a557c024"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/boundary-results.json",
+      "sha256": "eeb6991401687a908265ae5ae276fe6036ec3bdd8c5cb4d385e1035bd3c5d560"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/phase-close-initial-path-refusal.txt",
+      "sha256": "b419e543d7797f11372bd618b5299f7db93fbefc5301aff341ac62e39d05f0aa"
+    },
+    {
+      "path": "/Users/gqadonis/.prometheus/plugins/prometheus-skill-pack/current/shared/scripts/kbd-phase-close-eval.sh",
+      "sha256": "dd732ebbd23b9cd30903b56a21a7ea29f845c584b33889bda31d788aae6cf637"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/docs/archive/Comprehensive Architectural Report Distributed Parking Management Systems and High-Performance Rust Audit Infrastructur.md",
+      "sha256": "90d322f926e7912f6a0e2951eb49cc339f1cc8ad4112da5e57f3063893612c56"
+    }
+  ],
+  "refusal_mechanism": "Installed helper concatenates source path and digest with spaces and reads with IFS space. It truncates this whitespace-containing documentation path to docs/archive/Comprehensive, exactly matching the observed BLOCKED missing-path refusal. This representation change enables checking remaining production source paths; helper/product code is unchanged.",
+  "review_type": "narrow_path_representation_delta_only",
+  "schema_version": 1,
+  "source_exclusion_scope": "Historical document archived by a360779 docs: archive invalid docs and reset TODO/API (cr-16 1.1); no Rust/product/workflow source removed or changed. Excluded document hash still matches current file and committed candidate blob; preserved in preimage and correction provenance.",
+  "verdict": "PASS",
+  "verified_delta": "Parsed objects differ only by removing one unchanged historical archived documentation sourceDigest and adding completedEvidence.sourceMapRepresentationCorrection. All17 scenarios, their carry/digests, budgets and all other object fields are identical; remaining1517 source pins still match current bytes."
+}

@@ -1,0 +1,50 @@
+{
+  "schema": "kbd.phase-disposition/v1",
+  "projectId": "f6c384db-6ee1-4f1b-9bab-0e1602ec2615",
+  "runId": "phase-certification-remediation-20261022T103344Z",
+  "phaseId": "phase-0-4-operational-assurance",
+  "phaseStatus": "in_progress",
+  "contractBound": true,
+  "disposition": "OPEN",
+  "binding": {
+    "contractPath": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json",
+    "contractDigest": "b1993dbc9a81f8e688300c97e7a621f341d068c6c536222de7c0e9bb0a95c911",
+    "scenarioDigests": {
+      "OA-01": "a189aeb4ca413cd2e2b2e9e6f6f9786f1e33201b04cba1f14ac974d4b3acf181",
+      "OA-02": "cb339704db270b42a9ab1c5ff9317763d3778b6ccfe82320659ad119abed35b0",
+      "OA-03": "b4d3e3170f4278e54225734c46517588d2973542684f5a0a0405163169831844",
+      "OA-04": "2eeda898d94dd238b21b91a05a6a753c2f875eae80584cd2c9835d6ddf67a3d7",
+      "OA-05": "3f9ccc7844f7d7598d853d91d0bb06ce2fadd3fdf99049127ce1a047a6178f1a",
+      "OA-06": "99b2f6456a797fc96a442d2e3690b79e598e0d83516e47a83ca9f11e42a45b6f",
+      "OA-07": "7ab0dc15cc5fa43a9771429bf2c38c37d4278b4f0aa48b35d6f23bc9056e6b45",
+      "OA-08": "d71b7c02d82290f40b4afa08d201962d843a62e90376659e9e71c05194f7dfa1",
+      "OA-09": "3a4d626c625ad385bb23c252fcc07bf5947fc75ef3f84a94bc559cc44eff4843",
+      "OA-10": "f2193788474842dc303c7dedec6f1071dea5ffd03fc6522183df1952641ed9a1",
+      "OA-11": "5c14e75fec1fe3e67a700f140fd57d6d08f5e4c83375b7ec2b049daaba9aaa9a",
+      "OA-12": "aca7c519e0db177437372e50fb5d2e539e6281d09dc4f224e4e5b52913890d25",
+      "OA-13": "dbd5bafb27c92b329adc67fa0828c1371d199cf1f8be51a8a9f2b2caa28f5bfc",
+      "OA-14": "d8578e212968bba5fe6e53b50e096395022c44a28908c3ff760aa8a1c65d7338",
+      "OA-15": "4af607c845ad779dbfd869fea65334080728bc2004392ef733af350e6f475802",
+      "OA-16": "33d8c23c6988d35e15e7acef7e0f95216a12f5bda63e0cf048161f3faeb10ce5",
+      "OA-17": "d8b84f9f3d1db3a8e9d76382aae56df2aa23e14cab8e0cf72a1ee9c175e63224"
+    },
+    "planRevision": 1,
+    "adoptionDecisionId": "contract-adoption-phase-0-4-operational-assurance-b1993dbc",
+    "bindingRevision": 3,
+    "authority": {
+      "manifestRaw": "{\"action\":\"amend-contract\",\"approver\":\"travis@tribehealthsolutions.com\",\"contractPath\":\".kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json\",\"kind\":\"kbd.scope-authority\",\"namespace\":\"prometheus-kbd-scope-amendment\",\"newContractDigest\":\"b1993dbc9a81f8e688300c97e7a621f341d068c6c536222de7c0e9bb0a95c911\",\"nonce\":\"78120cb0ee52f42b7f87dd2fa3945183\",\"phaseId\":\"phase-0-4-operational-assurance\",\"previousContractDigest\":\"04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2\",\"projectId\":\"f6c384db-6ee1-4f1b-9bab-0e1602ec2615\",\"reason\":\"Operator explicitly approved budget-only tool-call ceiling increase from 3000 to 15000 and autonomous completion; no scenarios, tests, time or repair limits changed\",\"runId\":\"phase-certification-remediation-20261022T103344Z\",\"scenarioChanges\":{\"added\":[],\"modified\":[],\"removed\":[]},\"schemaVersion\":\"1\",\"timestamp\":\"2026-10-25T11:12:33Z\"}",
+      "manifestSha256": "73df9994b85d6e36320cc6477fc714bc3b113343aa136b66494bd11a35574bff",
+      "signature": "-----BEGIN SSH SIGNATURE-----\nU1NIU0lHAAAAAQAAADMAAAALc3NoLWVkMjU1MTkAAAAgyscvqIKUJFIvtb3WEIENiKk6iV\nlxAe5Fs/QkCGzf0QMAAAAecHJvbWV0aGV1cy1rYmQtc2NvcGUtYW1lbmRtZW50AAAAAAAA\nAAZzaGE1MTIAAABTAAAAC3NzaC1lZDI1NTE5AAAAQM+NfOoz2n+ndicplbLwoqdSpH47vr\nJsZvRF7r9E+UVqJGiuPWUTASC2/j+rKv8EXWTLMpBBB50XYD7CSTAqnw4=\n-----END SSH SIGNATURE-----\n",
+      "approver": "travis@tribehealthsolutions.com",
+      "namespace": "prometheus-kbd-scope-amendment",
+      "allowedSignersSha256": "a29020463ad810d800a0319c876d59908471e9061657d2b60cd56dfafc903e9e"
+    }
+  },
+  "closure": null,
+  "lastRefusal": null,
+  "successor": null,
+  "consumptionHighWater": {},
+  "awaitingSuccessor": false,
+  "dispatchAllowed": true,
+  "successorAllowed": false
+}

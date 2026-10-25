@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "status": "PUBLISHED_EXACT_AUTHENTIC_BYTES",
+  "observed_at": "2026-10-25T15:39:03.244165+00:00",
+  "asset_id": 675408229,
+  "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/releases/download/v0.4.0/kbd-phase-closure-evidence.zip",
+  "sha256": "7825c8d2396744748653d1e34e661a2e03ec98b980f24b0c4a3f932682c8d42a",
+  "bytes": 128032,
+  "members": [
+    {
+      "member": "boundary-results.json",
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/boundary-results.json",
+      "sha256": "eeb6991401687a908265ae5ae276fe6036ec3bdd8c5cb4d385e1035bd3c5d560",
+      "bytes": 213305
+    },
+    {
+      "member": "signature-verification.txt",
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/budget-amendment/signature-verification.txt",
+      "sha256": "90aae5d3c43afb910421f3ca45ea71a3c1b9c6ac266dfb487a112980716b240f",
+      "bytes": 152
+    },
+    {
+      "member": "cert-secret-disposition.json",
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/publication-completion/cert-secret-disposition.json",
+      "sha256": "b0e1cc16b2f45d39ca5acab204ec99a33ccad1fbfa7f18da3d9bba5a82258010",
+      "bytes": 736264
+    },
+    {
+      "member": "closed-disposition.json",
+      "path": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/closed-disposition.json",
+      "sha256": "2c3a672404c4471e9e5f8f0b62dac98b24de852924260ab63a748b7f3c8ae6a7",
+      "bytes": 10624
+    }
+  ],
+  "scan": {
+    "original_staged_exit": 1,
+    "recursive_archive_exit": 1,
+    "finding_count": 32,
+    "disposition": "ALL_32_MATCHES_NONCREDENTIAL_NO_REPORTED_SECRET_BLOCKER",
+    "independent_disposition_sha256": "3f9f3a3e5df90da287ec3b38a408953e1d99c5c75d2b0a4833a076c8ca468902",
+    "classes": "21 public Git digests;4 public command identifiers;5 public SSH fingerprints;2 independently recomputed public runtime closure identities",
+    "policy": "Unchanged .gitleaks.toml; no ignore, baseline or bypass added. Raw bytes retained locally and in this asset; only their Git transport representation changes."
+  },
+  "restoration": "Download verified ZIP outside checkout; verify ZIP/member SHA256 values; copy each exact member to its listed repository-relative path. Current local originals already remain in place. Do not rerun phase hooks or phase close merely to restore files.",
+  "prior_three_member_asset": {
+    "id": 675400399,
+    "sha256": "2e96874364cf1c49a1139c79089fd1ca538c2f322a288238f3ae4f834969a6bd",
+    "status": "preserved unchanged; current asset additionally retains actual closed disposition"
+  }
+}
