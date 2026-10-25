@@ -1,85 +1,161 @@
-name: OA20 real hosted build-storage diagnostic
+name: OA20 native Windows source identity diagnostic
 on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
+env:
+  PYTHONDONTWRITEBYTECODE: '1'
+  RUSTUP_AUTO_INSTALL: '0'
+  RUSTUP_TOOLCHAIN: '1.99.1'
+  PROBE_CANDIDATE: d50eec3028ee673f02f19cd5b9282db725fcdc02
+  GIT_CONFIG_COUNT: '2'
+  GIT_CONFIG_KEY_0: core.autocrlf
+  GIT_CONFIG_VALUE_0: 'false'
+  GIT_CONFIG_KEY_1: core.symlinks
+  GIT_CONFIG_VALUE_1: 'true'
 jobs:
-  linux-storage:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 180
-    env:
-      RUSTUP_AUTO_INSTALL: '0'
-      RUSTUP_TOOLCHAIN: '1.99.1'
-      PYTHONDONTWRITEBYTECODE: '1'
-      PROBE_CANDIDATE: 05a012bb79e4061c8e8e21ab016d55439a1e2247
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: 05a012bb79e4061c8e8e21ab016d55439a1e2247
+          ref: d50eec3028ee673f02f19cd5b9282db725fcdc02
           fetch-depth: 0
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: '1.99.1'
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: nextest@0.9.149
-          fallback: none
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: assurance-linux
+          shared-key: assurance-windows
           save-if: false
-      - name: Prepare the actual backend images and locked sources before diagnostic freeze
+      - name: Prefetch both actual locked Windows dependency graphs
+        run: |
+          cargo +1.99.1 fetch --locked --manifest-path Cargo.toml
+          cargo +1.99.1 fetch --locked --manifest-path bindings/tauri-desktop/src-tauri/Cargo.toml
+      - name: Inspect native Windows link representation and canonical identity
+        run: |
+          python3 - <<'PY'
+          import hashlib, importlib.util, json, os, platform, subprocess, sys
+          from pathlib import Path
+          root = Path.cwd()
+          sys.path.insert(0, str(root / '.github/scripts'))
+          spec = importlib.util.spec_from_file_location('boundary', root / '.github/scripts/operational-assurance.py')
+          boundary = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(boundary)
+          assert platform.system() == 'Windows'
+          boundary.clean(os.environ['PROBE_CANDIDATE'])
+          canonical = boundary.sources()
+          links = []
+          for entry in subprocess.check_output(['git', 'ls-files', '--stage', '-z']).split(b'\0'):
+              if not entry:
+                  continue
+              meta, raw_name = entry.split(b'\t', 1)
+              mode, oid, stage = meta.split()
+              if mode != b'120000':
+                  continue
+              path = Path(os.fsdecode(raw_name))
+              expected = subprocess.check_output(['git', 'cat-file', 'blob', oid.decode()], env={**os.environ, 'GIT_NO_REPLACE_OBJECTS': '1'})
+              native = os.readlink(path) if path.is_symlink() else None
+              assert canonical[path.as_posix()] == hashlib.sha256(expected).hexdigest()
+              links.append({'path': path.as_posix(), 'native': native, 'git_target': os.fsdecode(expected),
+                            'canonical_sha256': canonical[path.as_posix()], 'is_native_link': path.is_symlink()})
+          licenses = [row for row in links if row['path'].endswith('/LICENSE-MIT')]
+          assert len(licenses) == 6 and all(row['is_native_link'] and '\\' in row['native'] for row in licenses)
+          proof = {'purpose': 'Actual Windows native-link diagnostic only; never certification',
+                   'candidate': os.environ['PROBE_CANDIDATE'], 'system': platform.system(), 'links': links}
+          (Path(os.environ['RUNNER_TEMP']) / 'windows-native-links.json').write_text(json.dumps(proof, indent=2) + '\n')
+          print('Six real native Windows license links match exact canonical Git blob identities.')
+          PY
+      - name: Run both real Windows production rows and export sealed evidence
         run: |
           set -euo pipefail
-          docker version
-          docker build --builder default -f docker/postgres17/Dockerfile -t parking-lot-pg:17 docker
-          docker build --builder default -f docker/postgres18/Dockerfile -t parking-lot-pg:18 docker
-          iggy_image=$(python3 -c 'import json; print(json.load(open(".github/negative-controls.json"))["iggy_image"])')
-          docker pull "$iggy_image"
-          cargo +1.99.1 fetch --locked --manifest-path Cargo.toml
-      - name: Exercise ordinary workspace and real normal mutant cases with scoped storage reclamation
-        env:
-          BOOTSTRAP_RUNNER_ENVIRONMENT: ${{ runner.environment }}
-        run: |
-          python3 - <<'PYTHON'
-          import copy,hashlib,importlib.util,json,os,platform,sys
+          python3 - <<'PY'
+          import os, subprocess
           from pathlib import Path
-          root=Path.cwd(); candidate=os.environ['PROBE_CANDIDATE']; out=Path(os.environ['RUNNER_TEMP'])/'storage-proof'; out.mkdir()
-          sys.path.insert(0,str(root/'.github/scripts'))
-          import assurance_build_storage as storage
-          spec=importlib.util.spec_from_file_location('boundary',root/'.github/scripts/operational-assurance.py'); boundary=importlib.util.module_from_spec(spec); spec.loader.exec_module(boundary)
-          spec=importlib.util.spec_from_file_location('negative',root/'.github/scripts/tests/negative-controls.py'); negative=importlib.util.module_from_spec(spec); spec.loader.exec_module(negative)
-          assert platform.system()=='Linux'
-          boundary.clean(candidate); sources=boundary.sources(); model=boundary.definition(); contract=boundary.contract(boundary.CONTRACT); negative_model=json.loads((root/'.github/negative-controls.json').read_bytes())
-          summary={'purpose':'real hosted storage diagnostic only; never certification','candidate':candidate,'contract_digest':contract,'source_sha256':sources,'records':[]}
-          inputs={'workspace':str(root),'out':str(out),'candidate':candidate,'contract':str(boundary.CONTRACT)}
-          for row_id in ['pg18','oa12-s-4-resource','oa12-s-16-pg18']:
-           row=copy.deepcopy(next(row for row in model['commands'] if row['id']==row_id)); argv=[boundary.expand(v,inputs) for v in row['argv']]; env={**boundary.environment(),**row.get('env',{})}; record={'id':row_id,'status':'NOT_EXERCISED'}; lease=None; proof=None; passed=False
-           print('DIAGNOSTIC CHECK',row_id,flush=True)
-           try:
-            boundary.clean(candidate); assert boundary.sources()==sources
-            if row.get('discovery_argv'):
-             listing=boundary.execute(row['discovery_argv'],out,row_id+'-discovery',root,env,row['timeout']);record['discovery']=listing;assert listing['exit']==0;record['selected_tests']=boundary.discovery_count((out/listing['stdout']).read_text(),row);assert record['selected_tests']>0
-            if row_id.startswith('oa12-'):lease=storage.begin_case(row_id.removeprefix('oa12-'),candidate,out);assert lease is not None
-            proof=boundary.execute(argv,out,row_id,root,env,row['timeout']);record['command']=proof;assert proof['exit']==0
-            if row.get('tests'):record['discovered_tests']=boundary.discovered(boundary.text(out,proof),row['tests']);assert record['discovered_tests']>0
-            if row_id.startswith('oa12-'):
-             case=next(case for case in negative_model['cases'] if case['id']==row_id.removeprefix('oa12-')); child=negative.verify_receipt(out/'oa12'/case['id'],case,negative_model,candidate);record['actual_case_receipt_sha256']=boundary.digest(out/'oa12'/case['id']/'receipt.json');assert child['status']=='PASS'
-            boundary.clean(candidate);assert boundary.sources()==sources;passed=True
-           finally:
-            if lease is not None:
-             record['build_storage']=storage.finish_case(lease,proof['exit'] if proof else None,row_passed=passed)
-             if record['build_storage']['status']!='RECLAIMED':passed=False
-            record['status']='PASS' if passed else 'FAIL';summary['records'].append(record);(out/'diagnostic.json').write_text(json.dumps(summary,indent=2)+'\n');print('DIAGNOSTIC RESULT',row_id,record['status'],record.get('build_storage',{}).get('reclaimed_bytes'),flush=True)
-           assert passed
-          assert all(record['status']=='PASS' for record in summary['records'])
-          files={p.relative_to(out).as_posix():boundary.digest(p) for p in out.rglob('*') if p.is_file()};(out/'files-sha256.json').write_text(json.dumps(files,indent=2)+'\n')
-          print('All actual diagnostic rows passed; ordinary workspace build retained, scoped mutation scratch reclaimed. Not release certification.',flush=True)
-          PYTHON
+          temp = Path(os.environ['RUNNER_TEMP'])
+          subprocess.run(['python3', '.github/scripts/operational-assurance.py', 'run',
+                          '--candidate', os.environ['PROBE_CANDIDATE'], '--profile', 'windows',
+                          '--out', str(temp / 'windows-raw')], stdin=subprocess.DEVNULL, check=True)
+          subprocess.run(['python3', '.github/scripts/operational-assurance.py', 'export',
+                          '--receipts', str(temp / 'windows-raw'), '--out', str(temp / 'windows-export')],
+                         stdin=subprocess.DEVNULL, check=True)
+          PY
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: hosted-build-storage-diagnostic
-          path: ${{ runner.temp }}/storage-proof/
+          name: windows-link-source-diagnostic
+          path: ${{ runner.temp }}/windows-export/
           if-no-files-found: error
+          retention-days: 7
+          overwrite: false
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: windows-native-link-inspection
+          path: ${{ runner.temp }}/windows-native-links.json
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: false
+  linux-collector:
+    needs: windows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: d50eec3028ee673f02f19cd5b9282db725fcdc02
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-link-source-diagnostic
+          path: ${{ runner.temp }}/windows-export
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-native-link-inspection
+          path: ${{ runner.temp }}/windows-inspection
+      - name: Verify unmodified Windows receipts and source hashes on Linux
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util, json, os, platform, sys
+          from pathlib import Path
+          root = Path.cwd()
+          sys.path.insert(0, str(root / '.github/scripts'))
+          spec = importlib.util.spec_from_file_location('boundary', root / '.github/scripts/operational-assurance.py')
+          boundary = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(boundary)
+          assert platform.system() == 'Linux'
+          candidate = os.environ['PROBE_CANDIDATE']
+          boundary.clean(candidate)
+          model = boundary.definition()
+          binding = boundary.contract(boundary.CONTRACT)
+          temp = Path(os.environ['RUNNER_TEMP'])
+          receipt = boundary.verify_job(temp / 'windows-export', model, candidate, binding)
+          assert receipt['status'] == 'PASS' and len(receipt['records']) == 2
+          native = json.loads((temp / 'windows-inspection/windows-native-links.json').read_bytes())
+          assert native['candidate'] == candidate and native['system'] == 'Windows'
+          out = temp / 'collector-proof'
+          out.mkdir()
+          boundary.write(out / 'linux-collector-verification.json', {
+              'purpose': 'Real Windows-to-Linux source and production-row verification; not release certification',
+              'candidate': candidate, 'contract_digest': binding, 'status': 'PASS', 'records': 2,
+              'windows_job_receipt_sha256': boundary.digest(temp / 'windows-export/job-receipt.json'),
+              'windows_native_link_inspection_sha256': boundary.digest(temp / 'windows-inspection/windows-native-links.json'),
+              'source_sha256': boundary.sources()})
+          print('PASS: exact native Windows producer evidence verified unchanged on Linux.')
+          PY
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: windows-linux-collector-verification
+          path: ${{ runner.temp }}/collector-proof/
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: false
