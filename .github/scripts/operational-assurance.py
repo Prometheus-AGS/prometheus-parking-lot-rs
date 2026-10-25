@@ -29,6 +29,7 @@ import urllib.request
 import zipfile
 
 sys.dont_write_bytecode = True
+from assurance_build_storage import begin_case, finish_case  # noqa: E402
 from release_evidence import (  # noqa: E402
     BOUNDARY_WORKFLOW, GitHubAPI, ReleaseError, canonical, git, require,
     sha256, validate_approvals, validate_policy, validate_preparation,
@@ -524,9 +525,13 @@ def run(args) -> int:
     start = time.monotonic()
     aborted = False
     for row in manifest["commands"]:
+        print(f"OA-18 CHECK {args.profile}/{row['id']}", flush=True)
         record = {"id": row["id"], "scenarios": row["scenarios"], "status": "NOT_EXERCISED"}
+        build_lease = None
+        proof = None
+        row_validated = False
         try:
-            require(not aborted, "earlier timeout/source change; remaining commands not attempted")
+            require(not aborted, "earlier timeout/source change/build-storage checkpoint; remaining commands not attempted")
             require(acquired, "concurrent/stale build lock; owner intervention required")
             require(model["profiles"][args.profile] in {"native", platform.system()}, "required OS unavailable")
             require(not row.get("blocked"), row.get("blocked", ""))
@@ -567,6 +572,8 @@ def run(args) -> int:
                 record["selected_tests_before_run"] = count
                 clean(args.candidate)
                 require(sources() == manifest["source_sha256"], "OA-18:changed-source-after-discovery")
+            if args.profile == "linux" and row["id"].startswith("oa12-") and row["id"] != "oa12-aggregate":
+                build_lease = begin_case(row["id"].removeprefix("oa12-"), args.candidate, output)
             proof = execute(row["argv"], output, row["id"], Path(row["cwd"]),
                             {**env, **row.get("env", {})}, row["timeout"])
             value = text(output, proof)
@@ -590,13 +597,23 @@ def run(args) -> int:
                     record.update(child_receipt=child.relative_to(output).as_posix(), child_sha256=digest(child))
             clean(args.candidate)
             require(sources() == manifest["source_sha256"], "OA-18:changed-source")
+            row_validated = record["status"] == "PASS"
         except (ReleaseError, OSError, ValueError, KeyError) as error:
             record.update(status="FAIL" if record.get("command") else
                           "NOT_EXERCISED" if aborted else "BLOCKED", reason=str(error))
             if "changed-" in str(error):
                 aborted = True
+        finally:
+            if build_lease is not None:
+                storage = finish_case(build_lease, proof["exit"] if proof is not None else None,
+                                      row_passed=row_validated)
+                record["build_storage"] = storage
+                if storage["status"] != "RECLAIMED":
+                    record.update(status="FAIL", reason="owned build scratch could not be safely reclaimed")
+                    aborted = True
         records.append(record)
         write(output / "progress.json", records)
+        print(f"OA-18 RESULT {args.profile}/{row['id']} {record['status']}", flush=True)
     if acquired and not aborted:
         (lock / "owner.json").unlink()
         lock.rmdir()
