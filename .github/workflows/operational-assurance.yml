@@ -19,6 +19,10 @@ on:
         description: Prepare only an independent quiet measurement bundle; never certify or publish
         type: boolean
         default: false
+      bootstrap_rehearsal:
+        description: Create only a trusted NOT_EXERCISED rehearsal for publishing controls; never certify or publish
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -39,7 +43,7 @@ env:
 
 jobs:
   profiles:
-    if: ${{ !inputs.run_quiet && github.ref == 'refs/heads/main' && github.ref_protected && github.run_attempt == 1 && inputs.candidate == github.sha }}
+    if: ${{ !inputs.run_quiet && !inputs.bootstrap_rehearsal && github.ref == 'refs/heads/main' && github.ref_protected && github.run_attempt == 1 && inputs.candidate == github.sha }}
     name: Boundary profile (${{ matrix.profile }})
     runs-on: ${{ matrix.os }}
     environment: release-certification
@@ -248,8 +252,83 @@ jobs:
   # A preparation dispatch uses its own fresh runner and does not certify.
   # Import this sealed bundle through the existing independent manual-profile
   # authority/pins on a later dispatch of the same frozen candidate.
+  bootstrap:
+    if: inputs.bootstrap_rehearsal && github.ref == 'refs/heads/main' && github.ref_protected && github.run_attempt == 1 && inputs.candidate == github.sha
+    name: Nonpublishing rehearsal bootstrap
+    runs-on: ubuntu-24.04
+    environment: release-certification
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    env:
+      CANDIDATE: ${{ inputs.candidate }}
+      PURPOSE: ${{ inputs.purpose }}
+      RUN_QUIET: ${{ inputs.run_quiet }}
+      OA18_INPUTS_JSON: ${{ vars.OA18_INPUTS_JSON }}
+      OA18_AUTHORITY_SHA256: ${{ vars.OA18_AUTHORITY_SHA256 }}
+      OA18_MATERIALS_JSON: ${{ vars.OA18_MATERIALS_JSON }}
+      RELEASE_TRUST_POLICY_JSON: ${{ vars.RELEASE_TRUST_POLICY_JSON }}
+      RELEASE_SSH_ALLOWED_SIGNERS: ${{ vars.RELEASE_SSH_ALLOWED_SIGNERS }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Reject certification and quiet-measurement bootstrap requests
+        run: |
+          if [[ "$PURPOSE" != rehearsal || "$RUN_QUIET" == true ]]; then
+            echo 'Bootstrap is only a nonpublishing rehearsal and cannot run quiet measurements.' >&2
+            exit 2
+          fi
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Stage independently pinned source authority, trust and original preparation
+        env:
+          BOOTSTRAP_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: python3 .github/scripts/prepare-hosted-assurance.py --profile collector
+      - name: Create only the authenticated unexercised rehearsal protocol
+        id: bootstrap_receipt
+        env:
+          BOOTSTRAP_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess, sys
+          from pathlib import Path
+          temp = Path(os.environ['RUNNER_TEMP'])
+          inputs = json.loads((temp / 'oa18-inputs.json').read_bytes())
+          argv = ['python3', '.github/scripts/operational-assurance.py', 'bootstrap-rehearsal',
+                  '--candidate', os.environ['CANDIDATE'],
+                  '--contract', '.kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json',
+                  '--policy', str(temp / 'release-trust-policy.json'),
+                  '--inputs', str(temp / 'oa18-inputs.json'),
+                  '--tag', inputs['tag'], '--preparation-plan', inputs['preparation_plan'],
+                  '--out', str(temp / 'oa18-bootstrap')]
+          sys.exit(subprocess.run(argv, stdin=subprocess.DEVNULL, check=False).returncode)
+          PY
+      - name: Preserve bootstrap inspection evidence without claiming profile execution
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: operational-assurance-bootstrap-evidence
+          path: ${{ runner.temp }}/oa18-bootstrap/
+          if-no-files-found: warn
+          retention-days: 7
+          overwrite: false
+      - name: Upload only the nonpublishing compact protocol members
+        if: steps.bootstrap_receipt.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: operational-assurance-boundary
+          path: |
+            ${{ runner.temp }}/oa18-bootstrap/compact/boundary-receipt.json
+            ${{ runner.temp }}/oa18-bootstrap/compact/release-plan.json
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: false
+
   quiet:
-    if: inputs.run_quiet && github.ref == 'refs/heads/main' && github.ref_protected && github.run_attempt == 1 && inputs.candidate == github.sha
+    if: ${{ !inputs.bootstrap_rehearsal && inputs.run_quiet && github.ref == 'refs/heads/main' && github.ref_protected && github.run_attempt == 1 && inputs.candidate == github.sha }}
     name: Independent quiet measurement bundle
     runs-on: ubuntu-24.04
     environment: release-certification
@@ -332,7 +411,7 @@ jobs:
           if-no-files-found: error
 
   assemble:
-    if: always() && !inputs.run_quiet && github.ref == 'refs/heads/main' && github.ref_protected && github.run_attempt == 1 && inputs.candidate == github.sha
+    if: always() && !inputs.run_quiet && !inputs.bootstrap_rehearsal && github.ref == 'refs/heads/main' && github.ref_protected && github.run_attempt == 1 && inputs.candidate == github.sha
     needs: profiles
     runs-on: ubuntu-24.04
     environment: release-certification
