@@ -1,0 +1,31 @@
+{
+  "purpose": "Pointers to unchanged original sealed producer receipts; not a replacement producer receipt",
+  "artifacts": [
+    {
+      "sha256": "5a8e46225dd8207f82ab0a524de1d9e721cf17675ceb804afddba2bd6950d177",
+      "name": "baseline-first-receipt.json",
+      "private_original": "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/source-record-originals/baseline-first-receipt.json",
+      "candidate": "ce034cb44d94bb4805ede4583a575f4e5215b728",
+      "status": "FAIL",
+      "counts": {
+        "PASS": 39,
+        "FAIL": 1,
+        "BLOCKED": 2,
+        "NOT_EXERCISED": 0
+      }
+    },
+    {
+      "sha256": "753e10c1ee43e3a41fc31632a21a911ee0b8614f39aa9abef30cba2b605748d1",
+      "name": "baseline-recovery-receipt.json",
+      "private_original": "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/source-record-originals/baseline-recovery-receipt.json",
+      "candidate": "ce034cb44d94bb4805ede4583a575f4e5215b728",
+      "status": "BLOCKED",
+      "counts": {
+        "PASS": 40,
+        "FAIL": 0,
+        "BLOCKED": 2,
+        "NOT_EXERCISED": 0
+      }
+    }
+  ]
+}

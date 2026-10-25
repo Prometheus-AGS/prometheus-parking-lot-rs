@@ -1,0 +1,1361 @@
+{
+  "scope": "DRAFT G02 Stage A refresh only; NOT AUTHORIZED; no mirror, bundle, rewrite, push, Support request or archive created",
+  "candidate": "ce034cb44d94bb4805ede4583a575f4e5215b728",
+  "repository": "Prometheus-AGS/prometheus-parking-lot-rs",
+  "observed_at": "2026-10-25T04:17:16.997432+00:00",
+  "count": 136,
+  "counts": {
+    "refs/heads": 72,
+    "refs/tags": 1,
+    "refs/pull": 63
+  },
+  "advertised_refs_sha256": "b26b813e09f69c210620adf7f3a43a8e1f82c7cfa1fead6c659e11d6fc91f510",
+  "sort": "LC_ALL=C sort -k2,2, LF-terminated sha<TAB>ref rows",
+  "delta_from_prior_draft": {
+    "previous_count": 134,
+    "previous_sha256": "031da0603315b133361951432235fba208526c563414de043f85ec3c6620372b",
+    "current_count": 136,
+    "current_sha256": "b26b813e09f69c210620adf7f3a43a8e1f82c7cfa1fead6c659e11d6fc91f510",
+    "added": [
+      {
+        "ref": "refs/heads/codex/operational-assurance",
+        "sha": "dcfffe1d918d941af2efd7a0c2367497960caedc"
+      },
+      {
+        "ref": "refs/pull/94/head",
+        "sha": "dcfffe1d918d941af2efd7a0c2367497960caedc"
+      }
+    ],
+    "removed": [],
+    "changed": [
+      {
+        "ref": "refs/heads/main",
+        "old": "92da0d3d28f7896ddc67062fa49ba40ea48d74a3",
+        "new": "ce034cb44d94bb4805ede4583a575f4e5215b728"
+      }
+    ]
+  },
+  "default_ref_observation": "ref: refs/heads/main\tHEAD\nce034cb44d94bb4805ede4583a575f4e5215b728\tHEAD\n",
+  "tag_object_and_peeled_commit": "3bdc75ff120615e5f084c10bdd964032dc615621\trefs/tags/v0.3.0\n4b747350c6883497813bed33623a9937ad7a5894\trefs/tags/v0.3.0^{}\n",
+  "paths": [
+    ".codex/auth.json",
+    ".codex/history.jsonl",
+    ".codex/sessions/",
+    ".codex/config.toml",
+    ".codex/version.json"
+  ],
+  "destinations": {
+    "observed_at": "2026-10-25T04:18:12.285443+00:00",
+    "status": "DRAFT; no destination created; permissions/retention/custodian need explicit operator approval; existing paths are never reused",
+    "checks": [
+      {
+        "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024",
+        "exists_including_symlink": false,
+        "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+        "ancestor_mode": "0o755",
+        "ancestor_uid": 501,
+        "same_exact_path_as_other": false
+      },
+      {
+        "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024/untouched.git",
+        "exists_including_symlink": false,
+        "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+        "ancestor_mode": "0o755",
+        "ancestor_uid": 501,
+        "same_exact_path_as_other": false
+      },
+      {
+        "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024/rewrite.git",
+        "exists_including_symlink": false,
+        "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+        "ancestor_mode": "0o755",
+        "ancestor_uid": 501,
+        "same_exact_path_as_other": false
+      },
+      {
+        "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024/fresh-verification",
+        "exists_including_symlink": false,
+        "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+        "ancestor_mode": "0o755",
+        "ancestor_uid": 501,
+        "same_exact_path_as_other": false
+      },
+      {
+        "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024/pre-purge.bundle",
+        "exists_including_symlink": false,
+        "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+        "ancestor_mode": "0o755",
+        "ancestor_uid": 501,
+        "same_exact_path_as_other": false
+      },
+      {
+        "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024/private-records",
+        "exists_including_symlink": false,
+        "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+        "ancestor_mode": "0o755",
+        "ancestor_uid": 501,
+        "same_exact_path_as_other": false
+      },
+      {
+        "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024/fresh-mirror.git",
+        "exists_including_symlink": false,
+        "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+        "ancestor_mode": "0o755",
+        "ancestor_uid": 501,
+        "same_exact_path_as_other": false
+      },
+      {
+        "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024/fresh-worktree",
+        "exists_including_symlink": false,
+        "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+        "ancestor_mode": "0o755",
+        "ancestor_uid": 501,
+        "same_exact_path_as_other": false
+      },
+      {
+        "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024/old-ancestry-scratch",
+        "exists_including_symlink": false,
+        "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+        "ancestor_mode": "0o755",
+        "ancestor_uid": 501,
+        "same_exact_path_as_other": false
+      }
+    ]
+  },
+  "backup_custodian_proposed": "repository operator; private local storage; no public upload",
+  "storage_protection_proposed": "create approved root/private records with umask077/mode0700 only after approval; no existing container claimed private; retention period requires operator specification",
+  "write_freeze": "operator must specify window; collect inventory again immediately before Stage A; any drift requires refreshed approval",
+  "approval_A": "private untouched full mirror plus independently verified bundle and disposable local rewrite for five exact paths and current136 advertised refs; return exact old/new map; no remote mutation",
+  "approval_B": "separate exact final ref map/old leases, signed tag consequences, protection restore, cache/Support, reclone and recovery approval; not supplied by A",
+  "unresolved_required_fields": [
+    "operator custodian/retention/write-freeze window",
+    "actual installed Git/filter-repo/gitleaks identities and availability before execution",
+    "actual post-rewrite map/backup digests only after approved A"
+  ],
+  "refs": [
+    {
+      "ref": "refs/heads/chore/0.3.0-release-records",
+      "old_live_object_id": "999b9dfce556e528deb79ff3f38bd788f34a5842",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/chore/agent-team-parking-lot-core",
+      "old_live_object_id": "f5101ee812726b091f081532e46dacb6baf778b1",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/chore/agent-tooling-openspec-kbd",
+      "old_live_object_id": "e32b77b273d04af92f631438acecd76fca385c49",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/chore/codex-handoff",
+      "old_live_object_id": "889adc84c3edcc2c5d6a5d804af6124c2322a55f",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/chore/kbd-records-round-5",
+      "old_live_object_id": "83f75c25c5c0aa1496447ce96659e314f1df1612",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/chore/zed-reads-agents-md",
+      "old_live_object_id": "64b736a5d922d647c583e2b2752477a55216cd54",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/codex/operational-assurance",
+      "old_live_object_id": "dcfffe1d918d941af2efd7a0c2367497960caedc",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/codex/phase-correctness-durability-closure",
+      "old_live_object_id": "a8caf0f6c0aee6842e9b8a5fc9e0700412256acc",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/docs/next-phase-plan-and-knowledge",
+      "old_live_object_id": "1c0d2f10b597726ad10323cd36cfcae5ab1e2eb2",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/fix/ci-docs-and-gitleaks",
+      "old_live_object_id": "1a579bc84e900e4b1f754450f72cf9e3fb984ae3",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/fix/cr-19-main-red",
+      "old_live_object_id": "3e59c34849bb14339117f15a74882e4b391c6a09",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/fix/execution-timeout-enforcement",
+      "old_live_object_id": "e8b02179f7b6089c58cf280644422f425190bc42",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/integration/fix2",
+      "old_live_object_id": "7dcb11ebf933935371db5b996e107b4bd12f4e99",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/integration/gate-fixes",
+      "old_live_object_id": "765e7bd3fd3e1aa6ebff5797831a2182a44702e2",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/kbd/certification-remediation",
+      "old_live_object_id": "a26da4b53c89f5515b3581a9a1dbf123eb5e410f",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/kbd/execute-dispatch-and-pages",
+      "old_live_object_id": "b1e5450fc5ca03dd9da49fb2b29253112eaa09e4",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/kbd/phase-correctness-and-durability",
+      "old_live_object_id": "88f805c1ea0d8f2b691b619ef6b9b8d3a700c887",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/kbd/plan-correctness-and-durability",
+      "old_live_object_id": "d3c15b1fbb2635b29b84f8d56403363e7aa498bf",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/main",
+      "old_live_object_id": "ce034cb44d94bb4805ede4583a575f4e5215b728",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/release/0.3.0",
+      "old_live_object_id": "d9b82425bff173e07bd29136607a5bb17d699634",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/events-engineer/cr-28-embedded-redb-queue",
+      "old_live_object_id": "7d59417defe2de6e3f158f9fdd8cfe8615542d10",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/events-engineer/cr-32-iggy-events",
+      "old_live_object_id": "2d377e7b94c53345cf5dfcb1312fce621b789204",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/events-engineer/cr-33-stream-replay",
+      "old_live_object_id": "d463b45d50fd1eb6a73c6a4937ed6dea52e16811",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/events-engineer/cr-34-mailbox-composition",
+      "old_live_object_id": "720cd62bc73dd64cde4178c3ca4d5cd9666fa2a7",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/events-engineer/fix2-iggy-config-docs",
+      "old_live_object_id": "1880177cfb7ad8cb9b339abefb2d76838bb86f08",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/events-engineer/gate-fix-iggy-config",
+      "old_live_object_id": "5c73dd72e8b1bd5af12452bfc81e29110bec75c0",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/events-engineer/gate-fix-redb-backend",
+      "old_live_object_id": "926a4f9e9a96c64a0382fff88c10f70271b0cbf7",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/platform-engineer/cr-35-test-targets",
+      "old_live_object_id": "6f7a7b8bde8c070efe25d4103915c85003050cb2",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/platform-engineer/cr-38-wasm-target",
+      "old_live_object_id": "130d8f7883db26465ff9445c8eb50528f2321f39",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/platform-engineer/cr-39-dependency-hygiene",
+      "old_live_object_id": "1b4bf7925e5dbe44b56cbc4a12b94fab366e6306",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/platform-engineer/cr-42-ci-rebuild",
+      "old_live_object_id": "eb4ca537cb54217c631f1af7594e360c58d41c7f",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/platform-engineer/cr-44-mobile-desktop-bindings",
+      "old_live_object_id": "fa918e9f470bd0f2cc62d4ebe0fef5a7750753f9",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/platform-engineer/cr-51-supply-chain-gates",
+      "old_live_object_id": "95d00f9dbdf7d8478a41f6df505277d947f9d61e",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/platform-engineer/cr-53-wasm-parity",
+      "old_live_object_id": "1c42bc55bce426030b00bd1e0ad2ec6f39cc83e0",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/platform-engineer/ffi-child-helper-guard",
+      "old_live_object_id": "833729b74f919279185f32a53ef05405dd410cd4",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/platform-engineer/gate-fix-release-packaging",
+      "old_live_object_id": "209895c689485b5d2c3d72cf9ef0230fd013189a",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/platform-engineer/tauri-lock-0.3.0",
+      "old_live_object_id": "93a4eada9e776b6c52e0371a45b7d7fd5d565aa9",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/postgres-engineer/cr-26-pg-lease-queue",
+      "old_live_object_id": "d0fa7130de6afee8a6a2305a55cc37741be4cf5b",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/postgres-engineer/cr-27-pg-mailbox",
+      "old_live_object_id": "7dc2bf49e5c48ec751e4d4f757507086c9934744",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/postgres-engineer/cr-30-pgmq-sql-backend",
+      "old_live_object_id": "bf616ad101327cc8cba2fc3549e2f9a2678e4de2",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/postgres-engineer/cr-36-pg-matrix",
+      "old_live_object_id": "1435a6fdd36300bdd72056480705c8e50d9d9d48",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/postgres-engineer/cr-43-postgres18-image",
+      "old_live_object_id": "4e4c752dfbdcc810167b355b44b900844589ce26",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/postgres-engineer/fix2-pg",
+      "old_live_object_id": "26a9076de7a7808373ea26319cf7b43af9cbb275",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/postgres-engineer/gate-fix-pg-backends",
+      "old_live_object_id": "9842719027c3d6d59f5e7e4db7d47d49615a5332",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/product-manager/cr-16-docs-truth",
+      "old_live_object_id": "d14f911422531a6bcda34392841d6dbcf62cb978",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/product-manager/cr-45-docs-site",
+      "old_live_object_id": "87319612eeb1cf67606e0b582505f9323a0be0b5",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/product-manager/cr-46-docs-theory",
+      "old_live_object_id": "8a8cf8835b247147535a5742e693e1ec081b6485",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/product-manager/cr-47-docs-guides",
+      "old_live_object_id": "478e7db9e3c80df8ae74a664702f9c05a3b02040",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/product-manager/docs-refresh-round12",
+      "old_live_object_id": "f184038adf6cb608235946fbabdbaab61834ed67",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/product-manager/readme-sync",
+      "old_live_object_id": "b09b63c33b909607a24efdcd157708d254348bf8",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/scheduler-engineer/cr-19-dispatcher-semaphore",
+      "old_live_object_id": "673a9db647683b16c979070ee58013cbaea5ec17",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/scheduler-engineer/cr-20-skip-ahead",
+      "old_live_object_id": "56fb3f0a42c18261b95ce356a3e731bc46e5364b",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/scheduler-engineer/cr-21-panic-containment",
+      "old_live_object_id": "0023f49d7f8f951d643e377e55fa392c33d8a997",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/scheduler-engineer/cr-22-result-slots",
+      "old_live_object_id": "22c2d2898d2cb659fff9e768879330914991a495",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/scheduler-engineer/cr-23-multi-resource",
+      "old_live_object_id": "8d77923a66a040fe73b6daf439f4ddaa150ca4a8",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/scheduler-engineer/cr-29-shutdown-cancellation",
+      "old_live_object_id": "e86a9d6c4ec394adf8bef99971a4494f44cb3179",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/scheduler-engineer/cr-31-hook-emission",
+      "old_live_object_id": "986f5fb70d42b4505518318f3af4012ca258d4ef",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/scheduler-engineer/cr-40-benchmarks",
+      "old_live_object_id": "7b899917aeb5cb497864e55aea15e0e51623f23d",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/scheduler-engineer/cr-49-durable-dispatch",
+      "old_live_object_id": "fff846c1cdb25472980b3cb23262a82911db6023",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/scheduler-engineer/cr-49-pg-matrix-followup",
+      "old_live_object_id": "e41770c1555bf03e2d118f7949a413b36fd6adad",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/scheduler-engineer/fix-retrieve-timeout",
+      "old_live_object_id": "815f5a503fded705618835f9cc01e788c69d6bf9",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/scheduler-engineer/fix2-loom-ci",
+      "old_live_object_id": "5e3415634d57cb98dfd0ef58aa46141b9a743c96",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/scheduler-engineer/gate-fix-core",
+      "old_live_object_id": "f2edb02c3ebc93e8921489c1b618c17c061c393e",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/tech-lead/cr-18-core-contracts",
+      "old_live_object_id": "f01f85660977f09953944b5f7b845eb6b1fae023",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/tech-lead/cr-25-backend-contracts",
+      "old_live_object_id": "bee3cd19a711e9936553c68fb6a3f76e11030b29",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/tech-lead/cr-37-config-schema",
+      "old_live_object_id": "9b0026557808e129aa6e1666191ce579f9cf6059",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/tech-lead/cr-41-toolchain-baseline",
+      "old_live_object_id": "5eed73ea33c0beec4164234e1cabd5747fd749b5",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/tech-lead/cr-48-workspace-split",
+      "old_live_object_id": "9c4e3283043e5a5a916d0efd58f9768d4531f615",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/tech-lead/fix2-runtime",
+      "old_live_object_id": "49beb9b8b6bae4265acdb41d23861f781ebd6412",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/tech-lead/followups-round12",
+      "old_live_object_id": "963750180fb3d6ea002d7f887adb7dbe6d3f569b",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/tech-lead/gate-fix-runtime",
+      "old_live_object_id": "273a52a58f9ee71c27b2d45a6205ec1aa95792d5",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/heads/team/tech-lead/prerelease-api-gaps",
+      "old_live_object_id": "4e64f0d263d3ff5870e56f1e45e5da6af1875019",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/1/head",
+      "old_live_object_id": "a26da4b53c89f5515b3581a9a1dbf123eb5e410f",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/10/head",
+      "old_live_object_id": "5eed73ea33c0beec4164234e1cabd5747fd749b5",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/11/head",
+      "old_live_object_id": "9c4e3283043e5a5a916d0efd58f9768d4531f615",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/12/head",
+      "old_live_object_id": "eb4ca537cb54217c631f1af7594e360c58d41c7f",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/13/head",
+      "old_live_object_id": "815f5a503fded705618835f9cc01e788c69d6bf9",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/14/head",
+      "old_live_object_id": "f01f85660977f09953944b5f7b845eb6b1fae023",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/15/head",
+      "old_live_object_id": "87319612eeb1cf67606e0b582505f9323a0be0b5",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/16/head",
+      "old_live_object_id": "95d00f9dbdf7d8478a41f6df505277d947f9d61e",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/17/head",
+      "old_live_object_id": "1a579bc84e900e4b1f754450f72cf9e3fb984ae3",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/18/head",
+      "old_live_object_id": "4e4c752dfbdcc810167b355b44b900844589ce26",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/19/head",
+      "old_live_object_id": "bee3cd19a711e9936553c68fb6a3f76e11030b29",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/2/head",
+      "old_live_object_id": "e8b02179f7b6089c58cf280644422f425190bc42",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/20/head",
+      "old_live_object_id": "8a8cf8835b247147535a5742e693e1ec081b6485",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/21/head",
+      "old_live_object_id": "673a9db647683b16c979070ee58013cbaea5ec17",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/22/head",
+      "old_live_object_id": "3e59c34849bb14339117f15a74882e4b391c6a09",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/23/head",
+      "old_live_object_id": "83f75c25c5c0aa1496447ce96659e314f1df1612",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/24/head",
+      "old_live_object_id": "0023f49d7f8f951d643e377e55fa392c33d8a997",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/25/head",
+      "old_live_object_id": "6f7a7b8bde8c070efe25d4103915c85003050cb2",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/26/head",
+      "old_live_object_id": "7d59417defe2de6e3f158f9fdd8cfe8615542d10",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/27/head",
+      "old_live_object_id": "d14f911422531a6bcda34392841d6dbcf62cb978",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/28/head",
+      "old_live_object_id": "22c2d2898d2cb659fff9e768879330914991a495",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/29/head",
+      "old_live_object_id": "130d8f7883db26465ff9445c8eb50528f2321f39",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/3/head",
+      "old_live_object_id": "e32b77b273d04af92f631438acecd76fca385c49",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/30/head",
+      "old_live_object_id": "d0fa7130de6afee8a6a2305a55cc37741be4cf5b",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/31/head",
+      "old_live_object_id": "7dc2bf49e5c48ec751e4d4f757507086c9934744",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/32/head",
+      "old_live_object_id": "9b0026557808e129aa6e1666191ce579f9cf6059",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/33/head",
+      "old_live_object_id": "bf616ad101327cc8cba2fc3549e2f9a2678e4de2",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/34/head",
+      "old_live_object_id": "720cd62bc73dd64cde4178c3ca4d5cd9666fa2a7",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/35/head",
+      "old_live_object_id": "fa918e9f470bd0f2cc62d4ebe0fef5a7750753f9",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/36/head",
+      "old_live_object_id": "1435a6fdd36300bdd72056480705c8e50d9d9d48",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/37/head",
+      "old_live_object_id": "fff846c1cdb25472980b3cb23262a82911db6023",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/38/head",
+      "old_live_object_id": "e41770c1555bf03e2d118f7949a413b36fd6adad",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/39/head",
+      "old_live_object_id": "e86a9d6c4ec394adf8bef99971a4494f44cb3179",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/4/head",
+      "old_live_object_id": "1c0d2f10b597726ad10323cd36cfcae5ab1e2eb2",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/40/head",
+      "old_live_object_id": "963750180fb3d6ea002d7f887adb7dbe6d3f569b",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/41/head",
+      "old_live_object_id": "f184038adf6cb608235946fbabdbaab61834ed67",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/42/head",
+      "old_live_object_id": "986f5fb70d42b4505518318f3af4012ca258d4ef",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/43/head",
+      "old_live_object_id": "56fb3f0a42c18261b95ce356a3e731bc46e5364b",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/44/head",
+      "old_live_object_id": "2d377e7b94c53345cf5dfcb1312fce621b789204",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/45/head",
+      "old_live_object_id": "b09b63c33b909607a24efdcd157708d254348bf8",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/46/head",
+      "old_live_object_id": "d463b45d50fd1eb6a73c6a4937ed6dea52e16811",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/47/head",
+      "old_live_object_id": "1b4bf7925e5dbe44b56cbc4a12b94fab366e6306",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/48/head",
+      "old_live_object_id": "8d77923a66a040fe73b6daf439f4ddaa150ca4a8",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/49/head",
+      "old_live_object_id": "1c42bc55bce426030b00bd1e0ad2ec6f39cc83e0",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/5/head",
+      "old_live_object_id": "f5101ee812726b091f081532e46dacb6baf778b1",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/50/head",
+      "old_live_object_id": "478e7db9e3c80df8ae74a664702f9c05a3b02040",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/51/head",
+      "old_live_object_id": "7b899917aeb5cb497864e55aea15e0e51623f23d",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/6/head",
+      "old_live_object_id": "64b736a5d922d647c583e2b2752477a55216cd54",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/7/head",
+      "old_live_object_id": "88f805c1ea0d8f2b691b619ef6b9b8d3a700c887",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/72/head",
+      "old_live_object_id": "4e64f0d263d3ff5870e56f1e45e5da6af1875019",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/73/head",
+      "old_live_object_id": "833729b74f919279185f32a53ef05405dd410cd4",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/74/head",
+      "old_live_object_id": "926a4f9e9a96c64a0382fff88c10f70271b0cbf7",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/75/head",
+      "old_live_object_id": "9842719027c3d6d59f5e7e4db7d47d49615a5332",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/76/head",
+      "old_live_object_id": "765e7bd3fd3e1aa6ebff5797831a2182a44702e2",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/77/head",
+      "old_live_object_id": "93a4eada9e776b6c52e0371a45b7d7fd5d565aa9",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/8/head",
+      "old_live_object_id": "d3c15b1fbb2635b29b84f8d56403363e7aa498bf",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/83/head",
+      "old_live_object_id": "7dcb11ebf933935371db5b996e107b4bd12f4e99",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/84/head",
+      "old_live_object_id": "d9b82425bff173e07bd29136607a5bb17d699634",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/9/head",
+      "old_live_object_id": "b1e5450fc5ca03dd9da49fb2b29253112eaa09e4",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/90/head",
+      "old_live_object_id": "999b9dfce556e528deb79ff3f38bd788f34a5842",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/91/head",
+      "old_live_object_id": "889adc84c3edcc2c5d6a5d804af6124c2322a55f",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/93/head",
+      "old_live_object_id": "a8caf0f6c0aee6842e9b8a5fc9e0700412256acc",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/pull/94/head",
+      "old_live_object_id": "dcfffe1d918d941af2efd7a0c2367497960caedc",
+      "proposed_stage_A_action": "preserve backup/inventory; server-owned; exclude client push; separately approved Support disposition",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "GitHub/server-owned",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    },
+    {
+      "ref": "refs/tags/v0.3.0",
+      "old_live_object_id": "3bdc75ff120615e5f084c10bdd964032dc615621",
+      "proposed_stage_A_action": "preserve untouched backup then map disposable rewrite; no remote update",
+      "new_object_id": null,
+      "final_after_arming_object_id": null,
+      "protection_owner": "repository operator; not verified for individual branch/tag",
+      "reason": "exact five-path historical containment; actual rewritten map unavailable until Stage A is separately approved/executed"
+    }
+  ]
+}

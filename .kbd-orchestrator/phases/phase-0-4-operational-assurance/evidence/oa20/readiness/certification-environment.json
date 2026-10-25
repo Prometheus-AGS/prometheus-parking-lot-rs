@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "gh",
+    "api",
+    "repos/Prometheus-AGS/prometheus-parking-lot-rs/environments/release-certification",
+    "--jq",
+    "{id,name,protection_rules,deployment_branch_policy}"
+  ],
+  "observed_at": "2026-10-25T04:17:11.872673+00:00",
+  "exit_code": 1,
+  "stdout": "{\"message\":\"Not Found\",\"documentation_url\":\"https://docs.github.com/rest/deployments/environments#get-an-environment\",\"status\":\"404\"}",
+  "stderr": "gh: Not Found (HTTP 404)\n"
+}

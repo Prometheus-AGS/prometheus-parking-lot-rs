@@ -1,0 +1,153 @@
+[
+  {
+    "profile": "baseline",
+    "source": "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/baseline-recovery",
+    "argv": [
+      "timeout",
+      "120",
+      "python3",
+      ".github/scripts/operational-assurance.py",
+      "export",
+      "--receipts",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/baseline-recovery",
+      "--out",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/export-final/baseline"
+    ],
+    "exit": 0
+  },
+  {
+    "profile": "macos",
+    "source": "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/macos",
+    "argv": [
+      "timeout",
+      "120",
+      "python3",
+      ".github/scripts/operational-assurance.py",
+      "export",
+      "--receipts",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/macos",
+      "--out",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/export-final/macos"
+    ],
+    "exit": 0
+  },
+  {
+    "profile": "ios",
+    "source": "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/ios",
+    "argv": [
+      "timeout",
+      "120",
+      "python3",
+      ".github/scripts/operational-assurance.py",
+      "export",
+      "--receipts",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/ios",
+      "--out",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/export-final/ios"
+    ],
+    "exit": 0
+  },
+  {
+    "profile": "linux",
+    "source": "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/linux",
+    "argv": [
+      "timeout",
+      "120",
+      "python3",
+      ".github/scripts/operational-assurance.py",
+      "export",
+      "--receipts",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/linux",
+      "--out",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/export-final/linux"
+    ],
+    "exit": 0
+  },
+  {
+    "profile": "windows",
+    "source": "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/windows",
+    "argv": [
+      "timeout",
+      "120",
+      "python3",
+      ".github/scripts/operational-assurance.py",
+      "export",
+      "--receipts",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/windows",
+      "--out",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/export-final/windows"
+    ],
+    "exit": 0
+  },
+  {
+    "profile": "android",
+    "source": "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/android",
+    "argv": [
+      "timeout",
+      "120",
+      "python3",
+      ".github/scripts/operational-assurance.py",
+      "export",
+      "--receipts",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/android",
+      "--out",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/export-final/android"
+    ],
+    "exit": 0
+  },
+  {
+    "profile": "macos-gui",
+    "source": "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/macos-gui",
+    "argv": [
+      "timeout",
+      "120",
+      "python3",
+      ".github/scripts/operational-assurance.py",
+      "export",
+      "--receipts",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/macos-gui",
+      "--out",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/export-final/macos-gui"
+    ],
+    "exit": 0
+  },
+  {
+    "profile": "quiet",
+    "source": "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/quiet",
+    "argv": [
+      "timeout",
+      "120",
+      "python3",
+      ".github/scripts/operational-assurance.py",
+      "export",
+      "--receipts",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/quiet",
+      "--out",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/export-final/quiet"
+    ],
+    "exit": 0
+  },
+  {
+    "operation": "assemble",
+    "argv": [
+      "timeout",
+      "180",
+      "python3",
+      ".github/scripts/operational-assurance.py",
+      "assemble",
+      "--candidate",
+      "ce034cb44d94bb4805ede4583a575f4e5215b728",
+      "--receipts",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/export-final",
+      "--inputs",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/baseline-inputs.json",
+      "--preparation-plan",
+      "/tmp/oa04-preparation-72adf5d/release-plan.json",
+      "--purpose",
+      "certification",
+      "--out",
+      "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/packet-recovery"
+    ],
+    "exit": 2
+  }
+]

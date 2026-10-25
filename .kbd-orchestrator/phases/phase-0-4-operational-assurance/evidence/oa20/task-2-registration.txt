@@ -1,0 +1,13 @@
+{
+  "revision": 1137,
+  "task": {
+    "id": "2",
+    "title": "1.2 Complete candidate-bound OA01\u2013OA17 certification with independent authority on approved environments",
+    "sequence": 2,
+    "status": "pending",
+    "summary": null
+  },
+  "committedLocally": true,
+  "controlPlane": "disabled",
+  "rawArtifact": "/Users/gqadonis/.local/state/prometheus/operational-assurance/ce034cb44d94bb4805ede4583a575f4e5215b728/task-2-registration.json"
+}

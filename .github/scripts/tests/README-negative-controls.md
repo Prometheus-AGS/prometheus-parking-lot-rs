@@ -89,7 +89,7 @@ frozen candidate. All new source/fixture/docs paths must be included in that
 candidate before the runner's clean-tree check. Use a private fresh evidence
 root outside the repository; each case output directory and the aggregate JSON
 must not already exist. Store the complete 40-character candidate identity and
-adopted contract digest `e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257`.
+adopted contract digest `04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2`.
 Ordinary PG cases must not inherit `PARKING_LOT_PG_UPGRADE_URL` or
 `PARKING_LOT_PG_UPGRADE_RUN_ID`; the upgrade delegate supplies those itself for
 its newly owned cluster.

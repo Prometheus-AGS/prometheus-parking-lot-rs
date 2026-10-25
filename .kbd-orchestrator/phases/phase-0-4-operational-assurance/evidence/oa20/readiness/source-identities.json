@@ -1,0 +1,70 @@
+{
+  ".github/workflows/operational-assurance.yml": {
+    "exit_code": 0,
+    "sha256": "8ce76a8736f212fe062ec8400b044d62b83625ec56d12ef3fb1d6ba41ac7a198",
+    "variable_names": [
+      "OA18_AUTHORITY_SHA256",
+      "OA18_INPUTS_JSON",
+      "RELEASE_TRUST_POLICY_JSON"
+    ]
+  },
+  ".github/workflows/release.yml": {
+    "exit_code": 0,
+    "sha256": "bf7ad862c41de430547990605fc0f2cb2699f95d6a8c2eaacf80b3955bd1ccba",
+    "variable_names": [
+      "GIT_CLIFF_BIN",
+      "RELEASE_PLZ_BIN",
+      "RELEASE_RUNNER",
+      "RELEASE_TRUST_POLICY_JSON"
+    ]
+  },
+  ".github/workflows/verify-release-tag.yml": {
+    "exit_code": 0,
+    "sha256": "d0f0da6266ee766271c0c05c7216f71dc53d55fa4394609ae0b7d0edc4c49039",
+    "variable_names": [
+      "RELEASE_GPG_FINGERPRINT",
+      "RELEASE_GPG_HOME",
+      "RELEASE_SIGNATURE_FORMAT",
+      "RELEASE_SSH_ALLOWED_SIGNERS",
+      "RELEASE_SSH_FINGERPRINT",
+      "RELEASE_SSH_IDENTITY",
+      "RELEASE_SSH_REVOCATIONS_FILE"
+    ]
+  },
+  ".github/workflows/ci.yml": {
+    "exit_code": 0,
+    "sha256": "46f93e6c0552445480e50cf7708c795aa785dc873abf3ce23dd8e92ac6b8fb45",
+    "variable_names": [
+      "PG_UPGRADE_IMAGE_ID",
+      "PG_UPGRADE_PG17_IMAGE_ID",
+      "PG_UPGRADE_PG18_IMAGE_ID",
+      "PG_UPGRADE_RUNNER",
+      "WASM_BROWSER_RUNNER",
+      "WASM_CHROMEDRIVER_BIN",
+      "WASM_CHROME_BIN"
+    ]
+  },
+  ".github/workflows/platform.yml": {
+    "exit_code": 0,
+    "sha256": "7cd508afe4fd602fe61bf8d2b4cfcc9d83937fb028c054403a6dc446f983ae26",
+    "variable_names": [
+      "DESKTOP_LINUX_RUNNER"
+    ]
+  },
+  ".github/release-boundary.schema.json": {
+    "exit_code": 0,
+    "sha256": "d82e6530f75f7db4f35be9617ab44cf88be68146fd95ae14c7b234ed9de0995b"
+  },
+  ".github/release-trust-policy.example.json": {
+    "exit_code": 0,
+    "sha256": "f51f660454333023970b32df67d5e50af65f9ff2b4b2df66c19e445f8f829c42"
+  },
+  ".kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json": {
+    "exit_code": 0,
+    "sha256": "4b1ba3d9755c7b3dfe8efa5120ae62e707b7b478d3e503f3a071d1eb60d58056"
+  },
+  "docs/runbooks/history-containment.md": {
+    "exit_code": 0,
+    "sha256": "a704ba9a0cd1ca3118b5700aad99ab97604dad7b0f84f47fb9d1632a8a920cc3"
+  }
+}

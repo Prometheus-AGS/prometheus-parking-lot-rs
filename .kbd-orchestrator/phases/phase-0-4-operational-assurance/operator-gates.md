@@ -31,3 +31,18 @@ The present task ends after assessment and planning. No Execute stage, productio
 ## Execute authority update — 2026-10-24
 
 The assessment-only stopping point above is superseded by the subsequent Execute request recorded in execution.md and the active goal. Proceed through the adopted implementation plan with timeout-bounded kbd-apply boundaries. Credential rotation and KBD signer replacement remain deferred/non-blocking. The scoped G-02 through G-06 authority limits above continue to apply; no remote push/PR/publication or account change is implied by Execute. Finish all independently authorized source work before requesting one batch of concrete operator actions.
+
+## 0.4.0 publication authority and scope amendment preparation
+
+Operator now authorizes the recommended history-cleanup deferral, hosted/manual certification approach and subsequent 0.4.0 publication after criteria pass. Rotation remains deferred. OA20 task2 began through kbd-apply at revision1139. Exact proposed contract, unsigned scope amendment, release environment/publisher proposals and observed capability limits are retained in evidence/oa20/publication-preparation/. Active contract is unchanged pending supported signed amendment. No publication or external configuration mutation occurred; missing signing/publisher/environment evidence is not PASS.
+
+## Effective superseding gates after signed amendment 04e74b62
+
+The supported runtime adopted binding revision2 (planRevision1) with contract digest04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2. Exact scope manifest/signature/adoption receipt are in evidence/oa20/publication-preparation/. Independent artifact review verified the same enrolled operator signature.
+
+- G01 remains deferred/nonblocking; exposure is not neutralized.
+- G02 actual history purge/cache removal is now deferred beyond0.4.0. Its amended gate means actual current-source/package/containment-fixture controls plus attributable scoped deferral evidence; it must not certify a purge or close#88 as purged.
+- G03 root selected the existing local key that matches both enrolled scope trust and GitHub's GQAdonis release-signing key1050763; public principal/fingerprint/provenance are retained in release-signing-selection.json. Operator delegated safest existing-key choice in publication request. No new key/enrollment/global setting, private key transfer or real release tag occurred. Final candidate/tag verification remains mandatory.
+- G04 authenticated crates.io owner session reached facade settings and observed no trusted publishers. Real seven-crate publisher/environment setup and public workflow/trust pins remain required; no API token fallback.
+- G05 user now authorizes0.4.0 publication after amended certificationPASS. Do not request the same publication intent again; actual GitHub environment review is still a separate observed product action. User continues merging source PRs.
+- G06 hosted automatic OS profiles plus attributable manual macOSGUI/quiet evidence supersedes self-hosted-only availability. No required production oracle or actual observation is waived.

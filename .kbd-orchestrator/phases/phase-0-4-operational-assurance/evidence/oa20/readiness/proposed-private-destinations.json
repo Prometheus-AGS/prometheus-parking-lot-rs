@@ -1,0 +1,78 @@
+{
+  "observed_at": "2026-10-25T04:18:12.285443+00:00",
+  "status": "DRAFT; no destination created; permissions/retention/custodian need explicit operator approval; existing paths are never reused",
+  "checks": [
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024",
+      "exists_including_symlink": false,
+      "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+      "ancestor_mode": "0o755",
+      "ancestor_uid": 501,
+      "same_exact_path_as_other": false
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024/untouched.git",
+      "exists_including_symlink": false,
+      "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+      "ancestor_mode": "0o755",
+      "ancestor_uid": 501,
+      "same_exact_path_as_other": false
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024/rewrite.git",
+      "exists_including_symlink": false,
+      "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+      "ancestor_mode": "0o755",
+      "ancestor_uid": 501,
+      "same_exact_path_as_other": false
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024/fresh-verification",
+      "exists_including_symlink": false,
+      "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+      "ancestor_mode": "0o755",
+      "ancestor_uid": 501,
+      "same_exact_path_as_other": false
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024/pre-purge.bundle",
+      "exists_including_symlink": false,
+      "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+      "ancestor_mode": "0o755",
+      "ancestor_uid": 501,
+      "same_exact_path_as_other": false
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024/private-records",
+      "exists_including_symlink": false,
+      "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+      "ancestor_mode": "0o755",
+      "ancestor_uid": 501,
+      "same_exact_path_as_other": false
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024/fresh-mirror.git",
+      "exists_including_symlink": false,
+      "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+      "ancestor_mode": "0o755",
+      "ancestor_uid": 501,
+      "same_exact_path_as_other": false
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024/fresh-worktree",
+      "exists_including_symlink": false,
+      "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+      "ancestor_mode": "0o755",
+      "ancestor_uid": 501,
+      "same_exact_path_as_other": false
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/parking-lot-containment-20261024/old-ancestry-scratch",
+      "exists_including_symlink": false,
+      "nearest_existing_ancestor": "/Users/gqadonis/.local/state/prometheus",
+      "ancestor_mode": "0o755",
+      "ancestor_uid": 501,
+      "same_exact_path_as_other": false
+    }
+  ]
+}

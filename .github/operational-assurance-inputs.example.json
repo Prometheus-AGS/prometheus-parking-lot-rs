@@ -1,11 +1,34 @@
 {
-  "baseline": {},
-  "linux": {},
-  "macos": {},
-  "windows": {},
-  "android": {},
-  "ios": {},
-  "macos-gui": {},
-  "quiet": {},
-  "collector": {}
+  "baseline": {
+    "authority_config": "material:authority.json",
+    "preparation_plan": "material:release-plan.json",
+    "preparation_source": "72adf5d8ad583c3b52b22194563e94f7895c5b3f",
+    "base": "92da0d3d28f7896ddc67062fa49ba40ea48d74a3",
+    "release_date": "2026-10-24"
+  },
+  "linux": {
+    "authority_config": "material:authority.json"
+  },
+  "macos": {
+    "authority_config": "material:authority.json"
+  },
+  "windows": {
+    "authority_config": "material:authority.json"
+  },
+  "android": {
+    "authority_config": "material:authority.json"
+  },
+  "ios": {
+    "authority_config": "material:authority.json"
+  },
+  "macos-gui": {
+    "authority_config": "material:authority.json"
+  },
+  "quiet": {
+    "authority_config": "material:authority.json"
+  },
+  "collector": {
+    "authority_config": "material:authority.json",
+    "preparation_plan": "material:release-plan.json"
+  }
 }

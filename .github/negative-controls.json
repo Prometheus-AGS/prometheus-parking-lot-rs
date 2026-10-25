@@ -2,7 +2,7 @@
   "schema_version": 1,
   "scenario": "OA-12",
   "execution": "NOT_EXERCISED",
-  "contract_digest": "e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257",
+  "contract_digest": "04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2",
   "toolchain": "1.99.1",
   "nextest": "0.9.149",
   "source_sites": {

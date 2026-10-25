@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "gh",
+    "api",
+    "repos/Prometheus-AGS/prometheus-parking-lot-rs/branches/main",
+    "--jq",
+    "{name,commit:.commit.sha,protected,protection}"
+  ],
+  "observed_at": "2026-10-25T04:17:07.658297+00:00",
+  "exit_code": 0,
+  "stdout": "{\"commit\":\"ce034cb44d94bb4805ede4583a575f4e5215b728\",\"name\":\"main\",\"protected\":false,\"protection\":{\"enabled\":false,\"required_status_checks\":{\"checks\":[],\"contexts\":[],\"enforcement_level\":\"off\"}}}\n",
+  "stderr": ""
+}

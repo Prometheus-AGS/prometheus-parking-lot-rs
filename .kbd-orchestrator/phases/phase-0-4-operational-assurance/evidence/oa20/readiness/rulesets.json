@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "gh",
+    "api",
+    "repos/Prometheus-AGS/prometheus-parking-lot-rs/rulesets",
+    "--jq",
+    "[.[]|{id,name,target,enforcement,source,source_type}]"
+  ],
+  "observed_at": "2026-10-25T04:17:09.234836+00:00",
+  "exit_code": 0,
+  "stdout": "[]\n",
+  "stderr": ""
+}

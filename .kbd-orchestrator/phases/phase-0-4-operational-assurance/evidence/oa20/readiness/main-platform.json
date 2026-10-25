@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "gh",
+    "run",
+    "view",
+    "40160960445",
+    "--repo",
+    "Prometheus-AGS/prometheus-parking-lot-rs",
+    "--json",
+    "databaseId,name,event,headSha,headBranch,status,conclusion,url,createdAt,updatedAt"
+  ],
+  "observed_at": "2026-10-25T04:17:15.030213+00:00",
+  "exit_code": 0,
+  "stdout": "{\"conclusion\":\"success\",\"createdAt\":\"2026-10-25T04:11:14Z\",\"databaseId\":40160960445,\"event\":\"push\",\"headBranch\":\"main\",\"headSha\":\"ce034cb44d94bb4805ede4583a575f4e5215b728\",\"name\":\"Platform\",\"status\":\"completed\",\"updatedAt\":\"2026-10-25T04:15:28Z\",\"url\":\"https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/actions/runs/40160960445\"}\n",
+  "stderr": ""
+}

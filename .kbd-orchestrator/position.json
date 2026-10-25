@@ -2,18 +2,20 @@
   "schemaVersion": "1",
   "generatedBy": "kbd-runtime",
   "projectionContractVersion": 2,
-  "sourceRevision": 1129,
-  "derivedRevision": 1129,
+  "sourceRevision": 1141,
+  "derivedRevision": 1141,
   "frontier": {
-    "3b637018-0150-4bf1-b8af-a19e9f09585f": 189,
+    "3b637018-0150-4bf1-b8af-a19e9f09585f": 201,
     "b4320c25-6bf5-4d74-9fe6-3d6b8b36bd69": 313,
     "fd8442d7-350a-436d-bd0e-6d99d54fdaa0": 627
   },
   "conflictCount": 0,
-  "updatedAt": "2026-10-24T20:10:51.055039Z",
+  "updatedAt": "2026-10-25T04:43:15.895357Z",
   "cursor": [
     "phase-0-4-operational-assurance",
-    "execute"
+    "execute",
+    "oa-20-merged-certification",
+    "2"
   ],
   "root": {
     "type": "phase",
@@ -21,7 +23,7 @@
     "status": "ready",
     "progress": {
       "done": 70,
-      "total": 70
+      "total": 71
     },
     "children": [
       {
@@ -31,7 +33,7 @@
         "status": "IN_PROGRESS",
         "progress": {
           "done": 19,
-          "total": 19
+          "total": 20
         },
         "children": [
           {
@@ -41,6 +43,15 @@
             "progress": {
               "done": 1,
               "total": 1
+            }
+          },
+          {
+            "type": "change",
+            "id": "oa-20-merged-certification",
+            "status": "IN_PROGRESS",
+            "progress": {
+              "done": 1,
+              "total": 2
             }
           },
           {

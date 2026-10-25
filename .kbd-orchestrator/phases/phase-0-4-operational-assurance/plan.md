@@ -373,3 +373,7 @@ No production build/test claim is made by this plan. Official tool/version selec
 ## Next action
 
 After plan review, canonical contract binding and task identity reconciliation, stop and present the plan. Execute is not entered in this planning response. A later execution request drives every task through timeout-bounded kbd-apply begin-task/end-task with stdin closed. No push, PR, account change, credential operation or history rewrite is included in this request.
+
+## Superseding Execute amendment04e74b62
+
+Operator chose the recommended deferral of real history cleanup and credential rotation, hostedOS automation plus attributable manualGUI/quiet evidence, then publication after actual amended certification. Supported signed binding revision2 is authoritative over earlier RB04/OA01 cleanup prerequisites and self-hosted scheduling assumptions. The updated adopted-contract.json changesOA01 only. OA20 task2 continuation implementation plan owns the coherent collector/workflow adaptation; all other scenario oracles remain unchanged. Root alone drives KBD; no prior receipt is relabelled; actual publication remains conditional on candidate-bound certificationPASS and real signing/OIDC/environment authority.

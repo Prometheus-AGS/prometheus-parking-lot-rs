@@ -1,0 +1,28 @@
+{
+  "scope": "supplemental website production verification only; original baseline FAIL receipt preserved; no aggregate certification claim",
+  "candidate": "ce034cb44d94bb4805ede4583a575f4e5215b728",
+  "argv": [
+    "timeout",
+    "300",
+    "npm",
+    "run",
+    "verify"
+  ],
+  "cwd": "/Users/gqadonis/.codex/worktrees/oa04-verification/prometheus-parking-lot-rs/website",
+  "exit": 0,
+  "started_epoch": 1792902083.6654232,
+  "elapsed_seconds": 31.73424482345581,
+  "selected_environment": {
+    "PLAYWRIGHT_BROWSERS_PATH": "/tmp/oa04-private-tools/playwright",
+    "VERIFY_SKIP_INSTALL": "1"
+  },
+  "browser": {
+    "path": "/tmp/oa04-private-tools/playwright/chromium_headless_shell-1248/chrome-headless-shell-mac-x64/chrome-headless-shell",
+    "version": "Google Chrome for Testing 156.0.8078.4",
+    "sha256": "a46b2df59e1f302c7060e5283f871ee410e285dcf862ae6bd0d81837bf1aa431"
+  },
+  "streams": {
+    "stdout.txt": "e92ca162c8f2feff8fd5ddd3070c170bfa3e3fdd1f3fdccec97e4a9165b424a5",
+    "stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -13,12 +13,15 @@ import datetime as dt
 import hashlib
 import importlib.util
 import json
+import ntpath
 import os
+import posixpath
 from pathlib import Path
 import platform
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import time
@@ -39,6 +42,8 @@ INPUT_KEYS = {"base", "release_date", "release_plz", "git_cliff", "trust_policy"
               "fresh_mirror", "pg17_image", "pg18_image", "upgrade_image", "chrome", "chromedriver",
               "android_ndk", "baseline_root", "quiet_attestation", "gui_positive", "gui_control",
               "authority_config", "rust_toolchain", "tag", "preparation_plan", "preparation_source"}
+MANUAL_PROFILES = {"macos-gui": "OA15-GUI", "quiet": "OA17-QUIET"}
+AUTOMATIC_PROFILES = {"baseline", "linux", "macos", "windows", "android", "ios"}
 CONTRACT = ROOT / ".kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json"
 SUBSTITUTION = re.compile(r"\{([a-z_][a-z_0-9]*)\}")
 TOOLS = {
@@ -120,10 +125,27 @@ def contract(path: Path) -> str:
 
 
 def sources() -> dict:
-    result = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True)
-    paths = [Path(os.fsdecode(x)) for x in result.stdout.split(b"\0") if x]
-    return {str(path): sha256(os.readlink(ROOT / path).encode()) if (ROOT / path).is_symlink()
-            else digest(ROOT / path) for path in paths if (ROOT / path).is_file()}
+    # Git index modes distinguish a real symlink from Windows' regular-file
+    # materialization of its target. Both bind the link bytes, never its referent.
+    result = subprocess.run(["git", "ls-files", "--stage", "-z"], cwd=ROOT,
+                            capture_output=True, check=True)
+    values = {}
+    for entry in result.stdout.split(b"\0"):
+        if not entry:
+            continue
+        metadata, raw_name = entry.split(b"\t", 1)
+        mode, _, stage = metadata.split()
+        require(stage == b"0", "OA-18:unmerged-source-index")
+        name = Path(os.fsdecode(raw_name))
+        path = ROOT / name
+        if mode == b"120000":
+            require(path.is_symlink() or path.is_file(), "OA-18:missing-symlink-source")
+            data = os.fsencode(os.readlink(path)) if path.is_symlink() else path.read_bytes()
+            values[name.as_posix()] = sha256(data)
+        elif path.is_file():
+            require(not path.is_symlink(), "OA-18:unexpected-source-symlink")
+            values[name.as_posix()] = digest(path)
+    return values
 
 
 def clean(candidate: str) -> None:
@@ -192,25 +214,74 @@ def text(folder: Path, record: dict) -> str:
     return "\n".join((folder / record[k]).read_text(errors="replace") for k in ("stdout", "stderr"))
 
 
+def authority_path(config_path: Path, value: str) -> Path:
+    """Portable immutable material names are confined to the config directory."""
+    require(isinstance(value, str) and bool(value), "authority material path missing")
+    path = Path(value)
+    if path.is_absolute():
+        return path
+    require(value not in {".", ".."} and "/" not in value and "\\" not in value
+            and ":" not in value, "authority relative path must be a material basename")
+    result = config_path.resolve().parent / value
+    require(not result.is_symlink() and result.resolve().parent == config_path.resolve().parent,
+            "authority material escapes config directory")
+    return result
+
+
+def authority_configuration(inputs: dict, candidate: str, binding: str) -> tuple[Path, dict, str]:
+    path = Path(inputs["authority_config"])
+    pin = os.environ.get("OA18_AUTHORITY_SHA256", "")
+    require(re.fullmatch(r"[0-9a-f]{64}", pin) is not None and pin != "0" * 64
+            and digest(path) == pin, "independently approved authority-config digest absent/mismatched")
+    config = json.loads(path.read_bytes())
+    require(config["candidate"] == candidate and config["contract_digest"] == binding,
+            "stale independently approved authority configuration")
+    age_limit = config.get("max_age_seconds")
+    require(type(age_limit) is int and 0 < age_limit <= 604800,
+            "explicit manual evidence freshness limit missing")
+    return path, config, pin
+
+
+def scoped_containment(report: dict, proofs: list[dict], binding: str) -> None:
+    model = definition()
+    if model.get("containment_scope") != "current-source-and-fixtures":
+        require(all(re.fullmatch(r"[0-9a-f]{64}", report.get(k, "")) for k in
+                    ("approved_rewrite_plan_sha256", "ref_plan_sha256", "cache_removal_evidence_sha256")),
+                "exact separately approved rewrite/refplan/cache evidence missing")
+        return
+    amendment = ROOT / ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/publication-preparation/scope-amendment.json"
+    pin = model.get("containment_scope_amendment_sha256", "")
+    require(re.fullmatch(r"[0-9a-f]{64}", pin) is not None and digest(amendment) == pin,
+            "exact adopted scope amendment source missing/different")
+    manifest = json.loads(amendment.read_bytes())
+    require(manifest.get("newContractDigest") == binding
+            and manifest.get("action") == "amend-contract"
+            and manifest.get("scenarioChanges") == {"added": [], "modified": ["OA-01"], "removed": []},
+            "containment amendment contract/scenario binding differs")
+    evidence = {item["sha256"] for item in proofs}
+    require(report.get("scope") == "current-source-and-fixtures"
+            and report.get("history_cleanup") == "DEFERRED"
+            and report.get("credential_rotation") == "DEFERRED"
+            and report.get("scope_amendment_sha256") == pin and pin in evidence,
+            "explicit cleanup/rotation deferral and adopted amendment evidence missing")
+    source_pin = report.get("current_source_evidence_sha256", "")
+    require(re.fullmatch(r"[0-9a-f]{64}", source_pin) is not None and source_pin in evidence,
+            "pinned current-source/fixture evidence missing")
+
+
 def authority(subject: str, inputs: dict, candidate: str, binding: str) -> dict:
     """An independently pinned report digest is authority; caller JSON alone isn't."""
     try:
-        path = Path(inputs["authority_config"])
-        pin = os.environ.get("OA18_AUTHORITY_SHA256", "")
-        require(re.fullmatch(r"[0-9a-f]{64}", pin) is not None and pin != "0" * 64
-                and digest(path) == pin, "independently approved authority-config digest absent/mismatched")
-        config = json.loads(path.read_bytes())
-        require(config["candidate"] == candidate and config["contract_digest"] == binding,
-                "stale independently approved authority configuration")
-        age_limit = config.get("max_age_seconds")
-        require(type(age_limit) is int and 0 < age_limit <= 604800, "explicit manual evidence freshness limit missing")
+        path, config, pin = authority_configuration(inputs, candidate, binding)
+        age_limit = config["max_age_seconds"]
         entry = config["subjects"][subject]
-        report_path = Path(entry["report"])
+        report_path = authority_path(path, entry["report"])
         require(report_path.is_absolute() and digest(report_path) == entry["sha256"]
                 and entry["source"], "approved report bytes/source differ")
         report = json.loads(report_path.read_bytes())
         require(report.get("candidate") == candidate and report.get("contract_digest") == binding,
                 "report candidate/contract differs")
+        require(isinstance(report.get("observed_at"), str), "manual report timestamp missing")
         observed = dt.datetime.fromisoformat(report["observed_at"].replace("Z", "+00:00"))
         require(observed.tzinfo is not None and 0 <= (dt.datetime.now(dt.timezone.utc) - observed).total_seconds() <= age_limit,
                 "stale/future manual report")
@@ -222,7 +293,7 @@ def authority(subject: str, inputs: dict, candidate: str, binding: str) -> dict:
                     and report.get("negative_observation"), "actual independent GUI observations missing")
         proofs = []
         for item in entry["evidence"]:
-            file = Path(item["path"])
+            file = authority_path(path, item["path"])
             require(file.is_absolute() and digest(file) == item["sha256"], "raw approved evidence differs")
             proofs.append({"path": str(file), "sha256": item["sha256"]})
         if subject == "review":
@@ -232,9 +303,7 @@ def authority(subject: str, inputs: dict, candidate: str, binding: str) -> dict:
                     and report.get("open_critical_findings") == 0,
                     "actual independent R2 acceptance/correction budget not established")
         elif subject == "G-02":
-            require(all(re.fullmatch(r"[0-9a-f]{64}", report.get(k, "")) for k in
-                        ("approved_rewrite_plan_sha256", "ref_plan_sha256", "cache_removal_evidence_sha256")),
-                    "exact separately approved rewrite/refplan/cache evidence missing")
+            scoped_containment(report, proofs, binding)
         elif subject == "G-04":
             require(all(re.fullmatch(r"[0-9a-f]{64}", report.get(k, "")) for k in
                         ("settings_evidence_sha256", "environment_receipt_sha256")),
@@ -245,7 +314,7 @@ def authority(subject: str, inputs: dict, candidate: str, binding: str) -> dict:
         return {"status": "PASS", "subject": subject, "report_sha256": entry["sha256"],
                 "source": entry["source"], "authority_config_sha256": pin,
                 "report_path": str(report_path), "raw": proofs}
-    except (ReleaseError, OSError, ValueError, KeyError) as error:
+    except (ReleaseError, OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile) as error:
         return {"status": "BLOCKED", "subject": subject, "reason": str(error)}
 
 
@@ -262,7 +331,7 @@ def retain_authority(output: Path, approved: dict) -> None:
             require(digest(source) == item["sha256"], "approved evidence changed before retention")
             target = folder / (str(number) + source.suffix)
             shutil.copyfile(source, target)
-            record["retained"].append({"path": str(target.relative_to(output)), "sha256": digest(target)})
+            record["retained"].append({"path": target.relative_to(output).as_posix(), "sha256": digest(target)})
 
 
 def make_freeze(args, model: dict, output: Path) -> dict:
@@ -387,7 +456,8 @@ def make_freeze(args, model: dict, output: Path) -> dict:
     retain_authority(output, approved)
     manifest = {"schema_version": 1, "candidate": args.candidate, "contract_digest": binding,
                 "definition_sha256": digest(DEFINITION), "source_sha256": sources(),
-                "profile": args.profile, "os": platform.platform(), "machine": platform.machine(),
+                "profile": args.profile, "os": platform.platform(), "system": platform.system(),
+                "machine": platform.machine(), "host": platform.node(),
                 "python": sys.version, "frozen_at": stamp(), "commands": rows,
                 "tools": observed, "images": images, "authority": approved, "fixture_inputs": fixture_inputs,
                 "inputs": inputs, "inputs_sha256": digest(args.inputs) if args.inputs else None,
@@ -515,7 +585,7 @@ def run(args) -> int:
                     child = Path(row["receipt"])
                     data = json.loads(child.read_bytes())
                     validate_child_receipt(data, row, args.candidate, manifest["contract_digest"])
-                    record.update(child_receipt=str(child.relative_to(output)), child_sha256=digest(child))
+                    record.update(child_receipt=child.relative_to(output).as_posix(), child_sha256=digest(child))
             clean(args.candidate)
             require(sources() == manifest["source_sha256"], "OA-18:changed-source")
         except (ReleaseError, OSError, ValueError, KeyError) as error:
@@ -546,7 +616,7 @@ def retained(path: Path, root: Path) -> bool:
 
 
 def seal(root: Path) -> None:
-    files = {str(p.relative_to(root)): digest(p) for p in sorted(root.rglob("*"))
+    files = {p.relative_to(root).as_posix(): digest(p) for p in sorted(root.rglob("*"))
              if p.is_file() and not p.is_symlink() and p.name != "files-sha256.json" and retained(p, root)}
     write(root / "files-sha256.json", files)
 
@@ -571,9 +641,31 @@ def safe(root: Path, name: str) -> Path:
     return result
 
 
+def validate_frozen_command(row: dict, checked: dict, frozen: dict) -> None:
+    """A receipt cannot replace a checked oracle/argv in its own frozen copy."""
+    inputs = frozen["inputs"]
+    require(set(inputs) <= INPUT_KEYS | {"workspace", "candidate", "contract", "out"}
+            and all(isinstance(value, str) for value in inputs.values())
+            and inputs["candidate"] == frozen["candidate"], "OA-18:changed-frozen-inputs")
+    paths = ntpath if frozen["system"] == "Windows" else posixpath
+    expected = copy.deepcopy(checked)
+    expected["argv"] = [expand(value, inputs) for value in checked["argv"]]
+    if checked.get("discovery_argv"):
+        expected["discovery_argv"] = [expand(value, inputs) for value in checked["discovery_argv"]]
+    expected["cwd"] = paths.normpath(paths.join(inputs["workspace"], expand(checked.get("cwd", "."), inputs)))
+    expected["env"] = {key: expand(value, inputs) for key, value in checked.get("env", {}).items()}
+    expected["paths"] = [paths.normpath(paths.join(inputs["workspace"], expand(value, inputs)))
+                         for value in checked.get("paths", [])]
+    expected["images"] = [expand(value, inputs) for value in checked.get("images", [])]
+    if checked.get("receipt"):
+        expected["receipt"] = expand(checked["receipt"], inputs)
+    require(row == expected, "OA-18:changed-frozen-command")
+
+
 def verify_job(folder: Path, model: dict, candidate: str, binding: str) -> dict:
+    require(not any(p.is_symlink() for p in folder.rglob("*")), "OA-18:linked-raw-evidence")
     files = json.loads((folder / "files-sha256.json").read_bytes())
-    require(set(files) == {str(p.relative_to(folder)) for p in folder.rglob("*")
+    require(set(files) == {p.relative_to(folder).as_posix() for p in folder.rglob("*")
                           if p.is_file() and p.name != "files-sha256.json"}, "OA-18:omitted-raw-evidence")
     for name, expected in files.items():
         require(digest(safe(folder, name)) == expected, "OA-18:altered-raw-evidence")
@@ -584,26 +676,35 @@ def verify_job(folder: Path, model: dict, candidate: str, binding: str) -> dict:
     require(digest(folder / "checked-manifest.json") == receipt["manifest_sha256"]
             and frozen["candidate"] == candidate and frozen["contract_digest"] == binding
             and frozen["source_sha256"] == sources(), "OA-18:stale-freeze")
-    required = {r["id"] for r in model["commands"] if r["profile"] == receipt["profile"]}
+    profile = receipt["profile"]
+    require(profile in model["profiles"] and frozen["profile"] == profile
+            and frozen.get("system") in {"Linux", "Darwin", "Windows"}
+            and model["profiles"][profile] in {"native", frozen["system"]}, "OA-18:wrong-os-profile")
+    required = {r["id"] for r in model["commands"] if r["profile"] == profile}
+    require(len(frozen["commands"]) == len(required)
+            and {r["id"] for r in frozen["commands"]} == required, "OA-18:omitted-frozen-command")
     records = receipt["records"]
     require(len(records) == len(required) and {r["id"] for r in records} == required,
             "OA-18:omitted-command")
     for record in records:
+        checked_row = next(r for r in model["commands"] if r["id"] == record["id"])
+        require(record["scenarios"] == checked_row["scenarios"], "OA-18:changed-command-scenarios")
         require(record["status"] in STATES, "OA-18:skipped-packet")
         if record["status"] != "PASS":
             continue
         row = next(r for r in frozen["commands"] if r["id"] == record["id"])
+        validate_frozen_command(row, checked_row, frozen)
         command = record["command"]
         require(command["argv"] == row["argv"] and command["cwd"] == row["cwd"]
                 and command["exit"] == row.get("expected_exit", 0), "OA-18:false-command-pass")
         for key in ("stdout", "stderr"):
-            require(digest(folder / command[key]) == command[key + "_sha256"], "OA-18:missing-log")
+            require(digest(safe(folder, command[key])) == command[key + "_sha256"], "OA-18:missing-log")
         if row.get("discovery_argv"):
             listing = record["discovery"]
             require(listing["argv"] == row["discovery_argv"] and listing["exit"] == 0,
                     "OA-18:missing-discovery")
             for stream in ("stdout", "stderr"):
-                require(digest(folder / listing[stream]) == listing[stream + "_sha256"], "OA-18:changed-discovery")
+                require(digest(safe(folder, listing[stream])) == listing[stream + "_sha256"], "OA-18:changed-discovery")
             count = discovery_count((folder / listing["stdout"]).read_text(), row)
             require(count > 0 and record["selected_tests_before_run"] == count, "OA-18:zero-discovery")
         if record["id"] == "oa02":
@@ -639,6 +740,99 @@ def validate_packet(packet: dict, model: dict, candidate: str, binding: str) -> 
         require(all(r["status"] == "PASS" for r in records), "OA-18:nonpass-required")
 
 
+def extract_archive(archive: Path, folder: Path) -> None:
+    """Untrusted immutable artifact boundary: only bounded regular files/directories."""
+    require(archive.stat().st_size <= 1024 ** 3 and not folder.exists(), "unsafe archive size/output")
+    with zipfile.ZipFile(archive) as bundle:
+        members = bundle.infolist()
+        require(len(members) <= 20000, "raw archive member limit")
+        seen = set()
+        total = 0
+        for info in members:
+            name = info.filename.rstrip("/")
+            require(name and "\\" not in name and ":" not in name and not name.startswith("/")
+                    and all(part not in {"", ".", ".."} for part in name.split("/")),
+                    "unsafe archive member path")
+            require(name not in seen, "duplicate archive member")
+            seen.add(name)
+            kind = stat.S_IFMT(info.external_attr >> 16)
+            require(kind in ({0, stat.S_IFDIR} if info.is_dir() else {0, stat.S_IFREG})
+                    and not info.flag_bits & 1, "unsafe raw archive link/type/encryption")
+            total += info.file_size
+            require(total <= 4 * 1024 ** 3, "unsafe raw archive expanded size")
+        folder.mkdir(parents=True)
+        for info in members:
+            target = safe(folder, info.filename)
+            if info.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with bundle.open(info) as source, target.open("xb") as dest:
+                    shutil.copyfileobj(source, dest)
+
+
+def profile_sources(model: dict) -> dict:
+    expected = {**{p: "github-actions" for p in AUTOMATIC_PROFILES},
+                **{p: "approved-manual-bundle" for p in MANUAL_PROFILES}}
+    require(set(model["profiles"]) == set(expected) and model.get("profile_sources") == expected,
+            "OA-18:changed-profile-sources")
+    return expected
+
+
+def import_manual_jobs(output: Path, model: dict, inputs: dict, candidate: str, binding: str) -> dict:
+    """Import only independently pinned local bundles; no manual automatic overrides."""
+    provenance = {}
+    for profile, subject in MANUAL_PROFILES.items():
+        try:
+            require(profile_sources(model)[profile] == "approved-manual-bundle", "manual source differs")
+            config_path, config, pin = authority_configuration(inputs, candidate, binding)
+            entries = config["manual_profiles"]
+            require(set(entries) == set(MANUAL_PROFILES), "manual profile inventory differs")
+            entry = entries[profile]
+            require(set(entry) == {"path", "sha256", "subject"} and entry["subject"] == subject,
+                    "manual profile subject differs")
+            archive = authority_path(config_path, entry["path"])
+            require(not archive.is_symlink() and archive.is_file()
+                    and digest(archive) == entry["sha256"], "manual archive digest differs")
+            approved = authority(subject, inputs, candidate, binding)
+            require(approved["status"] == "PASS" and entry["sha256"] in
+                    {proof["sha256"] for proof in approved["raw"]},
+                    "actual manual archive bytes lack independent authority coverage")
+            retained_archive = output / (profile + ".zip")
+            require(not retained_archive.exists(), "manual archive output already exists")
+            shutil.copyfile(archive, retained_archive)
+            require(digest(retained_archive) == entry["sha256"], "manual archive changed before import")
+            folder = output / profile
+            extract_archive(retained_archive, folder)
+            require(digest(archive) == entry["sha256"], "manual archive changed during import")
+            job = verify_job(folder, model, candidate, binding)
+            require(job["profile"] == profile, "manual profile receipt differs")
+            frozen = json.loads((folder / "checked-manifest.json").read_bytes())
+            require(isinstance(frozen.get("frozen_at"), str) and isinstance(job.get("finished"), str),
+                    "manual execution timestamps missing")
+            frozen_at = dt.datetime.fromisoformat(frozen["frozen_at"].replace("Z", "+00:00"))
+            finished = dt.datetime.fromisoformat(job["finished"].replace("Z", "+00:00"))
+            now = dt.datetime.now(dt.timezone.utc)
+            require(frozen_at.tzinfo is not None and finished.tzinfo is not None
+                    and frozen_at <= finished <= now
+                    and 0 <= (now - frozen_at).total_seconds() <= config["max_age_seconds"],
+                    "manual bundle stale/future execution interval")
+            require(frozen.get("host") and frozen.get("machine") and frozen.get("os"), "manual host identity missing")
+            report = json.loads(Path(approved["report_path"]).read_bytes())
+            require(report.get("profile") == profile and report.get("machine") == frozen["machine"]
+                    and report.get("os") == frozen["os"] and report.get("host") == frozen["host"]
+                    and dt.datetime.fromisoformat(report["observed_at"].replace("Z", "+00:00")) >= finished
+                    and report.get("archive_sha256") == entry["sha256"],
+                    "manual authority host/profile/archive binding differs")
+            retain_authority(output, {subject: approved})
+            provenance[profile] = {"status": "PASS", "source": "approved-manual-bundle",
+                                   "archive_sha256": entry["sha256"], "authority_config_sha256": pin,
+                                   "authority": approved}
+        except (ReleaseError, OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile) as error:
+            provenance[profile] = {"status": "BLOCKED", "reason": str(error)}
+    return provenance
+
+
 def fetch_jobs(output: Path, model: dict, candidate: str, policy: dict) -> dict:
     """Read only authenticated immutable artifacts from this approved first run."""
     require(os.environ.get("GITHUB_ACTIONS") == "true" and os.environ.get("GITHUB_SHA") == candidate
@@ -656,7 +850,7 @@ def fetch_jobs(output: Path, model: dict, candidate: str, policy: dict) -> dict:
         validate_approvals(api.get(f"/actions/runs/{run_id}/approvals"), policy["boundary_environment"])
         trust = {"status": "PASS", "workflow_sha256": policy["boundary_workflow_sha256"],
                  "environment": policy["boundary_environment"]["name"], "run_id": int(run_id)}
-    except (ReleaseError, OSError, ValueError, KeyError) as error:
+    except (ReleaseError, OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile) as error:
         trust["reason"] = str(error)
     artifacts = []
     page = 1
@@ -667,7 +861,9 @@ def fetch_jobs(output: Path, model: dict, candidate: str, policy: dict) -> dict:
             break
         page += 1
     provenance = {"trust": trust}
-    for profile in model["profiles"]:
+    for profile, source in profile_sources(model).items():
+        if source != "github-actions":
+            continue
         matches = [a for a in artifacts if a["name"] == "oa18-" + profile and not a["expired"]]
         if len(matches) != 1:
             provenance[profile] = {"status": "BLOCKED", "reason": "OA-18:omitted-os-artifact: " + profile}
@@ -692,22 +888,7 @@ def fetch_jobs(output: Path, model: dict, candidate: str, policy: dict) -> dict:
                 target.write(chunk)
         require(item.get("digest") == "sha256:" + digest(archive), "server raw artifact digest differs")
         folder = output / profile
-        folder.mkdir()
-        with zipfile.ZipFile(archive) as bundle:
-            names = [i.filename for i in bundle.infolist() if not i.is_dir()]
-            require(len(names) == len(set(names)), "duplicate archive member")
-            total = 0
-            for info in bundle.infolist():
-                total += info.file_size
-                require(total <= 4 * 1024 ** 3 and not (info.external_attr >> 16) & 0o170000 == 0o120000,
-                        "unsafe raw archive size/symlink")
-                dest = safe(folder, info.filename)
-                if info.is_dir():
-                    dest.mkdir(parents=True, exist_ok=True)
-                else:
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    with bundle.open(info) as source, dest.open("wb") as target:
-                        shutil.copyfileobj(source, target)
+        extract_archive(archive, folder)
         provenance[profile] = {"status": "PASS", "artifact_id": artifact_id, "run_id": int(run_id),
                                "archive_sha256": digest(archive), "source": BOUNDARY_WORKFLOW}
     return provenance
@@ -732,7 +913,8 @@ def assemble(args) -> int:
             source = args.out / "jobs"
             source.mkdir()
             provenance = fetch_jobs(source, model, args.candidate, policy)
-        except (ReleaseError, OSError, ValueError, KeyError) as error:
+            provenance.update(import_manual_jobs(source, model, inputs, args.candidate, binding))
+        except (ReleaseError, OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile) as error:
             provenance_error = str(error)
     profiles = {}
     records = []
@@ -740,9 +922,10 @@ def assemble(args) -> int:
         try:
             require(source is not None, "per-job evidence unavailable")
             job = verify_job(source / profile, model, args.candidate, binding)
+            require(job["profile"] == profile, "OA-18:profile-receipt-differs")
             profiles[profile] = {"status": job["status"], "receipt_sha256": digest(source / profile / "job-receipt.json")}
             records += job["records"]
-        except (ReleaseError, OSError, ValueError, KeyError) as error:
+        except (ReleaseError, OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile) as error:
             profiles[profile] = {"status": "BLOCKED", "reason": str(error)}
     approved = {s: authority(s, inputs, args.candidate, binding) for s in model["required_authority"]}
     signed = None
@@ -756,7 +939,7 @@ def assemble(args) -> int:
         require(report.get("tag") == args.tag and report.get("public_trust_sha256") == trust,
                 "G03 approved tag/public trust differs")
         write(args.out / "tag-verification.json", {**signed, "public_trust_sha256": trust})
-    except (ReleaseError, OSError, ValueError, KeyError) as error:
+    except (ReleaseError, OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile) as error:
         approved["G-03"] = {"status": "BLOCKED", "subject": "G-03", "reason": str(error)}
     retain_authority(args.out, approved)
     scenarios = {}
@@ -834,7 +1017,7 @@ def assemble(args) -> int:
         write(compact / "boundary-receipt.json", receipt)
         (compact / "release-plan.json").write_bytes(plan_bytes)
         compact_reason = "compact " + args.purpose + " artifact authored from observed packet; publication NOT_EXERCISED"
-    except (ReleaseError, OSError, ValueError, KeyError) as error:
+    except (ReleaseError, OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile) as error:
         compact_reason = str(error)
     write(args.out / "disposition.json", {"packet_status": packet["status"], "compact": compact_reason,
           "compact_present": (args.out / "compact").exists(), "publication": "NOT_EXERCISED"})
@@ -941,7 +1124,7 @@ def main() -> int:
     try:
         return {"run": run, "assemble": assemble, "export": export,
                 "android-elf": lambda _: android_elf(), "observe-quiet": observe_quiet}[args.operation](args)
-    except (ReleaseError, OSError, ValueError, KeyError) as error:
+    except (ReleaseError, OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile) as error:
         print("OA-18 BLOCKED: " + str(error), file=sys.stderr)
         return 2
 

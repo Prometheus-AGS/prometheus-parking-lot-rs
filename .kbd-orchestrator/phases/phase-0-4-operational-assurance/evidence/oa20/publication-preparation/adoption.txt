@@ -1,0 +1,1 @@
+ADOPTED path=.kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json sha256=04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2 planRevision=1 decision=contract-adoption-phase-0-4-operational-assurance-04e74b62 bound=revision-2 supersedes=contract-adoption-phase-0-4-operational-assurance-e77aa4ac

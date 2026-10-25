@@ -1,8 +1,8 @@
 name: Operational assurance boundary
 
-# Source only until operator-provisioned runners, protected-main/environment,
-# exact source/public-trust pins and authority inputs exist. No provisioning,
-# remote dispatch, signing, account mutation or publication lives in this job.
+# Hosted automated profiles plus independently attributable manual bundles.
+# Protected main/environment and exact public source/authority pins remain required.
+# Setup is job scoped; validators never install. No signing/publication occurs here.
 on:
   workflow_dispatch:
     inputs:
@@ -35,17 +35,27 @@ env:
 
 jobs:
   profiles:
-    if: github.ref == 'refs/heads/main' && github.run_attempt == 1 && inputs.candidate == github.sha
+    if: github.ref == 'refs/heads/main' && github.ref_protected && github.run_attempt == 1 && inputs.candidate == github.sha
     name: Boundary profile (${{ matrix.profile }})
-    # Every label is a preprovisioned, explicitly approved self-hosted host.
-    # Missing hosts are missing evidence; no hosted/paid fallback is selected.
-    runs-on: [self-hosted, '${{ matrix.profile }}']
+    runs-on: ${{ matrix.os }}
     environment: release-certification
     timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
-        profile: [baseline, linux, macos, windows, android, ios, macos-gui]
+        include:
+          - profile: baseline
+            os: ubuntu-24.04
+          - profile: linux
+            os: ubuntu-24.04
+          - profile: macos
+            os: macos-15
+          - profile: windows
+            os: windows-2025
+          - profile: android
+            os: ubuntu-24.04
+          - profile: ios
+            os: macos-15
     defaults:
       run:
         shell: bash
@@ -54,6 +64,10 @@ jobs:
       CANDIDATE: ${{ inputs.candidate }}
       OA18_INPUTS_JSON: ${{ vars.OA18_INPUTS_JSON }}
       OA18_AUTHORITY_SHA256: ${{ vars.OA18_AUTHORITY_SHA256 }}
+      OA18_MATERIALS_JSON: ${{ vars.OA18_MATERIALS_JSON }}
+      OA18_PLATFORM_JSON: ${{ vars.OA18_PLATFORM_JSON }}
+      RELEASE_TRUST_POLICY_JSON: ${{ vars.RELEASE_TRUST_POLICY_JSON }}
+      RELEASE_SSH_ALLOWED_SIGNERS: ${{ vars.RELEASE_SSH_ALLOWED_SIGNERS }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
@@ -61,15 +75,141 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Resolve public profile inputs; never approval dispatch JSON
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.99.1'
+          components: rustfmt,clippy
+      - name: Prepare the exact MSRV before freeze
+        if: matrix.profile == 'baseline' || matrix.profile == 'linux'
+        run: rustup toolchain install 1.95 --profile minimal
+      - name: Prepare WASM targets before freeze
+        if: matrix.profile == 'baseline' || matrix.profile == 'linux'
         run: |
-          python3 - <<'PY'
-          import json, os
-          from pathlib import Path
-          mapping = json.loads(os.environ.get('OA18_INPUTS_JSON') or '{}')
-          value = mapping.get(os.environ['PROFILE_ID'], {})
-          Path(os.environ['RUNNER_TEMP'], 'oa18-inputs.json').write_text(json.dumps(value))
-          PY
+          rustup target add --toolchain 1.99.1 wasm32-unknown-unknown
+          rustup target add --toolchain 1.95 wasm32-unknown-unknown
+      - name: Prepare Android targets before freeze
+        if: matrix.profile == 'android'
+        run: rustup target add --toolchain 1.99.1 aarch64-linux-android x86_64-linux-android
+      - name: Prepare iOS targets before freeze
+        if: matrix.profile == 'ios'
+        run: rustup target add --toolchain 1.99.1 aarch64-apple-ios aarch64-apple-ios-sim
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: assurance-${{ matrix.profile }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: actions/setup-node@v7
+        if: matrix.profile == 'baseline' || matrix.profile == 'linux'
+        with:
+          node-version: '24'
+      - uses: taiki-e/install-action@v2
+        if: matrix.profile == 'baseline'
+        with:
+          tool: nextest@0.9.149,cargo-deny@0.20.2,release-plz@0.3.173,git-cliff@2.14.2
+          fallback: none
+      - uses: taiki-e/install-action@v2
+        if: matrix.profile == 'linux'
+        with:
+          tool: nextest@0.9.149,wasm-bindgen@0.2.129
+          fallback: none
+      - name: Prepare Linux desktop and headless-browser libraries
+        if: matrix.profile == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libnss3 libatk-bridge2.0-0 libxss1 libasound2t64 libgbm1
+      - name: Prepare pinned Linux Chrome and driver before freeze
+        env:
+          BOOTSTRAP_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        if: matrix.profile == 'linux'
+        run: python3 .github/scripts/bootstrap-hosted-browser.py
+      - name: Prepare real pinned Linux backend collaborators before freeze
+        if: matrix.profile == 'linux'
+        run: |
+          set -euo pipefail
+          docker version
+          # Reuse the ordinary CI physical-upgrade preparation path. The default
+          # builder can see the local source-ID aliases; no image is published.
+          docker build --builder default -f docker/postgres17/Dockerfile -t parking-lot-pg:17 docker
+          docker build --builder default -f docker/postgres18/Dockerfile -t parking-lot-pg:18 docker
+          pg17_id=$(docker image inspect parking-lot-pg:17 --format '{{.Id}}')
+          pg18_id=$(docker image inspect parking-lot-pg:18 --format '{{.Id}}')
+          pg17_alias="oa14-local/pg17:${pg17_id#sha256:}"
+          pg18_alias="oa14-local/pg18:${pg18_id#sha256:}"
+          docker tag "$pg17_id" "$pg17_alias"
+          docker tag "$pg18_id" "$pg18_alias"
+          upgrade_tag="oa14-local/upgrade:${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker build --builder default -f docker/postgres18/upgrade/Dockerfile \
+            --build-arg "PG17_IMAGE=$pg17_alias" \
+            --build-arg "PG18_IMAGE=$pg18_alias" \
+            --build-arg "PG17_SOURCE_ID=$pg17_id" \
+            --build-arg "PG18_SOURCE_ID=$pg18_id" \
+            -t "$upgrade_tag" docker
+          upgrade_id=$(docker image inspect "$upgrade_tag" --format '{{.Id}}')
+          printf 'OA12_PG17_IMAGE=%s\nOA12_PG18_IMAGE=%s\nOA12_UPGRADE_IMAGE=%s\n' \
+            "$pg17_id" "$pg18_id" "$upgrade_id" >> "$GITHUB_ENV"
+          # This is the exact checked digest used by the real Iggy fixtures.
+          iggy_image=$(python3 -c 'import json; print(json.load(open(".github/negative-controls.json"))["iggy_image"])')
+          docker pull "$iggy_image"
+          docker image inspect "$iggy_image"
+      - name: Prepare baseline scanner and website browser before freeze
+        if: matrix.profile == 'baseline'
+        env:
+          GITLEAKS_VERSION: '8.30.1'
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/oa18-playwright
+        run: |
+          set -euo pipefail
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$tarball" "$base/$tarball"
+          curl -fsSL -o "$RUNNER_TEMP/checksums.txt" "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          (cd "$RUNNER_TEMP" && grep " ${tarball}\$" checksums.txt | sha256sum -c -)
+          mkdir "$RUNNER_TEMP/oa18-bin"
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP/oa18-bin" gitleaks
+          echo "$RUNNER_TEMP/oa18-bin" >> "$GITHUB_PATH"
+          (cd website && npm ci --no-audit --no-fund && npx --no-install playwright install --with-deps chromium)
+          echo "PLAYWRIGHT_BROWSERS_PATH=$PLAYWRIGHT_BROWSERS_PATH" >> "$GITHUB_ENV"
+          echo 'VERIFY_SKIP_INSTALL=1' >> "$GITHUB_ENV"
+      - name: Prepare Android NDK and pinned Kotlin before freeze
+        env:
+          BOOTSTRAP_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        if: matrix.profile == 'android'
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/prepare-hosted-assurance-platform.py --profile android
+          version=2.4.20
+          archive="$RUNNER_TEMP/kotlin-compiler-$version.zip"
+          gh release download "v$version" --repo JetBrains/kotlin --pattern "kotlin-compiler-$version.zip" --dir "$RUNNER_TEMP"
+          echo "59e9ca74c7904ef2c122b12114937673ccce68de820a663f0ed66ccf8799e0b7  $archive" | sha256sum -c -
+          unzip -q "$archive" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/kotlinc/bin" >> "$GITHUB_PATH"
+          cargo install cargo-ndk --version 4.1.2 --locked
+      - name: Select independently pinned preinstalled Xcode before freeze
+        env:
+          BOOTSTRAP_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        if: matrix.profile == 'macos' || matrix.profile == 'ios'
+        run: python3 .github/scripts/prepare-hosted-assurance-platform.py --profile "$PROFILE_ID"
+      - name: Prefetch locked workspace sources before offline assurance freeze
+        env:
+          CARGO_NET_OFFLINE: 'false'
+        run: |
+          # No --target filter: fetch the locked sources for every target,
+          # including this profile's native, WASM, Android or Apple targets.
+          # The producer remains strictly offline after this setup boundary.
+          cargo +1.99.1 fetch --locked --manifest-path Cargo.toml
+      - name: Prefetch locked standalone binding-generator sources
+        if: matrix.profile == 'baseline' || matrix.profile == 'android' || matrix.profile == 'ios'
+        env:
+          CARGO_NET_OFFLINE: 'false'
+        run: cargo +1.99.1 fetch --locked --manifest-path bindings/uniffi-bindgen/Cargo.toml
+      - name: Prefetch locked standalone native desktop workspace sources
+        if: matrix.profile == 'linux' || matrix.profile == 'macos' || matrix.profile == 'windows'
+        env:
+          CARGO_NET_OFFLINE: 'false'
+        # This member resolves the shared desktop Cargo.lock and both members.
+        run: cargo +1.99.1 fetch --locked --manifest-path bindings/tauri-desktop/src-tauri/Cargo.toml
+      - name: Stage immutable public evidence and resolve job-local inputs before freeze
+        env:
+          BOOTSTRAP_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: python3 .github/scripts/prepare-hosted-assurance.py --profile "$PROFILE_ID"
       - name: Freeze then execute available exact commands sequentially
         continue-on-error: true
         run: |
@@ -82,6 +222,15 @@ jobs:
         run: |
           python3 .github/scripts/operational-assurance.py export \
             --receipts "$RUNNER_TEMP/oa18-$PROFILE_ID" --out "$RUNNER_TEMP/upload-$PROFILE_ID"
+      - name: Preserve immutable setup material receipt
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: oa18-setup-${{ matrix.profile }}
+          path: |
+            ${{ runner.temp }}/oa18-materials/staging-receipt.json
+            ${{ runner.temp }}/oa18-platform-preparation.json
+          if-no-files-found: warn
       - name: Preserve immutable job receipts and redacted raw logs separately
         if: always()
         uses: actions/upload-artifact@v7
@@ -90,55 +239,10 @@ jobs:
           path: ${{ runner.temp }}/upload-${{ matrix.profile }}/
           if-no-files-found: error
 
-  quiet:
-    if: always() && github.ref == 'refs/heads/main' && github.run_attempt == 1 && inputs.candidate == github.sha
-    needs: profiles
-    name: Quiet PG benchmark measurement
-    runs-on: [self-hosted, quiet]
-    environment: release-certification
-    timeout-minutes: 360
-    defaults:
-      run:
-        shell: bash
-    env:
-      CANDIDATE: ${{ inputs.candidate }}
-      OA18_INPUTS_JSON: ${{ vars.OA18_INPUTS_JSON }}
-      OA18_AUTHORITY_SHA256: ${{ vars.OA18_AUTHORITY_SHA256 }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      - name: Read operator-provisioned quiet profile paths
-        run: |
-          python3 - <<'PY'
-          import json, os
-          from pathlib import Path
-          mapping = json.loads(os.environ.get('OA18_INPUTS_JSON') or '{}')
-          Path(os.environ['RUNNER_TEMP'], 'oa18-inputs.json').write_text(json.dumps(mapping.get('quiet', {})))
-          PY
-      - name: Stage, build and measure only with actual quiet-machine authority
-        continue-on-error: true
-        run: |
-          bash .github/scripts/operational-assurance-gate.sh --candidate "$CANDIDATE" \
-            --profile quiet --inputs "$RUNNER_TEMP/oa18-inputs.json" --out "$RUNNER_TEMP/oa18-quiet"
-      - name: Export raw benchmark evidence
-        if: always()
-        run: |
-          python3 .github/scripts/operational-assurance.py export \
-            --receipts "$RUNNER_TEMP/oa18-quiet" --out "$RUNNER_TEMP/upload-quiet"
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: oa18-quiet
-          path: ${{ runner.temp }}/upload-quiet/
-          if-no-files-found: error
-
   assemble:
-    if: always() && github.ref == 'refs/heads/main' && github.run_attempt == 1 && inputs.candidate == github.sha
-    needs: [profiles, quiet]
-    runs-on: [self-hosted, oa18-collector]
+    if: always() && github.ref == 'refs/heads/main' && github.ref_protected && github.run_attempt == 1 && inputs.candidate == github.sha
+    needs: profiles
+    runs-on: ubuntu-24.04
     environment: release-certification
     timeout-minutes: 30
     defaults:
@@ -150,6 +254,8 @@ jobs:
       OA18_INPUTS_JSON: ${{ vars.OA18_INPUTS_JSON }}
       OA18_AUTHORITY_SHA256: ${{ vars.OA18_AUTHORITY_SHA256 }}
       RELEASE_TRUST_POLICY_JSON: ${{ vars.RELEASE_TRUST_POLICY_JSON }}
+      RELEASE_SSH_ALLOWED_SIGNERS: ${{ vars.RELEASE_SSH_ALLOWED_SIGNERS }}
+      OA18_MATERIALS_JSON: ${{ vars.OA18_MATERIALS_JSON }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
@@ -157,6 +263,10 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Stage independently pinned preparation, trust, authority and manual bundles
+        env:
+          BOOTSTRAP_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+        run: python3 .github/scripts/prepare-hosted-assurance.py --profile collector
       - name: Collect actual same-run immutable artifacts and independently approved external bytes
         id: collect
         continue-on-error: true
@@ -165,10 +275,7 @@ jobs:
           import json, os, subprocess, sys
           from pathlib import Path
           temp = Path(os.environ['RUNNER_TEMP'])
-          mapping = json.loads(os.environ.get('OA18_INPUTS_JSON') or '{}')
-          inputs = mapping.get('collector', {})
-          (temp / 'oa18-inputs.json').write_text(json.dumps(inputs))
-          (temp / 'release-trust-policy.json').write_text(os.environ.get('RELEASE_TRUST_POLICY_JSON') or '{}')
+          inputs = json.loads((temp / 'oa18-inputs.json').read_bytes())
           argv = ['python3', '.github/scripts/operational-assurance.py', 'assemble',
                   '--candidate', os.environ['CANDIDATE'], '--trusted', '--purpose', os.environ['PURPOSE'],
                   '--policy', str(temp / 'release-trust-policy.json'), '--inputs', str(temp / 'oa18-inputs.json'),

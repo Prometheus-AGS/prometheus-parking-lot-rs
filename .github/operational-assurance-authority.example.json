@@ -1,7 +1,8 @@
 {
   "purpose": "UNARMED example; no report, approval or execution evidence exists here",
   "candidate": "",
-  "contract_digest": "e77aa4ac91ad92082a6cef288cd5f9b9636b6101faa65237dbe16116fff64257",
+  "contract_digest": "04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2",
   "max_age_seconds": 86400,
-  "subjects": {}
+  "subjects": {},
+  "manual_profiles": {}
 }
