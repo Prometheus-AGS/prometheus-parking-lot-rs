@@ -35,3 +35,12 @@ jobs:
           }, indent=2))
           assert result.returncode == 0
           PY
+      - uses: actions/checkout@v7
+        with:
+          ref: 6c214d7365ee3b8378d38ebb8c9f355c7f311c17
+          persist-credentials: false
+      - name: Exercise corrected exact Java and NDK setup on the actual hosted runner
+        env:
+          BOOTSTRAP_RUNNER_ENVIRONMENT: ${{ runner.environment }}
+          OA18_PLATFORM_JSON: '{"android_ndk_version":"27.3.13750724","java_version":"17.0.20.1"}'
+        run: python3 .github/scripts/prepare-hosted-assurance-platform.py --profile android
