@@ -33,3 +33,35 @@ Ownership and implementation sequence:
 Task2 route selection: OpenAI/gpt-6.1-sol/high fresh native tech-lead performed scoped architecture analysis; root trusted controller integrates. Collector/hosted execution workers use inherited native route with explicit ownership, verified by actual launch; this is an explicit selection change from the singular task2 worker to two platform ownership workers, selected for independent Python collector versus OS workflow scope. Final isolated critic/review remains dormant until coherent source boundary. No provider/billing change or paid resource authorized.
 
 Exit: actual amended OA01-OA17 plus regression/review/authority/provenance PASS on one frozen candidate, then approved publication and seven registry install/version checks. Missing public owner/signer/settings/manual observations remain unresolved, never fabricated.
+
+## Autonomous native and evidence transport continuation
+
+Operator explicitly requests native Mac automation in Codex, no manual test
+clicks, then genuine certification and publication. Root retains task2 and all
+canonical boundaries. The standalone private native helper uses built-in AX,
+exact fixture/PID/binary validation and native window screenshots; it never
+calls backend IPC or changes app source. An independent observer reviews actual
+captured pixels and trace. OS Accessibility/screen-capture grants remain real
+external prerequisites and cannot be bypassed. Existing failed manual attempts
+are retained, never rewritten into successful observations.
+
+Observed hosted gap: no first uploader existed for local original preparation
+and public authority bytes. Add a protected-main, first-attempt, environment-
+reviewed transport workflow and bounded same-repository release-asset ZIP decoder;
+root verifies downloaded Actions bytes before setting independent material pins.
+This is data transport, not new authority or changed acceptance. Decoder tests
+cover the actual untrusted archive/download boundary.
+
+The existing real same-workflow quiet observer can run on a dedicated ordinary
+hosted VM. Add a quiet-only preparation dispatch to the same boundary workflow,
+with separate immutable raw output and no collector/certificate. Later ordinary
+rehearsal/certification dispatches retain independent manual-bundle approval,
+six automatic profile provenance, all oracles and actual environment reviews.
+No forged GitHub context or local-agent process termination is permitted.
+
+Complete this coherent source set, run its archive/hosted/packet fixtures and
+required secret checks once, then obtain independent Python/security/workflow
+review. New source delivery requires a new final candidate; refresh approved
+public workflow hashes and regenerate candidate-bound evidence. Preserve original
+pre-bump plan bytes, trust identity and deferred rotation/history cleanup.
+Source PR merges remain operator-owned under the existing approved plan.

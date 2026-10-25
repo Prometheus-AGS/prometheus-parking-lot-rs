@@ -1,0 +1,65 @@
+name: Assurance public material transport
+
+# A transport receipt is not an authority report or certification receipt.
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: Full current protected main workflow SHA
+        required: true
+        type: string
+      asset_id:
+        description: Numeric same-repository release asset ID for the public seed ZIP
+        required: true
+        type: string
+      archive_sha256:
+        description: Independently computed exact SHA256 of the public seed ZIP
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assurance-public-material-transport
+  cancel-in-progress: false
+
+jobs:
+  transport:
+    if: github.ref == 'refs/heads/main' && github.ref_protected && github.run_attempt == 1 && inputs.candidate == github.sha
+    runs-on: ubuntu-24.04
+    environment: release-certification
+    timeout-minutes: 15
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      GH_TOKEN: ${{ github.token }}
+      SEED_ASSET_ID: ${{ inputs.asset_id }}
+      SEED_SHA256: ${{ inputs.archive_sha256 }}
+      CANDIDATE: ${{ inputs.candidate }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Validate and stage data from the pinned release asset
+        run: |
+          python3 .github/scripts/stage-assurance-seed.py \
+            --asset-id "$SEED_ASSET_ID" --sha256 "$SEED_SHA256" \
+            --candidate "$CANDIDATE" --out "$RUNNER_TEMP/assurance-public-materials"
+      - name: Upload immutable public material bytes
+        id: upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: oa18-public-materials-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/assurance-public-materials/
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: false
+          compression-level: 0
+      - name: Record immutable transport identity
+        env:
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ARTIFACT_DIGEST: ${{ steps.upload.outputs.artifact-digest }}
+        run: |
+          printf 'Transport only; authority remains independently pinned.\nArtifact ID: %s\nArtifact SHA256: %s\n' \
+            "$ARTIFACT_ID" "$ARTIFACT_DIGEST" >> "$GITHUB_STEP_SUMMARY"

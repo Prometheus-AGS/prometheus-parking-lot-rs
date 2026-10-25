@@ -137,6 +137,10 @@ jobs:
           path: candidate
           fetch-depth: 0
           persist-credentials: false
+      - name: Prepare the pinned publisher toolchain before authorization
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.99.1'
       - name: Revalidate certification and independent current environment approval before OIDC
         working-directory: candidate
         env:
