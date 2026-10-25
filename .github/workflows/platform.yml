@@ -37,7 +37,7 @@ jobs:
           PY
       - uses: actions/checkout@v7
         with:
-          ref: 6c214d7365ee3b8378d38ebb8c9f355c7f311c17
+          ref: 3cb9d3d466437426c33af91d77f679f64e4a0bb0
           persist-credentials: false
       - name: Exercise corrected exact Java and NDK setup on the actual hosted runner
         env:
