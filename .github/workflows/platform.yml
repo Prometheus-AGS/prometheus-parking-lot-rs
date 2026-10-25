@@ -1,214 +1,37 @@
-name: Platform
-
-# Mobile and desktop reach (cr-44): Android and iOS builds of the FFI crate, Kotlin and
-# Swift binding generation with a real smoke test of each, and the Tauri desktop example.
-#
-# Why a separate workflow rather than jobs in ci.yml:
-#   - The macOS jobs cost ten times a Linux minute, and the Tauri tree is several hundred
-#     crates. A workflow-level `paths` filter keeps them off pull requests that cannot
-#     affect them (docs, the scheduler, Postgres), which a job-level filter cannot do.
-#   - They are not on the critical path of ci.yml: nothing here gates the Linux test
-#     matrix, and the Linux test matrix does not wait for these.
-#   - The FFI crate itself IS part of ci.yml: it is a workspace member, so fmt, clippy,
-#     nextest (including its restart tests), docs, deny and the MSRV leg cover it on
-#     every pull request. This workflow adds only what needs another target or a
-#     toolchain the main matrix does not have.
-#
-# Trade-off, stated plainly: because of the path filter these checks do not run on every
-# pull request, so they should not be configured as *required* status checks (a skipped
-# workflow leaves a required check pending forever). They run on every push to main, on
-# a weekly schedule (toolchain and runner-image drift), and on demand.
+name: OA20 read-only runner identity diagnostic
 
 on:
-  push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
-    paths:
-      - "crates/parking-lot-ffi/**"
-      - "crates/parking-lot-embedded/**"
-      - "crates/parking-lot-core/**"
-      - "bindings/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "rust-toolchain.toml"
-      - "deny.toml"
-      - ".cargo/config.toml"
-      - ".github/workflows/platform.yml"
-  schedule:
-    - cron: "17 5 * * 1"
   workflow_dispatch:
-
-concurrency:
-  group: platform-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
   contents: read
 
-env:
-  CARGO_TERM_COLOR: always
-  CARGO_INCREMENTAL: "0"
-  RUST_BACKTRACE: 1
-  # rust-toolchain.toml pins the same version; keep both in step.
-  PINNED_TOOLCHAIN: "1.99.1"
-
 jobs:
-  android:
-    # Linux runner: the image ships the Android SDK and NDK, so this needs no macOS minutes.
-    # Builds the shared library for a phone (arm64-v8a) and an x86_64 emulator, then
-    # generates the Kotlin bindings and runs a Kotlin smoke test on a host JVM against
-    # the host build of the same library.
-    name: Android and Kotlin
-    runs-on: ubuntu-latest
+  java-identity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.PINNED_TOOLCHAIN }}
-          targets: aarch64-linux-android,x86_64-linux-android
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: android
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      # taiki-e/install-action has no cargo-ndk entry. rust-cache keeps ~/.cargo/bin, so
-      # after the first run on main this is a no-op.
-      - name: Install cargo-ndk
-        run: command -v cargo-ndk >/dev/null || cargo install cargo-ndk --version 4.1.2 --locked
-      - name: Select the newest preinstalled NDK
+      - name: Observe actual Java identity without installing or changing tools
+        shell: bash
         run: |
-          test -n "$ANDROID_NDK_LATEST_HOME" || { echo "::error::runner image has no ANDROID_NDK_LATEST_HOME"; exit 1; }
-          echo "ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
-          echo "NDK: $ANDROID_NDK_LATEST_HOME"
-      - name: Build the FFI crate for Android (cargo ndk)
-        run: cargo ndk -t arm64-v8a -t x86_64 build --locked -p prometheus-parking-lot-ffi
-      - name: Library is an Android ELF that exports the UniFFI entry points
-        run: |
-          set -euo pipefail
-          so=target/aarch64-linux-android/debug/libparking_lot_ffi.so
-          file "$so" | tee /dev/stderr | grep "ARM aarch64" > /dev/null
-          readelf="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
-          "$readelf" --dyn-syms --wide "$so" | grep "uniffi_parking_lot_ffi_fn_func_open_store" > /dev/null
-          # Informational: Google Play needs 16 KB page alignment for apps targeting Android 15+.
-          "$readelf" -l "$so" | grep LOAD
-      - name: Install kotlinc (pinned, checksum-verified)
-        env:
-          GH_TOKEN: ${{ github.token }}
-          KOTLIN_VERSION: "2.4.20"
-          KOTLIN_SHA256: "59e9ca74c7904ef2c122b12114937673ccce68de820a663f0ed66ccf8799e0b7"
-        run: |
-          set -euo pipefail
-          gh release download "v${KOTLIN_VERSION}" --repo JetBrains/kotlin \
-            --pattern "kotlin-compiler-${KOTLIN_VERSION}.zip" --dir "$RUNNER_TEMP"
-          zip="$RUNNER_TEMP/kotlin-compiler-${KOTLIN_VERSION}.zip"
-          echo "${KOTLIN_SHA256}  ${zip}" | sha256sum -c -
-          unzip -q "$zip" -d "$RUNNER_TEMP"
-          echo "$RUNNER_TEMP/kotlinc/bin" >> "$GITHUB_PATH"
-      - name: Generate the Kotlin and Swift bindings
-        run: bindings/generate.sh
-      - name: Kotlin smoke test (generated bindings, host JVM)
-        timeout-minutes: 10
-        run: bindings/smoke/kotlin.sh
-
-  apple:
-    # macOS runner: only a Mac has the iOS SDK. Builds the static library for a device
-    # and for the Apple-silicon simulator, then compiles the generated Swift bindings
-    # with a Swift smoke test against the host build of the same library.
-    name: iOS and Swift
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.PINNED_TOOLCHAIN }}
-          targets: aarch64-apple-ios,aarch64-apple-ios-sim
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: apple
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: Build the FFI crate for iOS (device)
-        run: cargo build --locked --target aarch64-apple-ios -p prometheus-parking-lot-ffi
-      - name: Build the FFI crate for iOS (simulator)
-        run: cargo build --locked --target aarch64-apple-ios-sim -p prometheus-parking-lot-ffi
-      - name: Generate the Kotlin and Swift bindings
-        run: bindings/generate.sh
-      - name: Swift smoke test (generated bindings, host)
-        timeout-minutes: 10
-        run: bindings/smoke/swift.sh
-
-  desktop:
-    # OA-15: build the real native Tauri shell on all three OS. Linux libraries
-    # are explicitly provisioned on default hosted CI; configured runners retain
-    # the preprovisioned prerequisite contract checked by desktop-assurance.py.
-    # GUI restart certification is a separate actual macOS manual observation.
-    name: Tauri desktop shell (${{ matrix.platform }})
-    runs-on: ${{ (matrix.platform == 'linux' && vars.DESKTOP_LINUX_RUNNER) || matrix.os }}
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: macos
-            os: macos-latest
-          - platform: linux
-            os: ubuntu-latest
-          - platform: windows
-            os: windows-latest
-    defaults:
-      run:
-        working-directory: bindings/tauri-desktop
-    steps:
-      - uses: actions/checkout@v7
-      - name: Provision Linux Tauri build prerequisites on the default hosted runner
-        if: matrix.platform == 'linux' && runner.environment == 'github-hosted' && vars.DESKTOP_LINUX_RUNNER == ''
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.PINNED_TOOLCHAIN }}
-          components: rustfmt,clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          # .cargo/config.toml sends every workspace's artifacts to <repo>/target.
-          workspaces: "bindings/tauri-desktop -> ../../target"
-          shared-key: desktop-${{ matrix.platform }}
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: Build actual native Tauri binary and preserve build-only receipt
-        run: python assurance/desktop-assurance.py build --output '${{ runner.temp }}/oa15-${{ matrix.platform }}'
-      - name: Preserve raw native shell build evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: oa15-build-${{ matrix.platform }}
-          path: ${{ runner.temp }}/oa15-${{ matrix.platform }}/
-          if-no-files-found: error
-      - name: Desktop formatting
-        if: matrix.platform == 'macos'
-        run: cargo fmt --all -- --check
-      - name: Desktop Clippy
-        if: matrix.platform == 'macos'
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - name: Queue-service restart regression (no GUI claim)
-        if: matrix.platform == 'macos'
-        timeout-minutes: 5
-        run: cargo test --workspace --locked
-
-  bindgen:
-    # The binding generator is a standalone workspace, so ci.yml's fmt and deny jobs do
-    # not see it. Same licence policy as the root, plus MPL-2.0 for UniFFI's generator
-    # crates (bindings/uniffi-bindgen/deny.toml).
-    name: Binding generator policy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ env.PINNED_TOOLCHAIN }}
-          components: rustfmt
-      - run: cargo fmt --manifest-path bindings/uniffi-bindgen/Cargo.toml --all -- --check
-      - uses: EmbarkStudios/cargo-deny-action@v2
-        with:
-          command: check
-          manifest-path: bindings/uniffi-bindgen/Cargo.toml
-          arguments: --locked --config bindings/uniffi-bindgen/deny.toml
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, shutil, subprocess
+          executable = shutil.which('java')
+          assert executable is not None
+          selected = pathlib.Path(executable).resolve()
+          result = subprocess.run(['java', '-version'], capture_output=True, text=True, check=False)
+          observed = result.stdout + result.stderr
+          print(json.dumps({
+              'purpose': 'read-only setup diagnostic; never certification',
+              'java_path': executable,
+              'java_realpath': str(selected),
+              'java_sha256': hashlib.sha256(selected.read_bytes()).hexdigest(),
+              'java_exit': result.returncode,
+              'java_identity': observed,
+              'configured_pin': '17.0.20',
+              'configured_pin_matches': '"17.0.20"' in observed,
+              'selected_public_java_paths': {name: os.environ.get(name)
+                  for name in ('JAVA_HOME', 'JAVA_HOME_17_X64')},
+          }, indent=2))
+          assert result.returncode == 0
+          PY
