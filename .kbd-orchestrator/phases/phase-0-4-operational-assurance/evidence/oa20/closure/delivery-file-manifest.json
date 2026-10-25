@@ -1,9 +1,8 @@
 {
-  "scope": "Staged closure/archive/evidence paths before adding this manifest; this manifest is the only additional path. Four authentic data originals are separately retained locally and in external-evidence.json archive.",
+  "scope": "Final staged branch snapshot versus certified sourceC536; includes this manifest. Four authentic data originals are separately retained locally/in release ZIP; current canonicalb199 working projection differs intentionally from Git software04 fixture and is separately retained as release JSON.",
   "paths": [
     ".kbd-orchestrator/current-waypoint.json",
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/.memory-writeback.tsv",
-    ".kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json",
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted/b1993dbc9a81f8e688300c97e7a621f341d068c6c536222de7c0e9bb0a95c911.json",
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/budget-amendment/adoption.txt",
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/budget-amendment/bound-disposition.json",
@@ -16,6 +15,7 @@
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/budget-amendment/template.stderr.txt",
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/closure-artifact-review.json",
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/closure-path-representation-review.json",
+    ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/delivery-file-manifest.json",
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/execute-to-reflect.txt",
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/external-evidence.json",
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/final-record.json",
@@ -65,6 +65,7 @@
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/post-archive-reconciliation.json",
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/reflect-completion.txt",
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/reflect-sycophancy-check.json",
+    ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/software-contract-delivery-review.json",
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/verify-archive-commands.json",
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/publication-completion/budget-usage-final-for-closure.json",
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/publication-completion/certification-artifacts.json",

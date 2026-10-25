@@ -46,5 +46,13 @@
     "id": 675400399,
     "sha256": "2e96874364cf1c49a1139c79089fd1ca538c2f322a288238f3ae4f834969a6bd",
     "status": "preserved unchanged; current asset additionally retains actual closed disposition"
+  },
+  "materialized_budget_projection": {
+    "url": "https://github.com/Prometheus-AGS/prometheus-parking-lot-rs/releases/download/v0.4.0/kbd-working-contract-b199.json",
+    "asset_id": 675424762,
+    "sha256": "7841e01dac73673025d88026071c4e15861eabf6d4575bcc038f116bfe5d1139",
+    "bytes": 37092,
+    "contract": "b1993dbc9a81f8e688300c97e7a621f341d068c6c536222de7c0e9bb0a95c911",
+    "role": "Exact local runtime-materialized budget projection, preserved separately from Git software04 fixture. Canonical binding/signed normalizedb199snapshot define current phase budgets. Restoring original software fixture in Git does not rewrite local current projection or canonical store."
   }
 }

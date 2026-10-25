@@ -15,5 +15,12 @@
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/budget-amendment/signature-verification.txt",
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/publication-completion/cert-secret-disposition.json",
     ".kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/closed-disposition.json"
-  ]
+  ],
+  "git_fixture_delivery": {
+    "softwareContract": "04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2",
+    "canonicalBudgetContract": "b1993dbc9a81f8e688300c97e7a621f341d068c6c536222de7c0e9bb0a95c911",
+    "intentional_local_modified_projection": ".kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json",
+    "review": "software-contract-delivery-review.json",
+    "product_or_ci_policy_changes": false
+  }
 }

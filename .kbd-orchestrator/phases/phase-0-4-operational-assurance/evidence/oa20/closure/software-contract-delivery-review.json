@@ -1,0 +1,88 @@
+{
+  "approved_scope": {
+    "action": "Restore only original software candidate contract blob into Git index, then make the delivery correction commit; keep local runtime-materialized b199 working bytes untouched.",
+    "argv": [
+      "git",
+      "restore",
+      "--source=53682521cb2a7a49c06e046c826890d9e11b6bfe",
+      "--staged",
+      "--",
+      ".kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json"
+    ],
+    "canonical_runtime_binding": "b1993dbc9a81f8e688300c97e7a621f341d068c6c536222de7c0e9bb0a95c911",
+    "current_runtime_working_sha256": "7841e01dac73673025d88026071c4e15861eabf6d4575bcc038f116bfe5d1139",
+    "delivered_software_contract": "04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2",
+    "original_software_blob_sha256": "14e59c25cde88e4152f3791983aacf352e172f407bb903243411af426cffde14",
+    "preserve": [
+      "Current signed b199 normalized snapshot and amendment lineage",
+      "Original normalized04 snapshot and software04 receipts",
+      "Typed CLOSED canonical disposition/store and current projections",
+      "Local working b199 adopted-contract.json bytes",
+      "All scenarios, budgets in canonical binding, source and CI policy"
+    ]
+  },
+  "artifact_echo": {
+    "actual_log": "FAIL: adopted contract changed",
+    "actual_predicate": "require(contract[\"identity\"][\"contractDigest\"] == manifest[\"contract_digest\"], \"adopted contract changed\")",
+    "runtime_rule": "The bound adopted/$B_DIGEST.json snapshot defines blocking scope; working contract drift is recorded and ignored."
+  },
+  "finding_classification": "Observed records-delivery CI identity failure; no product execution oracle failed in this lane before the contract precondition.",
+  "findings": [],
+  "limits": [
+    "Review approves only the stated index-delivery correction. Reviewer did not mutate index, working file or canonical state.",
+    "Restoring original04 on a fresh delivery checkout preserves tested software contract but does not supersede canonicalb199 budgets. Documentation must keep those roles explicit.",
+    "Fresh CI outcome after correction is unverified and must be observed before merge; no CI PASS is asserted.",
+    "Same-family isolated Codex artifact review, not a new software R2."
+  ],
+  "observed_at": "2026-10-25T15:45:04.943400+00:00",
+  "raw_proof": [
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json",
+      "sha256": "7841e01dac73673025d88026071c4e15861eabf6d4575bcc038f116bfe5d1139"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.github/negative-controls.json",
+      "sha256": "083aae35c79b2877503f1f3f93067149dad639edc8e19ce010a4b2815d9fba42"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.github/scripts/tests/negative-controls.py",
+      "sha256": "4079cb5fcb4e9e3ed8bf531d605e6512c0a900f7ba9aed39fc89ee676a40f78c"
+    },
+    {
+      "path": "/Users/gqadonis/.local/state/prometheus/operational-assurance/53682521cb2a7a49c06e046c826890d9e11b6bfe/setup/closure-pr-negative-s1.log",
+      "sha256": "2fd42c92710e431279a4aa5f8f4e0757ab28cd1df7b1318689d0023ae65e704e"
+    },
+    {
+      "path": "/Users/gqadonis/.prometheus/plugins/prometheus-skill-pack/current/shared/scripts/kbd-phase-close-eval.sh",
+      "sha256": "dd732ebbd23b9cd30903b56a21a7ea29f845c584b33889bda31d788aae6cf637"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/closure/closed-disposition.json",
+      "sha256": "2c3a672404c4471e9e5f8f0b62dac98b24de852924260ab63a748b7f3c8ae6a7"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/evidence/oa20/budget-amendment/budget-amendment.json",
+      "sha256": "83657e28ff7fc85caa2ce433378ea0f37b0b2418025052673183aaaa82f76375"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted/04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2.json",
+      "sha256": "04e74b62e7d21475021e682e36fcbbf4a6ddd7bb13a51103758590a6ab8916b2"
+    },
+    {
+      "path": "/Users/gqadonis/.codex/worktrees/operational-assurance/prometheus-parking-lot-rs/.kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted/b1993dbc9a81f8e688300c97e7a621f341d068c6c536222de7c0e9bb0a95c911.json",
+      "sha256": "b1993dbc9a81f8e688300c97e7a621f341d068c6c536222de7c0e9bb0a95c911"
+    }
+  ],
+  "records_commit": "d3205f0",
+  "review_type": "narrow_software_contract_index_delivery_correction",
+  "schema_version": 1,
+  "software_candidate": "53682521cb2a7a49c06e046c826890d9e11b6bfe",
+  "verdict": "APPROVE",
+  "verified_basis": [
+    "Actual s-1 log stops at adopted-contract identity predicate; manifest remains software04 and C536 contract satisfies exact predicate. This source predicate checks identity, not whole-file byte hash.",
+    "Current contract differs from software04 only at identity digest and adopted tool cap; all17 scenario objects identical.",
+    "Both original04 and canonicalb199 normalized adopted snapshots hash to their exact named identities and signed amendment file retains b199.",
+    "Actual retained disposition is CLOSED with canonicalb199 binding; runtime helper binds immutable normalized snapshot rather than requiring working-file identity.",
+    "Index-only git restore --staged does not request a working-tree rewrite, runtime mutation, reopening, policy edit, scenario waiver or recertification."
+  ]
+}
