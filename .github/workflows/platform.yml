@@ -1,71 +1,85 @@
-name: OA20 Android production-profile diagnostic
+name: OA20 real hosted build-storage diagnostic
 on:
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  android-profile:
+  linux-storage:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 180
     env:
       RUSTUP_AUTO_INSTALL: '0'
       RUSTUP_TOOLCHAIN: '1.99.1'
       PYTHONDONTWRITEBYTECODE: '1'
-      GH_TOKEN: ${{ github.token }}
+      PROBE_CANDIDATE: 05a012bb79e4061c8e8e21ab016d55439a1e2247
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: 67b9d9a90ff29108105c5ba46d839388b60a1d24
+          ref: 05a012bb79e4061c8e8e21ab016d55439a1e2247
           fetch-depth: 0
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: '1.99.1'
-          targets: aarch64-linux-android,x86_64-linux-android
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: nextest@0.9.149
+          fallback: none
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: assurance-android
-      - name: Provision exact Android tools before freeze
-        env:
-          BOOTSTRAP_RUNNER_ENVIRONMENT: ${{ runner.environment }}
-          OA18_PLATFORM_JSON: '{"android_ndk_version":"27.3.13750724","java_version":"17.0.20.1"}'
+          shared-key: assurance-linux
+          save-if: false
+      - name: Prepare the actual backend images and locked sources before diagnostic freeze
         run: |
           set -euo pipefail
-          python3 .github/scripts/prepare-hosted-assurance-platform.py --profile android
-          version=2.4.20
-          archive="$RUNNER_TEMP/kotlin-compiler-$version.zip"
-          gh release download "v$version" --repo JetBrains/kotlin --pattern "kotlin-compiler-$version.zip" --dir "$RUNNER_TEMP"
-          echo "59e9ca74c7904ef2c122b12114937673ccce68de820a663f0ed66ccf8799e0b7  $archive" | sha256sum -c -
-          unzip -q "$archive" -d "$RUNNER_TEMP"
-          echo "$RUNNER_TEMP/kotlinc/bin" >> "$GITHUB_PATH"
-          cargo install cargo-ndk --version 4.1.2 --locked
+          docker version
+          docker build --builder default -f docker/postgres17/Dockerfile -t parking-lot-pg:17 docker
+          docker build --builder default -f docker/postgres18/Dockerfile -t parking-lot-pg:18 docker
+          iggy_image=$(python3 -c 'import json; print(json.load(open(".github/negative-controls.json"))["iggy_image"])')
+          docker pull "$iggy_image"
           cargo +1.99.1 fetch --locked --manifest-path Cargo.toml
-          cargo +1.99.1 fetch --locked --manifest-path bindings/uniffi-bindgen/Cargo.toml
-      - name: Exercise actual clean frozen Android production profile
+      - name: Exercise ordinary workspace and real normal mutant cases with scoped storage reclamation
+        env:
+          BOOTSTRAP_RUNNER_ENVIRONMENT: ${{ runner.environment }}
         run: |
           python3 - <<'PYTHON'
-          import json,os,pathlib
-          (pathlib.Path(os.environ['RUNNER_TEMP'])/'inputs.json').write_text(json.dumps({'android_ndk':os.environ['ANDROID_NDK_HOME']}))
+          import copy,hashlib,importlib.util,json,os,platform,sys
+          from pathlib import Path
+          root=Path.cwd(); candidate=os.environ['PROBE_CANDIDATE']; out=Path(os.environ['RUNNER_TEMP'])/'storage-proof'; out.mkdir()
+          sys.path.insert(0,str(root/'.github/scripts'))
+          import assurance_build_storage as storage
+          spec=importlib.util.spec_from_file_location('boundary',root/'.github/scripts/operational-assurance.py'); boundary=importlib.util.module_from_spec(spec); spec.loader.exec_module(boundary)
+          spec=importlib.util.spec_from_file_location('negative',root/'.github/scripts/tests/negative-controls.py'); negative=importlib.util.module_from_spec(spec); spec.loader.exec_module(negative)
+          assert platform.system()=='Linux'
+          boundary.clean(candidate); sources=boundary.sources(); model=boundary.definition(); contract=boundary.contract(boundary.CONTRACT); negative_model=json.loads((root/'.github/negative-controls.json').read_bytes())
+          summary={'purpose':'real hosted storage diagnostic only; never certification','candidate':candidate,'contract_digest':contract,'source_sha256':sources,'records':[]}
+          inputs={'workspace':str(root),'out':str(out),'candidate':candidate,'contract':str(boundary.CONTRACT)}
+          for row_id in ['pg18','oa12-s-4-resource','oa12-s-16-pg18']:
+           row=copy.deepcopy(next(row for row in model['commands'] if row['id']==row_id)); argv=[boundary.expand(v,inputs) for v in row['argv']]; env={**boundary.environment(),**row.get('env',{})}; record={'id':row_id,'status':'NOT_EXERCISED'}; lease=None; proof=None; passed=False
+           print('DIAGNOSTIC CHECK',row_id,flush=True)
+           try:
+            boundary.clean(candidate); assert boundary.sources()==sources
+            if row.get('discovery_argv'):
+             listing=boundary.execute(row['discovery_argv'],out,row_id+'-discovery',root,env,row['timeout']);record['discovery']=listing;assert listing['exit']==0;record['selected_tests']=boundary.discovery_count((out/listing['stdout']).read_text(),row);assert record['selected_tests']>0
+            if row_id.startswith('oa12-'):lease=storage.begin_case(row_id.removeprefix('oa12-'),candidate,out);assert lease is not None
+            proof=boundary.execute(argv,out,row_id,root,env,row['timeout']);record['command']=proof;assert proof['exit']==0
+            if row.get('tests'):record['discovered_tests']=boundary.discovered(boundary.text(out,proof),row['tests']);assert record['discovered_tests']>0
+            if row_id.startswith('oa12-'):
+             case=next(case for case in negative_model['cases'] if case['id']==row_id.removeprefix('oa12-')); child=negative.verify_receipt(out/'oa12'/case['id'],case,negative_model,candidate);record['actual_case_receipt_sha256']=boundary.digest(out/'oa12'/case['id']/'receipt.json');assert child['status']=='PASS'
+            boundary.clean(candidate);assert boundary.sources()==sources;passed=True
+           finally:
+            if lease is not None:
+             record['build_storage']=storage.finish_case(lease,proof['exit'] if proof else None,row_passed=passed)
+             if record['build_storage']['status']!='RECLAIMED':passed=False
+            record['status']='PASS' if passed else 'FAIL';summary['records'].append(record);(out/'diagnostic.json').write_text(json.dumps(summary,indent=2)+'\n');print('DIAGNOSTIC RESULT',row_id,record['status'],record.get('build_storage',{}).get('reclaimed_bytes'),flush=True)
+           assert passed
+          assert all(record['status']=='PASS' for record in summary['records'])
+          files={p.relative_to(out).as_posix():boundary.digest(p) for p in out.rglob('*') if p.is_file()};(out/'files-sha256.json').write_text(json.dumps(files,indent=2)+'\n')
+          print('All actual diagnostic rows passed; ordinary workspace build retained, scoped mutation scratch reclaimed. Not release certification.',flush=True)
           PYTHON
-          # Missing external authority remains BLOCKED; inspect all four real
-          # Android rows independently. This diagnostic never certifies.
-          bash .github/scripts/operational-assurance-gate.sh --candidate 67b9d9a90ff29108105c5ba46d839388b60a1d24 --profile android --inputs "$RUNNER_TEMP/inputs.json" --out "$RUNNER_TEMP/android-proof"
-      - name: Require all four actual Android records to pass
-        if: always()
-        run: |
-          python3 - <<'PYTHON'
-          import json,os,pathlib
-          p=pathlib.Path(os.environ['RUNNER_TEMP'])/'android-proof'
-          d=json.loads((p/'job-receipt.json').read_text())
-          print(json.dumps({'purpose':'diagnostic only; not release certification','records':d['records']},indent=2))
-          assert len(d['records'])==4 and all(r['status']=='PASS' for r in d['records'])
-          PYTHON
-      - name: Export actual retained proof
-        if: always()
-        run: python3 .github/scripts/operational-assurance.py export --receipts "$RUNNER_TEMP/android-proof" --out "$RUNNER_TEMP/export-android"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: android-production-diagnostic
-          path: ${{ runner.temp }}/export-android/
+          name: hosted-build-storage-diagnostic
+          path: ${{ runner.temp }}/storage-proof/
           if-no-files-found: error
