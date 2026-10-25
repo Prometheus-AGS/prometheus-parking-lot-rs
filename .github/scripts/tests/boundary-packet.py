@@ -10,6 +10,7 @@ import subprocess
 from pathlib import Path
 import sys
 import tempfile
+from types import SimpleNamespace
 from unittest.mock import patch
 import unittest
 
@@ -19,6 +20,35 @@ sys.path.insert(0, str(SCRIPTS))
 spec = importlib.util.spec_from_file_location("boundary", SCRIPTS / "operational-assurance.py")
 boundary = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(boundary)
+
+
+class AndroidToolControls(unittest.TestCase):
+    @unittest.skipUnless(os.name == "posix", "Android hosted profile uses POSIX executables")
+    def test_cargo_plugin_health_preserves_plugin_identity(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            launcher = root / "cargo"
+            plugin = root / "cargo-ndk"
+            launcher.write_text('#!/bin/sh\n[ "$1" = ndk ] && [ "$2" = --version ] && echo "cargo-ndk 4.1.2"\n')
+            launcher.chmod(0o755)
+            plugin.write_bytes(b"distinct plugin identity")
+            plugin.chmod(0o755)
+            output = root / "out"
+            output.mkdir()
+            args = SimpleNamespace(candidate="1" * 40, contract=root / "contract", inputs=None, profile="android")
+            model = {"contract_digest": "2" * 64, "profiles": {"android": "native"},
+                     "commands": [{"profile": "android", "argv": [], "tools": ["ndk"]}],
+                     "required_authority": [], "budgets": {}}
+            with patch.dict(os.environ, {"PATH": str(root)}), \
+                 patch.object(boundary, "clean"), \
+                 patch.object(boundary, "contract", return_value="2" * 64), \
+                 patch.object(boundary, "sources", return_value={}):
+                result = boundary.make_freeze(args, model, output)["tools"]["ndk"]
+            self.assertEqual(result["status"], "PASS")
+            self.assertEqual(result["version_argv"], ["cargo", "ndk", "--version"])
+            self.assertEqual(result["path"], str(plugin.resolve()))
+            self.assertEqual(result["sha256"], boundary.digest(plugin))
+            self.assertNotEqual(result["sha256"], boundary.digest(launcher))
 
 
 class PacketControls(unittest.TestCase):

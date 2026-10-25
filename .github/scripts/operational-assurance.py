@@ -67,7 +67,7 @@ TOOLS = {
     "git_cliff": (["{git_cliff}", "--version"], "2.14.2"),
     "gpg": (["gpg", "--version"], "gpg"),
     "ssh-keygen": (["ssh", "-V"], "OpenSSH"),
-    "ndk": (["cargo-ndk", "--version"], "4.1.2"),
+    "ndk": (["cargo", "ndk", "--version"], "4.1.2"),
     "kotlinc": (["kotlinc", "-version"], "2.4.20"),
     "java": (["java", "-version"], "version"),
     "swift": (["swift", "--version"], "Swift version"),
@@ -374,7 +374,9 @@ def make_freeze(args, model: dict, output: Path) -> dict:
         try:
             argv, expected = TOOLS[name]
             argv = [expand(v, inputs) for v in argv]
-            location = shutil.which(argv[0])
+            # Cargo sets the plugin environment required by cargo-ndk. Retain
+            # the plugin's own identity rather than hashing the Cargo launcher.
+            location = shutil.which("cargo-ndk" if name == "ndk" else argv[0])
             require(location is not None, "executable not on installed PATH")
             record = {"path": str(Path(location).resolve()), "sha256": digest(Path(location)),
                       "presence": "PRESENT", "version_argv": argv}
