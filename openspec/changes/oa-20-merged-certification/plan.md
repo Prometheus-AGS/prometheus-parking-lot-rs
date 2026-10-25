@@ -65,3 +65,18 @@ review. New source delivery requires a new final candidate; refresh approved
 public workflow hashes and regenerate candidate-bound evidence. Preserve original
 pre-bump plan bytes, trust identity and deferred rotation/history cleanup.
 Source PR merges remain operator-owned under the existing approved plan.
+
+
+### Observed hosted Java identity correction — 2026-10-25
+
+Rehearsal 40171089615 stopped Android setup before certification: the pinned
+runner image actually executes Temurin 17.0.20.1, although its inventory lists
+17.0.20. A separate read-only native runner diagnostic 40171306802 recorded
+the actual executable/version/hash. The existing setup parser accepted only
+three numeric components, so a valid exact four-component pin was impossible.
+Accept three or four numeric components while retaining the exact quoted runtime
+identity comparison. Cover both accepted formats, a mismatched patch component,
+and malformed/unbounded versions. This changes setup only; final certification
+must use fresh candidate-bound evidence and an independently configured exact
+17.0.20.1 pin. Preserve the original failed rehearsal and prior signed candidate
+record. No product behavior, contract oracle or credential deferral changes.

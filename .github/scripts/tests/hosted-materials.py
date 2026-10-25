@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import stat
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -23,6 +24,9 @@ spec.loader.exec_module(module)
 trust_spec = importlib.util.spec_from_file_location('release_trust_staging', SCRIPTS / 'stage-release-trust.py')
 trust = importlib.util.module_from_spec(trust_spec)
 trust_spec.loader.exec_module(trust)
+platform_spec = importlib.util.spec_from_file_location('hosted_platform', SCRIPTS / 'prepare-hosted-assurance-platform.py')
+platform_setup = importlib.util.module_from_spec(platform_spec)
+platform_spec.loader.exec_module(platform_setup)
 
 
 class Materials(unittest.TestCase):
@@ -191,6 +195,61 @@ class Materials(unittest.TestCase):
             with self.assertRaises(module.ReleaseError):
                 module.main()
             stage.assert_not_called()
+
+
+class AndroidJavaPins(unittest.TestCase):
+    """Synthetic setup controls; actual hosted setup remains a separate gate."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        home = self.root / 'sdk/ndk/27.3.13750724'
+        home.mkdir(parents=True)
+        (home / 'source.properties').write_text('Pkg.Revision = 27.3.13750724\n')
+
+    def prepare(self, expected, actual):
+        self.executed = []
+
+        def run(argv, **kwargs):
+            self.executed.append(argv)
+            if argv == ['java', '-version']:
+                return subprocess.CompletedProcess(argv, 0, '', 'openjdk version "' + actual + '"\n')
+            return subprocess.CompletedProcess(argv, 0)
+
+        with patch.dict(os.environ, {
+                'GITHUB_ACTIONS': 'true', 'BOOTSTRAP_RUNNER_ENVIRONMENT': 'github-hosted',
+                'RUNNER_OS': 'Linux', 'RUNNER_TEMP': str(self.root),
+                'ANDROID_HOME': str(self.root / 'sdk'), 'GITHUB_ENV': str(self.root / 'environment'),
+                'OA18_PLATFORM_JSON': json.dumps({'android_ndk_version': '27.3.13750724',
+                                                  'java_version': expected})}), \
+                patch.object(sys, 'argv', ['prepare-hosted-assurance-platform.py', '--profile', 'android']), \
+                patch.object(platform_setup.subprocess, 'run', side_effect=run) as execute:
+            platform_setup.main()
+            return execute.call_args_list
+
+    def test_exact_three_and_four_component_java_versions_prepare(self):
+        for version in ('17.0.20', '17.0.20.1'):
+            with self.subTest(version=version):
+                calls = self.prepare(version, version)
+                self.assertEqual(len(calls), 2)
+                receipt = json.loads((self.root / 'oa18-platform-preparation.json').read_bytes())
+                self.assertIn('"' + version + '"', receipt['java'])
+                self.assertEqual(receipt['pins']['java_version'], version)
+
+    def test_four_component_runtime_cannot_match_a_three_component_pin(self):
+        with self.assertRaisesRegex(SystemExit, 'preinstalled Java version differs'):
+            self.prepare('17.0.20', '17.0.20.1')
+        self.assertFalse((self.root / 'oa18-platform-preparation.json').exists())
+        self.assertFalse((self.root / 'environment').exists())
+        self.assertEqual(self.executed, [['java', '-version']])
+
+    def test_malformed_or_unbounded_java_pin_is_rejected_before_execution(self):
+        for version in ('17.0', '17.0.20.1.1', '17.0.20-ea', '17.0.20.1\n'):
+            with self.subTest(version=version):
+                with self.assertRaisesRegex(SystemExit, 'exact public java_version required'):
+                    self.prepare(version, version)
+                self.assertEqual(self.executed, [])
 
 
 if __name__ == '__main__':
