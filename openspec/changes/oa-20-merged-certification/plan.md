@@ -87,3 +87,17 @@ installer places it at `ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager`.
 Select that installed SDK tool by the already validated SDK root rather than
 assuming a PATH entry. Retain both failed diagnostics; the fresh hosted setup
 must exercise Java identity and actual NDK provisioning successfully.
+
+
+### Observed cross-host preparation provenance correction — 2026-10-25
+
+The retained real Linux baseline receipt from rehearsal 40171089615 reproduces
+all 13 original prepared files exactly, with the same pinned release-plz and
+git-cliff release/version/source identities. OA02 then rejects their Linux binary
+hashes because the immutable original preparation used native macOS binaries.
+Preserve the exact original plan and both hosts' native executable provenance.
+Compare portable pinned tool identity plus every exact prepared/final file, and
+validate each reproduced binary hash against its actual local executable.
+Exercise changed pinned-version and changed actual-binary-hash controls through
+the real preparation fixture. No prepared bytes, tool pins, contract or publication
+oracle are amended. A fresh hosted cross-OS reproduction remains required.

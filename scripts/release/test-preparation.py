@@ -68,12 +68,19 @@ def compare_final_preparation(final: Path, original: dict, reproduced: dict, wor
               "packages", "excluded", "files_sha256")
     if any(original.get(key) != reproduced.get(key) for key in fields):
         raise AssertionError("OA-02:final-preparation-mismatch: reproduced plan differs")
-    original_tools = {name: {k: v for k, v in tool.items() if k != "path"}
+    # Native executable paths/hashes stay in each immutable plan. Cross-host
+    # reproduction compares the pinned release/version/source identity and
+    # exact prepared bytes; macOS and Linux executables have different hashes.
+    native_fields = {"path", "sha256"}
+    original_tools = {name: {k: v for k, v in tool.items() if k not in native_fields}
                       for name, tool in original["tools"].items()}
-    reproduced_tools = {name: {k: v for k, v in tool.items() if k != "path"}
+    reproduced_tools = {name: {k: v for k, v in tool.items() if k not in native_fields}
                         for name, tool in reproduced["tools"].items()}
     if original_tools != reproduced_tools:
         raise AssertionError("OA-02:final-preparation-mismatch: tool identities differ")
+    for tool in reproduced["tools"].values():
+        if sha(Path(tool["path"])) != tool["sha256"]:
+            raise AssertionError("OA-02:final-preparation-mismatch: reproduced executable hash differs")
     for name, expected in original["files_sha256"].items():
         if sha(final / name) != expected or sha(workspace / name) != expected:
             raise AssertionError("OA-02:final-preparation-mismatch: prepared/final bytes differ: " + name)
@@ -154,6 +161,21 @@ def main() -> int:
 
     if bound_plan is not None:
         compare_final_preparation(source, bound_plan, receipt, workspace)
+        for field, replacement, diagnostic in (
+                ("version", "99.0.0", "tool identities differ"),
+                ("sha256", "0" * 64, "reproduced executable hash differs")):
+            changed_tool = copy.deepcopy(receipt)
+            changed_tool["tools"]["release-plz"][field] = replacement
+            try:
+                compare_final_preparation(source, bound_plan, changed_tool, workspace)
+            except AssertionError as error:
+                if diagnostic not in str(error):
+                    raise
+                (evidence / f"tool-{field}-mismatch-control.json").write_text(json.dumps({
+                    "expected_rejection": str(error), "candidate": args.final_candidate,
+                    "original_plan_sha256": sha(args.preparation_plan)}, indent=2) + "\n")
+            else:
+                raise AssertionError("OA-02:tool identity/hash mismatch control was accepted")
         mismatched = copy.deepcopy(receipt)
         mismatched["files_sha256"]["Cargo.toml"] = "0" * 64
         try:
