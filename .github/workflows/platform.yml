@@ -1,46 +1,71 @@
-name: OA20 read-only runner identity diagnostic
-
+name: OA20 Android production-profile diagnostic
 on:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
-  java-identity:
+  android-profile:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 90
+    env:
+      RUSTUP_AUTO_INSTALL: '0'
+      RUSTUP_TOOLCHAIN: '1.99.1'
+      PYTHONDONTWRITEBYTECODE: '1'
+      GH_TOKEN: ${{ github.token }}
     steps:
-      - name: Observe actual Java identity without installing or changing tools
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import hashlib, json, os, pathlib, shutil, subprocess
-          executable = shutil.which('java')
-          assert executable is not None
-          selected = pathlib.Path(executable).resolve()
-          result = subprocess.run(['java', '-version'], capture_output=True, text=True, check=False)
-          observed = result.stdout + result.stderr
-          print(json.dumps({
-              'purpose': 'read-only setup diagnostic; never certification',
-              'java_path': executable,
-              'java_realpath': str(selected),
-              'java_sha256': hashlib.sha256(selected.read_bytes()).hexdigest(),
-              'java_exit': result.returncode,
-              'java_identity': observed,
-              'configured_pin': '17.0.20',
-              'configured_pin_matches': '"17.0.20"' in observed,
-              'selected_public_java_paths': {name: os.environ.get(name)
-                  for name in ('JAVA_HOME', 'JAVA_HOME_17_X64')},
-          }, indent=2))
-          assert result.returncode == 0
-          PY
       - uses: actions/checkout@v7
         with:
-          ref: 3cb9d3d466437426c33af91d77f679f64e4a0bb0
+          ref: 67b9d9a90ff29108105c5ba46d839388b60a1d24
+          fetch-depth: 0
           persist-credentials: false
-      - name: Exercise corrected exact Java and NDK setup on the actual hosted runner
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.99.1'
+          targets: aarch64-linux-android,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: assurance-android
+      - name: Provision exact Android tools before freeze
         env:
           BOOTSTRAP_RUNNER_ENVIRONMENT: ${{ runner.environment }}
           OA18_PLATFORM_JSON: '{"android_ndk_version":"27.3.13750724","java_version":"17.0.20.1"}'
-        run: python3 .github/scripts/prepare-hosted-assurance-platform.py --profile android
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/prepare-hosted-assurance-platform.py --profile android
+          version=2.4.20
+          archive="$RUNNER_TEMP/kotlin-compiler-$version.zip"
+          gh release download "v$version" --repo JetBrains/kotlin --pattern "kotlin-compiler-$version.zip" --dir "$RUNNER_TEMP"
+          echo "59e9ca74c7904ef2c122b12114937673ccce68de820a663f0ed66ccf8799e0b7  $archive" | sha256sum -c -
+          unzip -q "$archive" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/kotlinc/bin" >> "$GITHUB_PATH"
+          cargo install cargo-ndk --version 4.1.2 --locked
+          cargo +1.99.1 fetch --locked --manifest-path Cargo.toml
+          cargo +1.99.1 fetch --locked --manifest-path bindings/uniffi-bindgen/Cargo.toml
+      - name: Exercise actual clean frozen Android production profile
+        run: |
+          python3 - <<'PYTHON'
+          import json,os,pathlib
+          (pathlib.Path(os.environ['RUNNER_TEMP'])/'inputs.json').write_text(json.dumps({'android_ndk':os.environ['ANDROID_NDK_HOME']}))
+          PYTHON
+          # Missing external authority remains BLOCKED; inspect all four real
+          # Android rows independently. This diagnostic never certifies.
+          bash .github/scripts/operational-assurance-gate.sh --candidate 67b9d9a90ff29108105c5ba46d839388b60a1d24 --profile android --inputs "$RUNNER_TEMP/inputs.json" --out "$RUNNER_TEMP/android-proof"
+      - name: Require all four actual Android records to pass
+        if: always()
+        run: |
+          python3 - <<'PYTHON'
+          import json,os,pathlib
+          p=pathlib.Path(os.environ['RUNNER_TEMP'])/'android-proof'
+          d=json.loads((p/'job-receipt.json').read_text())
+          print(json.dumps({'purpose':'diagnostic only; not release certification','records':d['records']},indent=2))
+          assert len(d['records'])==4 and all(r['status']=='PASS' for r in d['records'])
+          PYTHON
+      - name: Export actual retained proof
+        if: always()
+        run: python3 .github/scripts/operational-assurance.py export --receipts "$RUNNER_TEMP/android-proof" --out "$RUNNER_TEMP/export-android"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: android-production-diagnostic
+          path: ${{ runner.temp }}/export-android/
+          if-no-files-found: error
