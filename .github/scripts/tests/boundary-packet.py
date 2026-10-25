@@ -155,6 +155,116 @@ class PacketControls(unittest.TestCase):
 
 
 class SourcePortabilityControls(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="oa20-link-identity-")
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.env = {**os.environ, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull}
+        for key in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+                    "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NO_REPLACE_OBJECTS"):
+            self.env.pop(key, None)
+        self.git("init", "-q")
+        self.git("config", "core.symlinks", "false")
+        self.target = b"../../LICENSE-MIT"
+        self.blob = self.git("hash-object", "-w", "--stdin", data=self.target).decode()
+        self.git("update-index", "--add", "--cacheinfo", "120000," + self.blob + ",link")
+        self.path = self.root / "link"
+        self.path.write_bytes(self.target)
+        self.root_patch = patch.object(boundary, "ROOT", self.root)
+        self.root_patch.start()
+        self.addCleanup(self.root_patch.stop)
+        self.env_patch = patch.dict(os.environ, self.env, clear=True)
+        self.env_patch.start()
+        self.addCleanup(self.env_patch.stop)
+
+    def git(self, *argv, data=None):
+        return subprocess.run(["git", *argv], cwd=self.root, env=self.env, input=data,
+                              capture_output=True, check=True).stdout.strip()
+
+    def native_link(self, target):
+        self.path.unlink()
+        try:
+            self.path.symlink_to(os.fsdecode(target))
+        except OSError as error:
+            self.skipTest("native link privileges unavailable: " + str(error))
+
+    def test_exact_regular_materialization_uses_canonical_git_blob(self):
+        self.assertEqual(boundary.sources(), {"link": boundary.sha256(self.target)})
+
+    @unittest.skipUnless(os.name == "posix", "POSIX native link byte semantics")
+    def test_exact_posix_link_uses_canonical_git_blob(self):
+        self.native_link(self.target)
+        with patch.object(boundary.platform, "system", return_value="Linux"):
+            self.assertEqual(boundary.sources(), {"link": boundary.sha256(self.target)})
+
+    def test_windows_native_separator_representation_uses_canonical_git_blob(self):
+        self.native_link(self.target)
+        represented = self.target.replace(b"/", b"\\")
+        with patch.object(boundary.platform, "system", return_value="Windows"), \
+                patch.object(boundary.os, "readlink", return_value=os.fsdecode(represented)):
+            self.assertEqual(boundary.sources(), {"link": boundary.sha256(self.target)})
+
+    @unittest.skipUnless(os.name == "posix", "POSIX literal backslash link semantics")
+    def test_posix_does_not_normalize_literal_backslashes(self):
+        self.native_link(self.target.replace(b"/", b"\\"))
+        with patch.object(boundary.platform, "system", return_value="Linux"):
+            with self.assertRaisesRegex(boundary.ReleaseError, "changed-symlink-source"):
+                boundary.sources()
+
+    @unittest.skipUnless(os.name == "posix", "POSIX literal backslash link semantics")
+    def test_posix_backslash_target_remains_byte_exact(self):
+        target = b"literal\\name"
+        blob = self.git("hash-object", "-w", "--stdin", data=target).decode()
+        self.git("update-index", "--cacheinfo", "120000," + blob + ",link")
+        self.native_link(target)
+        with patch.object(boundary.platform, "system", return_value="Linux"):
+            self.assertEqual(boundary.sources(), {"link": boundary.sha256(target)})
+
+    def test_windows_wrong_native_target_is_rejected(self):
+        self.native_link(self.target)
+        with patch.object(boundary.platform, "system", return_value="Windows"), \
+                patch.object(boundary.os, "readlink", return_value="..\\..\\wrong-license"):
+            with self.assertRaisesRegex(boundary.ReleaseError, "changed-symlink-source"):
+                boundary.sources()
+
+    def test_materialized_contents_are_not_separator_normalized(self):
+        self.path.write_bytes(self.target.replace(b"/", b"\\"))
+        with patch.object(boundary.platform, "system", return_value="Windows"):
+            with self.assertRaisesRegex(boundary.ReleaseError, "changed-symlink-source"):
+                boundary.sources()
+
+    def test_materialized_referent_contents_are_rejected(self):
+        self.path.write_bytes(b"MIT license referent contents\n")
+        with self.assertRaisesRegex(boundary.ReleaseError, "changed-symlink-source"):
+            boundary.sources()
+
+    def test_missing_link_is_rejected(self):
+        self.path.unlink()
+        with self.assertRaisesRegex(boundary.ReleaseError, "missing-symlink-source"):
+            boundary.sources()
+
+    def test_git_replacement_cannot_mask_original_link_identity(self):
+        changed = b"../../OTHER-LICENSE"
+        replacement = self.git("hash-object", "-w", "--stdin", data=changed).decode()
+        self.git("replace", self.blob, replacement)
+        # Verify this fixture really has an active replacement outside sources().
+        self.assertEqual(self.git("cat-file", "blob", self.blob), changed)
+        self.assertEqual(boundary.sources(), {"link": boundary.sha256(self.target)})
+        self.path.write_bytes(changed)
+        with self.assertRaisesRegex(boundary.ReleaseError, "changed-symlink-source"):
+            boundary.sources()
+
+    def test_altered_index_link_blob_rejects_unchanged_worktree_target(self):
+        changed = self.git("hash-object", "-w", "--stdin", data=b"../../OTHER-LICENSE").decode()
+        self.git("update-index", "--cacheinfo", "120000," + changed + ",link")
+        with self.assertRaisesRegex(boundary.ReleaseError, "changed-symlink-source"):
+            boundary.sources()
+
+    def test_unknown_index_mode_fails_closed(self):
+        self.git("update-index", "--cacheinfo", "160000," + self.blob + ",link")
+        with self.assertRaisesRegex(boundary.ReleaseError, "unsupported-source-mode"):
+            boundary.sources()
+
     def test_git_symlink_and_windows_materialization_bind_identical_source_bytes(self):
         with tempfile.TemporaryDirectory(prefix="oa20-source-portability-") as temporary:
             root = Path(temporary)

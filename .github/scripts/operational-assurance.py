@@ -135,14 +135,27 @@ def sources() -> dict:
         if not entry:
             continue
         metadata, raw_name = entry.split(b"\t", 1)
-        mode, _, stage = metadata.split()
+        mode, oid, stage = metadata.split()
         require(stage == b"0", "OA-18:unmerged-source-index")
+        require(mode in {b"100644", b"100755", b"120000"}, "OA-18:unsupported-source-mode")
         name = Path(os.fsdecode(raw_name))
         path = ROOT / name
         if mode == b"120000":
             require(path.is_symlink() or path.is_file(), "OA-18:missing-symlink-source")
-            data = os.fsencode(os.readlink(path)) if path.is_symlink() else path.read_bytes()
-            values[name.as_posix()] = sha256(data)
+            expected = subprocess.run(
+                ["git", "cat-file", "blob", oid.decode("ascii")], cwd=ROOT,
+                env={**os.environ, "GIT_NO_REPLACE_OBJECTS": "1"},
+                capture_output=True, check=True).stdout
+            if path.is_symlink():
+                actual = os.fsencode(os.readlink(path))
+                # Only Windows' native link representation changes separators.
+                # Backslashes in a POSIX Git target remain literal bytes.
+                equivalent = (platform.system() == "Windows" and b"\\" not in expected
+                              and actual == expected.replace(b"/", b"\\"))
+                require(actual == expected or equivalent, "OA-18:changed-symlink-source")
+            else:
+                require(path.read_bytes() == expected, "OA-18:changed-symlink-source")
+            values[name.as_posix()] = sha256(expected)
         elif path.is_file():
             require(not path.is_symlink(), "OA-18:unexpected-source-symlink")
             values[name.as_posix()] = digest(path)
@@ -1044,6 +1057,146 @@ def assemble(args) -> int:
     return 0 if (args.out / "compact").exists() else 2
 
 
+
+def bootstrap_rehearsal(args) -> int:
+    """Inspect real release trust without running or certifying any production profile."""
+    policy_bytes = args.policy.read_bytes()
+    policy = json.loads(policy_bytes)
+    validate_policy(policy)
+    require(policy == json.loads(os.environ.get("RELEASE_TRUST_POLICY_JSON") or "{}"),
+            "bootstrap policy differs from independently configured protected policy")
+    require(os.environ.get("GITHUB_ACTIONS") == "true"
+            and os.environ.get("BOOTSTRAP_RUNNER_ENVIRONMENT") == "github-hosted"
+            and os.environ.get("GITHUB_SHA") == args.candidate
+            and os.environ.get("GITHUB_REF") == "refs/heads/main"
+            and os.environ.get("GITHUB_REF_PROTECTED") == "true"
+            and os.environ.get("GITHUB_RUN_ATTEMPT") == "1"
+            and os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
+            and os.environ.get("GITHUB_REPOSITORY") == policy["repository"]
+            and os.environ.get("GITHUB_WORKSPACE") == str(ROOT)
+            and os.environ.get("GITHUB_WORKFLOW_REF") ==
+                policy["repository"] + "/" + BOUNDARY_WORKFLOW + "@refs/heads/main",
+            "bootstrap requires the actual first-attempt protected-main hosted workflow")
+    run_id = os.environ.get("GITHUB_RUN_ID", "")
+    require(re.fullmatch(r"[0-9]+", run_id) is not None and int(run_id) > 0,
+            "bootstrap authenticated workflow run ID missing")
+    clean(args.candidate)
+    model = definition()
+    binding = contract(args.contract)
+    require(binding == model["contract_digest"] == policy["contract_digest"],
+            "bootstrap source/model/operator contract differs")
+    require(set(model["required_scenarios"]) == {f"OA-{n:02}" for n in range(1, 18)},
+            "bootstrap mandatory scenario set differs")
+    output = args.out.resolve()
+    require(not args.out.exists() and not args.out.is_symlink() and not output.is_relative_to(ROOT),
+            "fresh external bootstrap output required")
+    output.mkdir(parents=True)
+    original_sources = sources()
+    api = GitHubAPI(policy["repository"])
+    current = api.get(f"/actions/runs/{run_id}")
+    write(output / "workflow-run.json", current)
+    validate_run(current, policy, args.candidate, BOUNDARY_WORKFLOW, completed=False)
+    require(type(current.get("id")) is int and current["id"] == int(run_id),
+            "bootstrap API run identity differs")
+    workflow_digest = api.workflow_digest(BOUNDARY_WORKFLOW, args.candidate)
+    require(workflow_digest == policy["boundary_workflow_sha256"]
+            and digest(ROOT / BOUNDARY_WORKFLOW) == workflow_digest,
+            "bootstrap approved API/checkout workflow digest differs")
+    approvals = api.get(f"/actions/runs/{run_id}/approvals")
+    write(output / "environment-approvals.json", approvals)
+    validate_approvals(approvals, policy["boundary_environment"])
+    input_bytes = args.inputs.read_bytes()
+    inputs = json.loads(input_bytes)
+    require(set(inputs) <= INPUT_KEYS and all(isinstance(value, str) for value in inputs.values()),
+            "bootstrap inputs must be checked public string paths/identities")
+    require(Path(inputs["trust_policy"]).resolve() == args.policy.resolve(),
+            "bootstrap staged policy path differs")
+    configured = json.loads(os.environ.get("OA18_INPUTS_JSON") or "{}")["collector"]
+    reference = configured.get("preparation_plan", "")
+    require(isinstance(reference, str) and reference.startswith("material:"),
+            "bootstrap original plan requires protected collector material reference")
+    name = reference.removeprefix("material:")
+    require(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", name) is not None
+            and name not in {".", "..", "staging-receipt.json"},
+            "bootstrap preparation material name is unsafe")
+    materials = json.loads(os.environ.get("OA18_MATERIALS_JSON") or "{}")
+    require(materials.get("schema_version") == 1, "bootstrap immutable material schema differs")
+    material = materials["files"][name]
+    staged = Path(os.environ["RUNNER_TEMP"]).resolve() / "oa18-materials"
+    plan_path = staged / name
+    require("collector" in material["profiles"] and not plan_path.is_symlink()
+            and args.preparation_plan.resolve() == plan_path.resolve()
+            and Path(inputs["preparation_plan"]).resolve() == plan_path.resolve(),
+            "bootstrap original plan path/material scope differs")
+    plan_bytes = plan_path.read_bytes()
+    require(re.fullmatch(r"[0-9a-f]{64}", material["sha256"]) is not None
+            and sha256(plan_bytes) == material["sha256"],
+            "bootstrap original plan differs from independently pinned material bytes")
+    staging = json.loads((staged / "staging-receipt.json").read_bytes())
+    require(staging.get("schema_version") == 1 and staging.get("profile") == "collector"
+            and [item for item in staging["materials"] if item.get("name") == name] ==
+                [{"name": name, **material}], "bootstrap original plan staging identity differs")
+    plan = json.loads(plan_bytes)
+    require(plan.get("candidate") != args.candidate, "bootstrap requires the original pre-bump preparation plan")
+    approved = {subject: authority(subject, inputs, args.candidate, binding)
+                for subject in ("G-02", "G-03", "G-04")}
+    require(all(record["status"] == "PASS" for record in approved.values()),
+            "bootstrap requires authenticated G02/G03/G04 authority and raw proof")
+    signed, trust = verify_candidate_tag(ROOT, policy, args.candidate, args.tag)
+    require(signed.get("status") == "PASS" and signed.get("candidate") == args.candidate
+            and signed.get("tag") == args.tag, "bootstrap actual tag identity differs")
+    identity = json.loads(Path(approved["G-03"]["report_path"]).read_bytes())
+    require(identity.get("tag") == args.tag and identity.get("public_trust_sha256") == trust,
+            "bootstrap G03 approved tag/public trust differs")
+    # The preparation policy imports candidate code only after its signature and
+    # independently approved identity have authenticated that exact candidate.
+    validate_preparation(ROOT, plan, args.candidate, "0.4.0")
+    retain_authority(output, approved)
+    authority_config, _, authority_pin = authority_configuration(inputs, args.candidate, binding)
+    require(digest(authority_config) == authority_pin, "bootstrap authority configuration changed")
+    for filename, data in (("release-plan.json", plan_bytes),
+                           ("source-contract.json", args.contract.read_bytes()),
+                           ("checked-definition.json", DEFINITION.read_bytes()),
+                           ("public-trust-policy.json", policy_bytes),
+                           ("profile-inputs.json", input_bytes),
+                           ("authority-config.json", authority_config.read_bytes()),
+                           ("material-staging-receipt.json", (staged / "staging-receipt.json").read_bytes())):
+        (output / filename).write_bytes(data)
+    write(output / "tag-verification.json", {**signed, "public_trust_sha256": trust})
+    inspection = {"schema_version": 1, "purpose": "rehearsal", "status": "NOT_EXERCISED",
+                  "candidate": args.candidate, "contract_digest": binding,
+                  "production_profiles_executed": [], "source_sha256": original_sources,
+                  "definition_sha256": digest(DEFINITION), "policy_sha256": sha256(policy_bytes),
+                  "inputs_sha256": sha256(input_bytes), "authority": approved,
+                  "material": {"name": name, **material}, "preparation_plan_sha256": sha256(plan_bytes),
+                  "provenance": {"run_id": int(run_id), "run_attempt": 1,
+                      "repository": policy["repository"], "workflow": BOUNDARY_WORKFLOW,
+                      "workflow_sha256": workflow_digest,
+                      "run_sha256": digest(output / "workflow-run.json"),
+                      "approvals_sha256": digest(output / "environment-approvals.json")},
+                  "reason": "trust inspection only; no production profile, review or operator gate executed"}
+    write(output / "inspection-manifest.json", inspection)
+    unexercised = {"status": "NOT_EXERCISED"}
+    receipt = {"schema_version": 1, "purpose": "rehearsal", "candidate": args.candidate,
+               "contract_digest": binding, "tag": args.tag, "tag_object": signed["tag_object"],
+               "version": "0.4.0", "manifest_sha256": digest(output / "inspection-manifest.json"),
+               "preparation_plan_sha256": sha256(plan_bytes),
+               "tag_verification": {**signed, "public_trust_sha256": trust},
+               "scenarios": [{"id": subject, **unexercised} for subject in model["required_scenarios"]],
+               "baseline": dict(unexercised), "review": dict(unexercised),
+               "operator_gates": {subject: dict(unexercised) for subject in ("G-02", "G-03", "G-04")},
+               "status": "NOT_EXERCISED"}
+    validate_receipt(receipt, args.candidate, binding, args.tag, "0.4.0", publication=False)
+    clean(args.candidate)
+    require(sources() == original_sources, "bootstrap source changed during inspection")
+    compact = output / "compact"
+    compact.mkdir()
+    write(compact / "boundary-receipt.json", receipt)
+    (compact / "release-plan.json").write_bytes(plan_bytes)
+    seal(output)
+    return 0
+
+
 def observe_quiet(args) -> int:
     """Observe an already built, dedicated host; never stop/tune any process."""
     require(platform.system() in {"Linux", "Darwin"}, "quiet measurement supports Linux/macOS")
@@ -1130,6 +1283,11 @@ def main() -> int:
     collect.add_argument("--tag")
     collect.add_argument("--trusted", action="store_true")
     collect.add_argument("--purpose", choices=("rehearsal", "certification"), default="rehearsal")
+    bootstrap = sub.add_parser("bootstrap-rehearsal")
+    for name in ("candidate", "tag"):
+        bootstrap.add_argument("--" + name, required=True)
+    for name in ("contract", "policy", "inputs", "preparation-plan", "out"):
+        bootstrap.add_argument("--" + name, type=Path, required=True)
     copy_parser = sub.add_parser("export")
     copy_parser.add_argument("--receipts", type=Path, required=True)
     copy_parser.add_argument("--out", type=Path, required=True)
@@ -1142,7 +1300,8 @@ def main() -> int:
     args = parser.parse_args()
     try:
         return {"run": run, "assemble": assemble, "export": export,
-                "android-elf": lambda _: android_elf(), "observe-quiet": observe_quiet}[args.operation](args)
+                "android-elf": lambda _: android_elf(), "observe-quiet": observe_quiet,
+                "bootstrap-rehearsal": bootstrap_rehearsal}[args.operation](args)
     except (ReleaseError, OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile) as error:
         print("OA-18 BLOCKED: " + str(error), file=sys.stderr)
         return 2
