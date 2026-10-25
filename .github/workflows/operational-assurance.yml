@@ -15,6 +15,10 @@ on:
         type: choice
         options: [rehearsal, certification]
         default: rehearsal
+      run_quiet:
+        description: Prepare only an independent quiet measurement bundle; never certify or publish
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -35,7 +39,7 @@ env:
 
 jobs:
   profiles:
-    if: github.ref == 'refs/heads/main' && github.ref_protected && github.run_attempt == 1 && inputs.candidate == github.sha
+    if: ${{ !inputs.run_quiet && github.ref == 'refs/heads/main' && github.ref_protected && github.run_attempt == 1 && inputs.candidate == github.sha }}
     name: Boundary profile (${{ matrix.profile }})
     runs-on: ${{ matrix.os }}
     environment: release-certification
@@ -239,8 +243,94 @@ jobs:
           path: ${{ runner.temp }}/upload-${{ matrix.profile }}/
           if-no-files-found: error
 
+  # A preparation dispatch uses its own fresh runner and does not certify.
+  # Import this sealed bundle through the existing independent manual-profile
+  # authority/pins on a later dispatch of the same frozen candidate.
+  quiet:
+    if: inputs.run_quiet && github.ref == 'refs/heads/main' && github.ref_protected && github.run_attempt == 1 && inputs.candidate == github.sha
+    name: Independent quiet measurement bundle
+    runs-on: ubuntu-24.04
+    environment: release-certification
+    timeout-minutes: 360
+    defaults:
+      run:
+        shell: bash
+    env:
+      CANDIDATE: ${{ inputs.candidate }}
+      RUSTUP_TOOLCHAIN: '1.99.1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: '1.99.1'
+      - name: Prepare baseline source and pinned PostgreSQL image before freeze
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/oa17-setup"
+          git worktree add --detach "$RUNNER_TEMP/oa17-baseline" 92da0d3d28f7896ddc67062fa49ba40ea48d74a3
+          docker version > "$RUNNER_TEMP/oa17-setup/docker-version.txt"
+          docker build --builder default -f docker/postgres18/Dockerfile -t parking-lot-pg:18 docker \
+            > "$RUNNER_TEMP/oa17-setup/pg18-build.stdout.txt" \
+            2> "$RUNNER_TEMP/oa17-setup/pg18-build.stderr.txt"
+          docker image inspect parking-lot-pg:18 > "$RUNNER_TEMP/oa17-setup/pg18-image.json"
+      - name: Prefetch both locked dependency sets before offline builds and observation
+        env:
+          CARGO_NET_OFFLINE: 'false'
+        run: |
+          set -euo pipefail
+          cargo +1.99.1 fetch --locked --manifest-path Cargo.toml \
+            > "$RUNNER_TEMP/oa17-setup/candidate-fetch.stdout.txt" \
+            2> "$RUNNER_TEMP/oa17-setup/candidate-fetch.stderr.txt"
+          cargo +1.99.1 fetch --locked --manifest-path "$RUNNER_TEMP/oa17-baseline/Cargo.toml" \
+            > "$RUNNER_TEMP/oa17-setup/baseline-fetch.stdout.txt" \
+            2> "$RUNNER_TEMP/oa17-setup/baseline-fetch.stderr.txt"
+      - name: Resolve only actual quiet-job paths before producer freeze
+        run: |
+          python3 - <<'PYTHON'
+          import json, os
+          from pathlib import Path
+          temp = Path(os.environ['RUNNER_TEMP'])
+          (temp / 'oa17-inputs.json').write_text(json.dumps({
+              'baseline_root': str(temp / 'oa17-baseline'),
+              'rust_toolchain': '1.99.1',
+          }, indent=2) + '\n')
+          PYTHON
+      - name: Run the incumbent quiet producer and real normal/slow-control measurements
+        id: measure
+        run: |
+          # No agents, concurrent build jobs, process kills or host tuning.
+          # The producer finishes both builds before actual quiet observation;
+          # each sample rechecks the real process/load/image identities.
+          timeout 18000 bash .github/scripts/operational-assurance-gate.sh --candidate "$CANDIDATE" \
+            --contract .kbd-orchestrator/phases/phase-0-4-operational-assurance/adopted-contract.json \
+            --profile quiet --inputs "$RUNNER_TEMP/oa17-inputs.json" \
+            --out "$RUNNER_TEMP/oa18-quiet" </dev/null
+      - name: Export sealed quiet receipts and raw samples without source or build trees
+        if: always()
+        run: |
+          python3 .github/scripts/operational-assurance.py export \
+            --receipts "$RUNNER_TEMP/oa18-quiet" --out "$RUNNER_TEMP/upload-quiet"
+      - name: Preserve quiet preparation evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: oa18-quiet-setup
+          path: ${{ runner.temp }}/oa17-setup/
+          if-no-files-found: warn
+      - name: Preserve separate immutable quiet-measurement evidence for independent import
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: oa18-quiet-measurement
+          path: ${{ runner.temp }}/upload-quiet/
+          if-no-files-found: error
+
   assemble:
-    if: always() && github.ref == 'refs/heads/main' && github.ref_protected && github.run_attempt == 1 && inputs.candidate == github.sha
+    if: always() && !inputs.run_quiet && github.ref == 'refs/heads/main' && github.ref_protected && github.run_attempt == 1 && inputs.candidate == github.sha
     needs: profiles
     runs-on: ubuntu-24.04
     environment: release-certification

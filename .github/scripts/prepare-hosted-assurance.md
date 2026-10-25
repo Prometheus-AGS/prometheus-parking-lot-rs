@@ -142,3 +142,23 @@ Pinned tool installation uses the existing
 NDK selection follows the official
 [sdkmanager interface](https://developer.android.com/tools/sdkmanager); Xcode uses
 Apple's [job-local developer-directory selection](https://developer.apple.com/documentation/xcode/configuring-command-line-tools-settings).
+
+## Autonomous evidence preparation
+
+Initial local public evidence enters Actions through the separately reviewed
+[material transport](assurance-materials.md). It preserves original bytes and
+creates no authority; the existing independent material/config pins remain
+mandatory after the controller verifies the downloaded immutable artifact.
+
+A `run_quiet: true` dispatch of the boundary workflow runs only a fresh,
+dedicated `ubuntu-24.04` measurement job. It prepares the exact baseline,
+source-pinned PG18 image and locked sources, then invokes the unchanged quiet
+producer. The real same-workflow observer runs after both builds and the
+measurement rechecks process/load/image identities per sample. No local coding
+agent is stopped and no machine is tuned. Its sealed `oa18-quiet-measurement`
+artifact is preparation evidence, never a certificate. Import it on a later
+ordinary dispatch of the same candidate using the existing independently
+approved manual-bundle mechanism. `run_quiet: false` remains the default and
+runs the six automated profiles and full collector. A fresh hosted VM does not
+prove an idle underlying physical host; the actual sampling oracles still have
+to pass.
